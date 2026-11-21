@@ -37,6 +37,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 
 ### Mecânicas (lógica do servidor)
 - [Fórmulas de status](mecanicas/formulas-status.md): MaxEVP confirmada, análise de ATK/DEF/BR/HP/VP, experimento proposto.
+- [Evolução](mecanicas/evolucao.md): cada forma tem atributos, pontos e skills próprios; nível e EXP são do digimon.
 
 ### Cliente
 - [Binário](cliente/binario.md): desempacotamento, RTTI, dispatcher, IPs fixos, renderer.

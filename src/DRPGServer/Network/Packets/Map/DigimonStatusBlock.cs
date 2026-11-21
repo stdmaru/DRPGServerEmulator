@@ -6,7 +6,8 @@ namespace DRPGServer.Network.Packets.Map;
 /// <summary>
 /// Bloco de status de digimon, comum a 0x02, 0x63, 0x70, 0x71, 0xB2 e 0xB4.
 /// ✅ v322: 696 bytes (era 688 na v242; 0xB4 e o 0x02 com 5 blocos na sessão 52).
-/// ❓ Os 8 bytes novos caem na área zerada depois de 0x13F: a posição exata ainda não é conhecida.
+/// Offsets 0..343 iguais à v242; depois de 343 é zero em todas as capturas, então a posição dos
+/// 8 bytes novos não muda nenhum byte gerado. Cada forma de evolução tem bloco próprio (docs/mecanicas/evolucao.md).
 /// Layout em docs/protocolo/structs/status-digimon.md. Os offsets nos comentários são relativos
 /// ao início do bloco. No protótipo cada pacote tinha uma cópia; os bytes "?" vêm das capturas.
 /// </summary>

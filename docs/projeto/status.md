@@ -19,6 +19,9 @@
 - ✅ Capturas longas v322: sessões 53, 54 e 56 (~84 mil pacotes, 80 marcadores) cobrem criar/apagar, tutorial, batalha, level up, pontos de atributo, evolução, itens, depósito, party, chat.
 - ✅ Channel corrigido pela v322: lista, criar e apagar. Ver [channel](../protocolo/structs/channel.md).
 
+- ✅ Bloco de status v322: offsets 0..343 iguais à v242; o resto é zero nas capturas (os 8 bytes novos não têm efeito observável).
+- ✅ Status por forma de evolução confirmado na sessão 56. Ver [evolução](../mecanicas/evolucao.md). **Exige remodelar o digimon no emulador.**
+
 ## Em andamento / próximo passo
 1. **Corrigir o que existe, do começo do fluxo para o fim** (login → channel → entrada no mapa → mapa → batalha), com amostras novas do oficial (v322). Só depois implementar coisas novas. Status e batalha entram nesse caminho.
 2. **Protocolo v322:** confirmar a hipótese do bloco de status +4 bytes (sessão 52 tem `0x02`, `0x10`, `0xB4`). Capturar sessões mais longas na v322: troca de mapa, batalha, level up (`0x70`/`0x71`).
