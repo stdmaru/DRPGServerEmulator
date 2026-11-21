@@ -1,0 +1,108 @@
+using System.Collections.Concurrent;
+using System.Collections.Frozen;
+using System.Reflection;
+using DRPGServer.Game.World;
+using DRPGServer.Network.Protocol;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace DRPGServer.Network.Handlers;
+
+/// <summary>Entrega cada pacote ao handler do (servidor, opcode): direto na sessão ou na fila do mundo.</summary>
+public sealed class PacketDispatcher
+{
+    private readonly FrozenDictionary<(ServerRole, ushort), object> _handlers;
+    private readonly GameWorld _world;
+    private readonly ILogger<PacketDispatcher> _log;
+    private readonly ConcurrentDictionary<(ServerRole, ushort), bool> _reportedUnknown = new();
+
+    public PacketDispatcher(IServiceProvider services, GameWorld world, ILogger<PacketDispatcher> log)
+    {
+        _world = world;
+        _log = log;
+        var map = new Dictionary<(ServerRole, ushort), object>();
+        foreach (var (type, attr) in PacketHandlerRegistration.Discover())
+        {
+            var key = (attr.Role, attr.Opcode);
+            if (!map.TryAdd(key, services.GetRequiredService(type)))
+                throw new InvalidOperationException($"dois handlers para {attr.Role} {OpcodeNames.Of(attr.Role, attr.Opcode)}");
+        }
+        _handlers = map.ToFrozenDictionary();
+    }
+
+    public int Count => _handlers.Count;
+
+    public async ValueTask DispatchAsync(Session session, IncomingFrame frame, CancellationToken ct)
+    {
+        if (!_handlers.TryGetValue((session.Role, frame.Opcode), out var handler))
+        {
+            var level = _reportedUnknown.TryAdd((session.Role, frame.Opcode), true) ? LogLevel.Information : LogLevel.Debug;
+            _log.Log(level, "Sem handler para {Opcode} em {Role} ({Size}B)", OpcodeNames.Of(session.Role, frame.Opcode), session.Role, frame.Header.Size);
+            return;
+        }
+
+        switch (handler)
+        {
+            case ISessionPacketHandler sessionHandler:
+                try
+                {
+                    await sessionHandler.HandleAsync(session, new PacketReader(frame.Payload), ct);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                catch (Exception e)
+                {
+                    Report(session, frame, e);
+                }
+                break;
+
+            case IWorldPacketHandler worldHandler:
+                _world.Post(() =>
+                {
+                    if (session.IsClosed) return;
+                    try
+                    {
+                        worldHandler.Handle(session, new PacketReader(frame.Payload));
+                    }
+                    catch (Exception e)
+                    {
+                        Report(session, frame, e);
+                    }
+                });
+                break;
+        }
+    }
+
+    private void Report(Session session, IncomingFrame frame, Exception e)
+    {
+        var opcode = OpcodeNames.Of(session.Role, frame.Opcode);
+        if (e is PacketFormatException)
+            _log.LogWarning("Pacote {Opcode} malformado de {Session}: {Message}", opcode, session, e.Message);
+        else
+            _log.LogError(e, "Erro tratando {Opcode} de {Session}", opcode, session);
+    }
+}
+
+public static class PacketHandlerRegistration
+{
+    public static IEnumerable<(Type Type, PacketHandlerAttribute Attribute)> Discover() =>
+        from type in typeof(PacketHandlerRegistration).Assembly.GetTypes()
+        where type is { IsClass: true, IsAbstract: false }
+        from attr in type.GetCustomAttributes<PacketHandlerAttribute>()
+        select (type, attr);
+
+    /// <summary>Registra todos os handlers (classes com [PacketHandler]) como singletons.</summary>
+    public static IServiceCollection AddPacketHandlers(this IServiceCollection services)
+    {
+        foreach (var type in Discover().Select(d => d.Type).Distinct())
+        {
+            if (!typeof(ISessionPacketHandler).IsAssignableFrom(type) && !typeof(IWorldPacketHandler).IsAssignableFrom(type))
+                throw new InvalidOperationException($"{type.Name} tem [PacketHandler] mas não implementa ISessionPacketHandler nem IWorldPacketHandler");
+            services.AddSingleton(type);
+        }
+        foreach (var type in typeof(PacketHandlerRegistration).Assembly.GetTypes()
+                     .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(ISessionLifecycle).IsAssignableFrom(t)))
+            services.AddSingleton(typeof(ISessionLifecycle), type);
+        services.AddSingleton<PacketDispatcher>();
+        return services;
+    }
+}

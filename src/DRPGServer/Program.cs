@@ -1,0 +1,97 @@
+using Dapper;
+using DRPGServer.Configuration;
+using DRPGServer.Data;
+using DRPGServer.Data.GameData;
+using DRPGServer.Data.Persistence;
+using DRPGServer.Data.Repositories;
+using DRPGServer.Game.Battle;
+using DRPGServer.Game.Commands;
+using DRPGServer.Game.World;
+using DRPGServer.Network;
+using DRPGServer.Network.Handlers;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+DefaultTypeMap.MatchNamesWithUnderscores = true;
+
+var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory,
+});
+builder.Configuration
+    .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false)
+    .AddEnvironmentVariables("DRPG_");
+builder.Logging.ClearProviders();
+builder.Logging.AddSimpleConsole(o =>
+{
+    o.SingleLine = true;
+    o.TimestampFormat = "HH:mm:ss.fff ";
+});
+
+var services = builder.Services;
+services.Configure<ServersOptions>(builder.Configuration.GetSection(ServersOptions.Section));
+services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.Section));
+services.Configure<GameOptions>(builder.Configuration.GetSection(GameOptions.Section));
+services.AddSingleton(TimeProvider.System);
+
+// dados
+services.AddSingleton<Database>();
+services.AddSingleton<DatabaseMigrator>();
+services.AddSingleton<AccountRepository>();
+services.AddSingleton<CharacterRepository>();
+services.AddSingleton(sp =>
+{
+    var path = sp.GetRequiredService<IOptions<GameOptions>>().Value.ResourcesPath;
+    return GameDataLoader.Load(Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path));
+});
+
+// ordem importa: serviços param na ordem inversa (rede → mundo → persistência)
+services.AddSingleton<PersistenceQueue>();
+services.AddHostedService<PersistenceService>();
+services.AddSingleton<GameWorld>();
+services.AddHostedService(sp => sp.GetRequiredService<GameWorld>());
+services.AddSingleton<NetworkHost>();
+services.AddHostedService(sp => sp.GetRequiredService<NetworkHost>());
+
+// jogo
+services.AddSingleton<ZoneSystem>();
+services.AddSingleton<BattleSystem>();
+services.AddSingleton<PlayerSystem>();
+services.AddSingleton<CharacterFactory>();
+services.AddSingleton<ChatCommands>();
+
+// rede
+services.AddSingleton<AccountRegistry>();
+services.AddSingleton<PacketTrace>();
+services.AddSingleton<CharacterListService>();
+services.AddPacketHandlers();
+
+using var host = builder.Build();
+var log = host.Services.GetRequiredService<ILogger<Program>>();
+
+try
+{
+    var data = host.Services.GetRequiredService<GameData>();
+    log.LogInformation("Tabelas: {Species} digimons, {Items} itens, {Drops} grupos de drop, {Zones} zonas",
+        data.Species.Count, data.Items.Count, data.DropGroups.Count, data.ZoneIds.Count);
+
+    using (var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5)))
+        await host.Services.GetRequiredService<DatabaseMigrator>().MigrateAsync(cts.Token);
+
+    // os sistemas se registram no mundo ao serem criados; criar antes da thread do mundo subir
+    host.Services.GetRequiredService<ZoneSystem>();
+    host.Services.GetRequiredService<BattleSystem>();
+    host.Services.GetRequiredService<PlayerSystem>();
+}
+catch (Exception e)
+{
+    log.LogCritical(e, "Falha na partida");
+    return 1;
+}
+
+await host.RunAsync();
+return 0;

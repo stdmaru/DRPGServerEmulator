@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DRPGServer</RootNamespace>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="MySqlConnector" Version="3.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Tabelas do jogo (XML) e migrações do banco vão junto do binário. -->
+    <None Include="Resources\**\*.xml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\sql\upgrade\*.sql" Link="sql\upgrade\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="appsettings*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Payloads capturados ainda não decodificados (ver Network/Packets/Templates/README.md). -->
+    <EmbeddedResource Include="Network\Packets\Templates\*.hex" LogicalName="Templates.%(Filename)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DRPGServer.Tests" />
+  </ItemGroup>
+
+</Project>

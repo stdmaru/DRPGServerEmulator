@@ -3,3 +3,5 @@ bin/
 .vs/
 .vscode/
 .devcontainer/database
+*.user
+appsettings.Local.json
