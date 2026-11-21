@@ -9,7 +9,28 @@ namespace DRPGServer.Data.GameData;
 public sealed record DigimonSpecies(
     ushort Id, string Name, byte Stage, byte Attribute, Game.Stats.Attributes? Growth, ushort Skill1, ushort Skill2);
 
-public sealed record ItemInfo(uint Id, string Name);
+/// <summary>Item de <c>item_info_us</c> com as colunas que o registro de 108 bytes repete (ver <see cref="ClientTables.Items"/>).</summary>
+public sealed record ItemInfo(uint Id, string Name)
+{
+    public byte Type { get; init; }
+    public byte SubType { get; init; }
+    public ushort Col16 { get; init; }
+    public uint Col17 { get; init; }
+    public uint BuyPrice { get; init; }
+    public uint SellPrice { get; init; }
+    public uint Level { get; init; } = 1;
+    public byte Flag24 { get; init; }
+    public byte Flag25 { get; init; }
+    public uint MaxStack { get; init; } = 1;
+    public byte Flag33 { get; init; }
+}
+
+/// <summary>Skill de <c>digimon_skill_us</c>. ✅ Custo em VP = 20 + nível exigido.</summary>
+public sealed record SkillInfo(ushort Id, string Name, ushort RequiredLevel, byte Type)
+{
+    public const int MaxLevel = 10;
+    public int VpCost => 20 + RequiredLevel;
+}
 
 public sealed record DropEntry(uint ItemId, byte Rate);
 
@@ -24,10 +45,16 @@ public sealed record PortalInfo(byte MapId, short X, short Y, byte DestMapId, sh
     }
 }
 
-/// <summary>Um digimon possível num grupo selvagem. O primeiro da lista sempre aparece.</summary>
+/// <summary>
+/// Um digimon possível num grupo selvagem. O primeiro da lista sempre aparece. Os status vêm do nível
+/// (<see cref="Game.Stats.WildFormulas"/>); <see cref="Stats"/> substitui (XML: HP, VP, ATK, DEF, BR), como o
+/// Yuramon enfraquecido do tutorial. <paramref name="BitReward"/> é o máximo: ✅ o oficial sorteia de ¾ dele até ele.
+/// </summary>
 public sealed record SpawnOption(
-    ushort SpeciesId, ushort Level, int Str, int Agi, int Con, int Int,
-    long ExpReward, double BitReward, ushort AppearanceRate, uint DropGroup);
+    ushort SpeciesId, ushort Level, long ExpReward, double BitReward, ushort AppearanceRate, uint DropGroup)
+{
+    public Game.Stats.CombatStats? Stats { get; init; }
+}
 
 /// <summary>
 /// Área de spawn. Cada grupo tem uma casa: um dos <paramref name="Points"/> (✅ fixos no oficial) ou, sem pontos,
@@ -44,6 +71,9 @@ public sealed class GameData
 {
     public required FrozenDictionary<ushort, DigimonSpecies> Species { get; init; }
     public required FrozenDictionary<uint, ItemInfo> Items { get; init; }
+    public FrozenDictionary<ushort, SkillInfo> Skills { get; init; } = FrozenDictionary<ushort, SkillInfo>.Empty;
+    /// <summary>Espécie → próxima forma da linha evolutiva (<c>tree_us</c>).</summary>
+    public FrozenDictionary<ushort, ushort> Evolutions { get; init; } = FrozenDictionary<ushort, ushort>.Empty;
     public required FrozenDictionary<byte, ClientMap> Maps { get; init; }
     /// <summary>Grade de cada mapa (vazia se o grids.bin não foi extraído: aí tudo é andável).</summary>
     public required FrozenDictionary<byte, MapGrid> Grids { get; init; }
@@ -53,6 +83,12 @@ public sealed class GameData
     public required IReadOnlyList<byte> ZoneIds { get; init; }
 
     public DigimonSpecies? FindSpecies(ushort id) => Species.GetValueOrDefault(id);
+    public SkillInfo? FindSkill(ushort id) => id == 0 ? null : Skills.GetValueOrDefault(id);
+    public ItemInfo? FindItem(uint id) => Items.GetValueOrDefault(id);
+
+    /// <summary>Próxima forma da linha (null no fim da linha ou se a espécie não está na árvore).</summary>
+    public DigimonSpecies? NextForm(DigimonSpecies species) =>
+        Evolutions.TryGetValue(species.Id, out var next) ? FindSpecies(next) : null;
 
     /// <summary>EXP para passar do nível dado (fórmula do oficial, ver <see cref="Game.Stats.ExpFormulas"/>).</summary>
     public long DigimonExpToNext(int level) => Game.Stats.ExpFormulas.DigimonExpToNext(level);

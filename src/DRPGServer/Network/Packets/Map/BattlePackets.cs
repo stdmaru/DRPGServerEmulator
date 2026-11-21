@@ -73,8 +73,14 @@ public enum BattleAction : byte
 public enum BattleIcon : ushort
 {
     None = 0,
+    Summon = 0x02,                              // ✅ invocar um digimon do time (alvo = serial dele)
     Flee = 0x04,                                // ✅ fugir (sem alvo)
     Attack = 0x0A,                              // ✅ ataque básico
+    Skill1 = 0x0B,                              // ✅ skill 1 da forma (Hop Hip, Bunbun Punch)
+    Skill2 = 0x0C,                              // ✅ skill 2 (V-mon Head)
+    Evolve1 = 0x14,                             // ✅ evoluir para a 1ª forma da lista do 0x9E (sem alvo)
+    Evolve2 = 0x15,
+    Evolve3 = 0x16,                             // ✅ 3ª forma (Tactimon, sessão 56)
 }
 
 /// <summary>0x35 (S2C, 36 bytes): u8 ação, u16 ícone, u8 0, serial de quem age, serial do alvo.</summary>
@@ -104,7 +110,8 @@ public sealed class LockActionBarPacket : ServerPacket
 /// depois u32 lado (1 inimigo, 2 jogador), u32 skill (0 = ataque básico), u32 0. Layout em docs/mecanicas/batalha.md.
 /// </summary>
 public sealed class ActionResultsPacket(
-    IReadOnlyList<Combatant> actingTeam, IReadOnlyList<Combatant> otherTeam, Combatant actor, Combatant target, bool landed)
+    IReadOnlyList<Combatant> actingTeam, IReadOnlyList<Combatant> otherTeam, Combatant actor, Combatant target, bool landed,
+    ushort skillId = 0)
     : ServerPacket
 {
     public const int EntryLength = 136;
@@ -116,7 +123,7 @@ public sealed class ActionResultsPacket(
         WriteTeam(w, actingTeam);
         WriteTeam(w, otherTeam);
         w.WriteI32(actor.Side == BattleSide.B ? 1 : 2);
-        w.WriteI32(0);                          // skill (0 = ataque básico)
+        w.WriteI32(skillId);                    // ✅ skill (0 = ataque básico)
         w.WriteI32(0);
     }
 
@@ -142,6 +149,22 @@ public sealed class ActionResultsPacket(
             w.WriteZeros(96);                   // 38 ❓ 64/68/80 só aparecem em skills
             w.WriteU16((ushort)c.Actions);      // 134 ações feitas na batalha
         }
+    }
+}
+
+/// <summary>0x64 (720 bytes): ✅ digimon do time invocado: u8 2, u8 posição no time A, u16 0, u32 0, bloco, 16 zeros.</summary>
+public sealed class BattleSummonPacket(int position, Digimon digimon) : ServerPacket
+{
+    public override ushort Opcode => (ushort)MapOpcode.BattleSummon;
+
+    protected override void Write(PacketWriter w)
+    {
+        w.WriteU8(2);
+        w.WriteU8((byte)position);
+        w.WriteU16(0);
+        w.WriteU32(0);
+        DigimonStatusBlock.Write(w, digimon);
+        w.WriteZeros(16);
     }
 }
 

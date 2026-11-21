@@ -28,6 +28,20 @@ public static class BattleFormulas
         return new Hit(true, Math.Max(1, (int)BaseDamage(attacker.Stats.Atk, target.Stats.Def)));
     }
 
+    /// <summary>
+    /// Skill: o mesmo ataque com multiplicador. ❓ Medido: Hop Hip (nível exigido 6) ×1,075, Bunbun Punch (11) ×1,07,
+    /// V-mon Head (16) ×1,15 no nível 1 e Bunbun Punch nível 10 ×1,17. Ajuste: 1 + 0,0075·(nível exigido + 4) + 0,01·(nível − 1).
+    /// </summary>
+    public static Hit Skill(Digimon attacker, Digimon target, Data.GameData.SkillInfo skill, int skillLevel, Random random)
+    {
+        if (random.NextDouble() >= HitChance) return new Hit(false, 0);
+        double mult = SkillMultiplier(skill, skillLevel);
+        return new Hit(true, Math.Max(1, (int)(BaseDamage(attacker.Stats.Atk, target.Stats.Def) * mult)));
+    }
+
+    public static double SkillMultiplier(Data.GameData.SkillInfo skill, int skillLevel) =>
+        1 + 0.0075 * (skill.RequiredLevel + 4) + 0.01 * (Math.Max(1, skillLevel) - 1);
+
     public static double BaseDamage(int atk, int def) => (double)atk * atk / (10.0 * Math.Max(1, def));
 
     /// <summary>

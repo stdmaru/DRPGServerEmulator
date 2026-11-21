@@ -235,7 +235,7 @@ public sealed class Zone
     {
         var random = _world.Random;
         var drop = new ItemDrop(_nextDropUid++, itemId, (short)(x + random.Next(-1, 2)), (short)(y + random.Next(-1, 2)),
-            _world.Now, ownerCharacterUid);
+            _world.Now, ownerCharacterUid) { Info = _data.FindItem(itemId) };
         _drops.Add(drop.Uid, drop);
         Broadcast(new ItemDropPacket(drop));
         return drop;

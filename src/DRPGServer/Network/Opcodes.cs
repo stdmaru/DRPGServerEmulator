@@ -49,6 +49,7 @@ public enum MapOpcode : ushort
     BattleStartReq = 0x61,
     BattleStartRes = 0x62,
     BattleCreate = 0x63,
+    BattleSummon = 0x64,           // S2C ✅ digimon do time invocado na batalha (u8 2, u8 posição, bloco)
     BattleFleeDigimon = 0x65,      // S2C ✅ serial do digimon que fugiu
     BattleActionResults = 0x67,
     BattleLockActionBar = 0x68,
@@ -59,23 +60,32 @@ public enum MapOpcode : ushort
     BattleRewardBitExp = 0x6E,
     BattleLevelUp = 0x70,
     DigimonAddAbilityPoint = 0x71,
+    DigimonSkillUpgrade = 0x72,    // ✅ subir skill: bloco (uid, serial), u8 estágio, u8 skill (1/2)
+    DigimonEvolved = 0x80,         // S2C ✅ forma nova ao subir de nível (rookie no 11, champion no 21 em batalha)
+    BattleEvolve = 0x81,           // S2C ✅ evolução escolhida no menu, quando a barra enche
+    DigimonFormInfo = 0x82,        // ✅ janela de evolução: u32 estágio (0 = atual), u32 0, bloco
     BattleDigimonStatus = 0x84,    // S2C ✅ bloco de status do digimon no fim da batalha
     Unknown73 = 0x73,
     Unknown74 = 0x74,
     Unknown7E = 0x7E,
     Unknown7F = 0x7F,
-    ItemDropGet = 0x91,
+    ItemDropGet = 0x91,            // ✅ mover item: do chão para o inventário ou dentro do inventário
+    EvolutionList = 0x9E,          // ✅ C2S uid; S2C u8 1, u8 0, u16 × 3 formas liberadas
     TeleportCharacter = 0xB0,
     TamerExp = 0xB1,               // S2C ✅ nível e EXP do tamer no fim da batalha
     RefreshDigimonStatus = 0xB2,
     SingleDigimonInfo = 0xB4,      // C2S ✅ cliente saiu da tela de resultado (6,6 s depois do 0x6D); S2C eco
+    ItemDestroy = 0xBD,            // ✅ jogar item no chão (destrói)
     KeepAlive = 0xC4,
+    BattleItemReceive = 0xC8,      // S2C ✅ item na bolsa de batalha (registro de 76)
     InventoryItemReceive = 0xC9,
     UnknownE6 = 0xE6,
     UnknownF0 = 0xF0,
+    SetLeader = 0xF1,              // ✅ trocar o líder: u32 0, u32 personagem, u32 digimon
     InventoryRefresh = 0xFC,
     Unknown121 = 0x121,
     Unknown152 = 0x152,
+    PartySwap = 0x173,             // ✅ botão k troca as posições k + 1 e k + 2 do time
 }
 
 public enum GlobalOpcode : ushort

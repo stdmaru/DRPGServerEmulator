@@ -34,7 +34,7 @@ public static class DigimonStatusBlock
         d.Serial.Write(w);                      // 4
         w.WriteU16(d.SpeciesId);                // 20
         w.WriteU16(0);                          // 22 ? sempre 0
-        w.WriteU8(1);                           // 24 ? sempre 1
+        w.WriteU8(d.IsWild ? (byte)0 : d.UnlockedStage); // 24 ✅ maior estágio liberado (0 no selvagem)
         w.WriteFixedString(d.Name, 21);         // 25
         w.WriteU16(d.Level);                    // 46
         // 48: ✅ o oficial manda zero nos atributos de digimon selvagem (0x63) e os reais nos do jogador
@@ -88,17 +88,21 @@ public static class DigimonStatusBlock
         w.WriteU16(d.SkillPoints);              // 274
     }
 
-    /// <summary>276..327: skills (só a primeira é conhecida) e bytes capturados.</summary>
+    /// <summary>
+    /// 276..327: skills da forma atual. ✅ Por skill: u32 id, u16 nível exigido (coluna 1 do <c>digimon_skill_us</c>),
+    /// i16 nível (0 = ainda não aprendida). Em 296, ✅ quanto a barra de ação enche por passo.
+    /// </summary>
     public static void WriteSkills(PacketWriter w, Digimon d)
     {
-        w.WriteU32(12);                         // 276 skill 1 (id 12 nas capturas)
-        w.WriteU16(6);                          // 280 ?
-        w.WriteI16(1);                          // 282 nível da skill 1 ❓
-        w.WriteU32(0);                          // 284 skill 2
-        w.WriteU16(0);                          // 288 ?
-        w.WriteI16(0);                          // 290 nível da skill 2
+        for (int slot = 0; slot < DigimonForm.SkillSlots; slot++)
+        {
+            ushort id = d.Current.SkillId(slot);
+            w.WriteU32(id);                                         // 276 / 284
+            w.WriteU16(d.SkillInfoOf(slot)?.RequiredLevel ?? 0);    // 280 / 288
+            w.WriteI16((short)(id == 0 ? 0 : d.Current.SkillLevels[slot])); // 282 / 290
+        }
         w.WriteU32(0);                          // 292
-        w.WriteU32(0x2A);                       // 296 ? (0x2A, 0x4C, 0x69 nas capturas)
+        w.WriteU32((uint)Game.Battle.BattleFormulas.GaugeGain(d, d.IsWild)); // 296 ✅ barra por passo
         w.WriteU8(d.IsWild ? (byte)2 : (byte)0); // 300 ✅ 0 no digimon do jogador, 2 no selvagem
         w.WriteZeros(11);
         w.WriteU8(8);                           // 312 ? (7 ou 8 nas capturas)

@@ -28,7 +28,16 @@ public sealed class Combatant(Digimon digimon, BattleSide side, Player? owner, W
     /// <summary>Ação marcada pelo jogador (0x35); acontece quando a barra enche.</summary>
     public BattleIcon Choice { get; set; }
     public Combatant? ChoiceTarget { get; set; }
+    /// <summary>Digimon do time escolhido para invocar (<see cref="BattleIcon.Summon"/>).</summary>
+    public Digimon? ChoiceSummon { get; set; }
     public bool GaugeFull => Gauge >= BattleFormulas.MaxGauge;
+
+    public void ClearChoice()
+    {
+        Choice = BattleIcon.None;
+        ChoiceTarget = null;
+        ChoiceSummon = null;
+    }
 }
 
 /// <summary>
@@ -37,8 +46,9 @@ public sealed class Combatant(Digimon digimon, BattleSide side, Player? owner, W
 /// Abertura: 0x61 (C2S) → 0x62 (S2C serial) → 0x62 (C2S eco) → 0x63 (times) → 0x69 (C2S pronto) →
 /// 0x10 (tamer em batalha) → 0x69. Depois as barras enchem (0x6B de todos a cada passo). O jogador marca a
 /// ação com 0x35 (2 → 1 marcada, de novo → 4 desmarcada); com a barra cheia ela acontece:
-/// 0x35 (3) → 0x68 → [0x6E/0x70 se derrubou] → 0x67. O inimigo age sozinho: 0x68 → 0x67. As barras param
-/// até o cliente mandar 0x69 no fim da animação. Vitória: … 0x67 → 0xB1 → 0x10 → 0x84 → 0x6D 1.
+/// ataque/skill 0x35 (3) → 0x68 → [0x6E/0x70/0x80 se derrubou] → 0x67; invocação 0x68 → 0x64 → 0x35 (3);
+/// evolução 0x68 → 0x81 → 0x35 (3). O inimigo age sozinho: 0x68 → 0x67. As barras param até o cliente mandar
+/// 0x69 no fim da animação. Vitória: … 0x67 → 0xB1 → 0x10 → 0x84 → 0x6D 1 (0xB1, 0x84 e 0x6D um por digimon).
 /// Fuga: 0x35 (3) → 0x65 → 0x6A → 0x6D 2.
 /// </summary>
 public sealed class Battle
@@ -83,6 +93,7 @@ public sealed class Battle
 
     private IEnumerable<Combatant> All => _teamA.Concat(_teamB);
     private Combatant? Find(Serial serial) => All.FirstOrDefault(c => c.Digimon.Serial == serial);
+    public bool Contains(Digimon digimon) => All.Any(c => c.Digimon == digimon);
 
     internal void Start()
     {
@@ -144,42 +155,94 @@ public sealed class Battle
         {
             var targets = _teamA.Where(c => !c.Digimon.IsKnockedOut).ToList();
             if (targets.Count == 0) return;
-            Attack(actor, targets[_system.Random.Next(targets.Count)]);
+            Attack(actor, targets[_system.Random.Next(targets.Count)], null);
             return;
         }
 
         var choice = actor.Choice;
         var target = actor.ChoiceTarget;
-        actor.Choice = BattleIcon.None;
-        actor.ChoiceTarget = null;
-        Broadcast(new ActionRequestPacket(BattleAction.Executed, BattleIcon.None, actor.Digimon.Serial, Serial.Empty));
+        var summon = actor.ChoiceSummon;
+        actor.ClearChoice();
+        var executed = new ActionRequestPacket(BattleAction.Executed, BattleIcon.None, actor.Digimon.Serial, Serial.Empty);
 
-        if (choice == BattleIcon.Flee)
+        switch (choice)
         {
-            Flee(actor);
-            return;
+            case BattleIcon.Flee:
+                Broadcast(executed);
+                Flee(actor);
+                return;
+            case BattleIcon.Summon:
+                if (summon is null || !CanSummon(actor, summon)) break;
+                Broadcast(new LockActionBarPacket());
+                Summon(actor, summon);
+                Broadcast(executed);
+                return;
+            case >= BattleIcon.Evolve1 and <= BattleIcon.Evolve3:
+                var options = actor.Digimon.EvolutionOptions();
+                int index = choice - BattleIcon.Evolve1;
+                if (index >= options.Count) break;
+                Broadcast(new LockActionBarPacket());
+                actor.Digimon.EvolveTo(options[index]);
+                actor.Gauge = 0;
+                actor.Actions++;
+                Broadcast(new BattleEvolvePacket(actor.Digimon));
+                Broadcast(executed);
+                _phase = Phase.Animating;
+                return;
+            case BattleIcon.Attack or BattleIcon.Skill1 or BattleIcon.Skill2:
+                if (target is null || target.Digimon.IsKnockedOut) break;
+                Broadcast(executed);
+                Attack(actor, target, choice == BattleIcon.Attack ? null : choice - BattleIcon.Skill1);
+                return;
         }
-        if (target is null || target.Digimon.IsKnockedOut) return;
-        Attack(actor, target);
+        Broadcast(executed);                    // ação que deixou de valer (alvo caiu, VP acabou): perde a vez
+        actor.Gauge = 0;
     }
 
-    private void Attack(Combatant actor, Combatant target)
+    /// <param name="skillSlot">null = ataque básico.</param>
+    private void Attack(Combatant actor, Combatant target, int? skillSlot)
     {
         Broadcast(new LockActionBarPacket());
-        var hit = BattleFormulas.Attack(actor.Digimon, target.Digimon, _system.Random);
+        var digimon = actor.Digimon;
+        Hit hit;
+        ushort skillId = 0;
+        if (skillSlot is { } slot && digimon.SkillInfoOf(slot) is { } skill && digimon.SpendVp(skill.VpCost))
+        {
+            skillId = skill.Id;
+            hit = BattleFormulas.Skill(digimon, target.Digimon, skill, digimon.Current.SkillLevels[slot], _system.Random);
+        }
+        else
+        {
+            hit = BattleFormulas.Attack(digimon, target.Digimon, _system.Random);
+        }
         target.Digimon.TakeDamage(hit.Damage);
         actor.Actions++;
         actor.Gauge = 0;
 
         if (target.Digimon.IsKnockedOut && actor.Owner is { } owner && target.Wild is { } member)
-            _system.GrantRewards(owner, actor.Digimon, member);
+            _system.GrantRewards(owner, actor, _teamA.Where(c => c.Owner == owner && !c.Digimon.IsKnockedOut).ToList(), member);
 
         var (acting, other) = actor.Side == BattleSide.A ? (_teamA, _teamB) : (_teamB, _teamA);
-        Broadcast(new ActionResultsPacket(acting, other, actor, target, hit.Landed));
+        Broadcast(new ActionResultsPacket(acting, other, actor, target, hit.Landed, skillId));
 
         if (_teamB.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Win);
         else if (_teamA.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Lose);
         else _phase = Phase.Animating;
+    }
+
+    private bool CanSummon(Combatant actor, Digimon digimon) =>
+        _teamA.Count < MaxPerSide && actor.Owner is { } owner && owner.Character.SlotOf(digimon) >= 0
+        && !Contains(digimon) && !digimon.IsKnockedOut;
+
+    /// <summary>✅ Invocação (sessão 56): o digimon entra no time A na próxima posição, com a barra zerada.</summary>
+    private void Summon(Combatant actor, Digimon digimon)
+    {
+        var c = new Combatant(digimon, BattleSide.A, actor.Owner, null);
+        _teamA.Add(c);
+        actor.Gauge = 0;
+        actor.Actions++;
+        Broadcast(new BattleSummonPacket(_teamA.Count - 1, digimon));
+        _phase = Phase.Animating;
     }
 
     private void Flee(Combatant actor)
@@ -195,8 +258,7 @@ public sealed class Battle
     {
         foreach (var c in _teamA.Where(c => c.ChoiceTarget is { Digimon.IsKnockedOut: true }))
         {
-            c.Choice = BattleIcon.None;
-            c.ChoiceTarget = null;
+            c.ClearChoice();
             Broadcast(new ActionRequestPacket(BattleAction.Cleared, BattleIcon.None, c.Digimon.Serial, Serial.Empty));
         }
     }
@@ -211,23 +273,51 @@ public sealed class Battle
         if (Find(requester) is not { } actor || actor.Owner != player || actor.Digimon.IsKnockedOut) return;
 
         Combatant? victim = null;
+        Digimon? summon = null;
         switch (icon)
         {
             case BattleIcon.Attack:
                 victim = Find(target);
                 if (victim is null || victim.Side == actor.Side || victim.Digimon.IsKnockedOut) return;
                 break;
+            case BattleIcon.Skill1 or BattleIcon.Skill2:
+                victim = Find(target);
+                if (victim is null || victim.Side == actor.Side || victim.Digimon.IsKnockedOut) return;
+                int slot = icon - BattleIcon.Skill1;
+                // ✅ skill só depois de aprendida (nível 0 no bloco antes do nível exigido) e com VP para o custo
+                if (actor.Digimon.Current.SkillLevels[slot] < 1 || actor.Digimon.SkillInfoOf(slot) is not { } skill
+                    || actor.Digimon.Vp < skill.VpCost) return;
+                break;
+            case BattleIcon.Summon:
+                summon = player.Character.FindDigimon(target);
+                if (summon is null || !CanSummon(actor, summon)) return;
+                break;
             case BattleIcon.Flee:
                 break;
+            case >= BattleIcon.Evolve1 and <= BattleIcon.Evolve3:
+                if (icon - BattleIcon.Evolve1 >= actor.Digimon.EvolutionOptions().Count) return;
+                break;
             default:
-                return;                             // ❓ skills e itens ainda não
+                return;                             // ❓ itens ainda não
         }
 
-        bool same = actor.Choice == icon && actor.ChoiceTarget == victim;
-        actor.Choice = same ? BattleIcon.None : icon;
-        actor.ChoiceTarget = same ? null : victim;
-        var targetSerial = victim?.Digimon.Serial ?? Serial.Empty;
+        bool same = actor.Choice == icon && actor.ChoiceTarget == victim && actor.ChoiceSummon == summon;
+        actor.ClearChoice();
+        if (!same)
+        {
+            actor.Choice = icon;
+            actor.ChoiceTarget = victim;
+            actor.ChoiceSummon = summon;
+        }
+        var targetSerial = victim?.Digimon.Serial ?? summon?.Serial ?? Serial.Empty;
         Broadcast(new ActionRequestPacket(same ? BattleAction.Cleared : BattleAction.Selected, icon, requester, targetSerial));
+    }
+
+    /// <summary>0x9E: formas para as quais o digimon pode evoluir agora (✅ só em batalha nas capturas).</summary>
+    public IReadOnlyList<Data.GameData.DigimonSpecies> EvolutionOptions(Player player, uint digimonUid)
+    {
+        var c = _teamA.FirstOrDefault(c => c.Owner == player && c.Digimon.Uid == digimonUid);
+        return c is null || c.Digimon.IsKnockedOut || _phase is Phase.Opening or Phase.Over ? [] : c.Digimon.EvolutionOptions();
     }
 
     /// <summary>Comando de GM: derruba um lado inteiro e encerra.</summary>
@@ -239,8 +329,8 @@ public sealed class Battle
         {
             if (c.Digimon.IsKnockedOut) continue;
             c.Digimon.TakeDamage(c.Digimon.Hp);
-            if (owner is not null && c.Wild is { } member)
-                _system.GrantRewards(owner, owner.Leader, member);
+            if (owner is not null && c.Wild is { } member && _teamA.FirstOrDefault(a => !a.Digimon.IsKnockedOut) is { } killer)
+                _system.GrantRewards(owner, killer, _teamA.Where(a => a.Owner == owner && !a.Digimon.IsKnockedOut).ToList(), member);
         }
         End(side == BattleSide.B ? BattleResult.Win : BattleResult.Lose);
     }
@@ -250,6 +340,8 @@ public sealed class Battle
     {
         _participants.Remove(player);
         player.Battle = null;
+        foreach (var c in _teamA.Where(c => c.Owner == player))
+            c.Digimon.Devolve();
         if (_participants.Count == 0)
             End(BattleResult.Cancel);
     }
@@ -263,17 +355,22 @@ public sealed class Battle
         {
             foreach (var player in _participants)
             {
+                var mine = _teamA.Where(c => c.Owner == player).ToList();
                 if (result == BattleResult.Win)
-                    player.Send(new TamerExpPacket(player.Character));
+                    foreach (var _ in mine)
+                        player.Send(new TamerExpPacket(player.Character));
                 player.Zone?.Broadcast(new RefreshCharacterInfoPacket(player.Character, TamerState.Idle));
-                foreach (var c in _teamA.Where(c => c.Owner == player))
+                foreach (var c in mine)
                 {
                     // ❓ derrota por nocaute não capturada; o digimon volta com 1 de HP para não ficar zerado no mapa
                     if (c.Digimon.IsKnockedOut) c.Digimon.Heal(1, 0, 0);
+                    // ✅ evoluído volta para a forma-base no fim (sem Aura): o 0x84 já traz o bloco do rookie
+                    c.Digimon.Devolve();
                     if (result == BattleResult.Win) player.Send(new BattleDigimonStatusPacket(c.Digimon));
                 }
+                foreach (var _ in mine)
+                    player.Send(new BattleEndPacket(result));
             }
-            Broadcast(new BattleEndPacket(result));
         }
 
         _system.Finish(this, result);

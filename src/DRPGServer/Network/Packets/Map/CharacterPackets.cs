@@ -33,10 +33,26 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
         w.WriteU8((byte)Rank.ChromeDigizoid);
         w.WriteZeros(1151);
 
-        // 1240: 5 blocos de status (✅ v322: o fim do pacote andou 5 × 8 bytes). Só o líder por ora.
-        // O líder usa o mesmo começo do bloco de status, com 64..191 próprio.
+        // 1240: ✅ 5 blocos de status, um por posição do time (líder na 0; pode haver posição vazia, sessão 56)
+        foreach (var d in c.Party)
+        {
+            if (d is null) DigimonStatusBlock.WriteEmpty(w);
+            else WritePartyBlock(w, d);
+        }
+
+        w.WriteI16(c.X);                        // 4720 na v322 (4680 na v242)
+        w.WriteI16(c.Y);
+        // ❓ capturado: 0x1852..0x1856 e 0x2052..0x205A parecem ponteiros/handles do servidor oficial
+        w.WriteSparse(2876,
+            (1852, [0xDC, 0xF3, 0x51, 0x68, 0x01]),
+            (2052, [0xFA, 0x11, 0x00, 0x00, 0x50, 0xB8, 0x52, 0x68]),
+            (2792, [0x0A]));
+    }
+
+    /// <summary>Bloco do time: o começo do bloco de status, com 64..191 próprio.</summary>
+    private static void WritePartyBlock(PacketWriter w, Digimon d)
+    {
         int block = w.Position;
-        var d = c.Leader;
         DigimonStatusBlock.WriteHead(w, d);
         w.WriteZeros(52);                       // 64
         w.WriteI16(0);                          // 116 bônus de ATK (taxa)
@@ -54,15 +70,6 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
         w.WriteI32(0);                          // bônus de CON
         w.WriteI32(0);                          // bônus de INT
         w.WriteZeros(DigimonStatusBlock.Length - (w.Position - block));
-        for (int i = 1; i < 5; i++) DigimonStatusBlock.WriteEmpty(w);
-
-        w.WriteI16(c.X);                        // 4720 na v322 (4680 na v242)
-        w.WriteI16(c.Y);
-        // ❓ capturado: 0x1852..0x1856 e 0x2052..0x205A parecem ponteiros/handles do servidor oficial
-        w.WriteSparse(2876,
-            (1852, [0xDC, 0xF3, 0x51, 0x68, 0x01]),
-            (2052, [0xFA, 0x11, 0x00, 0x00, 0x50, 0xB8, 0x52, 0x68]),
-            (2792, [0x0A]));
     }
 }
 

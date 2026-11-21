@@ -53,8 +53,8 @@ public static class GameDataLoader
         foreach (var e in Elements(root, "Map/DigimonSpawns.xml", "DigimonSpawns", "Spawn"))
         {
             var options = e.Elements("SpawnOption").Select(o => new SpawnOption(
-                U16(o, "DigimonID"), U16(o, "Level"), I32(o, "STR"), I32(o, "AGI"), I32(o, "CON"), I32(o, "INT"),
-                I64(o, "ExpReward"), F64(o, "BitReward"), U16(o, "AppearanceRate"), U32(o, "DropGroup"))).ToList();
+                U16(o, "DigimonID"), U16(o, "Level"), I64(o, "ExpReward"), F64(o, "BitReward"), U16(o, "AppearanceRate"),
+                U32(o, "DropGroup")) { Stats = FixedStats(o, U16(o, "Level")) }).ToList();
             var points = e.Elements("Point").Select(p => (I16(p, "X"), I16(p, "Y"))).ToList();
             var area = new SpawnArea(U8(e, "MapID"), I16(e, "PosXMin"), I16(e, "PosXMax"), I16(e, "PosYMin"), I16(e, "PosYMax"),
                 points.Count > 0 ? points.Count : I32(e, "MaxCount"), TimeSpan.FromSeconds(F64(e, "RespawnTime")), options, points,
@@ -78,6 +78,8 @@ public static class GameDataLoader
         {
             Species = species,
             Items = items,
+            Skills = ClientTables.Skills(pack),
+            Evolutions = ClientTables.Evolutions(pack),
             DropGroups = drops.ToFrozenDictionary(),
             Maps = maps,
             Grids = grids,
@@ -121,6 +123,15 @@ public static class GameDataLoader
             if (list.Count > 0) result[map.Id] = list;
         }
         return result.ToFrozenDictionary();
+    }
+
+    /// <summary>Status fixos de um selvagem (HP, VP, ATK, DEF, BR, todos ou nenhum).</summary>
+    private static Game.Stats.CombatStats? FixedStats(XElement o, int level)
+    {
+        if (o.Attribute("HP") is null) return null;
+        int hp = I32(o, "HP"), vp = I32(o, "VP");
+        return new Game.Stats.CombatStats(hp, vp, Game.Stats.StatFormulas.MaxEvp(level), I32(o, "ATK"), I32(o, "DEF"), I32(o, "BR"),
+            Game.Stats.StatFormulas.MaxActionGauge);
     }
 
     private static IEnumerable<XElement> Elements(string root, string file, string rootName, string element)

@@ -21,20 +21,46 @@ public static class StatFormulas
     /// <summary>✅ Medidor de ação máximo: 500 em todas as amostras, de qualquer espécie.</summary>
     public const int MaxActionGauge = 500;
 
-    /// <summary>❓ Bônus por atributo a partir de rookie (só rookie confirmado nas capturas).</summary>
-    public const int RookieBonus = 20;
+    /// <summary>Estágios (coluna 2 do <c>digimon_us</c>, byte 160 do bloco de status).</summary>
+    public const byte InTraining = 1, Rookie = 2, Champion = 3, Ultimate = 4, Mega = 5;
+
+    /// <summary>✅ Nível em que o digimon chega a cada estágio: rookie no 11, champion 21, ultimate 31, mega 41.</summary>
+    public static int StageLevel(byte stage) => stage switch
+    {
+        <= InTraining => 1,
+        Rookie => 11,
+        _ => 21 + 10 * (stage - Champion),
+    };
 
     /// <summary>
-    /// 10 em cada atributo no nível 1 e o crescimento da dex (<see cref="DigimonSpecies.Growth"/>) por nível.
-    /// ✅ in-training; rookie soma +20 (❓ champion em diante). Espécie sem dex não cresce.
+    /// Último nível em que a forma ainda cresce: ✅ in-training 10, rookie 20 (Kotemon L160 = base de L20, sem pontos;
+    /// V-mon igual no 20 e no 21), ❓ champion 30, ultimate 40; mega até o máximo.
+    /// </summary>
+    public static int GrowthCap(byte stage) => stage >= Mega ? int.MaxValue : Math.Max(InTraining, (int)stage) * 10;
+
+    /// <summary>
+    /// Atributos base da forma: 10 + 20 por estágio acima de in-training + status-base × (nível limitado − 1).
+    /// ✅ in-training e rookie (Monodramon L11 60/50/50/50, Kotemon L160 87/68/68/49). ❓ champion e ultimate batem
+    /// em CON e INT (Musyamon, Vajramon L160) mas não em STR/AGI; mega não segue a fórmula. Espécie sem dex não cresce.
     /// </summary>
     public static Attributes BaseAttributes(DigimonSpecies species, int level)
     {
-        int levels = Math.Max(0, level - 1);
+        int stage = Math.Max(InTraining, (int)species.Stage);
+        int levels = Math.Max(0, Math.Min(level, GrowthCap((byte)stage)) - 1);
         var g = species.Growth ?? default;
-        int bonus = species.Stage >= 2 ? RookieBonus : 0;
-        return new(10 + bonus + g.Str * levels, 10 + bonus + g.Agi * levels,
-                   10 + bonus + g.Con * levels, 10 + bonus + g.Int * levels);
+        int b = 10 + 20 * (stage - 1);
+        return new(b + g.Str * levels, b + g.Agi * levels, b + g.Con * levels, b + g.Int * levels);
+    }
+
+    /// <summary>
+    /// Pontos de atributo que a forma ganhou até o nível: 2 por nível dentro da janela do estágio. ✅ rookie 2·(L − 1)
+    /// até o 21 (40 no L160), champion 0 no L21 e 20 no L160, mega 2·(L − 41) (238 no L160).
+    /// </summary>
+    public static int AbilityPointsEarned(byte stage, int level)
+    {
+        int start = stage <= Rookie ? 1 : StageLevel(stage);
+        int end = stage >= Mega ? int.MaxValue : stage <= InTraining ? 11 : StageLevel((byte)(stage + 1));
+        return 2 * Math.Max(0, Math.Min(level, end) - start);
     }
 
     // ✅ status = ⌊c1·√a + c2·√b⌋, sem nível nem espécie (ajuste em 80 amostras v322, todos os estágios).
