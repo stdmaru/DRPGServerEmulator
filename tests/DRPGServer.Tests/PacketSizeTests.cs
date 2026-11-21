@@ -20,6 +20,7 @@ public class PacketSizeTests
     {
         var character = Entities.Character();
         var digimon = character.Leader;
+        var combatant = new Combatant(digimon, BattleSide.A, null, null);
         var drop = new ItemDrop(10_001, 41, 50, 50, TimeSpan.Zero, null);
         var item = new Inventory(999).Add(41, 1)!;
         var wild = new WildDigimon(TestSupport.Data, TestSupport.Data.SpawnsOf(79)[0], 27, 65);
@@ -42,10 +43,14 @@ public class PacketSizeTests
             (new ItemDropPacket(drop, removed: true), 112),
             (new ExitGamePacket(), 0),
             (new JoinHandshakePacket(), 504),
-            (new ActionRequestPacket(1, Serial.New(), Serial.New()), 36),
+            (new ActionRequestPacket(BattleAction.Selected, BattleIcon.Attack, Serial.New(), Serial.New()), 36), // ✅ v322
             (new NpcChoicePacket(1), 4),
             (new StartBattlePacket(Serial.New()), 20),
-            (new ActionResultsPacket([digimon], [digimon], digimon, digimon, false), 1372),
+            (new ActionResultsPacket([combatant], [combatant], combatant, combatant, true), 1372), // ✅ v322
+            (new FleeDigimonPacket(Serial.New()), 16),                 // ✅ v322 (sessão 53)
+            (new FleeTamerPacket(Serial.New()), 16),
+            (new BattleDigimonStatusPacket(digimon), 696),             // ✅ v322 (0x84)
+            (new TamerExpPacket(character), 1252),                     // ✅ v322 (0xB1)
             (new LockActionBarPacket(), 0),
             (new BattleBeginPacket(), 0),
             (new ActionCooldownPacket(Serial.New(), 10), 24),

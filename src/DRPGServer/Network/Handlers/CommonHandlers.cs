@@ -26,7 +26,6 @@ public sealed class KeepAliveHandler : ISessionPacketHandler
 [PacketHandler(ChannelOpcode.MapConnectionConfirm)]  // usuário + personagem antes de ir para o mapa
 [PacketHandler(ChannelOpcode.ClientHardwareInfo)]
 [PacketHandler(GlobalOpcode.CharacterJoin)]
-[PacketHandler(MapOpcode.SingleDigimonInfo)]         // ❓ o pedido C2S ainda não foi entendido
 [PacketHandler(MapOpcode.KeepAlive)]                 // resposta do cliente ao ping do servidor
 public sealed class IgnoreHandler : ISessionPacketHandler
 {

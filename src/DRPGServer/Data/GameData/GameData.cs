@@ -32,10 +32,12 @@ public sealed record SpawnOption(
 /// <summary>
 /// Área de spawn. Cada grupo tem uma casa: um dos <paramref name="Points"/> (✅ fixos no oficial) ou, sem pontos,
 /// uma célula andável sorteada no retângulo. O grupo anda só em volta da casa (<c>WildDigimon.RoamRadius</c>).
+/// <paramref name="Exclusive"/>: ✅ grupo que entra em batalha (11) e morre (8 → 12), como os Otamamon da sessão 56.
+/// Sem ele o grupo é compartilhado: continua andando no mapa e a batalha usa cópias (docs/mecanicas/batalha.md).
 /// </summary>
 public sealed record SpawnArea(
     byte MapId, short XMin, short XMax, short YMin, short YMax, int MaxCount, TimeSpan RespawnTime,
-    IReadOnlyList<SpawnOption> Options, IReadOnlyList<(short X, short Y)> Points);
+    IReadOnlyList<SpawnOption> Options, IReadOnlyList<(short X, short Y)> Points, bool Exclusive = false);
 
 /// <summary>Tabelas estáticas do jogo, carregadas uma vez na partida. Imutáveis.</summary>
 public sealed class GameData

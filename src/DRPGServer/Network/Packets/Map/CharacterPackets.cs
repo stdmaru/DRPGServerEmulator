@@ -72,7 +72,7 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
 /// ❓ Os 4 bytes novos caem depois de 100: a v322 traz um par (5, ~5000) em 128 que não aparece na v242.
 /// Layout em docs/protocolo/structs/tamer-resumo.md.
 /// </summary>
-public sealed class RefreshCharacterInfoPacket(Character character) : ServerPacket
+public sealed class RefreshCharacterInfoPacket(Character character, TamerState state = TamerState.Idle) : ServerPacket
 {
     public override ushort Opcode => (ushort)MapOpcode.RefreshCharacterInfo;
 
@@ -84,7 +84,8 @@ public sealed class RefreshCharacterInfoPacket(Character character) : ServerPack
         w.WriteU8(c.TamerId);                   // 37
         w.WriteU16(1);                          // 38 ? (1, 2, 5, 6)
         w.WriteU16(c.Level);                    // 40 nível do tamer ✅
-        w.WriteU16(1);                          // 42 ? dois u8 (baixo 1/5/11/15, alto 0..7)
+        w.WriteU8((byte)state);                 // 42 ✅ estado: 1 parado, 5 andando, 11 em batalha (como o 0x11)
+        w.WriteU8(0);                           // 43 ✅ direção (0..7, como a dos selvagens)
         w.WriteI16(c.X);                        // 44 posição
         w.WriteI16(c.Y);
         w.WriteI16(c.X);                        // 48 destino (igual à posição quando parado) ✅

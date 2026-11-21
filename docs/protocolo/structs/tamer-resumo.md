@@ -9,7 +9,7 @@ Evidência: `captures.db`, 49 amostras v242 (200 bytes) e 1919 v322 (204 bytes),
 | 37 | u8 | tamer (1–4) | ✅ |
 | 38 | u16 | ? (v242: 1, 2; v322: 1, 2, 5, 6) | |
 | 40 | u16 | nível do tamer | ✅ (14 para o personagem nível 14) |
-| 42 | u8, u8 | ? (baixo 1/5/11/15, alto 0..7) | |
+| 42 | u8, u8 | estado (1 parado, 5 andando, 11 em batalha; ❓ 15), direção 0..7 | ✅ [batalha](../../mecanicas/batalha.md) |
 | 44 | i16, i16 | X, Y | ✅ |
 | 48 | i16, i16 | X, Y de destino (igual à posição quando parado, 798 de 1919) | ✅ |
 | 52 | i32 | 0 em todas | |

@@ -4,6 +4,14 @@ using DRPGServer.Network.Protocol;
 
 namespace DRPGServer.Game.Entities;
 
+/// <summary>✅ Estado do tamer no offset 42 do 0x10 (mesmos códigos do 0x11 dos selvagens).</summary>
+public enum TamerState : byte
+{
+    Idle = 1,
+    Moving = 5,
+    InBattle = 11,
+}
+
 /// <summary>Personagem online no mapa. Vive na thread do mundo.</summary>
 public sealed class Player(Session session, AuthenticatedAccount account, Character character)
 {
@@ -16,6 +24,12 @@ public sealed class Player(Session session, AuthenticatedAccount account, Charac
     public Battle.Battle? Battle { get; internal set; }
     public bool InBattle => Battle is not null;
     public bool IsOnline => !Session.IsClosed;
+
+    /// <summary>
+    /// Próxima recuperação automática (hora do mundo). ✅ Parada na batalha; o oficial cura logo no fim
+    /// (0,04–0,34 s depois do 0x6D, ainda na tela de resultado) e segue de 5,2 em 5,2 s.
+    /// </summary>
+    public TimeSpan NextRecoveryAt { get; internal set; }
 
     /// <summary>Hora (do mundo) do último 0x20 aceito ou do último teleporte.</summary>
     public TimeSpan LastMoveAt { get; internal set; }

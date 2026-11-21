@@ -29,14 +29,14 @@ Dados: 592 grupos e 72 mil pacotes `0x11` nas sessões 53–58 (v322).
   3. no próximo, 1.
 - **Direção:** o sinal de (dx, dy): (0,+1)=0, (−,+)=1, (−,0)=2, (−,−)=3, (0,−)=4, (+,−)=5, (+,0)=6, (+,+)=7.
   Ela só muda no pacote de chegada (96 %).
-- **Batalha:** 11 enquanto dura.
-- **Derrota:** 8 por ~10,4 s, depois 12, e o serial some. Volta como grupo novo (serial novo). ❓ Só 2 amostras.
+- **Batalha:** ✅ o grupo comum continua andando (a batalha é instanciada); só o grupo exclusivo fica em 11. Ver [batalha](batalha.md).
+- **Derrota** (exclusivo): 8 por ~10,4 s, depois 12, e o serial some. Volta como grupo novo (serial novo). ❓ Só 2 amostras.
 - 98 % das posições dos selvagens são andáveis; o resto fica encostado em área andável.
 
 ## Emulador (`Game/World/Zone.cs`, `Game/Entities/WildDigimon.cs`)
 - Tick de 344 ms, chance de 5 %, destino sorteado na caixa da casa **e andável** (até 8 tentativas).
 - Casa: `<Point>` no `DigimonSpawns.xml` (capturado) ou célula andável sorteada no retângulo.
-- Derrotado: 8 por 10,4 s, 12, e um grupo novo na mesma casa depois do `RespawnTime`.
+- Grupo comum não sai do mapa na batalha; `Exclusive="true"` no `<Spawn>`: 11 na batalha e, se derrotado, 8 por 10,4 s, 12, e um grupo novo na mesma casa depois do `RespawnTime`.
 
 ## ❓ Em aberto
 - Casas e espécies de todos os mapas: as capturas têm muitos grupos, mas a conexão nem sempre diz o mapa. Hoje só o

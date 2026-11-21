@@ -42,6 +42,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Fórmulas de EXP](mecanicas/formulas-exp.md): digimon ⌊20L·1,2^L⌋ em float32 (trava no nível 77), tamer 5(L+1), recompensa 0x6E, evento de EXP ❓.
 - [Evolução](mecanicas/evolucao.md): cada forma tem atributos, pontos e skills próprios; nível e EXP são do digimon.
 - [Movimento](mecanicas/movimento.md): 0x20 a cada 0,87 s, até ~10,6 células/s, validação de célula e velocidade.
+- [Batalha](mecanicas/batalha.md): fluxo 0x61…0x6D, 0x67, dano ⌊ATK²/(10·DEF)⌋, barra por nível/BR, acerto, fuga, grupo compartilhado, recuperação.
 - [Selvagens](mecanicas/selvagens.md): 0x11, tick de 344 ms, casa fixa com caixa de 7 × 7, 5 % de chance de andar, estados.
 - [Portais](mecanicas/portais.md): posição e destino do `map_us`, chegada capturada em `Portals.xml` ou estimada.
 - [Tick do mapa](mecanicas/tick-mapa.md): ping 0xC4 do servidor a cada ~5,2 s, recuperação HP +5 / VP +3 / EVP +10, saída 0x2B.

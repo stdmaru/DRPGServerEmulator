@@ -27,17 +27,31 @@ public sealed class BattleSystem : IWorldSystem
     }
 
     internal Random Random => _world.Random;
+    internal TimeSpan Now => _world.Now;
     public int Count => _battles.Count;
 
+    /// <summary>
+    /// 0x61: batalha contra um grupo do mapa. ✅ Grupo comum é compartilhado: segue andando no mapa (nunca vai a 11)
+    /// e a batalha usa cópias novas dos membros (b1268476 enfrentado 6 vezes nas sessões 54 e 56). Grupo
+    /// <see cref="SpawnArea.Exclusive"/> fica em batalha (11) e morre na vitória.
+    /// </summary>
     public Battle? StartPve(Player player, Serial wildSerial)
     {
         if (player.InBattle || player.Zone is not { } zone) return null;
         if (zone.FindWild(wildSerial) is not { CanBattle: true } wild) return null;
 
-        var battle = new Battle(this, player, wild, _world.Random);
+        bool exclusive = wild.Spawn.Exclusive;
+        Func<WildMember, Digimon> enemyOf = exclusive
+            ? m => { m.Digimon.RestoreAll(); return m.Digimon; }
+            : m => WildDigimon.CreateMember(_data, m.Option);
+        var battle = new Battle(this, player, wild, enemyOf, _world.Random);
         _battles.Add(battle);
         battle.Start();
-        zone.Broadcast(new WildDigimonUpdatePacket(wild));
+        if (exclusive)
+        {
+            wild.State = WildState.InBattle;
+            zone.Broadcast(new WildDigimonUpdatePacket(wild));
+        }
         _log.LogDebug("{Player} começou {Battle} contra {Wild}", player, battle, wild.Leader.Name);
         return battle;
     }
@@ -53,24 +67,28 @@ public sealed class BattleSystem : IWorldSystem
 
     internal void Finish(Battle battle, BattleResult result)
     {
-        foreach (var c in battle.TeamA)
+        if (result != BattleResult.Cancel)
         {
-            c.Digimon.TotalBattles++;
-            if (result == BattleResult.Win) c.Digimon.TotalWins++;
-        }
-        foreach (var player in battle.Participants)
-        {
-            player.Character.TotalBattles++;
-            if (result == BattleResult.Win) player.Character.TotalWins++;
+            foreach (var c in battle.TeamA)
+            {
+                c.Digimon.TotalBattles++;
+                if (result == BattleResult.Win) c.Digimon.TotalWins++;
+            }
+            foreach (var player in battle.Participants)
+            {
+                player.Character.TotalBattles++;
+                if (result == BattleResult.Win) player.Character.TotalWins++;
+            }
         }
 
-        var zone = battle.Participants.FirstOrDefault()?.Zone;
-        if (result == BattleResult.Win && zone is not null)
-            zone.Kill(battle.Wild);
-        else
+        if (battle.Wild.Spawn.Exclusive && battle.Zone is { } zone)
         {
-            battle.Wild.Reset();
-            zone?.Broadcast(new WildDigimonUpdatePacket(battle.Wild));
+            if (result == BattleResult.Win) zone.Kill(battle.Wild);
+            else
+            {
+                battle.Wild.Reset();
+                zone.Broadcast(new WildDigimonUpdatePacket(battle.Wild));
+            }
         }
         _log.LogDebug("{Battle} terminou: {Result}", battle, result);
     }

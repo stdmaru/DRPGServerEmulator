@@ -6,6 +6,7 @@ namespace DRPGServer.Game.Battle;
 
 public enum BattleSide : byte { A, B }
 
+/// <summary>Resultado no 0x6D. <see cref="Cancel"/> é interno (desconexão): não vai para o cliente.</summary>
 public enum BattleResult : byte
 {
     Win = 1,
@@ -20,200 +21,228 @@ public sealed class Combatant(Digimon digimon, BattleSide side, Player? owner, W
     public BattleSide Side { get; } = side;
     public Player? Owner { get; } = owner;
     public WildMember? Wild { get; } = wild;
+    public bool IsWild => Owner is null;
     public int Gauge { get; set; }
-    public Combatant? AutoTarget { get; set; }
-    public bool GaugeFull => Gauge >= Digimon.Stats.MaxActionGauge;
+    /// <summary>✅ Ações feitas na batalha (u16 no offset 134 da entrada do 0x67).</summary>
+    public int Actions { get; set; }
+    /// <summary>Ação marcada pelo jogador (0x35); acontece quando a barra enche.</summary>
+    public BattleIcon Choice { get; set; }
+    public Combatant? ChoiceTarget { get; set; }
+    public bool GaugeFull => Gauge >= BattleFormulas.MaxGauge;
 }
 
 /// <summary>
-/// Batalha PvE, portada do protótipo sem mudar a mecânica (a próxima tarefa refaz o sistema).
-/// Roda só na thread do mundo, chamada pelo <see cref="BattleSystem"/>.
+/// Batalha PvE, refeita sobre as capturas v322 (docs/mecanicas/batalha.md). Roda só na thread do mundo.
 ///
-/// Fluxo: 0x61 (C2S pede) → 0x62 (S2C serial) → 0x62 (C2S confirma) → 0x63 (S2C times) →
-/// 0x69 (C2S pronto) → 0x69 (S2C) → barras enchem (0x6B) → ataque (0x68, 0x67) →
-/// o cliente manda 0x69 de novo quando termina a animação → … → 0x6D (fim).
+/// Abertura: 0x61 (C2S) → 0x62 (S2C serial) → 0x62 (C2S eco) → 0x63 (times) → 0x69 (C2S pronto) →
+/// 0x10 (tamer em batalha) → 0x69. Depois as barras enchem (0x6B de todos a cada passo). O jogador marca a
+/// ação com 0x35 (2 → 1 marcada, de novo → 4 desmarcada); com a barra cheia ela acontece:
+/// 0x35 (3) → 0x68 → [0x6E/0x70 se derrubou] → 0x67. O inimigo age sozinho: 0x68 → 0x67. As barras param
+/// até o cliente mandar 0x69 no fim da animação. Vitória: … 0x67 → 0xB1 → 0x10 → 0x84 → 0x6D 1.
+/// Fuga: 0x35 (3) → 0x65 → 0x6A → 0x6D 2.
 /// </summary>
 public sealed class Battle
 {
-    private static readonly TimeSpan StartDelay = TimeSpan.FromMilliseconds(700);
-    private static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(200);
+    /// <summary>✅ Passo das barras: mediana de 0,16 s entre 0x6B do mesmo digimon (2927 de 4300 intervalos).</summary>
+    public static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(165);
     public const int MaxPerSide = 5;
+
+    private enum Phase { Opening, Running, Animating, Over }
 
     private readonly BattleSystem _system;
     private readonly List<Player> _participants = [];
     private readonly List<Combatant> _teamA = [];
     private readonly List<Combatant> _teamB = [];
-    private readonly Queue<(Combatant Attacker, Combatant Target)> _pending = new();
+    private Phase _phase = Phase.Opening;
     private TimeSpan _timer;
-    private bool _started;
 
-    /// <summary>O cliente terminou de animar e espera o próximo passo (0x69).</summary>
-    private bool _clientReady;
-
-    /// <summary>Barras enchendo; dá para pedir ação.</summary>
-    private bool _idle;
-
-    internal Battle(BattleSystem system, Player player, WildDigimon wild, Random random)
+    internal Battle(BattleSystem system, Player player, WildDigimon wild, Func<WildMember, Digimon> enemyOf, Random random)
     {
         _system = system;
         Wild = wild;
+        Zone = player.Zone;
         _participants.Add(player);
         _teamA.Add(new Combatant(player.Leader, BattleSide.A, player, null));
         for (int i = 0; i < wild.Members.Count && _teamB.Count < MaxPerSide; i++)
         {
             var member = wild.Members[i];
-            if (i == 0 || random.Next(101) <= member.Option.AppearanceRate)
-                _teamB.Add(new Combatant(member.Digimon, BattleSide.B, null, member));
+            if (i == 0 || random.Next(100) < member.Option.AppearanceRate)
+                _teamB.Add(new Combatant(enemyOf(member), BattleSide.B, null, member));
         }
     }
 
     public Serial Serial { get; } = Serial.New();
     public WildDigimon Wild { get; }
+    public World.Zone? Zone { get; }
     public IReadOnlyList<Combatant> TeamA => _teamA;
     public IReadOnlyList<Combatant> TeamB => _teamB;
     public IReadOnlyList<Player> Participants => _participants;
-    public bool IsOver { get; private set; }
-    public bool IsIdle => _idle;
+    public bool IsOver => _phase == Phase.Over;
+    /// <summary>Barras enchendo (fora da abertura e das animações).</summary>
+    public bool IsRunning => _phase == Phase.Running;
 
     private IEnumerable<Combatant> All => _teamA.Concat(_teamB);
+    private Combatant? Find(Serial serial) => All.FirstOrDefault(c => c.Digimon.Serial == serial);
 
     internal void Start()
     {
         foreach (var player in _participants)
             player.Battle = this;
-        foreach (var c in All)
-            c.Gauge = 0;
-        Wild.State = WildState.InBattle;
         Broadcast(new StartBattlePacket(Serial));
-        _timer = -StartDelay;
     }
 
     /// <summary>0x62 confirmado pelo cliente: manda os dois times.</summary>
-    public void SendTeams(Player player) => player.Send(new BattleCreatePacket(this));
+    public void SendTeams(Player player)
+    {
+        if (_phase == Phase.Opening) player.Send(new BattleCreatePacket(this));
+    }
 
-    /// <summary>0x69: o cliente está pronto para continuar.</summary>
+    /// <summary>0x69: o cliente terminou de carregar (abertura) ou de animar (depois de cada ação).</summary>
     public void ClientReady(Player player)
     {
+        switch (_phase)
+        {
+            case Phase.Opening:
+                player.Zone?.Broadcast(new RefreshCharacterInfoPacket(player.Character, TamerState.InBattle));
+                break;
+            case Phase.Animating:
+                ClearDeadChoices();
+                break;
+            default:
+                return;
+        }
         player.Send(new BattleBeginPacket());
-        if (!_idle) _clientReady = true;
+        _phase = Phase.Running;
+        _timer = TimeSpan.Zero;
     }
 
     internal void Update(TimeSpan dt)
     {
-        if (IsOver) return;
+        if (_phase != Phase.Running) return;
         _timer += dt;
         if (_timer < TickInterval) return;
-        _timer = TimeSpan.Zero;
-        _started = true;
+        _timer -= TickInterval;
         Step();
     }
 
     private void Step()
     {
-        if (_teamA.All(c => c.Digimon.IsKnockedOut)) { End(BattleResult.Lose); return; }
-        if (_teamB.All(c => c.Digimon.IsKnockedOut)) { End(BattleResult.Win); return; }
+        var alive = All.Where(c => !c.Digimon.IsKnockedOut).ToList();
+        foreach (var c in alive)
+            c.Gauge = Math.Min(BattleFormulas.MaxGauge, c.Gauge + BattleFormulas.GaugeGain(c.Digimon, c.IsWild));
+        foreach (var c in alive)
+            Broadcast(new ActionCooldownPacket(c.Digimon.Serial, c.Gauge));
 
-        if (_pending.TryDequeue(out var action))
+        // ✅ quem tem a barra cheia e uma ação age; o selvagem age sozinho, o jogador espera a escolha
+        if (alive.FirstOrDefault(c => c.GaugeFull && (c.IsWild || c.Choice != BattleIcon.None)) is { } actor)
+            Act(actor);
+    }
+
+    private void Act(Combatant actor)
+    {
+        if (actor.IsWild)
         {
-            _clientReady = false;
-            _idle = false;
-            Attack(action.Attacker, action.Target);
+            var targets = _teamA.Where(c => !c.Digimon.IsKnockedOut).ToList();
+            if (targets.Count == 0) return;
+            Attack(actor, targets[_system.Random.Next(targets.Count)]);
             return;
         }
 
-        if (_clientReady) _idle = true;
-        if (!_idle) return;
+        var choice = actor.Choice;
+        var target = actor.ChoiceTarget;
+        actor.Choice = BattleIcon.None;
+        actor.ChoiceTarget = null;
+        Broadcast(new ActionRequestPacket(BattleAction.Executed, BattleIcon.None, actor.Digimon.Serial, Serial.Empty));
 
-        var cooldowns = new List<ServerPacket>();
-        foreach (var c in All)
+        if (choice == BattleIcon.Flee)
         {
-            if (c.Digimon.IsKnockedOut) continue;
-            c.Gauge = Math.Min(c.Gauge + BattleFormulas.GaugeGain(c), c.Digimon.Stats.MaxActionGauge);
-            cooldowns.Add(new ActionCooldownPacket(c.Digimon.Serial, c.Gauge));
-
-            if (c.Side == BattleSide.B && c.AutoTarget is null)
-                QueueAutoAttack(c, PickTarget(_teamA), visual: false);
-
-            if (c.GaugeFull && c.AutoTarget is { } target)
-            {
-                _pending.Enqueue((c, target));
-                break;
-            }
+            Flee(actor);
+            return;
         }
-        foreach (var packet in cooldowns)
-            Broadcast(packet);
+        if (target is null || target.Digimon.IsKnockedOut) return;
+        Attack(actor, target);
     }
 
-    private Combatant PickTarget(List<Combatant> team)
-    {
-        var alive = team.Where(c => !c.Digimon.IsKnockedOut).ToList();
-        return alive.Count > 0 ? alive[_system.Random.Next(alive.Count)] : team[0];
-    }
-
-    /// <summary>0x35: o jogador escolheu atacar um alvo.</summary>
-    public void RequestAction(Player player, Serial requester, Serial target)
-    {
-        if (!_idle || IsOver) return;
-        var attacker = All.FirstOrDefault(c => c.Digimon.Serial == requester);
-        var victim = All.FirstOrDefault(c => c.Digimon.Serial == target);
-        if (attacker is null || victim is null || attacker.Owner != player) return;
-
-        if (attacker.AutoTarget is not null)
-            ClearAutoAttack(attacker);
-        QueueAutoAttack(attacker, victim, visual: !attacker.GaugeFull);
-    }
-
-    private void Attack(Combatant attacker, Combatant target)
+    private void Attack(Combatant actor, Combatant target)
     {
         Broadcast(new LockActionBarPacket());
+        var hit = BattleFormulas.Attack(actor.Digimon, target.Digimon, _system.Random);
+        target.Digimon.TakeDamage(hit.Damage);
+        actor.Actions++;
+        actor.Gauge = 0;
 
-        int damage = BattleFormulas.Damage(attacker.Digimon, target.Digimon);
-        target.Digimon.TakeDamage(damage);
-        Broadcast(ActionResults(attacker, target));
+        if (target.Digimon.IsKnockedOut && actor.Owner is { } owner && target.Wild is { } member)
+            _system.GrantRewards(owner, actor.Digimon, member);
 
-        if (target.Digimon.IsKnockedOut)
+        var (acting, other) = actor.Side == BattleSide.A ? (_teamA, _teamB) : (_teamB, _teamA);
+        Broadcast(new ActionResultsPacket(acting, other, actor, target, hit.Landed));
+
+        if (_teamB.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Win);
+        else if (_teamA.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Lose);
+        else _phase = Phase.Animating;
+    }
+
+    private void Flee(Combatant actor)
+    {
+        Broadcast(new FleeDigimonPacket(actor.Digimon.Serial));
+        if (actor.Owner is { } owner)
+            Broadcast(new FleeTamerPacket(owner.Character.Serial));
+        End(BattleResult.Lose);
+    }
+
+    /// <summary>✅ Escolha apontando para um inimigo derrubado: o oficial desmarca (0x35 4, ícone e alvo zerados).</summary>
+    private void ClearDeadChoices()
+    {
+        foreach (var c in _teamA.Where(c => c.ChoiceTarget is { Digimon.IsKnockedOut: true }))
         {
-            ClearAutoAttack(attacker);
-            foreach (var c in All.Where(c => c.AutoTarget == target))
-                c.AutoTarget = null;
-            if (attacker.Owner is { } owner && target.Wild is { } member)
-                _system.GrantRewards(owner, attacker.Digimon, member);
+            c.Choice = BattleIcon.None;
+            c.ChoiceTarget = null;
+            Broadcast(new ActionRequestPacket(BattleAction.Cleared, BattleIcon.None, c.Digimon.Serial, Serial.Empty));
         }
-        attacker.Gauge = 0;
     }
 
-    private ActionResultsPacket ActionResults(Combatant attacker, Combatant target)
+    /// <summary>
+    /// 0x35: o jogador clicou numa ação. ✅ Alterna: marca (1) ou, se é a mesma, desmarca (4); o servidor
+    /// devolve o ícone e o alvo. Vale também durante a animação (o cliente manda antes do 0x69).
+    /// </summary>
+    public void RequestAction(Player player, BattleIcon icon, Serial requester, Serial target)
     {
-        bool enemyTurn = attacker.Side == BattleSide.B;
-        var attackers = (enemyTurn ? _teamB : _teamA).Select(c => c.Digimon).ToList();
-        var defenders = (enemyTurn ? _teamA : _teamB).Select(c => c.Digimon).ToList();
-        return new ActionResultsPacket(attackers, defenders, attacker.Digimon, target.Digimon, enemyTurn);
+        if (_phase is Phase.Opening or Phase.Over) return;
+        if (Find(requester) is not { } actor || actor.Owner != player || actor.Digimon.IsKnockedOut) return;
+
+        Combatant? victim = null;
+        switch (icon)
+        {
+            case BattleIcon.Attack:
+                victim = Find(target);
+                if (victim is null || victim.Side == actor.Side || victim.Digimon.IsKnockedOut) return;
+                break;
+            case BattleIcon.Flee:
+                break;
+            default:
+                return;                             // ❓ skills e itens ainda não
+        }
+
+        bool same = actor.Choice == icon && actor.ChoiceTarget == victim;
+        actor.Choice = same ? BattleIcon.None : icon;
+        actor.ChoiceTarget = same ? null : victim;
+        var targetSerial = victim?.Digimon.Serial ?? Serial.Empty;
+        Broadcast(new ActionRequestPacket(same ? BattleAction.Cleared : BattleAction.Selected, icon, requester, targetSerial));
     }
 
-    private void ClearAutoAttack(Combatant c)
-    {
-        c.AutoTarget = null;
-        Broadcast(new ActionRequestPacket(0, c.Digimon.Serial, Serial.Empty));
-    }
-
-    private void QueueAutoAttack(Combatant c, Combatant target, bool visual)
-    {
-        c.AutoTarget = target;
-        if (visual)
-            Broadcast(new ActionRequestPacket(1, c.Digimon.Serial, target.Digimon.Serial));
-    }
-
-    /// <summary>Comando de GM: derruba um lado inteiro.</summary>
+    /// <summary>Comando de GM: derruba um lado inteiro e encerra.</summary>
     public void KnockOut(BattleSide side)
     {
         if (IsOver) return;
-        _idle = false;
+        var owner = _participants.FirstOrDefault();
         foreach (var c in side == BattleSide.A ? _teamA : _teamB)
         {
+            if (c.Digimon.IsKnockedOut) continue;
             c.Digimon.TakeDamage(c.Digimon.Hp);
-            Broadcast(ActionResults(c, c));
+            if (owner is not null && c.Wild is { } member)
+                _system.GrantRewards(owner, owner.Leader, member);
         }
-        _clientReady = true;
+        End(side == BattleSide.B ? BattleResult.Win : BattleResult.Lose);
     }
 
     /// <summary>Jogador saiu (desconectou). Sem ninguém, a batalha acaba sem resultado.</summary>
@@ -228,11 +257,31 @@ public sealed class Battle
     private void End(BattleResult result)
     {
         if (IsOver) return;
-        IsOver = true;
-        Broadcast(new BattleEndPacket(result));
+        _phase = Phase.Over;
+
+        if (result != BattleResult.Cancel)
+        {
+            foreach (var player in _participants)
+            {
+                if (result == BattleResult.Win)
+                    player.Send(new TamerExpPacket(player.Character));
+                player.Zone?.Broadcast(new RefreshCharacterInfoPacket(player.Character, TamerState.Idle));
+                foreach (var c in _teamA.Where(c => c.Owner == player))
+                {
+                    // ❓ derrota por nocaute não capturada; o digimon volta com 1 de HP para não ficar zerado no mapa
+                    if (c.Digimon.IsKnockedOut) c.Digimon.Heal(1, 0, 0);
+                    if (result == BattleResult.Win) player.Send(new BattleDigimonStatusPacket(c.Digimon));
+                }
+            }
+            Broadcast(new BattleEndPacket(result));
+        }
+
         _system.Finish(this, result);
         foreach (var player in _participants)
+        {
             player.Battle = null;
+            player.NextRecoveryAt = _system.Now + World.Zone.RecoveryAfterBattle;
+        }
         _participants.Clear();
     }
 
@@ -244,5 +293,5 @@ public sealed class Battle
             player.Session.SendFrame(frame);
     }
 
-    public override string ToString() => $"batalha {Serial} ({(_started ? "andando" : "começando")})";
+    public override string ToString() => $"batalha {Serial} ({_phase})";
 }

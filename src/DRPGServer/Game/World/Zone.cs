@@ -15,7 +15,9 @@ public sealed class Zone
     // ✅ derrotado (8) por ~10,4 s antes de sair do mapa (12); ❓ só 2 amostras
     public static readonly TimeSpan DeadDisplayTime = TimeSpan.FromSeconds(10.4);
     // ✅ v322 (sessões 52–56): o oficial manda 0xC4 e a recuperação no mesmo tick, mediana 5,2 s (p10 5,1, p90 5,3)
-    private static readonly TimeSpan RecoveryInterval = TimeSpan.FromMilliseconds(5200);
+    public static readonly TimeSpan RecoveryInterval = TimeSpan.FromMilliseconds(5200);
+    /// <summary>✅ Primeira recuperação depois da batalha: mediana 0,2 s depois do 0x6D (41 batalhas, 0,04–0,34 s).</summary>
+    public static readonly TimeSpan RecoveryAfterBattle = TimeSpan.FromMilliseconds(200);
     private static readonly TimeSpan DropCleanInterval = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan DropLifetime = TimeSpan.FromSeconds(60);
     /// <summary>✅ Chance por tick de um selvagem parado começar a andar: 3276 de 65 462 ticks parados (5 %).</summary>
@@ -62,7 +64,9 @@ public sealed class Zone
             UpdateWild(now);
 
         if (Every(ref _recoveryTimer, dt, RecoveryInterval))
-            AutoRecovery();
+            foreach (var player in _players)
+                player.Send(new KeepAlivePacket((ushort)MapOpcode.KeepAlive));
+        AutoRecovery(now);
 
         if (Every(ref _cleanTimer, dt, DropCleanInterval))
             foreach (var drop in _drops.Values.Where(d => now - d.DroppedAt >= DropLifetime).ToList())
@@ -84,6 +88,7 @@ public sealed class Zone
         _world.AssertWorldThread();
         _players.Add(player);
         player.Zone = this;
+        player.NextRecoveryAt = _world.Now + RecoveryInterval;
         foreach (var wild in _wild.Values)
             player.Send(new WildDigimonUpdatePacket(wild));
     }
@@ -105,16 +110,16 @@ public sealed class Zone
     }
 
     /// <summary>
-    /// Tick de ~5,2 s: ping 0xC4 para todos (também em batalha; o cliente responde) e recuperação do
-    /// líder fora da batalha. ✅ 349 ticks: HP +5, VP +3, EVP +10, até o máximo, independente do máximo;
-    /// 0xB2 só quando algo mudou.
+    /// Recuperação do líder a cada ~5,2 s, por jogador. ✅ 349 ticks: HP +5, VP +3, EVP +10, até o máximo;
+    /// 0xB2 só quando algo mudou. ✅ Nenhum 0xB2 durante as 67 batalhas v322; no fim o relógio recomeça com
+    /// <see cref="RecoveryAfterBattle"/> (ver <see cref="Player.NextRecoveryAt"/>). O ping 0xC4 segue no tick da zona.
     /// </summary>
-    private void AutoRecovery()
+    private void AutoRecovery(TimeSpan now)
     {
         foreach (var player in _players)
         {
-            player.Send(new KeepAlivePacket((ushort)MapOpcode.KeepAlive));
-            if (player.InBattle) continue;
+            if (player.InBattle || now < player.NextRecoveryAt) continue;
+            player.NextRecoveryAt = now + RecoveryInterval;
             var leader = player.Leader;
             var before = (leader.Hp, leader.Vp, leader.Evp);
             leader.Heal(5, 3, 10);

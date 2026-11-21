@@ -57,7 +57,8 @@ public static class GameDataLoader
                 I64(o, "ExpReward"), F64(o, "BitReward"), U16(o, "AppearanceRate"), U32(o, "DropGroup"))).ToList();
             var points = e.Elements("Point").Select(p => (I16(p, "X"), I16(p, "Y"))).ToList();
             var area = new SpawnArea(U8(e, "MapID"), I16(e, "PosXMin"), I16(e, "PosXMax"), I16(e, "PosYMin"), I16(e, "PosYMax"),
-                points.Count > 0 ? points.Count : I32(e, "MaxCount"), TimeSpan.FromSeconds(F64(e, "RespawnTime")), options, points);
+                points.Count > 0 ? points.Count : I32(e, "MaxCount"), TimeSpan.FromSeconds(F64(e, "RespawnTime")), options, points,
+                (bool?)e.Attribute("Exclusive") ?? false);
             if (grids.GetValueOrDefault(area.MapId) is { } grid)
                 foreach (var (x, y) in points)
                     if (!grid.IsWalkable(x, y)) throw new GameDataException($"spawn no mapa {area.MapId}: ponto ({x}, {y}) não é andável");

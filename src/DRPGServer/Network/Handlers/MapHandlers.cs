@@ -274,17 +274,33 @@ public sealed class BattleReadyHandler : PlayerHandler
     protected override void Handle(Player player, PacketReader packet) => player.Battle?.ClientReady(player);
 }
 
-/// <summary>0x35: ação escolhida (por ora só ataque).</summary>
+/// <summary>0x35 (50 bytes): u8 ação (2), u16 ícone (0x0A ataque, 0x04 fuga), u8 0, quem age, alvo.</summary>
 [PacketHandler(MapOpcode.BattleActionReq)]
 public sealed class BattleActionHandler : PlayerHandler
 {
     protected override void Handle(Player player, PacketReader packet)
     {
-        packet.ReadU8();
-        packet.ReadU16();
+        if (packet.ReadU8() != (byte)BattleAction.Choose) return;
+        var icon = (BattleIcon)packet.ReadU16();
         packet.ReadU8();
         var requester = Serial.Read(packet);
         var target = Serial.Read(packet);
-        player.Battle?.RequestAction(player, requester, target);
+        player.Battle?.RequestAction(player, icon, requester, target);
+    }
+}
+
+/// <summary>
+/// 0xB4 (C2S, bloco de status): ✅ o cliente manda um por digimon 6,6 s depois do 0x6D, ao sair da tela de
+/// resultado; o oficial ecoa o bloco de cada um com os dados dele.
+/// </summary>
+[PacketHandler(MapOpcode.SingleDigimonInfo)]
+public sealed class DigimonInfoHandler : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        packet.ReadU32();
+        var serial = Serial.Read(packet);
+        if (player.Leader.Serial == serial)
+            player.Send(new SingleDigimonInfoPacket(player.Leader));
     }
 }

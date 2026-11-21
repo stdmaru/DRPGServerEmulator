@@ -1,3 +1,6 @@
+using DRPGServer.Game;
+using DRPGServer.Network.Packets.Map;
+using DRPGServer.Network.Protocol;
 using DRPGServer.Data;
 using System.Collections.Frozen;
 using DRPGServer.Data.GameData;
@@ -112,62 +115,175 @@ public class BattleTests
     private void Tick(int times = 1)
     {
         for (int i = 0; i < times; i++)
-            _battles.Update(TimeSpan.Zero, TimeSpan.FromMilliseconds(200));
+            _battles.Update(TimeSpan.Zero, Battle.TickInterval);
     }
 
-    [Fact]
-    public void Win_rewards_and_removes_wild_group()
+    /// <summary>Abre a batalha até as barras começarem a encher.</summary>
+    private Battle Open()
     {
         var wild = _zones.Find(79)!.WildDigimons.First();
         var battle = _battles.StartPve(_player, wild.Serial)!;
-        Assert.Same(battle, _player.Battle);
-        Assert.Equal(WildState.InBattle, wild.State);
-        Assert.Null(_battles.StartPve(_player, wild.Serial));   // já em batalha
-        Assert.Contains((ushort)0x62, _session.SentOpcodes());
-
+        Assert.Equal([(ushort)0x62], _session.SentOpcodes());
         battle.SendTeams(_player);
         battle.ClientReady(_player);
-        Assert.Equal([(ushort)0x63, (ushort)0x69], _session.SentOpcodes());
-
-        Tick(6);                                                // passa o atraso inicial e começa a encher
-        Assert.True(battle.IsIdle);
-        Assert.Contains((ushort)0x6B, _session.SentOpcodes());
-
-        battle.KnockOut(BattleSide.B);
-        Tick();
-        Assert.True(battle.IsOver);
-        Assert.Null(_player.Battle);
-        Assert.Equal(WildState.Dead, wild.State);
-        Assert.Equal(1, _player.Character.TotalWins);
-        Assert.Contains((ushort)0x6D, _session.SentOpcodes());
-        Assert.Equal(0, _battles.Count);
+        Assert.Equal([(ushort)0x63, (ushort)0x10, (ushort)0x69], _session.SentOpcodes());
+        Assert.True(battle.IsRunning);
+        return battle;
     }
 
     [Fact]
-    public void Disconnect_cancels_battle_and_frees_wild_group()
+    public void Shared_wild_group_keeps_roaming_and_battle_uses_copies()
     {
         var wild = _zones.Find(79)!.WildDigimons.First();
-        _battles.StartPve(_player, wild.Serial);
+        var battle = Open();
+        Assert.Same(battle, _player.Battle);
+        Assert.NotEqual(WildState.InBattle, wild.State);
+        Assert.DoesNotContain(battle.TeamB, c => wild.Members.Any(m => m.Digimon == c.Digimon));
+        Assert.Null(_battles.StartPve(_player, wild.Serial));   // já em batalha
+    }
+
+    [Fact]
+    public void Gauges_fill_every_step_and_the_marked_attack_happens_when_full()
+    {
+        var battle = Open();
+        var me = battle.TeamA[0];
+        var enemy = battle.TeamB[0];
+        Tick();
+        Assert.Equal(1 + battle.TeamB.Count, _session.SentOpcodes().Count(o => o == 0x6B));
+        Assert.Equal(BattleFormulas.GaugeGain(me.Digimon, wild: false), me.Gauge);
+
+        // ✅ clicar alterna: marca (1), desmarca (4)
+        battle.RequestAction(_player, BattleIcon.Attack, me.Digimon.Serial, enemy.Digimon.Serial);
+        battle.RequestAction(_player, BattleIcon.Attack, me.Digimon.Serial, enemy.Digimon.Serial);
+        var frames = _session.DrainOutgoing();
+        Assert.Equal([(byte)BattleAction.Selected, (byte)BattleAction.Cleared], frames.Select(f => f[PacketHeader.Length]).ToArray());
+        battle.RequestAction(_player, BattleIcon.Attack, me.Digimon.Serial, enemy.Digimon.Serial);
+        _session.DrainOutgoing();
+
+        enemy.Gauge = int.MinValue / 2;                         // o inimigo não age neste teste
+        var sent = new List<ushort>();
+        for (int i = 0; i < 20 && battle.IsRunning; i++)
+        {
+            Tick();
+            sent.AddRange(_session.SentOpcodes());
+        }
+        Assert.False(battle.IsRunning);
+        int at = sent.IndexOf(0x68);
+        Assert.Equal((ushort)0x35, sent[at - 1]);               // 3: ação executada
+        Assert.Equal((ushort)0x67, sent[^1]);
+        Assert.Equal(0, me.Gauge);
+        Assert.Equal(1, me.Actions);
+        Assert.Equal(BattleIcon.None, me.Choice);
+
+        // ✅ barras paradas até o cliente terminar a animação (0x69)
+        Tick(5);
+        Assert.DoesNotContain((ushort)0x6B, _session.SentOpcodes());
+        battle.ClientReady(_player);
+        Assert.Contains((ushort)0x69, _session.SentOpcodes());
+        Tick();
+        Assert.Contains((ushort)0x6B, _session.SentOpcodes());
+    }
+
+    [Fact]
+    public void Wild_attacks_on_its_own_when_full()
+    {
+        var battle = Open();
+        battle.TeamB[0].Gauge = BattleFormulas.MaxGauge;
+        Tick();
+        var sent = _session.SentOpcodes();
+        Assert.Equal([(ushort)0x68, (ushort)0x67], sent.Where(o => o is 0x68 or 0x67 or 0x35).ToList());
+        Assert.False(battle.IsRunning);
+    }
+
+    [Fact]
+    public void Win_sends_end_sequence_and_recovery_restarts_right_after()
+    {
+        var battle = Open();
+        _player.Leader.TakeDamage(10);
+        _zones.Find(79)!.Update(TimeSpan.FromHours(1), TimeSpan.FromMilliseconds(50));
+        Assert.DoesNotContain((ushort)0xB2, _session.SentOpcodes());   // ✅ sem recuperação durante a batalha
+
+        battle.KnockOut(BattleSide.B);
+        var sent = _session.SentOpcodes();
+        Assert.Equal([(ushort)0xB1, (ushort)0x10, (ushort)0x84, (ushort)0x6D], sent.Where(o => o is 0xB1 or 0x10 or 0x84 or 0x6D).ToList());
+        Assert.Contains((ushort)0x6E, sent);
+        Assert.True(battle.IsOver);
+        Assert.Null(_player.Battle);
+        Assert.Equal(1, _player.Character.TotalWins);
+        Tick();
+        Assert.Equal(0, _battles.Count);
+
+        // ✅ o oficial cura ~0,2 s depois do 0x6D, ainda na tela de resultado
+        Assert.InRange(_player.NextRecoveryAt - _world.Now, TimeSpan.Zero, Zone.RecoveryAfterBattle);
+    }
+
+    [Fact]
+    public void Flee_happens_when_gauge_fills()
+    {
+        var battle = Open();
+        var me = battle.TeamA[0];
+        battle.RequestAction(_player, BattleIcon.Flee, me.Digimon.Serial, Serial.Empty);
+        foreach (var c in battle.TeamB) c.Gauge = int.MinValue / 2;
+        me.Gauge = BattleFormulas.MaxGauge;
+        _session.DrainOutgoing();
+        Tick();
+        var sent = _session.SentOpcodes();
+        Assert.Equal([(ushort)0x35, (ushort)0x65, (ushort)0x6A], sent.Where(o => o is 0x35 or 0x65 or 0x6A).ToList());
+        Assert.Equal((ushort)0x6D, sent[^1]);
+        Assert.True(battle.IsOver);
+        Assert.Equal(0, _player.Character.TotalWins);
+        Assert.Equal(1, _player.Character.TotalBattles);
+    }
+
+    [Fact]
+    public void Disconnect_cancels_battle_silently()
+    {
+        var battle = Open();
         _battles.PlayerLeft(_player);
         Tick();
-        Assert.Equal(WildState.Idle, wild.State);
+        Assert.True(battle.IsOver);
+        Assert.DoesNotContain((ushort)0x6D, _session.SentOpcodes());
         Assert.Equal(0, _battles.Count);
+        Assert.Equal(0, _player.Character.TotalBattles);
     }
 
     [Fact]
     public void Cannot_command_a_digimon_you_do_not_own()
     {
-        var wild = _zones.Find(79)!.WildDigimons.First();
-        var battle = _battles.StartPve(_player, wild.Serial)!;
-        battle.ClientReady(_player);
-        Tick(6);
-        _session.DrainOutgoing();
+        var battle = Open();
         var enemy = battle.TeamB[0].Digimon.Serial;
-        battle.RequestAction(_player, enemy, battle.TeamA[0].Digimon.Serial);
+        battle.RequestAction(_player, BattleIcon.Attack, enemy, battle.TeamA[0].Digimon.Serial);
+        battle.RequestAction(_player, BattleIcon.Attack, battle.TeamA[0].Digimon.Serial, battle.TeamA[0].Digimon.Serial);
         Assert.DoesNotContain((ushort)0x35, _session.SentOpcodes());
     }
 }
 
+public class BattleFormulaTests
+{
+    [Theory]
+    // ✅ v322, ataque básico entre in-training (sessões 53–54): ATK, DEF, dano
+    [InlineData(145, 63, 33)]
+    [InlineData(145, 43, 48)]
+    [InlineData(218, 63, 75)]
+    [InlineData(261, 63, 108)]
+    [InlineData(283, 69, 116)]
+    [InlineData(80, 94, 6)]
+    public void Basic_attack_damage_matches_captures(int atk, int def, int damage) =>
+        Assert.Equal(damage, (int)BattleFormulas.BaseDamage(atk, def));
+
+    [Fact]
+    public void Gauge_gain_matches_captures()
+    {
+        // ✅ v322: jogador pelo nível (L1 42, L2 77, L10 BR 201 → 109, L20 BR 349 → 124); selvagem pelo BR
+        Assert.Equal(42, BattleFormulas.GaugeGain(1, 131, wild: false));
+        Assert.Equal(77, BattleFormulas.GaugeGain(2, 139, wild: false));
+        Assert.InRange(BattleFormulas.GaugeGain(10, 201, wild: false), 108, 110);
+        Assert.Equal(124, BattleFormulas.GaugeGain(20, 349, wild: false));
+        Assert.Equal(8, BattleFormulas.GaugeGain(1, 85, wild: true));
+        Assert.Equal(14, BattleFormulas.GaugeGain(17, 165, wild: true));
+        Assert.Equal(33, BattleFormulas.GaugeGain(50, 1040, wild: true));
+    }
+}
 public class InfrastructureTests
 {
     [Fact]
@@ -222,10 +338,11 @@ public class ZoneTickTests
         var (hp, vp, evp) = (leader.Hp, leader.Vp, leader.Evp);
         session.DrainOutgoing();
 
-        zone.Update(TimeSpan.Zero, TimeSpan.FromMilliseconds(5100));
+        var due = player.NextRecoveryAt;
+        zone.Update(due - TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(5100));
         Assert.DoesNotContain((ushort)0xC4, session.SentOpcodes());
 
-        zone.Update(TimeSpan.Zero, TimeSpan.FromMilliseconds(100));
+        zone.Update(due, TimeSpan.FromMilliseconds(100));
         var sent = session.SentOpcodes();
         Assert.Contains((ushort)0xC4, sent);
         Assert.Contains((ushort)0xB2, sent);
