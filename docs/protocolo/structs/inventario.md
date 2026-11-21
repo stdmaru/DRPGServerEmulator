@@ -16,7 +16,7 @@ O mesmo registro aparece no `0x97` (item recebido: 12 bytes, `u32` posição, re
 | off | tipo | campo |
 |---|---|---|
 | 0 | u32 | uid do item |
-| 4 | u32 | id do item (`ItemTable.xml`) |
+| 4 | u32 | id do item (`item_info_us` do cliente) |
 | 8 | u8, u8 | ❓ tipo (`0C 02` carta/livro, `05 01` semente, `07 06` consumível, `0B 03`/`0C 03` …) |
 | 12 | u32 | quantidade (sementes: 3 → 2 ao entregar) |
 | 16 | u32… | ❓ limites e preço: `E7 03` (999), `E8 03` (1000), `64` (100), `10 27` (10000) |

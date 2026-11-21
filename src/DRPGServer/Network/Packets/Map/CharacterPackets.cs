@@ -1,5 +1,6 @@
 using DRPGServer.Game;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Stats;
 using DRPGServer.Network.Protocol;
 
 namespace DRPGServer.Network.Packets.Map;
@@ -21,7 +22,7 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
         w.WriteZeros(2);
         w.WriteI32(0);                          // fama
         w.WriteI32(0);                          // EXP do tamer ❓ não persistido
-        w.WriteI32(10);                         // EXP para o próximo nível do tamer ❓
+        w.WriteI32((int)ExpFormulas.TamerExpToNext(c.Level)); // EXP para o próximo nível do tamer ✅ 5·(L + 1)
         w.WriteZeros(4);
         w.WriteF64(c.Bits);
         w.WriteI32(c.TotalWins);
@@ -42,8 +43,8 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
         w.WriteI16(0);                          // 118 bônus de DEF (taxa)
         w.WriteI16(0);                          // 120 bônus de BR (taxa)
         w.WriteZeros(38);                       // 122
-        w.WriteU8(1);                           // 160 tipo de evolução (in-training, rookie...)
-        w.WriteU8(0);                           // 161 ?
+        w.WriteU8(d.Species.Stage);             // 160 estágio (1 in-training, 2 rookie...)
+        w.WriteU8(d.Species.Attribute);         // 161 atributo
         w.WriteSparse(30, (0, [0x01]));         // 162
         DigimonStatusBlock.WriteCombat(w, d);
         DigimonStatusBlock.WriteProgress(w, d);
@@ -92,7 +93,7 @@ public sealed class RefreshCharacterInfoPacket(Character character) : ServerPack
         c.Leader.Serial.Write(w);               // 56
         w.WriteU16(c.Leader.SpeciesId);         // 72
         w.WriteFixedString(c.Leader.Name, 21);  // 74
-        w.WriteU8(1);                           // 95 estágio do líder ❓ (1 in-training, 2 rookie, 3 champion, 5 mega); o emulador ainda não tem a tabela
+        w.WriteU8(c.Leader.Species.Stage);      // 95 estágio do líder ✅ (1 in-training, 2 rookie, 3 champion, 5 mega)
         w.WriteI32(c.Leader.Level);             // 96 nível do líder ✅
         w.WriteU32(0);                          // 100 ? (20030 em megas; o mesmo valor do bloco de status em 320)
         w.WriteZeros(100);                      // até 204
@@ -184,9 +185,9 @@ public sealed class WildDigimonUpdatePacket(WildDigimon wild) : ServerPacket
         w.WriteFixedString(leader.Name, 21);
         w.WriteU8(0);
         w.WriteU16(leader.SpeciesId);
-        w.WriteU16(1);                          // ❓ tipo de evolução
+        w.WriteU16(leader.Species.Stage);       // ❓ estágio (era 1 fixo)
         w.WriteU16(leader.Level);
-        w.WriteU8(leader.Species.Classification);
+        w.WriteU8(2);                           // ❓ 2 como no byte 300 do bloco de status do selvagem
         w.WriteU8(wild.State switch             // 1 no mapa, 6/8 morto, 11 em batalha
         {
             WildState.InBattle => 11,

@@ -1,4 +1,5 @@
 using DRPGServer.Data;
+using DRPGServer.Data.GameData;
 using DRPGServer.Game.Battle;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Stats;
@@ -228,5 +229,107 @@ public class ZoneTickTests
         Assert.Contains((ushort)0xC4, sent);
         Assert.Contains((ushort)0xB2, sent);
         Assert.Equal((hp + 5, vp + 3, evp + 10), (leader.Hp, leader.Vp, leader.Evp));
+    }
+}
+
+public class ExpFormulaTests
+{
+    // ✅ capturas v242 e v322: EXP para o próximo nível, níveis 1–21 (offset 256 do bloco de status)
+    private static readonly long[] Captured =
+        [24, 57, 103, 165, 248, 358, 501, 687, 928, 1238, 1634, 2139, 2781, 3594, 4622, 5916, 7543, 9584, 12140, 15335, 19322];
+
+    [Fact]
+    public void Digimon_exp_matches_captures()
+    {
+        for (int level = 1; level <= Captured.Length; level++)
+            Assert.Equal(Captured[level - 1], ExpFormulas.DigimonExpToNext(level));
+        // ✅ digimon nível 160 da sessão 56: o valor do nível 77
+        Assert.Equal(1_925_209_472, ExpFormulas.DigimonExpToNext(77));
+        Assert.Equal(1_925_209_472, ExpFormulas.DigimonExpToNext(160));
+    }
+
+    [Theory]
+    [InlineData(1, 10)]
+    [InlineData(5, 30)]
+    [InlineData(14, 75)]
+    [InlineData(15, 80)]
+    [InlineData(201, 1010)]
+    public void Tamer_exp_matches_captures(int level, long expected) =>
+        Assert.Equal(expected, ExpFormulas.TamerExpToNext(level));
+}
+
+public class ClientTablesTests
+{
+    [Fact]
+    public void Species_take_growth_from_dex_by_id_then_by_name()
+    {
+        var s = TestSupport.Data.Species;
+        Assert.Equal(new Attributes(2, 1, 1, 1), s[10].Growth);
+        Assert.Equal((byte)2, s[50].Stage);
+        Assert.Equal((ushort)31, s[50].Skill2);
+        Assert.Equal(new Attributes(1, 2, 3, 4), s[60].Growth);   // dex com outro id, mesmo nome
+        Assert.Null(s[61].Growth);                                 // sem linha na dex
+        Assert.Equal("Namedmon", s[62].Name);                      // nome vazio no digimon_us
+    }
+
+    [Fact]
+    public void Base_attributes_grow_per_level_and_rookie_adds_bonus()
+    {
+        var s = TestSupport.Data.Species;
+        Assert.Equal(new Attributes(10, 10, 10, 10), StatFormulas.BaseAttributes(s[10], 1));
+        Assert.Equal(new Attributes(28, 19, 19, 19), StatFormulas.BaseAttributes(s[10], 10));
+        Assert.Equal(new Attributes(30 + 30, 30 + 20, 30 + 20, 30 + 10), StatFormulas.BaseAttributes(s[50], 11));
+        Assert.Equal(new Attributes(10, 10, 10, 10), StatFormulas.BaseAttributes(s[61], 30));
+    }
+
+    [Fact]
+    public void Items_and_zones_come_from_the_client()
+    {
+        var data = TestSupport.Data;
+        Assert.Equal("Test Seed", data.Items[41].Name);
+        Assert.False(data.Items.ContainsKey(0));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 13, 40, 44, 79, 90, 91], data.ZoneIds.Select(i => (int)i));
+    }
+
+    [Fact]
+    public void Captured_portal_wins_over_map_table_name()
+    {
+        var p = Assert.Single(TestSupport.Data.PortalsOf(40), p => p.X == 4 && p.Y == 80);
+        Assert.Equal(new PortalInfo(40, 4, 80, 44, 193, 43), p);
+    }
+
+    [Fact]
+    public void Unknown_portal_arrives_next_to_the_return_portal()
+    {
+        // 90 → 91: portal de volta em (50, 50), centro dos portais de 91 em (70, 30) → 5 casas por eixo
+        var p = Assert.Single(TestSupport.Data.PortalsOf(90));
+        Assert.Equal(new PortalInfo(90, 10, 10, 91, 55, 45), p);
+        Assert.Equal(2, TestSupport.Data.PortalsOf(91).Count);
+    }
+}
+
+/// <summary>
+/// O pacote real do cliente (Resources/Client, v322, fora do git) carrega junto com as tabelas do servidor.
+/// Sem a cópia local o teste passa sem checar nada.
+/// </summary>
+public class RealClientTablesTests
+{
+    [Fact]
+    public void Real_client_pack_loads_with_server_resources()
+    {
+        var resources = Path.Combine(AppContext.BaseDirectory, "Resources");
+        var table = Path.Combine(resources, "Client", "table.hf");
+        if (!File.Exists(table)) return;
+        var data = GameDataLoader.Load(resources, ClientPack.Open(table));
+        Assert.True(data.Species.Count > 700);
+        Assert.True(data.Items.Count > 10_000);
+        Assert.Contains((byte)79, data.ZoneIds);
+        Assert.Equal(new PortalInfo(1, 3, 120, 2, 165, 17), data.PortalsOf(1).Single(p => p.X == 3));
+        Assert.Equal((byte)1, data.Species[14].Stage);
+        Assert.Equal(new DRPGServer.Game.Stats.Attributes(2, 2, 2, 2), data.Species[14].Growth);
+        var yuramon = data.Species[14];
+        Console.WriteLine($"real: {data.Species.Count} espécies ({data.Species.Values.Count(s => s.Growth is null)} sem dex), " +
+            $"{data.Items.Count} itens, {data.ZoneIds.Count} zonas, {data.Portals.Values.Sum(p => p.Count)} portais; " +
+            $"Yuramon {yuramon.Name} estágio {yuramon.Stage} cresc. {yuramon.Growth}");
     }
 }

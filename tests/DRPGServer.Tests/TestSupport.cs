@@ -11,7 +11,10 @@ namespace DRPGServer.Tests;
 internal static class TestSupport
 {
     private static readonly Lazy<GameData> LazyData = new(() =>
-        GameDataLoader.Load(Path.Combine(AppContext.BaseDirectory, "Resources")));
+        GameDataLoader.Load(Path.Combine(AppContext.BaseDirectory, "Resources"), Pack));
+
+    /// <summary>Pacote sintético em Fixtures/client (gerado de Fixtures/client-src).</summary>
+    public static ClientPack Pack => ClientPack.Open(Path.Combine(AppContext.BaseDirectory, "Fixtures", "client", "table.hf"));
 
     public static GameData Data => LazyData.Value;
 

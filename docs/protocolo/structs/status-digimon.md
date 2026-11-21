@@ -20,8 +20,8 @@ Offsets relativos ao início do bloco (não do payload; em 0x71 o bloco começa 
 | 25 | char[21] | nome | ✅ |
 | 46 | u16 | nível | ✅ |
 | 48 | i32×4 | STR, AGI, CON, INT | ✅ |
-| 64 | 128 B | ? | tudo zero, exceto o u32 em +160 |
-| 160 | u16, u16 | ❓ tipo/estágio | valores 0x0001/0x0001, 0x0102/0x0001, 0x0001/0x0002, 0x0102/0x0080, 0x0202/0x0200; variam por espécie e não por nível |
+| 64 | 128 B | ? | tudo zero, exceto 160..163 |
+| 160 | u8, u8, u16 | estágio, atributo, ? | ✅ estágio e atributo = colunas 2 e 3 do `digimon_us`; o u16 em 162 (1, 2, 0x80, 0x200) ❓ varia por espécie |
 | 192 | i32×3 | HP, VP, EVP atuais | ✅ |
 | 204 | i32×3 | ATK, DEF, BR | ✅ |
 | 216 | 8 B | ? | `00 00 00 80 00 00 00 00` |
@@ -35,8 +35,9 @@ Offsets relativos ao início do bloco (não do payload; em 0x71 o bloco começa 
 | 276 | u32, u16, i16 | skill 1: id, ❓ (6, 11, 21, 41), nível (1–10) | ✅ id e nível (sessão 56: 1 → 10) |
 | 284 | u32, u16, i16 | skill 2, mesmo formato | ✅ |
 | 296 | u32 | ? (0x2A…0x75, cresce com o nível) | |
+| 300 | u8 | dono | ✅ 0 no digimon do jogador, 2 no selvagem (era a "Classification" inventada) |
 | 312 | u8 | ? (7, 8, 0x41) | |
-| 320 | u32, u32 | ❓ id (20030, 20100) e 1; não é item da `ItemTable` | |
+| 320 | u32, u32 | ❓ id (20030, 20100) e 1; não é item do `item_info_us` | |
 | 328 | i32×4 | ❓ bônus de STR/AGI/CON/INT (1 ou 15 nas amostras) | |
 | 344 | … | zero em todas as amostras | |
 

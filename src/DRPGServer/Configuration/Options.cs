@@ -43,7 +43,14 @@ public sealed class GameOptions
     /// <summary>Pasta das tabelas XML. Relativa ao executável se não for absoluta.</summary>
     public string ResourcesPath { get; set; } = "Resources";
 
-    public int DigimonMaxLevel { get; set; } = 100;
+    /// <summary>
+    /// Caminho do <c>table.hf</c> do cliente (o <c>table.pf</c> fica ao lado). Relativo ao executável se não for
+    /// absoluto. Padrão: Resources/Client, fora do git (copie do cliente v322; docs/projeto/legal.md).
+    /// </summary>
+    public string ClientTablePath { get; set; } = "Resources/Client/table.hf";
+
+    /// <summary>❓ 160 por ora (o oficial tem personagens acima de 200; o limite real não é conhecido).</summary>
+    public int DigimonMaxLevel { get; set; } = 160;
     public int MaxStackPerItem { get; set; } = 999;
     public double ExpRate { get; set; } = 1;
     public double BitRate { get; set; } = 1;

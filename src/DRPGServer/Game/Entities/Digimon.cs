@@ -20,6 +20,7 @@ public sealed class Digimon
 
     /// <summary>Chave no banco (0 = selvagem).</summary>
     public uint Uid { get; init; }
+    public bool IsWild => Uid == 0;
     public Serial Serial { get; } = Serial.New();
     public DigimonSpecies Species { get; }
     public ushort SpeciesId => Species.Id;
@@ -45,7 +46,7 @@ public sealed class Digimon
     public Attributes Attributes =>
         (FixedAttributes is { } f && (f.Str | f.Agi | f.Con | f.Int) != 0 ? f : StatFormulas.BaseAttributes(Species, Level)) + Allocated;
 
-    public CombatStats Stats => StatFormulas.Combat(Attributes, Level, Species.ActionGauge);
+    public CombatStats Stats => StatFormulas.Combat(Attributes, Level);
     public long ExpToNextLevel => _data.DigimonExpToNext(Level);
     public bool IsKnockedOut => Hp <= 0;
 

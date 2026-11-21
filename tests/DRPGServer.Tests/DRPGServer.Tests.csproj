@@ -12,6 +12,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- pacote de tabelas sintético (linhas inventadas, nada do cliente); ver Fixtures/README.md -->
+    <None Include="Fixtures\client\*" CopyToOutputDirectory="PreserveNewest" LinkBase="Fixtures\client" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
     <ProjectReference Include="..\..\src\DRPGServer\DRPGServer.csproj" />
   </ItemGroup>

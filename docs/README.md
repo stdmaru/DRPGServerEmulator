@@ -39,12 +39,14 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 
 ### Mecânicas (lógica do servidor)
 - [Fórmulas de status](mecanicas/formulas-status.md): MaxEVP confirmada, análise de ATK/DEF/BR/HP/VP, experimento proposto.
+- [Fórmulas de EXP](mecanicas/formulas-exp.md): digimon ⌊20L·1,2^L⌋ em float32 (trava no nível 77), tamer 5(L+1), recompensa 0x6E, evento de EXP ❓.
 - [Evolução](mecanicas/evolucao.md): cada forma tem atributos, pontos e skills próprios; nível e EXP são do digimon.
+- [Portais](mecanicas/portais.md): posição e destino do `map_us`, chegada capturada em `Portals.xml` ou estimada.
 - [Tick do mapa](mecanicas/tick-mapa.md): ping 0xC4 do servidor a cada ~5,2 s, recuperação HP +5 / VP +3 / EVP +10, saída 0x2B.
 
 ### Cliente
 - [Binário](cliente/binario.md): desempacotamento, RTTI, dispatcher, IPs fixos, renderer.
-- [Arquivos de dados](cliente/arquivos-de-dados.md): `table.pf` e `resource.pf`, `drpg_pack.py`, o que existe e o que falta.
+- [Arquivos de dados](cliente/arquivos-de-dados.md): `table.pf` e `resource.pf`, `drpg_pack.py`, colunas que o servidor lê na partida, o que falta.
 - [Wine](cliente/wine.md): rodar no Linux, prefixo dedicado, causa e correção da tela congelada no loading (corrida no backbuffer DirectDraw).
 - [Qualidade de vida](cliente/qualidade-de-vida.md): resolução e os três níveis (wrapper → hooks → decompilação incremental).
 

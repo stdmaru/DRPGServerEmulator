@@ -37,7 +37,7 @@ O protótipo (e a reescrita) guarda **um** conjunto de status por digimon. É pr
 - **Forma** (digimon × espécie): atributos, pontos de atributo, skills e níveis de skill.
 
 ## ❓ Em aberto
-- Tabela de estágio por espécie (o `DigimonData.xml` não tem) e a linha evolutiva de cada digimon.
+- ✅ Estágio por espécie: coluna 2 do `digimon_us`. Falta a linha evolutiva de cada digimon.
 - Taxa e intervalo da drenagem de EVP.
 - Como nascem os atributos de uma forma na primeira evolução (base fixa por espécie/nível?).
 - Se vitórias/batalhas são por forma ou do digimon.

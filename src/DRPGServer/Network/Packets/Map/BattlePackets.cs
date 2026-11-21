@@ -34,7 +34,7 @@ public sealed class BattleCreatePacket(Battle battle) : ServerPacket
     {
         for (int i = 0; i < Battle.MaxPerSide; i++)
         {
-            if (i < team.Count) DigimonStatusBlock.Write(w, team[i].Digimon, attributes: false);
+            if (i < team.Count) DigimonStatusBlock.Write(w, team[i].Digimon);
             else DigimonStatusBlock.WriteEmpty(w);
         }
     }

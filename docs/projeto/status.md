@@ -24,6 +24,8 @@
 - ✅ Layout do `0x03` mapeado e gerado a partir do inventário. Ver [inventário](../protocolo/structs/inventario.md). Falta persistir o inventário e os dados dos itens.
 - ✅ `0x10` mapeado (0..100 igual à v242) e corrigido no emulador. Ver [resumo do tamer](../protocolo/structs/tamer-resumo.md). Falta a tabela de estágio das espécies.
 - ✅ Tick do mapa como no oficial: ping `0xC4` do servidor e recuperação a cada 5,2 s. Ver [tick do mapa](../mecanicas/tick-mapa.md).
+- ✅ Espécies, itens, zonas e portais lidos do `table.pf` do cliente na partida (sem XML inventado). Crescimento da `dex_us`, estágio e atributo do `digimon_us`, MaxActionGauge constante, nível máximo 160 (❓ provisório). Ver [arquivos de dados](../cliente/arquivos-de-dados.md) e [portais](../mecanicas/portais.md).
+- ✅ Tabelas de EXP trocadas por fórmulas exatas (digimon e tamer). Ver [fórmulas de EXP](../mecanicas/formulas-exp.md). ❓ Evento de EXP ainda sem pacote identificado.
 
 ## Em andamento / próximo passo
 1. **Corrigir o que existe, do começo do fluxo para o fim** (login → channel → entrada no mapa → mapa → batalha), com amostras novas do oficial (v322). Só depois implementar coisas novas. Status e batalha entram nesse caminho.
@@ -38,5 +40,5 @@
 - ❓ O método de dump do Themida é manual e não está documentado. Necessário a cada atualização do oficial.
 - ✅ O stub do XIGNCODE funciona contra o oficial na v322 até a seleção de servidor (login com sucesso). ❓ Falta confirmar canal e mapa.
 - Os endereços em [binário](../cliente/binario.md) são da v242 (o dispatcher etc.). Refazer na v322.
-- As fórmulas de ATK/DEF/BR/HP/VP do emulador erram até 109 pontos (`Game/Stats/StatFormulas.cs`). Os atributos base por nível (`10 + base × (L − 1)`) também são ❓.
+- As fórmulas de ATK/DEF/BR/HP/VP do emulador erram até 109 pontos (`Game/Stats/StatFormulas.cs`). Atributos base confirmados só até rookie; champion em diante ❓.
 - Protocolo alvo **v322**. Entrada no mapa já bate em tamanho com a sessão 52; o conteúdo de vários pacotes ainda é cópia de captura ou zero.

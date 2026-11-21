@@ -16,10 +16,10 @@ public static class DigimonStatusBlock
     public const int Length = 696;
 
     /// <summary>Escreve o bloco inteiro (<see cref="Length"/> bytes).</summary>
-    public static void Write(PacketWriter w, Digimon d, bool attributes = true)
+    public static void Write(PacketWriter w, Digimon d)
     {
         int start = w.Position;
-        WriteHead(w, d, attributes);
+        WriteHead(w, d);
         WriteBody(w, d);
         w.WriteZeros(Length - (w.Position - start));
     }
@@ -28,7 +28,7 @@ public static class DigimonStatusBlock
     public static void WriteEmpty(PacketWriter w) => w.WriteZeros(Length);
 
     /// <summary>0..63: identidade, nível e atributos.</summary>
-    public static void WriteHead(PacketWriter w, Digimon d, bool attributes = true)
+    public static void WriteHead(PacketWriter w, Digimon d)
     {
         w.WriteU32(d.Uid);                      // 0
         d.Serial.Write(w);                      // 4
@@ -37,26 +37,20 @@ public static class DigimonStatusBlock
         w.WriteU8(1);                           // 24 ? sempre 1
         w.WriteFixedString(d.Name, 21);         // 25
         w.WriteU16(d.Level);                    // 46
-        if (attributes)
-        {
-            var a = d.Attributes;               // 48
-            w.WriteI32(a.Str);
-            w.WriteI32(a.Agi);
-            w.WriteI32(a.Con);
-            w.WriteI32(a.Int);
-        }
-        else
-        {
-            // ❓ em 0x63 o protótipo mandava 10/10/10/10 capturado
-            w.WriteI32(10); w.WriteI32(10); w.WriteI32(10); w.WriteI32(10);
-        }
+        // 48: ✅ o oficial manda zero nos atributos de digimon selvagem (0x63) e os reais nos do jogador
+        var a = d.IsWild ? default : d.Attributes;
+        w.WriteI32(a.Str);
+        w.WriteI32(a.Agi);
+        w.WriteI32(a.Con);
+        w.WriteI32(a.Int);
     }
 
     /// <summary>64..327: estado, status de combate, EXP, contadores e skills.</summary>
     public static void WriteBody(PacketWriter w, Digimon d)
     {
-        // 64..191: zero nas capturas, exceto 160 (u16, u16) ❓ tipo/estágio, varia por espécie
-        w.WriteSparse(128, (96, [0x01, 0x00, 0x01, 0x00]));
+        // 64..191: zero nas capturas, exceto 160 estágio, 161 atributo (✅ colunas 2 e 3 do digimon_us)
+        // e o u16 em 162 (❓ 1, 2, 0x80, 0x200 nas capturas; varia por espécie)
+        w.WriteSparse(128, (96, [d.Species.Stage, d.Species.Attribute, 0x01, 0x00]));
         WriteCombat(w, d);
         WriteProgress(w, d);
         WriteSkills(w, d);
@@ -105,7 +99,7 @@ public static class DigimonStatusBlock
         w.WriteI16(0);                          // 290 nível da skill 2
         w.WriteU32(0);                          // 292
         w.WriteU32(0x2A);                       // 296 ? (0x2A, 0x4C, 0x69 nas capturas)
-        w.WriteU8(d.Species.Classification);    // 300 ícone do nome (D, B*, V**...)
+        w.WriteU8(d.IsWild ? (byte)2 : (byte)0); // 300 ✅ 0 no digimon do jogador, 2 no selvagem
         w.WriteZeros(11);
         w.WriteU8(8);                           // 312 ? (7 ou 8 nas capturas)
         w.WriteZeros(15);                       // até 327

@@ -4,7 +4,9 @@ Dados: 54 amostras (19 únicas) extraídas por [extract_status.py](../ferramenta
 
 ## ✅ Confirmadas
 - **MaxEVP = L × (L − 1)**: bate nas 19 amostras (L2→2, L6→30, L13→156).
-- **MaxActionGauge = 500** em todas as amostras (❓ pode variar em espécies não vistas).
+- **MaxActionGauge = 500** em todas as amostras; o emulador usa a constante (`StatFormulas.MaxActionGauge`).
+- **Atributos base = 10 + crescimento × (L − 1) + pontos distribuídos**, com o crescimento das colunas 15..18 da `dex_us` ([arquivos de dados](../cliente/arquivos-de-dados.md)). Confirmado em in-training. Rookie soma **+20** em cada atributo (❓ só rookie visto; champion em diante desconhecido).
+- Digimon selvagem chega no `0x63` com atributos **zero**; o do jogador, com os reais. O byte 300 do bloco é 0 no do jogador e 2 no selvagem.
 
 ## ❌ Fórmulas atuais do emulador (`Game/Stats/StatFormulas.cs`)
 São lineares, com coeficientes quebrados. Erro máximo contra as amostras: ATK −24…+109, DEF −8…+42, BR −5…+57, MaxHP −8…+27, MaxVP −10…+31. **Não usar como referência.**
@@ -16,7 +18,6 @@ São lineares, com coeficientes quebrados. Erro máximo contra as amostras: ATK 
   - V-mon (635) L11, INT 40→60: DEF +10, BR +45 (2,25/pt), VP +37 (1,85/pt).
   - A explicação pode ser retorno decrescente, peso por espécie ou estágio, ou peso por nível. Os dados atuais não separam essas hipóteses.
 - **Há bônus fora dos 4 atributos:** Guilmon (51) L13 com os mesmos atributos aparece com ATK 384→386 e HP 284→285. Candidatos: equipamento, título, buff, status do tamer.
-- A tabela `digimon_us` do cliente **não tem** atributos base nem crescimento (só nome, skills e tipo). Esses dados só existem no servidor.
 
 ## Amostras-chave
 | ID | L | STR AGI CON INT | ATK DEF BR HP VP |

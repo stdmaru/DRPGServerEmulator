@@ -15,6 +15,8 @@
   <ItemGroup>
     <!-- Tabelas do jogo (XML) e migrações do banco vão junto do binário. -->
     <None Include="Resources\**\*.xml" CopyToOutputDirectory="PreserveNewest" />
+    <!-- fora do git: copie do cliente (docs/cliente/arquivos-de-dados.md) -->
+    <None Include="Resources\Client\table.hf;Resources\Client\table.pf" Condition="Exists('Resources\Client\table.pf')" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\sql\upgrade\*.sql" Link="sql\upgrade\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Update="appsettings*.json" CopyToOutputDirectory="PreserveNewest" />
     <!-- Payloads capturados ainda não decodificados (ver Network/Packets/Templates/README.md). -->

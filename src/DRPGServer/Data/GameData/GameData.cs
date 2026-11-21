@@ -2,9 +2,12 @@ using System.Collections.Frozen;
 
 namespace DRPGServer.Data.GameData;
 
-/// <summary>Espécie de digimon (Resources/Digimon/DigimonData.xml). Os "Base*" são palpite do protótipo.</summary>
+/// <summary>
+/// Espécie de digimon, lida das tabelas do cliente (<c>digimon_us</c> e <c>dex_us</c>, ver docs/cliente/arquivos-de-dados.md).
+/// <paramref name="Growth"/>: atributos ganhos por nível (✅ in-training e rookie nas capturas); null se a dex não tem a espécie.
+/// </summary>
 public sealed record DigimonSpecies(
-    ushort Id, string Name, int BaseStr, int BaseAgi, int BaseCon, int BaseInt, int ActionGauge, byte Classification);
+    ushort Id, string Name, byte Stage, byte Attribute, Game.Stats.Attributes? Growth, ushort Skill1, ushort Skill2);
 
 public sealed record ItemInfo(uint Id, string Name);
 
@@ -35,18 +38,16 @@ public sealed class GameData
 {
     public required FrozenDictionary<ushort, DigimonSpecies> Species { get; init; }
     public required FrozenDictionary<uint, ItemInfo> Items { get; init; }
+    public required FrozenDictionary<byte, ClientMap> Maps { get; init; }
     public required FrozenDictionary<uint, IReadOnlyList<DropEntry>> DropGroups { get; init; }
-    public required FrozenDictionary<int, long> DigimonExp { get; init; }
-    public required FrozenDictionary<int, long> CharacterExp { get; init; }
     public required FrozenDictionary<byte, IReadOnlyList<PortalInfo>> Portals { get; init; }
     public required FrozenDictionary<byte, IReadOnlyList<SpawnArea>> Spawns { get; init; }
     public required IReadOnlyList<byte> ZoneIds { get; init; }
 
     public DigimonSpecies? FindSpecies(ushort id) => Species.GetValueOrDefault(id);
 
-    /// <summary>EXP para passar do nível dado. Sem entrada na tabela = não sobe mais.</summary>
-    public long DigimonExpToNext(int level) =>
-        DigimonExp.TryGetValue(level, out var exp) && exp > 0 ? exp : long.MaxValue;
+    /// <summary>EXP para passar do nível dado (fórmula do oficial, ver <see cref="Game.Stats.ExpFormulas"/>).</summary>
+    public long DigimonExpToNext(int level) => Game.Stats.ExpFormulas.DigimonExpToNext(level);
 
     public IReadOnlyList<PortalInfo> PortalsOf(byte mapId) => Portals.GetValueOrDefault(mapId) ?? [];
     public IReadOnlyList<SpawnArea> SpawnsOf(byte mapId) => Spawns.GetValueOrDefault(mapId) ?? [];

@@ -6,21 +6,22 @@ namespace DRPGServer.Data.GameData;
 
 public sealed class GameDataException(string message) : Exception(message);
 
-/// <summary>Lê as tabelas XML de Resources/ e valida as referências entre elas.</summary>
+/// <summary>
+/// Junta as tabelas do cliente (<see cref="ClientTables"/>) com as do servidor em Resources/ (o que o cliente
+/// não tem: spawns, drops e pontos de chegada dos portais) e valida as referências entre elas.
+/// </summary>
 public static class GameDataLoader
 {
-    public static GameData Load(string root)
-    {
-        var species = Elements(root, "Digimon/DigimonData.xml", "DigimonData", "Digimon")
-            .Select(e => new DigimonSpecies(
-                U16(e, "ID"), Str(e, "Name"), I32(e, "BaseSTR"), I32(e, "BaseAGI"), I32(e, "BaseCON"), I32(e, "BaseINT"),
-                I32(e, "ActionGauge"), U8(e, "Classification")))
-            .Where(s => s.Id != 0)
-            .ToUniqueDictionary(s => s.Id, "DigimonData");
+    /// <summary>Distância máxima, por eixo, entre o portal de volta e o ponto de chegada estimado.</summary>
+    private const int ArrivalNudge = 5;
 
-        var items = Elements(root, "Item/ItemTable.xml", "ItemTable", "Item")
-            .Select(e => new ItemInfo(U32(e, "ID"), Str(e, "Name")))
-            .ToUniqueDictionary(i => i.Id, "ItemTable");
+    /// <param name="root">Pasta Resources/ do servidor.</param>
+    /// <param name="pack">Pacote de tabelas do cliente.</param>
+    public static GameData Load(string root, ClientPack pack)
+    {
+        var species = ClientTables.Species(pack);
+        var items = ClientTables.Items(pack);
+        var maps = ClientTables.Maps(pack);
 
         var drops = new Dictionary<uint, IReadOnlyList<DropEntry>>();
         foreach (var group in Elements(root, "Item/ItemDrop.xml", "DropTable", "DropGroup"))
@@ -35,15 +36,16 @@ public static class GameDataLoader
             if (!drops.TryAdd(id, entries)) throw new GameDataException($"DropGroup {id} duplicado");
         }
 
-        var digimonExp = Elements(root, "Digimon/ExpTable.xml", "DigimonExpTable", "Digimon")
-            .ToUniqueDictionary(e => (int)U16(e, "Level"), "DigimonExpTable", e => I64(e, "TargetEXP"));
-        var characterExp = Elements(root, "Character/ExpTable.xml", "CharacterExpTable", "Character")
-            .ToUniqueDictionary(e => (int)U16(e, "Level"), "CharacterExpTable", e => I64(e, "TargetEXP"));
-
-        var portals = Elements(root, "Map/Portals.xml", "Portals", "Portal")
-            .Select(e => new PortalInfo(U8(e, "MapID"), I16(e, "PosX"), I16(e, "PosY"), U8(e, "DestMapID"), I16(e, "DestPosX"), I16(e, "DestPosY")))
-            .GroupBy(p => p.MapId)
-            .ToFrozenDictionary(g => g.Key, g => (IReadOnlyList<PortalInfo>)g.ToList());
+        var arrivals = new Dictionary<(byte, short, short), PortalInfo>();
+        foreach (var e in Elements(root, "Map/Portals.xml", "Portals", "Portal"))
+        {
+            var p = new PortalInfo(U8(e, "MapID"), I16(e, "PosX"), I16(e, "PosY"), U8(e, "DestMapID"), I16(e, "DestPosX"), I16(e, "DestPosY"));
+            if (!maps.TryGetValue(p.MapId, out var map) || !map.Portals.Any(c => c.X == p.X && c.Y == p.Y))
+                throw new GameDataException($"Portals.xml: mapa {p.MapId} não tem portal em ({p.X}, {p.Y}) no map_us");
+            if (!maps.ContainsKey(p.DestMapId)) throw new GameDataException($"Portals.xml: mapa {p.DestMapId} não existe");
+            if (!arrivals.TryAdd((p.MapId, p.X, p.Y), p)) throw new GameDataException($"Portals.xml: portal ({p.MapId}, {p.X}, {p.Y}) duplicado");
+        }
+        var portals = ResolvePortals(maps, arrivals);
 
         var spawns = new List<SpawnArea>();
         foreach (var e in Elements(root, "Map/DigimonSpawns.xml", "DigimonSpawns", "Spawn"))
@@ -63,19 +65,54 @@ public static class GameDataLoader
             spawns.Add(area);
         }
 
-        var zoneIds = Elements(root, "Map/Zones.xml", "Zones", "Zone").Select(e => U8(e, "MapID")).Where(id => id != 0).Distinct().ToList();
+        var zoneIds = maps.Keys.Order().ToList();
 
         return new GameData
         {
             Species = species,
             Items = items,
             DropGroups = drops.ToFrozenDictionary(),
-            DigimonExp = digimonExp,
-            CharacterExp = characterExp,
+            Maps = maps,
             Portals = portals,
             Spawns = spawns.GroupBy(s => s.MapId).ToFrozenDictionary(g => g.Key, g => (IReadOnlyList<SpawnArea>)g.ToList()),
             ZoneIds = zoneIds,
         };
+    }
+
+    /// <summary>
+    /// Portais do <c>map_us</c>. O destino vem do Portals.xml (✅ capturado) quando existe. Senão, o mapa de destino
+    /// é o do nome (desempata pelo mapa que tem portal de volta) e a chegada é ❓ estimada: o portal de volta,
+    /// deslocado até <see cref="ArrivalNudge"/> casas por eixo para o centro dos portais do mapa de destino
+    /// (nas capturas a chegada fica 4 a 9 casas para dentro). Portal sem destino resolvível fica de fora.
+    /// </summary>
+    private static FrozenDictionary<byte, IReadOnlyList<PortalInfo>> ResolvePortals(
+        FrozenDictionary<byte, ClientMap> maps, Dictionary<(byte, short, short), PortalInfo> arrivals)
+    {
+        var byName = maps.Values.ToLookup(m => m.Name);
+        var result = new Dictionary<byte, IReadOnlyList<PortalInfo>>();
+        foreach (var map in maps.Values)
+        {
+            var list = new List<PortalInfo>();
+            foreach (var c in map.Portals)
+            {
+                if (arrivals.TryGetValue((map.Id, c.X, c.Y), out var known))
+                {
+                    list.Add(known);
+                    continue;
+                }
+                var candidates = byName[c.DestName].ToList();
+                var dest = candidates.FirstOrDefault(m => m.Portals.Any(b => b.DestName == map.Name))
+                           ?? (candidates.Count == 1 ? candidates[0] : null);
+                var back = dest?.Portals.FirstOrDefault(b => b.DestName == map.Name);
+                if (dest is null || back is null) continue;
+                int cx = (int)Math.Round(dest.Portals.Average(b => b.X)), cy = (int)Math.Round(dest.Portals.Average(b => b.Y));
+                list.Add(new PortalInfo(map.Id, c.X, c.Y, dest.Id,
+                    (short)(back.X + Math.Clamp(cx - back.X, -ArrivalNudge, ArrivalNudge)),
+                    (short)(back.Y + Math.Clamp(cy - back.Y, -ArrivalNudge, ArrivalNudge))));
+            }
+            if (list.Count > 0) result[map.Id] = list;
+        }
+        return result.ToFrozenDictionary();
     }
 
     private static IEnumerable<XElement> Elements(string root, string file, string rootName, string element)
@@ -87,24 +124,9 @@ public static class GameDataLoader
         return top.Elements(element);
     }
 
-    private static FrozenDictionary<TKey, TValue> ToUniqueDictionary<TSource, TKey, TValue>(
-        this IEnumerable<TSource> source, Func<TSource, TKey> key, string table, Func<TSource, TValue> value) where TKey : notnull
-    {
-        var dict = new Dictionary<TKey, TValue>();
-        foreach (var item in source)
-            if (!dict.TryAdd(key(item), value(item)))
-                throw new GameDataException($"{table}: chave {key(item)} duplicada");
-        return dict.ToFrozenDictionary();
-    }
-
-    private static FrozenDictionary<TKey, TSource> ToUniqueDictionary<TSource, TKey>(
-        this IEnumerable<TSource> source, Func<TSource, TKey> key, string table) where TKey : notnull =>
-        source.ToUniqueDictionary(key, table, x => x);
-
     private static string Attr(XElement e, string name) =>
         e.Attribute(name)?.Value ?? throw new GameDataException($"<{e.Name}> sem o atributo {name}");
 
-    private static string Str(XElement e, string name) => e.Attribute(name)?.Value ?? "";
     private static byte U8(XElement e, string name) => byte.Parse(Attr(e, name), CultureInfo.InvariantCulture);
     private static short I16(XElement e, string name) => short.Parse(Attr(e, name), CultureInfo.InvariantCulture);
     private static ushort U16(XElement e, string name) => ushort.Parse(Attr(e, name), CultureInfo.InvariantCulture);

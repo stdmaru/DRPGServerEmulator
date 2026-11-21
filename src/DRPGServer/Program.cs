@@ -45,8 +45,10 @@ services.AddSingleton<AccountRepository>();
 services.AddSingleton<CharacterRepository>();
 services.AddSingleton(sp =>
 {
-    var path = sp.GetRequiredService<IOptions<GameOptions>>().Value.ResourcesPath;
-    return GameDataLoader.Load(Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path));
+    var o = sp.GetRequiredService<IOptions<GameOptions>>().Value;
+    var resources = Path.IsPathRooted(o.ResourcesPath) ? o.ResourcesPath : Path.Combine(AppContext.BaseDirectory, o.ResourcesPath);
+    var table = Path.IsPathRooted(o.ClientTablePath) ? o.ClientTablePath : Path.Combine(AppContext.BaseDirectory, o.ClientTablePath);
+    return GameDataLoader.Load(resources, ClientPack.Open(table));
 });
 
 // ordem importa: serviços param na ordem inversa (rede → mundo → persistência)
@@ -76,8 +78,8 @@ var log = host.Services.GetRequiredService<ILogger<Program>>();
 try
 {
     var data = host.Services.GetRequiredService<GameData>();
-    log.LogInformation("Tabelas: {Species} digimons, {Items} itens, {Drops} grupos de drop, {Zones} zonas",
-        data.Species.Count, data.Items.Count, data.DropGroups.Count, data.ZoneIds.Count);
+    log.LogInformation("Tabelas: {Species} digimons, {Items} itens, {Drops} grupos de drop, {Zones} zonas, {Portals} portais",
+        data.Species.Count, data.Items.Count, data.DropGroups.Count, data.ZoneIds.Count, data.Portals.Values.Sum(p => p.Count));
 
     using (var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5)))
         await host.Services.GetRequiredService<DatabaseMigrator>().MigrateAsync(cts.Token);
