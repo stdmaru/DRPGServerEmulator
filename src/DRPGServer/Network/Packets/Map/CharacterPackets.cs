@@ -65,30 +65,37 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
     }
 }
 
-/// <summary>0x10: resposta ao 0x04 (o cliente pede ao conectar no global).</summary>
+/// <summary>
+/// 0x10: resumo do tamer e do líder; resposta ao 0x04 e o que o oficial manda sobre outros jogadores.
+/// ✅ v322: 204 bytes (era 200). Offsets 0..100 iguais à v242 (1919 amostras v322, 49 v242).
+/// ❓ Os 4 bytes novos caem depois de 100: a v322 traz um par (5, ~5000) em 128 que não aparece na v242.
+/// Layout em docs/protocolo/structs/tamer-resumo.md.
+/// </summary>
 public sealed class RefreshCharacterInfoPacket(Character character) : ServerPacket
 {
     public override ushort Opcode => (ushort)MapOpcode.RefreshCharacterInfo;
 
     protected override void Write(PacketWriter w)
     {
-        character.Serial.Write(w);
-        w.WriteFixedString(character.Name, 21);
-        w.WriteU8(character.TamerId);
-        w.WriteU16(1);                          // ?
-        w.WriteU16(1);                          // ?
-        w.WriteU16(1);                          // ?
-        w.WriteI16(character.X);
-        w.WriteI16(character.Y);
-        w.WriteI16(0x3F);                       // ?
-        w.WriteI16(0x58);                       // ?
-        w.WriteI32(0);
-        character.Leader.Serial.Write(w);
-        w.WriteU16(character.Leader.SpeciesId);
-        w.WriteFixedString(character.Leader.Name, 21);
-        w.WriteU8(1);
-        w.WriteI32(1);
-        w.WriteZeros(104);                      // ✅ v322: 204 bytes (era 200). ❓ onde entram os 4 bytes novos
+        var c = character;
+        c.Serial.Write(w);                      // 0
+        w.WriteFixedString(c.Name, 21);         // 16
+        w.WriteU8(c.TamerId);                   // 37
+        w.WriteU16(1);                          // 38 ? (1, 2, 5, 6)
+        w.WriteU16(c.Level);                    // 40 nível do tamer ✅
+        w.WriteU16(1);                          // 42 ? dois u8 (baixo 1/5/11/15, alto 0..7)
+        w.WriteI16(c.X);                        // 44 posição
+        w.WriteI16(c.Y);
+        w.WriteI16(c.X);                        // 48 destino (igual à posição quando parado) ✅
+        w.WriteI16(c.Y);
+        w.WriteI32(0);                          // 52 sempre 0
+        c.Leader.Serial.Write(w);               // 56
+        w.WriteU16(c.Leader.SpeciesId);         // 72
+        w.WriteFixedString(c.Leader.Name, 21);  // 74
+        w.WriteU8(1);                           // 95 estágio do líder ❓ (1 in-training, 2 rookie, 3 champion, 5 mega); o emulador ainda não tem a tabela
+        w.WriteI32(c.Leader.Level);             // 96 nível do líder ✅
+        w.WriteU32(0);                          // 100 ? (20030 em megas; o mesmo valor do bloco de status em 320)
+        w.WriteZeros(100);                      // até 204
     }
 }
 

@@ -2,6 +2,16 @@
 
 Evidência: `captures.db`, sessão 56 (v322), blocos de status em `0x02`, `0x70`, `0x71`, `0x80`, `0x84`, `0xB2`, `0xB4`, `0xEF`, seguidos pelo **uid** do digimon. Script de análise: acompanhar `uid` × espécie ao longo do tempo (offsets em [status de digimon](../protocolo/structs/status-digimon.md)).
 
+## Regras do jogo (dono do projeto, 2026-11-21)
+- O digimon nasce **in-training**. No **nível 11** vira **rookie**, que passa a ser a forma-base: não volta mais para in-training.
+- O rookie desbloqueia as evoluções por nível: **champion 21**, **ultimate 31**, **mega 41**.
+- Ao atingir o nível de uma evolução **durante a batalha**, evolui automaticamente para ela e volta para rookie no fim da batalha.
+- Depois disso o fluxo é: rookie → batalha → digievolui pelo menu → batalha → rookie.
+- Evoluído, o **EVP é drenado periodicamente**. Com EVP zero, o digimon volta à força para rookie. *(A reproduzir.)*
+- O item **Aura** mantém o digimon evoluído de forma permanente, inclusive fora da batalha. ❓ Comportamento exato a pesquisar (cliente, engenharia reversa, internet).
+
+Batem com a sessão 56: uid 0x38a82 foi de Hopmon (31, in-training) a Monodramon (81, rookie) no nível 11, em batalha; uid 0x32610 foi de V-mon (rookie) a XV-mon (champion) no nível 21 e voltou no fim da batalha. ❓ O valor 20030, que aparece nos líderes de estágio 5 (`0x10` +100, bloco de status +320), pode ter relação com a Aura.
+
 ## O que a captura mostra ✅
 Cada digimon tem **um uid** e cada forma (espécie da linha evolutiva) tem **status próprios**. Ao evoluir, o bloco troca de espécie, mas o uid não muda.
 
@@ -27,6 +37,8 @@ O protótipo (e a reescrita) guarda **um** conjunto de status por digimon. É pr
 - **Forma** (digimon × espécie): atributos, pontos de atributo, skills e níveis de skill.
 
 ## ❓ Em aberto
+- Tabela de estágio por espécie (o `DigimonData.xml` não tem) e a linha evolutiva de cada digimon.
+- Taxa e intervalo da drenagem de EVP.
 - Como nascem os atributos de uma forma na primeira evolução (base fixa por espécie/nível?).
 - Se vitórias/batalhas são por forma ou do digimon.
 - Se uma forma ganha pontos de atributo nos níveis em que não estava ativa.

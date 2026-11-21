@@ -130,4 +130,19 @@ public class PacketSizeTests
         Assert.Equal(42u, BitConverter.ToUInt32(record[100..]));
         Assert.True(payload.AsSpan(0, 24 * 76).IndexOfAnyExcept((byte)0) < 0);
     }
+
+    [Fact]
+    public void Refresh_character_info_has_tamer_level_position_twice_and_leader_level()
+    {
+        // ✅ 0x10 v322 (sessões 52–56): nível do tamer em 40, X/Y em 44 e de novo em 48, nível do líder em 96
+        var character = Entities.Character();
+        character.Level = 14;
+        character.X = 57;
+        character.Y = 91;
+        var payload = new RefreshCharacterInfoPacket(character).EncodePayload();
+        Assert.Equal(14, BitConverter.ToUInt16(payload, 40));
+        Assert.Equal(new short[] { 57, 91, 57, 91 }, Enumerable.Range(0, 4).Select(k => BitConverter.ToInt16(payload, 44 + 2 * k)));
+        Assert.Equal(character.Leader.SpeciesId, BitConverter.ToUInt16(payload, 72));
+        Assert.Equal(character.Leader.Level, BitConverter.ToInt32(payload, 96));
+    }
 }
