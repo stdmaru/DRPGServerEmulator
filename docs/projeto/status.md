@@ -16,6 +16,9 @@
 - ✅ Fórmula confirmada: `MaxEVP = L × (L − 1)`. Ver [fórmulas](../mecanicas/formulas-status.md).
 - ✅ **Emulador reescrito** (branch `refactor/base`, sem commit, aguardando revisão): .NET 10, thread única do mundo, persistência em fila, migrações automáticas em `sql/upgrade`, 23 testes, devcontainer com SDK 10. Replay das sessões 10 e 4: login e channel idênticos ao oficial. Ver [arquitetura](../emulador/arquitetura.md) e [replay](../ferramentas/replay.md).
 
+- ✅ Capturas longas v322: sessões 53, 54 e 56 (~84 mil pacotes, 80 marcadores) cobrem criar/apagar, tutorial, batalha, level up, pontos de atributo, evolução, itens, depósito, party, chat.
+- ✅ Channel corrigido pela v322: lista, criar e apagar. Ver [channel](../protocolo/structs/channel.md).
+
 ## Em andamento / próximo passo
 1. **Corrigir o que existe, do começo do fluxo para o fim** (login → channel → entrada no mapa → mapa → batalha), com amostras novas do oficial (v322). Só depois implementar coisas novas. Status e batalha entram nesse caminho.
 2. **Protocolo v322:** confirmar a hipótese do bloco de status +4 bytes (sessão 52 tem `0x02`, `0x10`, `0xB4`). Capturar sessões mais longas na v322: troca de mapa, batalha, level up (`0x70`/`0x71`).
@@ -26,7 +29,6 @@
 - O `start_bin.bat` tem a conta sem o sufixo (o login falha). A certa é a do `start_launcher.bat`.
 - A "PreMap Loading Thread" tem o mesmo desenho e pode congelar na troca de mapa. Verificar.
 - Numa bateria de 6 execuções com `loadingbar`, o jogo fechou sozinho uma vez (~8 s, sem congelar). ❓ Causa desconhecida; talvez login repetido em sequência.
-- ❓ Protocolo v322: `0x02`, `0x10` e `0xB4` mudaram de tamanho (hipótese: bloco de status de digimon +4). Ver [opcodes](../protocolo/opcodes.md#mudanças-v242--v322).
 - ❓ O método de dump do Themida é manual e não está documentado. Necessário a cada atualização do oficial.
 - ✅ O stub do XIGNCODE funciona contra o oficial na v322 até a seleção de servidor (login com sucesso). ❓ Falta confirmar canal e mapa.
 - Os endereços em [binário](../cliente/binario.md) são da v242 (o dispatcher etc.). Refazer na v322.

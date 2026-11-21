@@ -30,6 +30,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Catálogo de opcodes](protocolo/opcodes.md): opcodes tratados pelo cliente, capturados e implementados.
 - Structs:
   - [Status de digimon](protocolo/structs/status-digimon.md): bloco comum aos opcodes 0x02, 0x10, 0x63, 0x70, 0x71…
+  - [Channel](protocolo/structs/channel.md): lista (0x12), criar (0x10) e apagar (0x11) personagem.
 
 ### Emulador
 - [Arquitetura](emulador/arquitetura.md): como rodar, migrações, estrutura, modelo de threads, handlers, autenticação entre servidores, testes.

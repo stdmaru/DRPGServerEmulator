@@ -40,7 +40,7 @@ Fonte: sessão 52 (proxy, login → mapa, 2026-11-21) contra as sessões 1–48.
 
 - ✅ O [bloco de status de digimon](structs/status-digimon.md) passou de 688 para **696** bytes (+8): `0xB4` é um bloco; `0x02` tem **5 blocos** (+40), e o que vem depois deles (X/Y do tamer em 4680 → 4720) andou 40.
 - ❓ `0x10` (+4) não contém bloco de status; com uma amostra v322 quase toda zero, não dá para saber onde entram os 4 bytes.
-- ❓ Deduzido, sem captura v322: `0x70` 696, `0x71` 704, `0xB2` 696, `0x63` 6960 (10 blocos). Confirmar com captura.
+- ✅ Confirmado nas sessões 53–56 (antes deduzido): `0x70` 696, `0x71` 704, `0xB2` 696, `0x63` 6960 (10 blocos).
 - Replay da sessão 52 contra o emulador: ✅ idêntico em opcode e tamanho nos 4 servidores (2026-11-21).
 - Os 72 opcodes "só em v242" no diff são só os que não apareceram nesta sessão curta. Não é remoção.
 - Antes de reaproveitar pcaps da v242 no emulador, ajustar o `extract_status.py` e a serialização do C# para essas estruturas.

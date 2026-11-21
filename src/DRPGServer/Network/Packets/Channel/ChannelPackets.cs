@@ -54,17 +54,25 @@ public sealed class AuthenticationPacket(int errorCode, string username, string 
     }
 }
 
+/// <summary>
+/// Cabeçalho do pedido de criação (0x10), ecoado pelo oficial na resposta.
+/// ✅ sessões 3, 4 e 53: slot escolhido pelo cliente, mapa 0x4F (tutorial) e dois u16 que variam
+/// (3B..3E e 37..3A). ❓ parecem coordenadas, mas o personagem criado aparece em outra posição.
+/// </summary>
+public readonly record struct CharacterCreateHeader(byte Slot, byte MapId, ushort A, ushort B);
+
 /// <summary>0x10: resultado da criação de personagem.</summary>
-public sealed class CharacterCreatePacket(int errorCode, byte tamerId, string name, ushort digimonId, string digimonName) : ServerPacket
+public sealed class CharacterCreatePacket(int errorCode, CharacterCreateHeader header, byte tamerId, string name, ushort digimonId, string digimonName) : ServerPacket
 {
     public override ushort Opcode => (ushort)ChannelOpcode.CharacterCreate;
 
     protected override void Write(PacketWriter w)
     {
         Result.Write(w, errorCode);
-        w.WriteU16(0x4F01);                     // ?
-        w.WriteU16(0x003D);                     // ? (varia 3B..3E)
-        w.WriteU16(0x0038);                     // ? (varia 37..3A)
+        w.WriteU8(header.Slot);
+        w.WriteU8(header.MapId);
+        w.WriteU16(header.A);
+        w.WriteU16(header.B);
         w.WriteU8(tamerId);
         w.WriteFixedString(name, 21);
         w.WriteU16(digimonId);
@@ -72,8 +80,8 @@ public sealed class CharacterCreatePacket(int errorCode, byte tamerId, string na
     }
 }
 
-/// <summary>0x11: personagem apagado.</summary>
-public sealed class CharacterDeletePacket(uint characterUid) : ServerPacket
+/// <summary>0x11: personagem apagado. ✅ sessão 53: o oficial ecoa o uid e o MD5 do pedido.</summary>
+public sealed class CharacterDeletePacket(uint characterUid, string passwordMd5) : ServerPacket
 {
     public override ushort Opcode => (ushort)ChannelOpcode.CharacterDelete;
 
@@ -81,8 +89,7 @@ public sealed class CharacterDeletePacket(uint characterUid) : ServerPacket
     {
         Result.Write(w, 0);
         w.WriteU32(characterUid);
-        // ❓ o pedido traz o MD5 da senha; o protótipo respondia o MD5 de "" e o cliente aceitava
-        w.WriteFixedString("d41d8cd98f00b204e9800998ecf8427e", 40);
+        w.WriteFixedString(passwordMd5, 40);
     }
 }
 

@@ -110,9 +110,7 @@ public sealed partial class CharacterCreateHandler(
 
         packet.ReadI32();
         packet.ReadI32();
-        packet.ReadU16();
-        packet.ReadU16();                       // semente 1
-        packet.ReadU16();                       // semente 2
+        var header = new CharacterCreateHeader(packet.ReadU8(), packet.ReadU8(), packet.ReadU16(), packet.ReadU16());
         var tamerId = packet.ReadU8();
         var name = packet.ReadFixedString(21);
         var digimonId = packet.ReadU16();
@@ -128,11 +126,12 @@ public sealed partial class CharacterCreateHandler(
             return;
         }
 
+        // o cliente escolhe o slot (✅ sessões 3 e 53); se ele estiver ocupado, usa o primeiro livre
         var slots = await list.LoadSlotsAsync(account.Uid, ct);
-        int slot = Array.IndexOf(slots, null);
+        int slot = header.Slot < slots.Length && slots[header.Slot] is null ? header.Slot : Array.IndexOf(slots, null);
         if (slot < 0) return;
 
-        var reply = (int error) => new CharacterCreatePacket(error, tamerId, name, digimonId, digimonName);
+        var reply = (int error) => new CharacterCreatePacket(error, header, tamerId, name, digimonId, digimonName);
         if (await characters.IsNameTakenAsync(name, ct))
         {
             session.Send(reply(ChannelError.NameTaken));
@@ -163,11 +162,11 @@ public sealed class CharacterDeleteHandler(CharacterRepository characters, Chara
         packet.ReadI32();
         packet.ReadI32();
         var uid = packet.ReadU32();
-        packet.ReadFixedString(40);             // MD5 da senha. ❓ o oficial confere; aqui não há senha local
+        var passwordMd5 = packet.ReadFixedString(40); // ❓ o oficial confere; aqui não há senha local
 
         if (!await characters.DeleteAsync(uid, account.Uid, ct)) return;
         log.LogInformation("{Username} apagou o personagem {Uid}", account.Username, uid);
-        session.Send(new CharacterDeletePacket(uid));
+        session.Send(new CharacterDeletePacket(uid, passwordMd5));
         await list.SendAsync(session, account.Uid, ct);
     }
 }

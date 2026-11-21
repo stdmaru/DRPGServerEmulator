@@ -29,7 +29,7 @@ public class PacketSizeTests
             (new HandshakePacket("user"), 28),
             (new ChannelSelectPacket(0), 52),
             (new AuthenticationPacket(0, "user"), 448),
-            (new CharacterCreatePacket(0, 1, "a", 10, "b"), 64),
+            (new CharacterCreatePacket(0, new CharacterCreateHeader(3, 0x4F, 0x3E, 0x38), 1, "a", 10, "b"), 64),
             (new CharacterListPacket([null, null, null, null], new Random(1)), 500),
             (new UserCheckPacket("user"), 22),
             (new CharacterDataPacket(character), 7600),                // ✅ v322 (sessão 52)
@@ -51,15 +51,15 @@ public class PacketSizeTests
             (new ActionCooldownPacket(Serial.New(), 10), 24),
             (new BattleEndPacket(BattleResult.Win), 1),
             (new RewardBitExpPacket(Serial.New(), 1, 1), 32),
-            (new LevelUpPacket(digimon), 696),                         // ❓ v322 deduzido do bloco de 696
-            (new AddAbilityPointPacket(digimon, 1, 1), 704),           // ❓ v322 deduzido
+            (new LevelUpPacket(digimon), 696),                         // ✅ v322 (sessões 54, 56)
+            (new AddAbilityPointPacket(digimon, 1, 1), 704),           // ✅ v322 (sessões 54, 56)
             (new Unknown73Packet(), 280),
             (new Unknown74Packet(), 60),
             (new Unknown7EPacket(0x29), 1940),
             (new Unknown7FPacket(0x3D), 2708),
             (new ItemDropGetPacket(drop, item), 236),
             (new TeleportCharacterPacket(79, 1, 1), 8),
-            (new RefreshDigimonStatusPacket(digimon), 696),            // ❓ v322 deduzido
+            (new RefreshDigimonStatusPacket(digimon), 696),            // ✅ v322 (sessão 56)
             (new SingleDigimonInfoPacket(digimon), 696),               // ✅ v322 (0xB4)
             (new KeepAlivePacket(0xC4), 0),
             (new ItemReceivePacket(item), 604),
@@ -90,6 +90,29 @@ public class PacketSizeTests
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), Entities.Character());
         zones.Find(79)!.Enter(player);
         var battle = battles.StartPve(player, zones.Find(79)!.WildDigimons.First().Serial)!;
-        Assert.Equal(6960, new BattleCreatePacket   /* ❓ v322: 10 blocos de 696 */(battle).EncodePayload().Length);
+        Assert.Equal(6960, new BattleCreatePacket   /* ✅ v322: 10 blocos de 696 (sessão 56) */(battle).EncodePayload().Length);
+    }
+
+    [Fact]
+    public void Character_create_echoes_request_header()
+    {
+        // ✅ sessão 53: resultado 2/0 e os 6 bytes do pedido (slot 3, mapa 0x4F, 0x3E, 0x38)
+        var payload = new CharacterCreatePacket(0, new CharacterCreateHeader(3, 0x4F, 0x3E, 0x38), 1, "a", 31, "b").EncodePayload();
+        Assert.Equal(Convert.FromHexString("0200000000000000034F3E003800"), payload[..14]);
+    }
+
+    [Fact]
+    public void Character_list_check_is_offset_plus_map_plus_level()
+    {
+        // ✅ 18 listas v322 (sessões 52–56): check − deslocamento = mapa + nível, e slot vazio leva só o índice
+        var summary = new CharacterSummary(7, 0, "a", 1, 14, 6, 57, 91, 5, 6, 619, 12, "b");
+        var payload = new CharacterListPacket([summary, null, null, null], new Random(1)).EncodePayload();
+        for (int slot = 0; slot < 4; slot++)
+        {
+            var b = payload.AsSpan(4 + 124 * slot, 124);
+            Assert.Equal(slot, b[112]);
+            int check = BitConverter.ToInt32(b[116..]), offset = BitConverter.ToInt32(b[120..]);
+            Assert.Equal(slot == 0 ? 20 : 0, check - offset);
+        }
     }
 }
