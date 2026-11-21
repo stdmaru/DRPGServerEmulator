@@ -12,8 +12,6 @@ public readonly record struct CombatStats(int MaxHp, int MaxVp, int MaxEvp, int 
 
 /// <summary>
 /// Todas as fórmulas de status num lugar só (ver docs/mecanicas/formulas-status.md).
-/// Só MaxEVP está confirmada. O resto é palpite do protótipo e erra até ~100 pontos:
-/// é o alvo da próxima tarefa.
 /// </summary>
 public static class StatFormulas
 {
@@ -39,15 +37,27 @@ public static class StatFormulas
                    10 + bonus + g.Con * levels, 10 + bonus + g.Int * levels);
     }
 
-    /// <summary>❌ Coeficientes do protótipo, sabidamente errados.</summary>
+    // ✅ status = ⌊c1·√a + c2·√b⌋, sem nível nem espécie (ajuste em 80 amostras v322, todos os estágios).
+    // Erra 1 ponto em: ATK 1, HP 0, DEF 0, BR 8, VP 2 amostras. Coeficientes = centro da região viável.
+    public const double AtkStr = 34.521, AtkAgi = 11.364;
+    public const double HpStr = 11.536, HpCon = 25.054;
+    public const double DefCon = 21.115, DefInt = 6.603;
+    public const double BrAgi = 9.900, BrInt = 31.642;
+    public const double VpCon = 11.213, VpInt = 25.446;
+
+    /// <summary>
+    /// ✅ Cada status é uma soma de raízes de dois atributos (os que o jogo diz: STR → ATK, HP;
+    /// AGI → BR, ATK; CON → DEF, HP, VP; INT → BR, VP, DEF). ❓ Bônus de equipamento/buff não entram.
+    /// </summary>
     public static CombatStats Combat(Attributes a, int level) => new(
-        MaxHp: Round(a.Str * 0.90 + a.Con * 3.10 + 75),
-        MaxVp: Round(a.Con * 1.4436 + a.Int * 2.5207 + 75),
+        MaxHp: Stat(HpStr, a.Str, HpCon, a.Con),
+        MaxVp: Stat(VpCon, a.Con, VpInt, a.Int),
         MaxEvp: MaxEvp(level),
-        Atk: Round(a.Str * 4.3706 + a.Agi * 1.8705 + 60),
-        Def: Round(a.Con * 3.0693 + a.Int * 0.6298 + 43),
-        Br: Round(a.Agi * 1.1758 + a.Int * 3.5702 + 85),
+        Atk: Stat(AtkStr, a.Str, AtkAgi, a.Agi),
+        Def: Stat(DefCon, a.Con, DefInt, a.Int),
+        Br: Stat(BrAgi, a.Agi, BrInt, a.Int),
         MaxActionGauge: MaxActionGauge);
 
-    private static int Round(double value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);
+    private static int Stat(double c1, int a, double c2, int b) =>
+        (int)Math.Floor(c1 * Math.Sqrt(Math.Max(0, a)) + c2 * Math.Sqrt(Math.Max(0, b)));
 }

@@ -333,3 +333,20 @@ public class RealClientTablesTests
             $"Yuramon {yuramon.Name} estágio {yuramon.Stage} cresc. {yuramon.Growth}");
     }
 }
+
+public class CombatFormulaTests
+{
+    // amostras do oficial (v322): STR AGI CON INT → ATK DEF BR HP VP
+    [Theory]
+    [InlineData(10, 10, 10, 10, 145, 87, 131, 115, 115)]     // nível 1, qualquer espécie
+    [InlineData(25, 16, 16, 13, 218, 108, 153, 157, 136)]    // Hopmon L4
+    [InlineData(44, 32, 31, 21, 293, 147, 201, 216, 179)]    // Hopmon L10
+    [InlineData(70, 60, 50, 50, 376, 195, 300, 273, 259)]    // rookie L11
+    [InlineData(91, 76, 70, 69, 428, 231, 349, 319, 305)]    // V-mon L20
+    [InlineData(114, 98, 91, 91, 481, 264, 399, 362, 349)]   // champion L21
+    public void Combat_stats_match_official_samples(int str, int agi, int con, int @int, int atk, int def, int br, int hp, int vp)
+    {
+        var s = StatFormulas.Combat(new Attributes(str, agi, con, @int), 1);
+        Assert.Equal((atk, def, br, hp, vp), (s.Atk, s.Def, s.Br, s.MaxHp, s.MaxVp));
+    }
+}

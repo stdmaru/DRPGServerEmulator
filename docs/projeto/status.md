@@ -13,7 +13,7 @@
 - ✅ `drpg_wine.sh`: prefixo dedicado, `run` (args do `start_bin.bat`), `run --debug`, `hang` (backtrace de todas as threads + minidump). Ver [Wine](../cliente/wine.md).
 - ✅ **Tela congelada no loading resolvida** (patch `loadingbar`, aplicado em `client/DigimonRPG.bin` e `DigimonRPG_proxy.bin`). Causa: a thread da barra e a principal usavam o mesmo backbuffer DirectDraw sem trava. O backbuffer ficava preso (`SURFACEBUSY`), mas o jogo seguia até a seleção de servidor. Agora a tela fica preta durante o loading.
 - ✅ Primeira sessão no oficial pela v322 (sessão 52, login → mapa) e `drpg_diff.py` rodado. Ver [opcodes](../protocolo/opcodes.md#mudanças-v242--v322).
-- ✅ Fórmula confirmada: `MaxEVP = L × (L − 1)`. Ver [fórmulas](../mecanicas/formulas-status.md).
+- ✅ Fórmulas de status: `MaxEVP = L × (L − 1)`, atributos pelo status-base da dex (até rookie) e ATK/DEF/BR/HP/VP = ⌊c₁√a + c₂√b⌋ (BR erra 1 ponto em 8/80). Ver [fórmulas](../mecanicas/formulas-status.md).
 - ✅ **Emulador reescrito** (branch `refactor/base`, sem commit, aguardando revisão): .NET 10, thread única do mundo, persistência em fila, migrações automáticas em `sql/upgrade`, 23 testes, devcontainer com SDK 10. Replay das sessões 10 e 4: login e channel idênticos ao oficial. Ver [arquitetura](../emulador/arquitetura.md) e [replay](../ferramentas/replay.md).
 
 - ✅ Capturas longas v322: sessões 53, 54 e 56 (~84 mil pacotes, 80 marcadores) cobrem criar/apagar, tutorial, batalha, level up, pontos de atributo, evolução, itens, depósito, party, chat.
@@ -40,5 +40,5 @@
 - ❓ O método de dump do Themida é manual e não está documentado. Necessário a cada atualização do oficial.
 - ✅ O stub do XIGNCODE funciona contra o oficial na v322 até a seleção de servidor (login com sucesso). ❓ Falta confirmar canal e mapa.
 - Os endereços em [binário](../cliente/binario.md) são da v242 (o dispatcher etc.). Refazer na v322.
-- As fórmulas de ATK/DEF/BR/HP/VP do emulador erram até 109 pontos (`Game/Stats/StatFormulas.cs`). Atributos base confirmados só até rookie; champion em diante ❓.
+- Atributos confirmados só até rookie; champion em diante ❓. Bônus de equipamento/título/buff ainda não aplicados.
 - Protocolo alvo **v322**. Entrada no mapa já bate em tamanho com a sessão 52; o conteúdo de vários pacotes ainda é cópia de captura ou zero.

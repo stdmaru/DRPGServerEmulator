@@ -1,39 +1,43 @@
 # Fórmulas de status
 
-Dados: 54 amostras (19 únicas) extraídas por [extract_status.py](../ferramentas/extract-status.md) dos 52 pcaps. Espécies 10, 14, 51, 56, 619 e 635, níveis 1–13. Layout em [status de digimon](../protocolo/structs/status-digimon.md).
+Dados: blocos de status de todas as capturas em `captures.db` (1634 blocos, 434 únicos). O ajuste usa as 80 amostras v322 sem bônus (byte 328 zerado), de in-training a champion (níveis 1–21). Layout em [status de digimon](../protocolo/structs/status-digimon.md). Código em `Game/Stats/StatFormulas.cs`.
 
-## ✅ Confirmadas
-- **MaxEVP = L × (L − 1)**: bate nas 19 amostras (L2→2, L6→30, L13→156).
-- **MaxActionGauge = 500** em todas as amostras; o emulador usa a constante (`StatFormulas.MaxActionGauge`).
-- **Atributos base = 10 + crescimento × (L − 1) + pontos distribuídos**, com o crescimento das colunas 15..18 da `dex_us` ([arquivos de dados](../cliente/arquivos-de-dados.md)). Confirmado em in-training. Rookie soma **+20** em cada atributo (❓ só rookie visto; champion em diante desconhecido).
-- Digimon selvagem chega no `0x63` com atributos **zero**; o do jogador, com os reais. O byte 300 do bloco é 0 no do jogador e 2 no selvagem.
+## ✅ Atributos (STR, AGI, CON, INT)
+**atributo = 10 + bônus do estágio + status-base × (L − 1) + pontos distribuídos**
 
-## ❌ Fórmulas atuais do emulador (`Game/Stats/StatFormulas.cs`)
-São lineares, com coeficientes quebrados. Erro máximo contra as amostras: ATK −24…+109, DEF −8…+42, BR −5…+57, MaxHP −8…+27, MaxVP −10…+31. **Não usar como referência.**
+- **Status-base:** crescimento por nível, nas colunas 15..18 da `dex_us` ([arquivos de dados](../cliente/arquivos-de-dados.md)). Exemplo: Gigimon 3/2/2/1, Yuramon 2/2/2/2.
+- **Bônus do estágio:** 0 em in-training e **+20** em rookie.
+  - Rookie confirmado no nível 11, sem pontos distribuídos: Monodramon (3/2/2/2) → 60/50/50/50, V-mon (3/2/2/1) → 60/50/50/40, Palmon (3/3/1/1) → 60/60/40/40.
+- ❓ **Champion em diante:** só há uma amostra limpa. XV-mon L21 = 114/98/91/91, que é o V-mon L21 do mesmo jogador (91/76/70/69, com 20 pontos em INT) +21..23 em cada atributo. Não dá para separar bônus de estágio de pontos herdados. Cada forma tem pontos próprios ([evolução](evolucao.md)).
+- O nível **não entra direto** nos status: o mesmo digimon com os mesmos atributos tem os mesmos status no nível 10 e 11 (e 20 e 21).
+- A espécie e o estágio também não entram: a fórmula abaixo vale igual de in-training a champion.
 
-## ❓ Hipóteses em aberto (ATK, DEF, BR, MaxHP, MaxVP)
-- Um ajuste linear em STR, AGI, CON, INT, nível e constante ainda deixa resíduo de 3–4, com coeficientes negativos sem sentido. Não é uma soma simples.
-- **Ganho por ponto muda:**
-  - Yuramon (14) L2, INT 13→14: DEF +1, BR +5, VP +4.
-  - V-mon (635) L11, INT 40→60: DEF +10, BR +45 (2,25/pt), VP +37 (1,85/pt).
-  - A explicação pode ser retorno decrescente, peso por espécie ou estágio, ou peso por nível. Os dados atuais não separam essas hipóteses.
-- **Há bônus fora dos 4 atributos:** Guilmon (51) L13 com os mesmos atributos aparece com ATK 384→386 e HP 284→285. Candidatos: equipamento, título, buff, status do tamer.
+## ✅ Status de combate
+**status = ⌊c₁·√a + c₂·√b⌋**, com os atributos que o jogo descreve:
 
-## Amostras-chave
-| ID | L | STR AGI CON INT | ATK DEF BR HP VP |
-|---|---|---|---|
-| 14 | 1 | 10 10 10 10 | 145 87 131 115 115 |
-| 14 | 2 | 12 12 12 13 | 159 96 148 126 130 |
-| 14 | 2 | 12 12 12 14 | 159 97 153 126 134 |
-| 14 | 6 | 20 20 20 22 | 205 125 192 163 169 |
-| 14 | 7 | 22 22 22 24 | 215 131 201 171 177 |
-| 14 | 8 | 24 24 24 26 | 225 137 210 179 184 |
-| 14 | 10 | 28 28 28 30 | 243 147 225 193 198 |
-| 635 | 11 | 60 50 50 40 | 347 190 270 266 240 |
-| 635 | 11 | 60 50 50 60 | 347 200 315 266 277 |
-| 635 | 12 | 63 52 52 61 | 355 204 319 272 280 |
+| Status | a | c₁ | b | c₂ | Amostras v322 com erro de 1 |
+|---|---|---|---|---|---|
+| ATK | STR | 34,521 | AGI | 11,364 | 1 / 80 |
+| MaxHP | STR | 11,536 | CON | 25,054 | 0 / 80 |
+| DEF | CON | 21,115 | INT | 6,603 | 0 / 80 |
+| BR | AGI | 9,900 | INT | 31,642 | 8 / 80 |
+| MaxVP | CON | 11,213 | INT | 25,446 | 2 / 80 |
 
-Crescimento por nível observado no Yuramon: +2 em cada atributo por nível (INT às vezes +3).
+- O expoente 0,5 sai do ajuste livre (melhor p = 0,500 em todos). Ajustes alternativos piores: log, soma linear, √(w·a + b), arredondamento por termo, `round`/`ceil`.
+- Os coeficientes são o centro da região que zera (ou minimiza) os erros. A região do HP inclui 11,5 / 25,0 e a do BR inclui c₂² ≈ 1000, mas não há um padrão "redondo" claro.
+- Nível 1 (10 em tudo): ATK 145, DEF 87, BR 131, HP 115, VP 115, igual ao jogo.
+- Marginal por ponto: d/dx = c/(2√x), por isso o ganho cai com o atributo. Exemplos: STR 20 → ATK +3,8/pt; STR 65 → +2,1/pt.
+- ❓ **BR** erra 1 ponto em 8 amostras, todas do V-mon L12–18 com INT 61–67. Pode haver um termo pequeno que falta ou um arredondamento diferente.
+- Nas v242 (13 amostras) os coeficientes que fecham são um pouco diferentes (ATK 33,68 / 12,25). ❓ Pode ser outra versão da fórmula ou poucas amostras.
+
+## ✅ Outros
+- **MaxEVP = L × (L − 1)** (L2 → 2, L6 → 30, L13 → 156).
+- **MaxActionGauge = 500** em todas as amostras.
+
+## ❓ Bônus fora da fórmula
+- Amostras com o byte 328 = 15/15/15/15 (personagem nível 160) e algumas `0xB4`/`0x82` em batalha ficam 1–45 % acima da fórmula. Candidatos: equipamento, título, buff de batalha, status do tamer. O emulador ainda não aplica nada disso.
+- O mega Tactimon L160 sem bônus (927/768/528/489) fica a ±2 da fórmula, mesmo com atributos ~10× maiores que as amostras do ajuste.
 
 ## Próximo passo
-O experimento controlado está na [campanha](../captura/campanha.md), item 1. Com 30–50 respostas de 0x71 deve dar para fechar fórmulas inteiras.
+- Champion+: capturar a evolução de um digimon sem pontos distribuídos (ou anotar os pontos de cada forma). Ver [campanha](../captura/campanha.md).
+- Bônus: capturar o mesmo digimon com e sem equipamento/título.

@@ -38,7 +38,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Arquitetura](emulador/arquitetura.md): como rodar, migrações, estrutura, modelo de threads, handlers, autenticação entre servidores, testes.
 
 ### Mecânicas (lógica do servidor)
-- [Fórmulas de status](mecanicas/formulas-status.md): MaxEVP confirmada, análise de ATK/DEF/BR/HP/VP, experimento proposto.
+- [Fórmulas de status](mecanicas/formulas-status.md): atributos = 10 + bônus do estágio + status-base × (L − 1) + pontos; ATK/DEF/BR/HP/VP = ⌊c₁√a + c₂√b⌋; MaxEVP L(L − 1).
 - [Fórmulas de EXP](mecanicas/formulas-exp.md): digimon ⌊20L·1,2^L⌋ em float32 (trava no nível 77), tamer 5(L+1), recompensa 0x6E, evento de EXP ❓.
 - [Evolução](mecanicas/evolucao.md): cada forma tem atributos, pontos e skills próprios; nível e EXP são do digimon.
 - [Portais](mecanicas/portais.md): posição e destino do `map_us`, chegada capturada em `Portals.xml` ou estimada.
