@@ -17,6 +17,9 @@ public sealed class Player(Session session, AuthenticatedAccount account, Charac
     public bool InBattle => Battle is not null;
     public bool IsOnline => !Session.IsClosed;
 
+    /// <summary>Hora (do mundo) do último 0x20 aceito ou do último teleporte.</summary>
+    public TimeSpan LastMoveAt { get; internal set; }
+
     public void Send(ServerPacket packet) => Session.Send(packet);
 
     public override string ToString() => $"{Character.Name}({Account.Username})";

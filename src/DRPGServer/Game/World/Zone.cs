@@ -10,12 +10,17 @@ namespace DRPGServer.Game.World;
 public sealed class Zone
 {
     private static readonly TimeSpan DropResendInterval = TimeSpan.FromMilliseconds(500);
-    private static readonly TimeSpan WildTickInterval = TimeSpan.FromSeconds(2);
+    // ✅ v322: o oficial manda o 0x11 de cada selvagem a cada ~344 ms (mediana de 72 mil pacotes), parado ou não
+    public static readonly TimeSpan WildTickInterval = TimeSpan.FromMilliseconds(344);
+    // ✅ derrotado (8) por ~10,4 s antes de sair do mapa (12); ❓ só 2 amostras
+    public static readonly TimeSpan DeadDisplayTime = TimeSpan.FromSeconds(10.4);
     // ✅ v322 (sessões 52–56): o oficial manda 0xC4 e a recuperação no mesmo tick, mediana 5,2 s (p10 5,1, p90 5,3)
     private static readonly TimeSpan RecoveryInterval = TimeSpan.FromMilliseconds(5200);
     private static readonly TimeSpan DropCleanInterval = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan DropLifetime = TimeSpan.FromSeconds(60);
-    private const int WildMoveChancePercent = 50;
+    /// <summary>✅ Chance por tick de um selvagem parado começar a andar: 3276 de 65 462 ticks parados (5 %).</summary>
+    public const double WildMoveChance = 0.05;
+    private const int HomeAttempts = 32;
 
     private readonly GameData _data;
     private readonly GameWorld _world;
@@ -31,10 +36,16 @@ public sealed class Zone
         _data = data;
         _world = world;
         Portals = data.PortalsOf(mapId);
+        Grid = data.GridOf(mapId);
         SpawnAll();
     }
 
     public byte MapId { get; }
+    /// <summary>Grade do mapa; null = sem grade extraída (tudo andável).</summary>
+    public MapGrid? Grid { get; }
+
+    public bool IsWalkable(int x, int y) => Grid?.IsWalkable(x, y) ?? true;
+    public bool IsNearWalkable(int x, int y) => Grid?.IsNearWalkable(x, y) ?? true;
     public IReadOnlyList<PortalInfo> Portals { get; }
     public IReadOnlyList<Player> Players => _players;
     public IEnumerable<WildDigimon> WildDigimons => _wild.Values;
@@ -120,11 +131,33 @@ public sealed class Zone
     {
         foreach (var area in _data.SpawnsOf(MapId))
             for (int i = 0; i < area.MaxCount; i++)
-                AddWild(new WildDigimon(_data, area, _world.Random));
+                if (Spawn(area, i) is { } wild)
+                    AddWild(wild);
+    }
+
+    /// <summary>Novo grupo na casa <paramref name="slot"/> da área (ponto fixo, ou célula andável sorteada).</summary>
+    private WildDigimon? Spawn(SpawnArea area, int slot)
+    {
+        if (area.Points.Count > 0)
+        {
+            var (px, py) = area.Points[slot % area.Points.Count];
+            return new WildDigimon(_data, area, px, py) { Slot = slot };
+        }
+        var random = _world.Random;
+        for (int i = 0; i < HomeAttempts; i++)
+        {
+            short x = (short)random.Next(area.XMin, area.XMax + 1), y = (short)random.Next(area.YMin, area.YMax + 1);
+            if (IsWalkable(x, y)) return new WildDigimon(_data, area, x, y) { Slot = slot };
+        }
+        return null;
     }
 
     private void AddWild(WildDigimon wild) => _wild.Add(wild.Serial, wild);
 
+    /// <summary>
+    /// Tick dos selvagens (docs/mecanicas/selvagens.md): parado → 5 % de chance de escolher um destino andável na
+    /// caixa da casa; andando → chega no tick seguinte e para no outro. Todos vão no 0x11 a cada tick.
+    /// </summary>
     private void UpdateWild(TimeSpan now)
     {
         var random = _world.Random;
@@ -132,30 +165,49 @@ public sealed class Zone
         {
             switch (wild.State)
             {
-                case WildState.Dead when now >= wild.RespawnAt:
-                    _wild.Remove(wild.Serial);
-                    var fresh = new WildDigimon(_data, wild.Spawn, random);
-                    AddWild(fresh);
-                    Broadcast(new WildDigimonUpdatePacket(fresh));
-                    continue;
-                case WildState.Dead:
-                    continue;
-                case WildState.Roaming when random.Next(100) < WildMoveChancePercent:
-                    var area = wild.Spawn;
-                    short x = (short)Math.Clamp(wild.X + random.Next(-2, 3), area.XMin, area.XMax);
-                    short y = (short)Math.Clamp(wild.Y + random.Next(-2, 3), area.YMin, area.YMax);
-                    if (x != wild.X || y != wild.Y) wild.MoveTo(x, y);
+                case WildState.Idle when random.NextDouble() < WildMoveChance:
+                    if (PickDestination(wild, random) is var (x, y)) wild.StartMove(x, y);
                     break;
+                case WildState.Moving when (wild.X, wild.Y) != (wild.DestX, wild.DestY):
+                    wild.Arrive();
+                    break;
+                case WildState.Moving:
+                    wild.Stop();
+                    break;
+                case WildState.Dead when now - wild.DiedAt >= DeadDisplayTime:
+                    wild.State = WildState.Gone;
+                    break;
+                case WildState.Gone when now - wild.DiedAt >= DeadDisplayTime + wild.Spawn.RespawnTime:
+                    _wild.Remove(wild.Serial);
+                    if (Spawn(wild.Spawn, wild.Slot) is { } fresh)
+                    {
+                        AddWild(fresh);
+                        Broadcast(new WildDigimonUpdatePacket(fresh));
+                    }
+                    continue;
+                case WildState.Gone:
+                    continue;
             }
             Broadcast(new WildDigimonUpdatePacket(wild));
         }
+    }
+
+    private (short, short)? PickDestination(WildDigimon wild, Random random)
+    {
+        const int r = WildDigimon.RoamRadius;
+        for (int i = 0; i < 8; i++)
+        {
+            short x = (short)(wild.HomeX + random.Next(-r, r + 1)), y = (short)(wild.HomeY + random.Next(-r, r + 1));
+            if ((x, y) != (wild.X, wild.Y) && IsWalkable(x, y)) return (x, y);
+        }
+        return null;
     }
 
     /// <summary>Marca o grupo como derrotado: some do mapa e volta depois do tempo de respawn.</summary>
     public void Kill(WildDigimon wild)
     {
         wild.State = WildState.Dead;
-        wild.RespawnAt = _world.Now + wild.Spawn.RespawnTime;
+        wild.DiedAt = _world.Now;
         Broadcast(new WildDigimonUpdatePacket(wild));
     }
 
@@ -163,7 +215,7 @@ public sealed class Zone
     {
         foreach (var wild in _wild.Values)
         {
-            wild.State = WildState.Dead;
+            wild.State = WildState.Gone;
             Broadcast(new WildDigimonUpdatePacket(wild));
         }
         _wild.Clear();

@@ -5,7 +5,8 @@ using DRPGServer.Game.Stats;
 namespace DRPGServer.Data.GameData;
 
 /// <summary>Um mapa de <c>map_us</c>, com os portais como o cliente os descreve.</summary>
-public sealed record ClientMap(byte Id, string Name, short WorldX, short WorldY, IReadOnlyList<ClientPortal> Portals);
+/// <paramref name="FileName"/>: nome do arquivo do mapa no <c>resource.pf</c> (<c>map\&lt;nome&gt;.map</c>), coluna 4.
+public sealed record ClientMap(byte Id, string Name, string FileName, short WorldX, short WorldY, IReadOnlyList<ClientPortal> Portals);
 
 /// <summary>Portal em <c>map_us</c>: posição no mapa e nome do mapa de destino (o cliente não traz o ponto de chegada).</summary>
 public sealed record ClientPortal(short X, short Y, string DestName);
@@ -60,7 +61,7 @@ public static class ClientTables
     }
 
     /// <summary>
-    /// Mapas: <c>map_us</c> (0 id, 1 nome, 12/13 posição no mapa-múndi, 16..31 quatro portais de
+    /// Mapas: <c>map_us</c> (0 id, 1 nome, 4 arquivo do mapa, 12/13 posição no mapa-múndi, 16..31 quatro portais de
     /// (nome do destino, ?, x, y); "Entire" é slot vazio). Linhas com id 0 são entradas genéricas.
     /// </summary>
     public static FrozenDictionary<byte, ClientMap> Maps(ClientPack pack)
@@ -73,7 +74,7 @@ public static class ClientTables
             for (int k = 16; k + 3 < 32; k += 4)
                 if (f[k].Length > 0 && f[k] != "Entire")
                     portals.Add(new ClientPortal(Short(f, k + 2), Short(f, k + 3), f[k]));
-            maps.TryAdd(id, new ClientMap(id, f[1], Short(f, 12), Short(f, 13), portals));
+            maps.TryAdd(id, new ClientMap(id, f[1], f[4], Short(f, 12), Short(f, 13), portals));
         }
         return maps.ToFrozenDictionary();
     }

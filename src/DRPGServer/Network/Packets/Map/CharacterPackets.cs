@@ -187,17 +187,12 @@ public sealed class WildDigimonUpdatePacket(WildDigimon wild) : ServerPacket
         w.WriteU16(leader.SpeciesId);
         w.WriteU16(leader.Species.Stage);       // ❓ estágio (era 1 fixo)
         w.WriteU16(leader.Level);
-        w.WriteU8(2);                           // ❓ 2 como no byte 300 do bloco de status do selvagem
-        w.WriteU8(wild.State switch             // 1 no mapa, 6/8 morto, 11 em batalha
-        {
-            WildState.InBattle => 11,
-            WildState.Dead => 6,
-            _ => 1,
-        });
+        w.WriteU8(2);                           // ✅ 2 em todos os selvagens (como o byte 300 do bloco de status)
+        w.WriteU8(wild.StateCode);              // ✅ 1 parado, 4 andando, 11 batalha, 8 derrotado, 12 saindo
         w.WriteU16((ushort)wild.Facing);
         w.WriteI16(wild.X);
         w.WriteI16(wild.Y);
-        w.WriteI16(wild.X);                     // ❓ destino do movimento; no oficial é igual à posição
-        w.WriteI16(wild.Y);
+        w.WriteI16(wild.DestX);                 // ✅ destino do movimento (igual à posição quando parado)
+        w.WriteI16(wild.DestY);
     }
 }

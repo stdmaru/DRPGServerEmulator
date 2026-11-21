@@ -17,8 +17,10 @@ public static class GameDataLoader
 
     /// <param name="root">Pasta Resources/ do servidor.</param>
     /// <param name="pack">Pacote de tabelas do cliente.</param>
-    public static GameData Load(string root, ClientPack pack)
+    /// <param name="grids">Grades dos mapas (<see cref="MapGrid.Load"/>); null = sem validação de posição.</param>
+    public static GameData Load(string root, ClientPack pack, FrozenDictionary<byte, MapGrid>? grids = null)
     {
+        grids ??= FrozenDictionary<byte, MapGrid>.Empty;
         var species = ClientTables.Species(pack);
         var items = ClientTables.Items(pack);
         var maps = ClientTables.Maps(pack);
@@ -53,8 +55,12 @@ public static class GameDataLoader
             var options = e.Elements("SpawnOption").Select(o => new SpawnOption(
                 U16(o, "DigimonID"), U16(o, "Level"), I32(o, "STR"), I32(o, "AGI"), I32(o, "CON"), I32(o, "INT"),
                 I64(o, "ExpReward"), F64(o, "BitReward"), U16(o, "AppearanceRate"), U32(o, "DropGroup"))).ToList();
+            var points = e.Elements("Point").Select(p => (I16(p, "X"), I16(p, "Y"))).ToList();
             var area = new SpawnArea(U8(e, "MapID"), I16(e, "PosXMin"), I16(e, "PosXMax"), I16(e, "PosYMin"), I16(e, "PosYMax"),
-                I32(e, "MaxCount"), TimeSpan.FromSeconds(F64(e, "RespawnTime")), options);
+                points.Count > 0 ? points.Count : I32(e, "MaxCount"), TimeSpan.FromSeconds(F64(e, "RespawnTime")), options, points);
+            if (grids.GetValueOrDefault(area.MapId) is { } grid)
+                foreach (var (x, y) in points)
+                    if (!grid.IsWalkable(x, y)) throw new GameDataException($"spawn no mapa {area.MapId}: ponto ({x}, {y}) não é andável");
             if (options.Count == 0) throw new GameDataException($"spawn no mapa {area.MapId} sem SpawnOption");
             if (options[0].AppearanceRate != 100) throw new GameDataException($"spawn no mapa {area.MapId}: a primeira opção precisa de AppearanceRate 100");
             foreach (var o in options)
@@ -73,6 +79,7 @@ public static class GameDataLoader
             Items = items,
             DropGroups = drops.ToFrozenDictionary(),
             Maps = maps,
+            Grids = grids,
             Portals = portals,
             Spawns = spawns.GroupBy(s => s.MapId).ToFrozenDictionary(g => g.Key, g => (IReadOnlyList<SpawnArea>)g.ToList()),
             ZoneIds = zoneIds,

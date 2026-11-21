@@ -1,5 +1,14 @@
+<!--
+  Point: casa fixa de cada grupo (✅ capturada: centro da caixa de 7 × 7 onde ele anda). Com pontos, MaxCount
+  é o número de pontos; sem pontos, cada grupo sorteia uma célula andável no retângulo PosX/PosY.
+  Ver docs/mecanicas/selvagens.md.
+-->
 <DigimonSpawns>
-    <Spawn MapID="79" MaxCount="3" PosXMin="24" PosYMin="63" PosXMax="33" PosYMax="70" RespawnTime="1">
+    <!-- mapa 79 (tutorial): sessões 53 e 54, mesmas três casas -->
+    <Spawn MapID="79" MaxCount="3" PosXMin="24" PosYMin="62" PosXMax="34" PosYMax="70" RespawnTime="1">
+        <Point X="27" Y="65"/>
+        <Point X="29" Y="66"/>
+        <Point X="31" Y="67"/>
         <SpawnOption DigimonID="14" Level="2" STR="0" AGI="0" CON="0" INT="0" ExpReward="0" BitReward="16" AppearanceRate="100" DropGroup="1"/>
     </Spawn>
 </DigimonSpawns>

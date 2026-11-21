@@ -112,15 +112,11 @@ public sealed class MoveCharacterHandler(ZoneSystem zones) : PlayerHandler
 {
     protected override void Handle(Player player, PacketReader packet)
     {
-        packet.ReadI16();
+        packet.ReadI16();                       // ✅ sempre 5
         short x = packet.ReadI16();
-        short y = packet.ReadI16();
+        short y = packet.ReadI16();             // ✅ os 14 bytes seguintes são zero
         if (player.InBattle) return;
-
-        player.Character.X = x;
-        player.Character.Y = y;
-        if (player.Zone?.Portals.FirstOrDefault(p => p.Contains(x, y)) is { } portal)
-            zones.Teleport(player, portal.DestMapId, portal.DestX, portal.DestY);
+        zones.Move(player, x, y);
     }
 }
 

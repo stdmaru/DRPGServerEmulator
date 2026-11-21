@@ -32,7 +32,7 @@ public sealed class BattleSystem : IWorldSystem
     public Battle? StartPve(Player player, Serial wildSerial)
     {
         if (player.InBattle || player.Zone is not { } zone) return null;
-        if (zone.FindWild(wildSerial) is not { State: WildState.Roaming } wild) return null;
+        if (zone.FindWild(wildSerial) is not { CanBattle: true } wild) return null;
 
         var battle = new Battle(this, player, wild, _world.Random);
         _battles.Add(battle);

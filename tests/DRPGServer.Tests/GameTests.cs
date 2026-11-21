@@ -1,4 +1,5 @@
 using DRPGServer.Data;
+using System.Collections.Frozen;
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Battle;
 using DRPGServer.Game.Entities;
@@ -149,7 +150,7 @@ public class BattleTests
         _battles.StartPve(_player, wild.Serial);
         _battles.PlayerLeft(_player);
         Tick();
-        Assert.Equal(WildState.Roaming, wild.State);
+        Assert.Equal(WildState.Idle, wild.State);
         Assert.Equal(0, _battles.Count);
     }
 
@@ -320,13 +321,20 @@ public class RealClientTablesTests
         var resources = Path.Combine(AppContext.BaseDirectory, "Resources");
         var table = Path.Combine(resources, "Client", "table.hf");
         if (!File.Exists(table)) return;
-        var data = GameDataLoader.Load(resources, ClientPack.Open(table));
+        var grids = Path.Combine(resources, "Client", ClientExtractor.GridsFile);
+        var data = GameDataLoader.Load(resources, ClientPack.Open(table), File.Exists(grids) ? MapGrid.Load(grids) : null);
         Assert.True(data.Species.Count > 700);
         Assert.True(data.Items.Count > 10_000);
         Assert.Contains((byte)79, data.ZoneIds);
         Assert.Equal(new PortalInfo(1, 3, 120, 2, 165, 17), data.PortalsOf(1).Single(p => p.X == 3));
         Assert.Equal((byte)1, data.Species[14].Stage);
         Assert.Equal(new DRPGServer.Game.Stats.Attributes(2, 2, 2, 2), data.Species[14].Growth);
+        if (data.Grids.Count > 0)
+        {
+            Assert.Equal((88, 132), (data.Grids[79].Width, data.Grids[79].Height));
+            Assert.True(data.Grids[79].IsWalkable(56, 56));     // posição inicial
+            Assert.Equal((176, 263), (data.Grids[2].Width, data.Grids[2].Height));
+        }
         var yuramon = data.Species[14];
         Console.WriteLine($"real: {data.Species.Count} espécies ({data.Species.Values.Count(s => s.Growth is null)} sem dex), " +
             $"{data.Items.Count} itens, {data.ZoneIds.Count} zonas, {data.Portals.Values.Sum(p => p.Count)} portais; " +
@@ -348,5 +356,183 @@ public class CombatFormulaTests
     {
         var s = StatFormulas.Combat(new Attributes(str, agi, con, @int), 1);
         Assert.Equal((atk, def, br, hp, vp), (s.Atk, s.Def, s.Br, s.MaxHp, s.MaxVp));
+    }
+}
+
+internal static class Grids
+{
+    /// <summary>Grade de teste: tudo andável menos a coluna x = <paramref name="wallX"/>.</summary>
+    public static MapGrid WithWall(int w, int h, int wallX)
+    {
+        var bits = new byte[(w * h + 7) / 8];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                if (x != wallX) bits[(y * w + x) >> 3] |= (byte)(1 << ((y * w + x) & 7));
+        return new MapGrid(w, h, bits);
+    }
+
+    public static GameData DataWithGrid(byte map, MapGrid grid) =>
+        GameDataLoader.Load(Path.Combine(AppContext.BaseDirectory, "Resources"), TestSupport.Pack,
+            new Dictionary<byte, MapGrid> { [map] = grid }.ToFrozenDictionary());
+}
+
+public class MapGridTests
+{
+    [Fact]
+    public void Reads_walk_bit_from_client_map_cells()
+    {
+        // u32 largura, u32 altura, u32 64, u32 32, células de 24 bytes; bit 0 do 6º u32 = andável
+        var d = new byte[16 + 24 * 6];
+        BitConverter.TryWriteBytes(d.AsSpan(0), 3);
+        BitConverter.TryWriteBytes(d.AsSpan(4), 2);
+        foreach (int i in new[] { 0, 4, 5 }) d[16 + 24 * i + 20] = 1;
+        d[16 + 24 * 1 + 20] = 0x00; d[16 + 24 * 1 + 21] = 0x01;   // só o bit 8: não é andável
+        var g = MapGrid.FromClientMap(d);
+        Assert.Equal((3, 2), (g.Width, g.Height));
+        Assert.True(g.IsWalkable(0, 0));
+        Assert.False(g.IsWalkable(1, 0));
+        Assert.True(g.IsWalkable(1, 1));     // célula 4 = (1, 1)
+        Assert.False(g.IsWalkable(3, 0));    // fora
+        Assert.True(g.IsNearWalkable(1, 0));
+    }
+
+    [Fact]
+    public void Grids_file_round_trips()
+    {
+        var path = Path.GetTempFileName();
+        MapGrid.Save(path, new Dictionary<byte, MapGrid> { [79] = Grids.WithWall(10, 7, 4) });
+        var g = MapGrid.Load(path)[79];
+        File.Delete(path);
+        Assert.Equal((10, 7), (g.Width, g.Height));
+        Assert.False(g.IsWalkable(4, 3));
+        Assert.True(g.IsWalkable(5, 3));
+    }
+}
+
+public class MovementTests
+{
+    private readonly GameWorld _world = TestSupport.NewWorld();
+    private readonly ZoneSystem _zones;
+    private readonly Session _session = TestSupport.NewSession();
+    private readonly Player _player;
+
+    public MovementTests()
+    {
+        // parede de 3 colunas em x = 59..61: x = 60 fica a 2 células da área livre
+        var data = Grids.DataWithGrid(79, WallOf3(100, 100));
+        _zones = new ZoneSystem(data, _world, NullLogger<ZoneSystem>.Instance);
+        _player = new Player(_session, new AuthenticatedAccount(1, "u", Authority.None), Entities.Character());
+        _zones.Find(79)!.Enter(_player);
+        _session.DrainOutgoing();
+    }
+
+    private static MapGrid WallOf3(int w, int h)
+    {
+        var bits = new byte[(w * h + 7) / 8];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                if (x is < 59 or > 61) bits[(y * w + x) >> 3] |= (byte)(1 << ((y * w + x) & 7));
+        return new MapGrid(w, h, bits);
+    }
+
+    [Fact]
+    public void Normal_step_is_accepted()
+    {
+        _zones.Move(_player, 52, 50);                       // de (56, 56): 7,2 células
+        Assert.Equal((52, 50), (_player.Character.X, _player.Character.Y));
+        Assert.Empty(_session.SentOpcodes());
+    }
+
+    [Fact]
+    public void Step_next_to_a_wall_is_accepted_like_official()
+    {
+        _zones.Move(_player, 59, 56);                       // bloqueada, mas encostada em x = 58
+        Assert.Equal(59, _player.Character.X);
+    }
+
+    [Fact]
+    public void Step_into_a_wall_snaps_back()
+    {
+        _zones.Move(_player, 60, 56);
+        Assert.Equal((56, 56), (_player.Character.X, _player.Character.Y));
+        Assert.Equal([(ushort)0xB0], _session.SentOpcodes());
+    }
+
+    [Fact]
+    public void Too_far_in_one_report_snaps_back()
+    {
+        _zones.Move(_player, 56, 90);                       // 34 células de uma vez
+        Assert.Equal(56, _player.Character.Y);
+        Assert.Equal([(ushort)0xB0], _session.SentOpcodes());
+    }
+
+    [Fact]
+    public void Allowed_distance_grows_with_time_but_not_while_idle()
+    {
+        Assert.Equal(Movement.MaxDistance(TimeSpan.Zero), Movement.MaxDistance(Movement.ReportInterval));
+        Assert.True(Movement.MaxDistance(Movement.ReportInterval) >= 9.3);     // maior passo capturado: 9,2
+        Assert.Equal(Movement.MaxDistance(TimeSpan.FromSeconds(2)), Movement.MaxDistance(TimeSpan.FromMinutes(5)));
+    }
+}
+
+public class WildRoamingTests
+{
+    private static readonly MapGrid Grid = Grids.WithWall(100, 100, 30);   // corta as caixas das casas
+
+    [Fact]
+    public void Wild_roams_only_around_home_on_walkable_cells()
+    {
+        var world = TestSupport.NewWorld();
+        var zone = new ZoneSystem(Grids.DataWithGrid(79, Grid), world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var wilds = zone.WildDigimons.ToList();
+        Assert.Equal([(27, 65), (29, 66), (31, 67)], wilds.Select(w => ((int)w.HomeX, (int)w.HomeY)));
+        var moved = false;
+        for (int i = 0; i < 2000; i++)
+        {
+            zone.Update(TimeSpan.Zero, Zone.WildTickInterval);
+            foreach (var w in wilds)
+            {
+                Assert.InRange(w.X, w.HomeX - WildDigimon.RoamRadius, w.HomeX + WildDigimon.RoamRadius);
+                Assert.InRange(w.Y, w.HomeY - WildDigimon.RoamRadius, w.HomeY + WildDigimon.RoamRadius);
+                Assert.True(Grid.IsWalkable(w.DestX, w.DestY));
+                moved |= (w.X, w.Y) != (w.HomeX, w.HomeY);
+            }
+        }
+        Assert.True(moved);
+    }
+
+    [Fact]
+    public void Move_is_two_ticks_moving_then_idle_and_every_tick_is_sent()
+    {
+        var world = TestSupport.NewWorld();
+        var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var session = TestSupport.NewSession();
+        zone.Enter(new Player(session, new AuthenticatedAccount(1, "u", Authority.None), Entities.Character()));
+        session.DrainOutgoing();
+        var w = zone.WildDigimons.First();
+
+        w.StartMove((short)(w.X + 2), (short)(w.Y - 2));
+        zone.Update(TimeSpan.Zero, Zone.WildTickInterval);   // chega, ainda "andando"
+        Assert.Equal((WildState.Moving, w.DestX, w.DestY, Direction.NorthEast), (w.State, w.X, w.Y, w.Facing));
+        zone.Update(TimeSpan.Zero, Zone.WildTickInterval);   // para
+        Assert.Equal(WildState.Idle, w.State);
+        Assert.Equal(2 * zone.WildDigimons.Count(), session.SentOpcodes().Count(op => op == 0x11));
+    }
+
+    [Fact]
+    public void Defeated_group_shows_dead_then_leaves_then_respawns_at_home()
+    {
+        var world = TestSupport.NewWorld();
+        var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var w = zone.WildDigimons.First();
+        zone.Kill(w);
+        Assert.Equal(8, w.StateCode);
+        var ticks = (int)Math.Ceiling(Zone.DeadDisplayTime / Zone.WildTickInterval);
+        for (int i = 0; i < ticks; i++) zone.Update(world.Now + Zone.WildTickInterval * (i + 1), Zone.WildTickInterval);
+        Assert.Equal(12, w.StateCode);
+        var later = world.Now + Zone.DeadDisplayTime + w.Spawn.RespawnTime + Zone.WildTickInterval * (ticks + 2);
+        zone.Update(later, Zone.WildTickInterval);
+        Assert.DoesNotContain(w, zone.WildDigimons);
+        Assert.Contains(zone.WildDigimons, f => (f.HomeX, f.HomeY) == (w.HomeX, w.HomeY));
     }
 }

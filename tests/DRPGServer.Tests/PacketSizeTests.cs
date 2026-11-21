@@ -22,7 +22,7 @@ public class PacketSizeTests
         var digimon = character.Leader;
         var drop = new ItemDrop(10_001, 41, 50, 50, TimeSpan.Zero, null);
         var item = new Inventory(999).Add(41, 1)!;
-        var wild = new WildDigimon(TestSupport.Data, TestSupport.Data.SpawnsOf(79)[0], new Random(1));
+        var wild = new WildDigimon(TestSupport.Data, TestSupport.Data.SpawnsOf(79)[0], 27, 65);
 
         var packets = new (ServerPacket Packet, int Size)[]
         {

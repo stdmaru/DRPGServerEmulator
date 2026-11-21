@@ -17,6 +17,15 @@ using Microsoft.Extensions.Options;
 
 DefaultTypeMap.MatchNamesWithUnderscores = true;
 
+// extract-client <pasta do cliente> <saída>: copia o pacote de tabelas e gera o grids.bin (docs/cliente/arquivos-de-dados.md)
+if (args is ["extract-client", var clientDir, var outDir])
+{
+    var r = ClientExtractor.Extract(clientDir, outDir);
+    Console.WriteLine($"{r.Grids} de {r.Maps} mapas com grade em {Path.GetFullPath(outDir)}");
+    foreach (var m in r.Missing) Console.WriteLine($"  sem .map: {m}");
+    return 0;
+}
+
 var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 {
     Args = args,
@@ -48,7 +57,8 @@ services.AddSingleton(sp =>
     var o = sp.GetRequiredService<IOptions<GameOptions>>().Value;
     var resources = Path.IsPathRooted(o.ResourcesPath) ? o.ResourcesPath : Path.Combine(AppContext.BaseDirectory, o.ResourcesPath);
     var table = Path.IsPathRooted(o.ClientTablePath) ? o.ClientTablePath : Path.Combine(AppContext.BaseDirectory, o.ClientTablePath);
-    return GameDataLoader.Load(resources, ClientPack.Open(table));
+    var grids = Path.Combine(Path.GetDirectoryName(table)!, ClientExtractor.GridsFile);
+    return GameDataLoader.Load(resources, ClientPack.Open(table), File.Exists(grids) ? MapGrid.Load(grids) : null);
 });
 
 // ordem importa: serviços param na ordem inversa (rede → mundo → persistência)
@@ -78,8 +88,10 @@ var log = host.Services.GetRequiredService<ILogger<Program>>();
 try
 {
     var data = host.Services.GetRequiredService<GameData>();
-    log.LogInformation("Tabelas: {Species} digimons, {Items} itens, {Drops} grupos de drop, {Zones} zonas, {Portals} portais",
-        data.Species.Count, data.Items.Count, data.DropGroups.Count, data.ZoneIds.Count, data.Portals.Values.Sum(p => p.Count));
+    log.LogInformation("Tabelas: {Species} digimons, {Items} itens, {Drops} grupos de drop, {Zones} zonas, {Portals} portais, {Grids} grades",
+        data.Species.Count, data.Items.Count, data.DropGroups.Count, data.ZoneIds.Count, data.Portals.Values.Sum(p => p.Count), data.Grids.Count);
+    if (data.Grids.Count == 0)
+        log.LogWarning("Sem grids.bin: movimento e selvagens sem validação de célula. Rode extract-client (docs/cliente/arquivos-de-dados.md)");
 
     using (var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5)))
         await host.Services.GetRequiredService<DatabaseMigrator>().MigrateAsync(cts.Token);

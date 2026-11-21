@@ -53,20 +53,38 @@ public sealed class ClientPack
     }
 
     /// <summary>
+    /// Lê uma entrada sem codec extra (assets do <c>resource.pf</c>, ex.: <c>map\r079.map</c>): só zlib.
+    /// </summary>
+    public byte[] ReadEntry(string name) => Inflate(ReadRaw(name));
+
+    /// <summary>Copia o .hf e o .pf para <paramref name="dir"/>.</summary>
+    public void CopyTo(string dir)
+    {
+        Directory.CreateDirectory(dir);
+        File.Copy(_pfPath, Path.Combine(dir, Path.GetFileName(_pfPath)), overwrite: true);
+        var hf = Path.ChangeExtension(_pfPath, ".hf");
+        File.Copy(hf, Path.Combine(dir, Path.GetFileName(hf)), overwrite: true);
+    }
+
+    public bool Contains(string name) => _entries.ContainsKey(Normalize(name));
+
+    private byte[] ReadRaw(string name)
+    {
+        if (!_entries.TryGetValue(Normalize(name), out var entry))
+            throw new GameDataException($"{name} não está no pacote do cliente");
+        var raw = new byte[entry.Size];
+        using var f = File.OpenRead(_pfPath);
+        f.Position = entry.Offset;
+        f.ReadExactly(raw);
+        return raw;
+    }
+
+    /// <summary>
     /// Lê uma tabela <c>.dat</c> (ex.: <c>table\digimon_us.dat</c>) como linhas de campos separados por <c>|</c>.
     /// </summary>
     public IReadOnlyList<string[]> ReadTable(string name)
     {
-        if (!_entries.TryGetValue(Normalize(name), out var entry))
-            throw new GameDataException($"tabela {name} não está no pacote do cliente");
-
-        var raw = new byte[entry.Size];
-        using (var f = File.OpenRead(_pfPath))
-        {
-            f.Position = entry.Offset;
-            f.ReadExactly(raw);
-        }
-        var plain = Inflate(Codec.OldDecode(Inflate(raw)));
+        var plain = Inflate(Codec.OldDecode(Inflate(ReadRaw(name))));
 
         var rows = new List<string[]>();
         int count = (int)BinaryPrimitives.ReadUInt32LittleEndian(plain);

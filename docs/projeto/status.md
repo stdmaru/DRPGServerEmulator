@@ -25,6 +25,7 @@
 - ✅ `0x10` mapeado (0..100 igual à v242) e corrigido no emulador. Ver [resumo do tamer](../protocolo/structs/tamer-resumo.md). Falta a tabela de estágio das espécies.
 - ✅ Tick do mapa como no oficial: ping `0xC4` do servidor e recuperação a cada 5,2 s. Ver [tick do mapa](../mecanicas/tick-mapa.md).
 - ✅ Espécies, itens, zonas e portais lidos do `table.pf` do cliente na partida (sem XML inventado). Crescimento da `dex_us`, estágio e atributo do `digimon_us`, MaxActionGauge constante, nível máximo 160 (❓ provisório). Ver [arquivos de dados](../cliente/arquivos-de-dados.md) e [portais](../mecanicas/portais.md).
+- ✅ Grade dos mapas lida do cliente (`extract-client` → `grids.bin`), 0x20 validado por célula e velocidade, roaming dos selvagens como no oficial (tick de 344 ms, casa ± 3, estados 1/4/11/8/12). Ver [movimento](../mecanicas/movimento.md) e [selvagens](../mecanicas/selvagens.md). Falta: casas e espécies dos selvagens nos outros mapas.
 - ✅ Tabelas de EXP trocadas por fórmulas exatas (digimon e tamer). Ver [fórmulas de EXP](../mecanicas/formulas-exp.md). ❓ Evento de EXP ainda sem pacote identificado.
 
 ## Em andamento / próximo passo

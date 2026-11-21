@@ -41,11 +41,14 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Fórmulas de status](mecanicas/formulas-status.md): atributos = 10 + bônus do estágio + status-base × (L − 1) + pontos; ATK/DEF/BR/HP/VP = ⌊c₁√a + c₂√b⌋; MaxEVP L(L − 1).
 - [Fórmulas de EXP](mecanicas/formulas-exp.md): digimon ⌊20L·1,2^L⌋ em float32 (trava no nível 77), tamer 5(L+1), recompensa 0x6E, evento de EXP ❓.
 - [Evolução](mecanicas/evolucao.md): cada forma tem atributos, pontos e skills próprios; nível e EXP são do digimon.
+- [Movimento](mecanicas/movimento.md): 0x20 a cada 0,87 s, até ~10,6 células/s, validação de célula e velocidade.
+- [Selvagens](mecanicas/selvagens.md): 0x11, tick de 344 ms, casa fixa com caixa de 7 × 7, 5 % de chance de andar, estados.
 - [Portais](mecanicas/portais.md): posição e destino do `map_us`, chegada capturada em `Portals.xml` ou estimada.
 - [Tick do mapa](mecanicas/tick-mapa.md): ping 0xC4 do servidor a cada ~5,2 s, recuperação HP +5 / VP +3 / EVP +10, saída 0x2B.
 
 ### Cliente
 - [Binário](cliente/binario.md): desempacotamento, RTTI, dispatcher, IPs fixos, renderer.
+- [Mapas](cliente/mapas.md): formato do `.map` (grade de células, bit de andável), `grids.bin`.
 - [Arquivos de dados](cliente/arquivos-de-dados.md): `table.pf` e `resource.pf`, `drpg_pack.py`, colunas que o servidor lê na partida, o que falta.
 - [Wine](cliente/wine.md): rodar no Linux, prefixo dedicado, causa e correção da tela congelada no loading (corrida no backbuffer DirectDraw).
 - [Qualidade de vida](cliente/qualidade-de-vida.md): resolução e os três níveis (wrapper → hooks → decompilação incremental).
