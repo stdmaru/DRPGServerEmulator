@@ -33,7 +33,7 @@ public class PacketSizeTests
             (new CharacterListPacket([null, null, null, null], new Random(1)), 500),
             (new UserCheckPacket("user"), 22),
             (new CharacterDataPacket(character), 7600),                // ✅ v322 (sessão 52)
-            (new InventoryDataPacket(), 4416),
+            (new InventoryDataPacket(new Inventory(999)), 4416),
             (new Unknown05Packet(), 164),
             (new HelloPacket(0x0E), 16),
             (new RefreshCharacterInfoPacket(character), 204),          // ✅ v322
@@ -114,5 +114,20 @@ public class PacketSizeTests
             int check = BitConverter.ToInt32(b[116..]), offset = BitConverter.ToInt32(b[120..]);
             Assert.Equal(slot == 0 ? 20 : 0, check - offset);
         }
+    }
+
+    [Fact]
+    public void Inventory_items_go_to_their_slot_with_amount_and_check()
+    {
+        // ✅ sessões 52–56: 24 × 76 bytes e depois 24 registros de 108; checagem = uid + item
+        var inventory = new Inventory(999);
+        inventory.Add(41, 3);
+        var payload = new InventoryDataPacket(inventory).EncodePayload();
+        var record = payload.AsSpan(24 * 76, 108);
+        Assert.Equal(1u, BitConverter.ToUInt32(record));
+        Assert.Equal(41u, BitConverter.ToUInt32(record[4..]));
+        Assert.Equal(3u, BitConverter.ToUInt32(record[12..]));
+        Assert.Equal(42u, BitConverter.ToUInt32(record[100..]));
+        Assert.True(payload.AsSpan(0, 24 * 76).IndexOfAnyExcept((byte)0) < 0);
     }
 }

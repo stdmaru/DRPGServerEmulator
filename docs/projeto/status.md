@@ -21,6 +21,7 @@
 
 - ✅ Bloco de status v322: offsets 0..343 iguais à v242; o resto é zero nas capturas (os 8 bytes novos não têm efeito observável).
 - ✅ Status por forma de evolução confirmado na sessão 56. Ver [evolução](../mecanicas/evolucao.md). **Exige remodelar o digimon no emulador.**
+- ✅ Layout do `0x03` mapeado e gerado a partir do inventário. Ver [inventário](../protocolo/structs/inventario.md). Falta persistir o inventário e os dados dos itens.
 
 ## Em andamento / próximo passo
 1. **Corrigir o que existe, do começo do fluxo para o fim** (login → channel → entrada no mapa → mapa → batalha), com amostras novas do oficial (v322). Só depois implementar coisas novas. Status e batalha entram nesse caminho.

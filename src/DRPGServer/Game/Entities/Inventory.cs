@@ -12,7 +12,7 @@ public sealed class InventoryItem
     public int Column => Slot % Inventory.Columns;
 }
 
-/// <summary>Inventário de itens (24 posições). ❓ Ainda não é persistido nem enviado no login (0x03 é um template zerado).</summary>
+/// <summary>Inventário de itens (24 posições). ❓ Ainda não é persistido: na entrada do mapa o 0x03 sai vazio.</summary>
 public sealed class Inventory(uint maxStack)
 {
     public const int Size = 24;

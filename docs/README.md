@@ -31,6 +31,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - Structs:
   - [Status de digimon](protocolo/structs/status-digimon.md): bloco comum aos opcodes 0x02, 0x10, 0x63, 0x70, 0x71…
   - [Channel](protocolo/structs/channel.md): lista (0x12), criar (0x10) e apagar (0x11) personagem.
+  - [Inventário](protocolo/structs/inventario.md): 0x03 (24 × 76 + 24 × 108) e o registro de item de 108 bytes.
 
 ### Emulador
 - [Arquitetura](emulador/arquitetura.md): como rodar, migrações, estrutura, modelo de threads, handlers, autenticação entre servidores, testes.
