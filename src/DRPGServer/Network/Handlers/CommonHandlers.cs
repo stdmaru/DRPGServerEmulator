@@ -5,9 +5,11 @@ using DRPGServer.Network.Protocol;
 
 namespace DRPGServer.Network.Handlers;
 
-/// <summary>0xC4: keep-alive. O cliente manda 14 bytes zero; o oficial responde vazio (capturas).</summary>
+/// <summary>
+/// 0xC4 no channel e no global: o cliente pinga (14 bytes zero) e o oficial responde vazio.
+/// ✅ v322: no mapa é o contrário: o servidor pinga a cada ~5,2 s (Zone) e não responde ao 0xC4 do cliente.
+/// </summary>
 [PacketHandler(ChannelOpcode.KeepAlive)]
-[PacketHandler(MapOpcode.KeepAlive)]
 [PacketHandler(GlobalOpcode.KeepAlive)]
 public sealed class KeepAliveHandler : ISessionPacketHandler
 {
@@ -25,6 +27,7 @@ public sealed class KeepAliveHandler : ISessionPacketHandler
 [PacketHandler(ChannelOpcode.ClientHardwareInfo)]
 [PacketHandler(GlobalOpcode.CharacterJoin)]
 [PacketHandler(MapOpcode.SingleDigimonInfo)]         // ❓ o pedido C2S ainda não foi entendido
+[PacketHandler(MapOpcode.KeepAlive)]                 // resposta do cliente ao ping do servidor
 public sealed class IgnoreHandler : ISessionPacketHandler
 {
     public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct) => ValueTask.CompletedTask;

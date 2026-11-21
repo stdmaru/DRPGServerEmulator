@@ -1,5 +1,6 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Entities;
+using DRPGServer.Network;
 using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
 
@@ -10,7 +11,8 @@ public sealed class Zone
 {
     private static readonly TimeSpan DropResendInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan WildTickInterval = TimeSpan.FromSeconds(2);
-    private static readonly TimeSpan RecoveryInterval = TimeSpan.FromSeconds(5);
+    // ✅ v322 (sessões 52–56): o oficial manda 0xC4 e a recuperação no mesmo tick, mediana 5,2 s (p10 5,1, p90 5,3)
+    private static readonly TimeSpan RecoveryInterval = TimeSpan.FromMilliseconds(5200);
     private static readonly TimeSpan DropCleanInterval = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan DropLifetime = TimeSpan.FromSeconds(60);
     private const int WildMoveChancePercent = 50;
@@ -91,14 +93,20 @@ public sealed class Zone
                 player.Session.SendFrame(frame);
     }
 
+    /// <summary>
+    /// Tick de ~5,2 s: ping 0xC4 para todos (também em batalha; o cliente responde) e recuperação do
+    /// líder fora da batalha. ✅ 349 ticks: HP +5, VP +3, EVP +10, até o máximo, independente do máximo;
+    /// 0xB2 só quando algo mudou.
+    /// </summary>
     private void AutoRecovery()
     {
         foreach (var player in _players)
         {
+            player.Send(new KeepAlivePacket((ushort)MapOpcode.KeepAlive));
             if (player.InBattle) continue;
             var leader = player.Leader;
             var before = (leader.Hp, leader.Vp, leader.Evp);
-            leader.Heal(5, 3, 0);
+            leader.Heal(5, 3, 10);
             if ((leader.Hp, leader.Vp, leader.Evp) != before)
                 player.Send(new RefreshDigimonStatusPacket(leader));
         }

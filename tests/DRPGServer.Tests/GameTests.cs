@@ -197,3 +197,36 @@ public class InfrastructureTests
             o => Assert.True(data.Species.ContainsKey(o.SpeciesId)));
     }
 }
+
+public class ZoneTickTests
+{
+    [Fact]
+    public void Map_tick_pings_and_recovers_leader_like_official()
+    {
+        // ✅ v322: a cada ~5,2 s o oficial manda 0xC4 e, se algo está abaixo do máximo, 0xB2 com HP +5, VP +3, EVP +10
+        var world = TestSupport.NewWorld();
+        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
+        var session = TestSupport.NewSession();
+        // nível 10: MaxEVP = L × (L − 1) = 90 (no nível 1 é 0)
+        var character = new Character(Entities.Digimon(level: 10), new Inventory(999))
+        {
+            Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79, X = 56, Y = 56,
+        };
+        var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
+        var zone = zones.Find(79)!;
+        zone.Enter(player);
+        var leader = player.Leader;
+        leader.Heal(-50, -50, -50);
+        var (hp, vp, evp) = (leader.Hp, leader.Vp, leader.Evp);
+        session.DrainOutgoing();
+
+        zone.Update(TimeSpan.Zero, TimeSpan.FromMilliseconds(5100));
+        Assert.DoesNotContain((ushort)0xC4, session.SentOpcodes());
+
+        zone.Update(TimeSpan.Zero, TimeSpan.FromMilliseconds(100));
+        var sent = session.SentOpcodes();
+        Assert.Contains((ushort)0xC4, sent);
+        Assert.Contains((ushort)0xB2, sent);
+        Assert.Equal((hp + 5, vp + 3, evp + 10), (leader.Hp, leader.Vp, leader.Evp));
+    }
+}
