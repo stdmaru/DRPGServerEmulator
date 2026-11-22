@@ -80,9 +80,13 @@ public enum MapOpcode : ushort
     BattleItemReceive = 0xC8,      // S2C ✅ item na bolsa de batalha (registro de 76)
     InventoryItemReceive = 0xC9,
     UnknownE6 = 0xE6,
-    UnknownF0 = 0xF0,
+    Rename = 0xF0,                 // ✅ renomear: u8 resultado, u8 tipo (1 tamer, 2 digimon), u32 uid, nome[20]
     SetLeader = 0xF1,              // ✅ trocar o líder: u32 0, u32 personagem, u32 digimon
     InventoryRefresh = 0xFC,
+    ItemUse = 0x41,                // ✅ usar item: u32 3, registro, bloco do digimon alvo (Taming Net: selvagem → capturado)
+    ItemUseFailed = 0xC3,          // S2C ✅ vazio: o item não pôde ser usado
+    DigimonReceived = 0xEF,        // S2C ✅ digimon novo no time (bloco)
+    BattleCapture = 0xB3,          // S2C ✅ resultado da captura em batalha (2 = falhou)
     Unknown121 = 0x121,
     Unknown152 = 0x152,
     PartySwap = 0x173,             // ✅ botão k troca as posições k + 1 e k + 2 do time

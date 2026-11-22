@@ -63,6 +63,7 @@ public sealed class Battle
     private readonly List<Player> _participants = [];
     private readonly List<Combatant> _teamA = [];
     private readonly List<Combatant> _teamB = [];
+    private readonly Dictionary<Player, int> _captureAttempts = [];
     private Phase _phase = Phase.Opening;
     private TimeSpan _timer;
 
@@ -189,6 +190,10 @@ public sealed class Battle
                 Broadcast(executed);
                 _phase = Phase.Animating;
                 return;
+            case BattleIcon.Capture:
+                if (target is null || !CanCapture(actor, target)) break;
+                Capture(actor, target);
+                return;
             case BattleIcon.Attack or BattleIcon.Skill1 or BattleIcon.Skill2:
                 if (target is null || target.Digimon.IsKnockedOut) break;
                 Broadcast(executed);
@@ -228,6 +233,40 @@ public sealed class Battle
         if (_teamB.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Win);
         else if (_teamA.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Lose);
         else _phase = Phase.Animating;
+    }
+
+    public int CaptureAttempts(Player player) => _captureAttempts.GetValueOrDefault(player);
+
+    private bool CanCapture(Combatant actor, Combatant target) =>
+        actor.Owner is { } owner && target.IsWild && !target.Digimon.IsKnockedOut
+        && CaptureAttempts(owner) < World.Taming.AttemptsPerBattle && World.Taming.CanBattleCapture(owner.Character, target.Digimon);
+
+    /// <summary>
+    /// ✅ Captura comum (sessão 56): 0x68 → 0xB3 → 0x35 3, depois a animação (0x69). ❓ No sucesso o selvagem sai da
+    /// batalha sem recompensa, o digimon novo vai para o time (0xEF) e a batalha acaba se não sobrar inimigo.
+    /// </summary>
+    private void Capture(Combatant actor, Combatant target)
+    {
+        var owner = actor.Owner!;
+        _captureAttempts[owner] = CaptureAttempts(owner) + 1;
+        actor.Gauge = 0;
+        actor.Actions++;
+        Broadcast(new LockActionBarPacket());
+        Digimon? captured = _system.Random.NextDouble() < _system.Taming.BattleChance
+            ? _system.Taming.Tame(owner.Character, target.Digimon.Species) : null;
+        Broadcast(new BattleCapturePacket(captured is not null, owner.Character.Serial, actor, target, captured));
+        Broadcast(new ActionRequestPacket(BattleAction.Executed, BattleIcon.None, actor.Digimon.Serial, Serial.Empty));
+        if (captured is not null)
+        {
+            target.Digimon.TakeDamage(target.Digimon.Hp);
+            owner.Send(new DigimonReceivedPacket(captured));
+            if (_teamB.All(c => c.Digimon.IsKnockedOut))
+            {
+                End(BattleResult.Win);
+                return;
+            }
+        }
+        _phase = Phase.Animating;
     }
 
     private bool CanSummon(Combatant actor, Digimon digimon) =>
@@ -287,6 +326,10 @@ public sealed class Battle
                 // ✅ skill só depois de aprendida (nível 0 no bloco antes do nível exigido) e com VP para o custo
                 if (actor.Digimon.Current.SkillLevels[slot] < 1 || actor.Digimon.SkillInfoOf(slot) is not { } skill
                     || actor.Digimon.Vp < skill.VpCost) return;
+                break;
+            case BattleIcon.Capture:
+                victim = Find(target);
+                if (victim is null || victim.Side == actor.Side || !CanCapture(actor, victim)) return;
                 break;
             case BattleIcon.Summon:
                 summon = player.Character.FindDigimon(target);

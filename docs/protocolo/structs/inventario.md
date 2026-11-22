@@ -45,3 +45,5 @@ O C2S tem sempre 14 bytes a mais que o S2C correspondente (zeros no fim).
 `Network/Packets/Map/ItemPackets.cs`. ✅ Persistido em `inventory_item` (migração `0003`). Handlers `ItemMoveHandler` (`0x91`:
 chão → inventário e inventário → inventário, trocando se ocupado) e `ItemDestroyHandler` (`0xBD`). ❓ Bolsas extras, segundo
 registro do `0x91` numa troca (zero nas capturas) e os campos do registro de 76 fora o Woodmon's Leaf. Testes: `TutorialTests`.
+
+Usar item (`0x41`): por ora só a Taming Net. Ver [captura](../../mecanicas/captura.md).

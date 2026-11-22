@@ -51,6 +51,7 @@ services.AddSingleton(TimeProvider.System);
 services.AddSingleton<Database>();
 services.AddSingleton<DatabaseMigrator>();
 services.AddSingleton<AccountRepository>();
+services.AddSingleton<DRPGServer.Game.DigimonUids>();
 services.AddSingleton<CharacterRepository>();
 services.AddSingleton(sp =>
 {
@@ -75,6 +76,7 @@ services.AddSingleton<BattleSystem>();
 services.AddSingleton<PlayerSystem>();
 services.AddSingleton<CharacterFactory>();
 services.AddSingleton<NpcScripts>();
+services.AddSingleton<Taming>();
 services.AddSingleton<ChatCommands>();
 
 // rede
@@ -95,7 +97,11 @@ try
         log.LogWarning("Sem grids.bin: movimento e selvagens sem validação de célula. Rode extract-client (docs/cliente/arquivos-de-dados.md)");
 
     using (var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5)))
+    {
         await host.Services.GetRequiredService<DatabaseMigrator>().MigrateAsync(cts.Token);
+        var maxUid = await host.Services.GetRequiredService<CharacterRepository>().MaxDigimonUidAsync(cts.Token);
+        host.Services.GetRequiredService<DRPGServer.Game.DigimonUids>().Seed(maxUid);
+    }
 
     // os sistemas se registram no mundo ao serem criados; criar antes da thread do mundo subir
     host.Services.GetRequiredService<ZoneSystem>();

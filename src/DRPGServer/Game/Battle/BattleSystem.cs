@@ -17,16 +17,19 @@ public sealed class BattleSystem : IWorldSystem
     private readonly GameOptions _options;
     private readonly ILogger<BattleSystem> _log;
 
-    public BattleSystem(GameWorld world, GameData data, IOptions<GameOptions> options, ILogger<BattleSystem> log)
+    public BattleSystem(GameWorld world, GameData data, IOptions<GameOptions> options, ILogger<BattleSystem> log,
+        Taming? taming = null)
     {
         _world = world;
         _data = data;
         _options = options.Value;
         _log = log;
+        Taming = taming ?? new Taming(data, new Game.DigimonUids(), options);
         world.AddSystem(this);
     }
 
     internal Random Random => _world.Random;
+    internal Taming Taming { get; }
     internal TimeSpan Now => _world.Now;
     public int Count => _battles.Count;
 

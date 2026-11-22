@@ -73,6 +73,7 @@ public enum BattleAction : byte
 public enum BattleIcon : ushort
 {
     None = 0,
+    Capture = 0x01,                             // ✅ captura comum (alvo = selvagem), até 3 por batalha
     Summon = 0x02,                              // ✅ invocar um digimon do time (alvo = serial dele)
     Flee = 0x04,                                // ✅ fugir (sem alvo)
     Attack = 0x0A,                              // ✅ ataque básico
@@ -95,6 +96,33 @@ public sealed class ActionRequestPacket(BattleAction action, BattleIcon icon, Se
         w.WriteU8(0);
         requester.Write(w);
         target.Write(w);
+    }
+}
+
+/// <summary>
+/// 0xB3 (744 bytes): resultado da captura comum. ✅ u32 resultado (2 = falhou, as 21 da sessão 56), serial do tamer,
+/// u32 0, bloco de 696 (na falha só o serial do alvo em +4), u32 0, serial de quem tentou, u32 0.
+/// ❓ Sucesso nunca capturado: 1 e o bloco do digimon novo.
+/// </summary>
+public sealed class BattleCapturePacket(bool success, Serial tamer, Combatant actor, Combatant target, Digimon? captured) : ServerPacket
+{
+    public override ushort Opcode => (ushort)MapOpcode.BattleCapture;
+
+    protected override void Write(PacketWriter w)
+    {
+        w.WriteU32(success ? 1u : 2u);
+        tamer.Write(w);
+        w.WriteU32(0);
+        if (success && captured is not null) DigimonStatusBlock.Write(w, captured);
+        else
+        {
+            w.WriteU32(0);
+            target.Digimon.Serial.Write(w);
+            w.WriteZeros(DigimonStatusBlock.Length - 4 - Serial.Length);
+        }
+        w.WriteU32(0);
+        actor.Digimon.Serial.Write(w);
+        w.WriteU32(0);
     }
 }
 

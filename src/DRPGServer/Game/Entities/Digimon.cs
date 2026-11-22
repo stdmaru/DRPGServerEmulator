@@ -42,6 +42,12 @@ public sealed class Digimon
         RestoreAll();
     }
 
+    /// <summary>✅ Nome de todo digimon obtido pelo jogo (captura, ovo), até o jogador renomear.</summary>
+    public const string DefaultName = "InputName";
+
+    /// <summary>✅ Pode renomear uma vez de graça (0xF0 responde 1); obtido pelo jogo nasce com ela.</summary>
+    public bool FreeRename { get; set; }
+
     /// <summary>Chave no banco (0 = selvagem ou ainda não salvo).</summary>
     public uint Uid { get; init; }
     /// <summary>Selvagem = tem status fixos. Não usa o uid: ele só é atribuído depois do construtor.</summary>

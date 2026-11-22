@@ -323,14 +323,67 @@ public sealed class Unknown121Handler : ISessionPacketHandler
     }
 }
 
-/// <summary>0xF0: o cliente pede; o servidor responde com o conteúdo capturado.</summary>
-[PacketHandler(MapOpcode.UnknownF0)]
-public sealed class UnknownF0Handler : ISessionPacketHandler
+/// <summary>
+/// 0xF0 (C2S 42): ✅ renomear. u8 0, u8 tipo (1 tamer, 2 digimon), u16 0, u32 uid, nome[20]. Sem nome é consulta.
+/// Digimon: uma renomeação grátis para quem nasceu "InputName"; o nome segue a regra da criação (letras e números).
+/// ❓ Renomeação paga (item) ainda não; tamer sempre 2, como o oficial na entrada.
+/// </summary>
+[PacketHandler(MapOpcode.Rename)]
+public sealed partial class RenameHandler : IWorldPacketHandler
 {
-    public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    [System.Text.RegularExpressions.GeneratedRegex("^[a-zA-Z0-9]{1,19}$")]
+    private static partial System.Text.RegularExpressions.Regex ValidName();
+
+    public void Handle(Session session, PacketReader packet)
     {
-        session.Send(new UnknownF0Packet());
-        return ValueTask.CompletedTask;
+        packet.ReadU8();
+        var kind = (RenameKind)packet.ReadU8();
+        packet.ReadU16();
+        uint uid = packet.ReadU32();
+        var name = packet.ReadFixedString(RenamePacket.NameLength);
+        // o tipo 1 chega logo na entrada, às vezes antes de o personagem estar no mundo: não derruba a conexão
+        if (kind != RenameKind.Digimon || session.Player is not { } player)
+        {
+            session.Send(new RenamePacket(RenameResult.NotAvailable, kind, uid, ""));
+            return;
+        }
+
+        var digimon = player.Character.FindDigimon(uid);
+        bool free = digimon is { FreeRename: true } && !player.InBattle;
+        if (name.Length == 0 || !free || !ValidName().IsMatch(name))
+        {
+            player.Send(new RenamePacket(free && name.Length == 0 ? RenameResult.Free : RenameResult.NotAvailable,
+                RenameKind.Digimon, uid, ""));
+            return;
+        }
+        digimon!.Name = name;
+        digimon.FreeRename = false;
+        player.Send(new RenamePacket(RenameResult.Renamed, RenameKind.Digimon, uid, name));
+    }
+}
+
+/// <summary>
+/// 0x41 (C2S 822): ✅ usar item. u32 3, registro do item (uid em +0), bloco do digimon alvo (selvagem: uid 0 e o
+/// serial dele em +4). Por ora só a Taming Net (<see cref="Taming"/>); o resto responde 0xC3.
+/// </summary>
+[PacketHandler(MapOpcode.ItemUse)]
+public sealed class ItemUseHandler(Taming taming, GameWorld world) : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        packet.ReadU32();
+        uint itemUid = packet.ReadU32();
+        packet.Skip(ItemRecord.Length - 4);
+        packet.ReadU32();                       // uid do alvo (0 no selvagem)
+        var target = Serial.Read(packet);
+
+        if (player.Character.Inventory.Main.FindByUid(itemUid) is not { } item)
+        {
+            player.Send(new ItemUseFailedPacket());
+            return;
+        }
+        if (!taming.UseNet(player, item, player.Zone?.FindWild(target), world.Random))
+            player.Send(new ItemUseFailedPacket());     // ❓ outros itens (consumíveis, tickets) ainda não
     }
 }
 

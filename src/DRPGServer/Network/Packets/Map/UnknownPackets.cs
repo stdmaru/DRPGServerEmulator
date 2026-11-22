@@ -60,13 +60,6 @@ public sealed class UnknownE6Packet : ServerPacket
         0xAC, 0x9B, 0xE3, 0xBA, 0x9E, 0x0C, 0x7C, 0x21, 0xCE, 0x1E, 0xD5, 0x34, 0xD3, 0xE1, 0xD6, 0x89]);
 }
 
-/// <summary>0xF0: resposta ao C2S 0xF0.</summary>
-public sealed class UnknownF0Packet : ServerPacket
-{
-    public override ushort Opcode => (ushort)MapOpcode.UnknownF0;
-    protected override void Write(PacketWriter w) => w.WriteSparse(28, (0, [0x02, 0x01]));
-}
-
 /// <summary>0x121: resposta ao C2S 0x121 (template capturado de 10304 bytes).</summary>
 public sealed class Unknown121Packet : ServerPacket
 {

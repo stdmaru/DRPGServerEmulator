@@ -42,6 +42,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Fórmulas de EXP](mecanicas/formulas-exp.md): digimon ⌊20L·1,2^L⌋ em float32 (trava no nível 77), tamer 5(L+1), recompensa 0x6E, evento de EXP ❓.
 - [Evolução](mecanicas/evolucao.md): cada forma tem atributos, pontos e skills próprios; nível e EXP são do digimon; 0x70/0x80/0x81/0x82/0x9E, pontos por estágio.
 - [Área inicial e time](mecanicas/area-inicial.md): NPCs do tutorial (0x56 escolhas 1–5 e 8), 0xF1 líder, 0x173 troca de posições.
+- [Captura e renomeação](mecanicas/captura.md): Taming Net no mapa (`0x41`, `0xEF`, `0xC3`), captura comum na batalha (ícone 1, `0xB3`, 3 tentativas, só in-training), renomeação grátis (`0xF0`).
 - [Movimento](mecanicas/movimento.md): 0x20 a cada 0,87 s, até ~10,6 células/s, validação de célula e velocidade.
 - [Batalha](mecanicas/batalha.md): fluxo 0x61…0x6D, 0x67, dano ⌊ATK²/(10·DEF)⌋, barra por nível/BR, acerto, fuga, grupo compartilhado, recuperação.
 - [Selvagens](mecanicas/selvagens.md): 0x11, tick de 344 ms, casa fixa com caixa de 7 × 7, 5 % de chance de andar, estados.

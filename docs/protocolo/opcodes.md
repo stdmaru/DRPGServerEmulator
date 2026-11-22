@@ -51,4 +51,5 @@ O protótipo mandava tamanhos diferentes do oficial. ✅ Corrigidos pelas captur
 - map `0x7E`: índice + 1936 zeros = 1940 (eram 1820).
 - map `0x91`: 236 (o protótipo copiava o tamanho do pedido C2S, 250). ✅ Layout em [inventário](structs/inventario.md).
 - ✅ Tutorial (sessões 53, 56): `0x91` 236, `0xBD` 240, `0xC9` 604, `0xC8` 444, `0xFC` 4424, `0x72` 704, `0x80` 696, `0x81` 720, `0x82` 720, `0x64` 720, `0x9E` 8, `0xF1` 12, `0x173` 8. O C2S desses pacotes tem 14 bytes a mais (zeros no fim). Detalhes em [inventário](structs/inventario.md), [evolução](../mecanicas/evolucao.md) e [área inicial](../mecanicas/area-inicial.md).
+- ✅ Captura (amostras de Taming Net e sessão 56): `0x41` 808 (C2S 822), `0xEF` 696, `0xC3` 0, `0xB3` 744, `0xF0` 28 (C2S 42). Detalhes em [captura](../mecanicas/captura.md).
 - C2S channel `0x18`: endereços MAC do cliente, sem resposta. C2S global `0x0E`: eco do hello, sem resposta.

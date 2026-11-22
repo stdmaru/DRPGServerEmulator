@@ -34,6 +34,12 @@ public sealed record SkillInfo(ushort Id, string Name, ushort RequiredLevel, byt
 
 public sealed record DropEntry(uint ItemId, byte Rate);
 
+/// <summary>
+/// Taming Net: captura no mapa um selvagem do estágio <paramref name="Stage"/> (1 in-training … 5 mega), com
+/// <paramref name="Chance"/> % (✅ as duas das amostras capturaram de primeira; são itens de cash).
+/// </summary>
+public sealed record TamingNet(uint ItemId, byte Stage, byte Chance);
+
 public sealed record PortalInfo(byte MapId, short X, short Y, byte DestMapId, short DestX, short DestY)
 {
     public const int Radius = 2;
@@ -78,6 +84,7 @@ public sealed class GameData
     /// <summary>Grade de cada mapa (vazia se o grids.bin não foi extraído: aí tudo é andável).</summary>
     public required FrozenDictionary<byte, MapGrid> Grids { get; init; }
     public required FrozenDictionary<uint, IReadOnlyList<DropEntry>> DropGroups { get; init; }
+    public FrozenDictionary<uint, TamingNet> TamingNets { get; init; } = FrozenDictionary<uint, TamingNet>.Empty;
     public required FrozenDictionary<byte, IReadOnlyList<PortalInfo>> Portals { get; init; }
     public required FrozenDictionary<byte, IReadOnlyList<SpawnArea>> Spawns { get; init; }
     public required IReadOnlyList<byte> ZoneIds { get; init; }
@@ -97,4 +104,5 @@ public sealed class GameData
     public IReadOnlyList<PortalInfo> PortalsOf(byte mapId) => Portals.GetValueOrDefault(mapId) ?? [];
     public IReadOnlyList<SpawnArea> SpawnsOf(byte mapId) => Spawns.GetValueOrDefault(mapId) ?? [];
     public IReadOnlyList<DropEntry> DropGroup(uint id) => DropGroups.GetValueOrDefault(id) ?? [];
+    public TamingNet? FindTamingNet(uint itemId) => TamingNets.GetValueOrDefault(itemId);
 }

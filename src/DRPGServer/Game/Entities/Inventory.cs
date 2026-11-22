@@ -109,6 +109,17 @@ public sealed class Bag
         return changed;
     }
 
+    /// <summary>Gasta <paramref name="amount"/> de uma pilha (uso de item). A posição esvazia quando acaba.</summary>
+    public bool Consume(InventoryItem item, uint amount)
+    {
+        if (this[item.Slot] != item || item.Amount < amount) return false;
+        item.Amount -= amount;
+        if (item.Amount == 0) _slots[item.Slot] = null;
+        return true;
+    }
+
+    public InventoryItem? FindByUid(uint uid) => _slots.FirstOrDefault(i => i?.Uid == uid);
+
     /// <summary>Coloca um item salvo (carga do banco).</summary>
     public bool Place(InventoryItem item)
     {

@@ -81,7 +81,11 @@ public class PacketSizeTests
             (new KeepAlivePacket(0xC4), 0),
             (new ItemReceivePacket(item), 604),
             (new UnknownE6Packet(), 32),
-            (new UnknownF0Packet(), 28),
+            (new RenamePacket(RenameResult.NotAvailable, RenameKind.Tamer, 0, ""), 28), // ✅ 0xF0
+            (new DigimonReceivedPacket(digimon), 696),                 // ✅ v322 (0xEF, sessão 56)
+            (new ItemUsePacket(item, digimon), 808),                   // ✅ v322 (0x41, sessão 56)
+            (new ItemUseFailedPacket(), 0),                            // ✅ 0xC3
+            (new BattleCapturePacket(false, Serial.New(), combatant, combatant, null), 744), // ✅ v322 (0xB3)
             (new Unknown121Packet(), 10304),
             (new Unknown152Packet(), 7048),
             (new UnknownE1Packet(), 1342),

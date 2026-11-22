@@ -55,6 +55,12 @@ public sealed class GameOptions
     public double ExpRate { get; set; } = 1;
     public double BitRate { get; set; } = 1;
 
+    /// <summary>
+    /// Chance da captura comum na batalha (0..1). ❓ No oficial é muito baixa e não há amostra de sucesso (21 falhas na
+    /// sessão 56); 10 % aqui para testar.
+    /// </summary>
+    public double CaptureChance { get; set; } = 0.10;
+
     /// <summary>Quarto digimon na criação: 0 Chibimon, 1 Yarmon, 2 Hopmon, 3 Dorimon.</summary>
     public int FourthStarterDigimon { get; set; }
 

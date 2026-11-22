@@ -120,3 +120,42 @@ public sealed class PartySwapPacket(ushort button) : ServerPacket
         w.WriteU16((ushort)(button + 1));
     }
 }
+
+/// <summary>0xEF (696 bytes): ✅ digimon novo no time (captura, ovo): o bloco dele. Vem antes da resposta do 0x41.</summary>
+public sealed class DigimonReceivedPacket(Digimon digimon) : ServerPacket
+{
+    public override ushort Opcode => (ushort)MapOpcode.DigimonReceived;
+    protected override void Write(PacketWriter w) => DigimonStatusBlock.Write(w, digimon);
+}
+
+/// <summary>
+/// 0xF0 (28 bytes): ✅ renomeação. u8 resultado, u8 tipo (1 tamer, 2 digimon), u16 0, u32 uid, nome[20].
+/// Digimon: consulta sem nome → 1 (tem a grátis) ou 2 (não tem); com nome → 3 (trocado, eco do nome).
+/// Tamer: o oficial sempre responde 2 na entrada do mapa.
+/// </summary>
+public sealed class RenamePacket(RenameResult result, RenameKind kind, uint uid, string name) : ServerPacket
+{
+    public const int NameLength = 20;
+
+    public override ushort Opcode => (ushort)MapOpcode.Rename;
+
+    protected override void Write(PacketWriter w)
+    {
+        w.WriteU8((byte)result);
+        w.WriteU8((byte)kind);
+        w.WriteU16(0);
+        w.WriteU32(uid);
+        w.WriteFixedString(name, NameLength);
+    }
+}
+
+public enum RenameKind : byte { Tamer = 1, Digimon = 2 }
+
+public enum RenameResult : byte
+{
+    /// <summary>Consulta: a renomeação grátis está disponível.</summary>
+    Free = 1,
+    /// <summary>Consulta ou pedido recusado: não tem a grátis (✅ sessão 44, depois de renomear).</summary>
+    NotAvailable = 2,
+    Renamed = 3,
+}

@@ -38,6 +38,16 @@ public static class GameDataLoader
             if (!drops.TryAdd(id, entries)) throw new GameDataException($"DropGroup {id} duplicado");
         }
 
+        var nets = new Dictionary<uint, TamingNet>();
+        foreach (var e in Elements(root, "Item/TamingNets.xml", "TamingNets", "Net"))
+        {
+            var net = new TamingNet(U32(e, "ItemID"), U8(e, "Stage"), U8(e, "Chance"));
+            if (!items.ContainsKey(net.ItemId)) throw new GameDataException($"TamingNets.xml: item {net.ItemId} não existe");
+            if (net.Stage is < 1 or > 5) throw new GameDataException($"TamingNets.xml: item {net.ItemId} com estágio {net.Stage} fora de 1..5");
+            if (net.Chance > 100) throw new GameDataException($"TamingNets.xml: item {net.ItemId} com chance {net.Chance} fora de 0..100");
+            if (!nets.TryAdd(net.ItemId, net)) throw new GameDataException($"TamingNets.xml: item {net.ItemId} duplicado");
+        }
+
         var arrivals = new Dictionary<(byte, short, short), PortalInfo>();
         foreach (var e in Elements(root, "Map/Portals.xml", "Portals", "Portal"))
         {
@@ -81,6 +91,7 @@ public static class GameDataLoader
             Skills = ClientTables.Skills(pack),
             Evolutions = ClientTables.Evolutions(pack),
             DropGroups = drops.ToFrozenDictionary(),
+            TamingNets = nets.ToFrozenDictionary(),
             Maps = maps,
             Grids = grids,
             Portals = portals,

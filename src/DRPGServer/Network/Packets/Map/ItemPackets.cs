@@ -264,3 +264,26 @@ public sealed class BattleItemReceivePacket(IReadOnlyList<InventoryItem> items) 
         w.WriteZeros((ItemReceivePacket.MaxEntries - list.Count) * (12 + BattleItemRecord.Length));
     }
 }
+
+/// <summary>
+/// 0x41 (808 bytes): ✅ item usado. u32 3 (inventário), registro do item depois do uso (quantidade 0 quando acaba) e
+/// o bloco do digimon: na Taming Net, o digimon capturado (sessões 6 e 8, v242 com bloco de 688).
+/// </summary>
+public sealed class ItemUsePacket(InventoryItem item, Digimon digimon) : ServerPacket
+{
+    public override ushort Opcode => (ushort)MapOpcode.ItemUse;
+
+    protected override void Write(PacketWriter w)
+    {
+        w.WriteU32((uint)ItemPlace.Inventory);
+        ItemRecord.Write(w, item);
+        DigimonStatusBlock.Write(w, digimon);
+    }
+}
+
+/// <summary>0xC3 (vazio): ✅ o item não pôde ser usado (sessão 56: carta e item 21011 usados em digimon do jogador).</summary>
+public sealed class ItemUseFailedPacket : ServerPacket
+{
+    public override ushort Opcode => (ushort)MapOpcode.ItemUseFailed;
+    protected override void Write(PacketWriter w) { }
+}

@@ -86,6 +86,7 @@ Dados: 67 batalhas v322 em `captures.db` (sessões 53, 54, 56 e 58; 362 golpes, 
 
 ## ✅ Skills, invocação e recompensas (sessão 56)
 - Skill: ícones `0x0B`/`0x0C` no `0x35`, só aprendida e com VP para o custo (20 + nível exigido); o id vai no fim do `0x67`. ❓ Multiplicador ajustado `1 + 0,0075·(nível exigido + 4) + 0,01·(nível − 1)` em 4 medidas.
+- Captura comum: `0x35` ícone 1 (alvo = selvagem) → `0x68` → `0xB3` → `0x35` 3, até 3 por batalha. Ver [captura](captura.md).
 - Invocação: `0x35` ícone 2 (alvo = serial do digimon do time) → `0x35` 1; com a barra cheia `0x68` → `0x64` (720: `u8 2`, `u8 posição`, `u16 0`, `u32 0`, bloco, 16 zeros) → `0x35` 3. Entra com a barra zerada.
 - Inimigo derrubado: cada digimon do jogador que está de pé ganha a **EXP inteira** (um `0x6E` por digimon, quem derrubou primeiro); os **bits vêm uma vez**, no `0x6E` de quem derrubou.
 - Fim com vários: `0xB1`, `0x84` e `0x6D` um por digimon; o `0xB4` de cada um na saída do resultado.

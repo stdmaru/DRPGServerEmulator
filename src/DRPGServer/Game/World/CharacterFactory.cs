@@ -59,6 +59,7 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
         {
             Uid = r.Uid,
             Name = string.IsNullOrEmpty(r.Name) ? species.Name : r.Name,
+            FreeRename = r.FreeRename,
         };
         digimon.Load(r.Exp, r.UnlockedStage, r.TotalWins, r.TotalBattles);
         foreach (var f in forms)
