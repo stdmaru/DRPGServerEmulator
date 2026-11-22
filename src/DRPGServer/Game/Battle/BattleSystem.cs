@@ -93,24 +93,38 @@ public sealed class BattleSystem : IWorldSystem
         _log.LogDebug("{Battle} terminou: {Result}", battle, result);
     }
 
-    internal void GrantRewards(Player owner, Digimon digimon, WildMember defeated)
+    /// <summary>
+    /// Inimigo derrubado. ✅ Cada digimon do dono que está de pé na batalha ganha a EXP inteira (um 0x6E por
+    /// digimon, quem derrubou primeiro); os bits vão uma vez só, no 0x6E de quem derrubou, sorteados entre ¾ do
+    /// máximo e o máximo. Cada item do grupo de drop é sorteado à parte.
+    /// </summary>
+    internal void GrantRewards(Player owner, Combatant killer, IReadOnlyList<Combatant> participants, WildMember defeated)
     {
         long exp = (long)(defeated.Option.ExpReward * _options.ExpRate);
-        double bits = defeated.Option.BitReward * _options.BitRate;
-
-        int levels = digimon.GainExp(exp, _options.DigimonMaxLevel);
+        double bits = RollBits(defeated.Option.BitReward) * _options.BitRate;
         owner.Character.AddBits(bits);
-        owner.Send(new RewardBitExpPacket(digimon.Serial, exp, bits));
-        if (levels > 0)
-            owner.Send(new LevelUpPacket(digimon));
 
-        var drops = _data.DropGroup(defeated.Option.DropGroup);
-        if (drops.Count > 0 && owner.Zone is { } zone)
+        var order = participants.Where(c => c != killer).Prepend(killer).Select(c => c.Digimon).Distinct();
+        bool first = true;
+        foreach (var digimon in order)
         {
-            int roll = _world.Random.Next(101);
-            foreach (var drop in drops.Where(d => roll <= d.Rate))
-                zone.Drop(drop.ItemId, owner.Character.X, owner.Character.Y, owner.Character.Uid);
+            Progression.GainExp(owner, digimon, exp, first ? bits : 0, _options.DigimonMaxLevel, inBattle: true);
+            first = false;
         }
+
+        if (owner.Zone is { } zone)
+            foreach (var drop in _data.DropGroup(defeated.Option.DropGroup))
+                if (_world.Random.Next(100) < drop.Rate)
+                    zone.Drop(drop.ItemId, owner.Character.X, owner.Character.Y, owner.Character.Uid);
+    }
+
+    /// <summary>✅ Bits de um selvagem: inteiro entre ⌊¾·máx⌋ e máx (Yuramon L2 do tutorial: 5, 5, 6, 7 com máximo 7).</summary>
+    internal int RollBits(double max)
+    {
+        int hi = (int)Math.Floor(max);
+        if (hi <= 0) return 0;
+        int lo = (int)Math.Floor(0.75 * max);
+        return _world.Random.Next(Math.Min(lo, hi), hi + 1);
     }
 
     public void Shutdown()

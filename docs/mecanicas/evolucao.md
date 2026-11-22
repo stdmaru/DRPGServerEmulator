@@ -31,14 +31,26 @@ Cada digimon tem **um uid** e cada forma (espécie da linha evolutiva) tem **sta
 - Primeira evolução de 0x38a82 (L11): o champion já começa com atributos próprios (60,50,50,50), ❓ que parecem uma base da forma por nível, não derivados do rookie.
 - Byte 160 (estágio): 01 in-training ❓, 02 rookie, 03 champion, 05 mega. 161 e 162 variam por espécie.
 
-## Impacto no emulador
-O protótipo (e a reescrita) guarda **um** conjunto de status por digimon. É preciso separar:
-- **Digimon**: uid, nome, nível, EXP, pontos de skill ❓, vitórias/batalhas ❓, forma atual.
-- **Forma** (digimon × espécie): atributos, pontos de atributo, skills e níveis de skill.
+## Pacotes ✅ (sessão 56)
+- **L11, in-training → rookie:** `0x6E` → `0x70` (bloco da forma antiga) → `0x80` (bloco do rookie). A forma in-training some.
+- **L21/31/41 em batalha:** `0x6E` → `0x70` → `0x80` com a forma nova; no fim volta à forma-base (`0x84` com o rookie). Fora da batalha o estágio só é liberado (byte 24 do bloco).
+- **Evolução pelo menu (em batalha):** `0x9E` C2S `u32 uid` → S2C `u8 1, u8 0, u16 × 3` (espécies de champion a mega liberadas, 0 = nenhuma); ícones `0x14`–`0x16` no `0x35`; com a barra cheia `0x68` → `0x81` (`u64 0`, bloco da forma nova, 16 zeros, 720 bytes) → `0x35` 3.
+- **Janela de evolução:** `0x82` C2S `u32 estágio` (0 = atual), `u32 0`, bloco ecoado → S2C 720 com o bloco da forma daquele estágio.
+- **`0x71` e `0x72`:** o pedido é o bloco ecoado + `u8 estágio da forma` + `u8 atributo (1–4)` ou `u8 skill (1–2)`. A resposta (704) traz o **bloco dessa forma**, não o da atual: dá para distribuir pontos e subir skills em formas liberadas pela janela.
+
+## Pontos ✅
+- Atributo: 2 por nível dentro da janela do estágio da forma (rookie do 1 ao 21, champion do 21 ao 31…; mega do 41 em diante).
+- Skill: compartilhados, `(L − 1) − Σ(nível − 1)` sobre as skills de todas as formas; cada nível custa 1, até 10.
+- Skill: bloco de 8 bytes por skill (`u32 id`, `u16 nível exigido` = coluna 1 do `digimon_skill_us`, `i16 nível`, 0 = não aprendida); passa a 1 ao chegar no nível exigido. Custo em batalha: VP 20 + nível exigido.
+- Linha evolutiva: `tree_us`, colunas 6/10/14/18/22 (in-training a mega); com mais de um sucessor vale o mais frequente.
+
+## No emulador
+`Game/Entities/Digimon.cs`: `DigimonForm` (atributos e níveis de skill), `BaseForm`/`Current`, `UnlockedStage`, `BecomeRookie`,
+`UnlockStage`, `EvolveTo`, `Devolve`, `FormAtStage`. `Game/World/Progression.cs` manda `0x70`/`0x80` depois do level-up.
+Banco: `digimon.digimon_id` = forma-base, `digimon.unlocked_stage`, tabela `digimon_form` (migração `0003`).
 
 ## ❓ Em aberto
-- ✅ Estágio por espécie: coluna 2 do `digimon_us`. Falta a linha evolutiva de cada digimon.
-- Taxa e intervalo da drenagem de EVP.
-- Como nascem os atributos de uma forma na primeira evolução (base fixa por espécie/nível?).
+- Atributos de champion em diante (STR/AGI não seguem a fórmula do rookie).
+- HP/VP ao voltar à forma-base: o emulador mantém a mesma proporção do máximo (V-mon 285/319 depois de lutar como XV-mon).
+- Taxa e intervalo da drenagem de EVP; item Aura.
 - Se vitórias/batalhas são por forma ou do digimon.
-- Se uma forma ganha pontos de atributo nos níveis em que não estava ativa.

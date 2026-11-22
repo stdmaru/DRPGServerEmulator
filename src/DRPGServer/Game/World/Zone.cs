@@ -110,8 +110,8 @@ public sealed class Zone
     }
 
     /// <summary>
-    /// Recuperação do líder a cada ~5,2 s, por jogador. ✅ 349 ticks: HP +5, VP +3, EVP +10, até o máximo;
-    /// 0xB2 só quando algo mudou. ✅ Nenhum 0xB2 durante as 67 batalhas v322; no fim o relógio recomeça com
+    /// Recuperação do time a cada ~5,2 s, por jogador. ✅ 349 ticks: HP +5, VP +3, EVP +10, até o máximo;
+    /// um 0xB2 por digimon que mudou (rajadas de até 5 na sessão 56). ✅ Nenhum 0xB2 durante as 67 batalhas v322; no fim o relógio recomeça com
     /// <see cref="RecoveryAfterBattle"/> (ver <see cref="Player.NextRecoveryAt"/>). O ping 0xC4 segue no tick da zona.
     /// </summary>
     private void AutoRecovery(TimeSpan now)
@@ -120,11 +120,13 @@ public sealed class Zone
         {
             if (player.InBattle || now < player.NextRecoveryAt) continue;
             player.NextRecoveryAt = now + RecoveryInterval;
-            var leader = player.Leader;
-            var before = (leader.Hp, leader.Vp, leader.Evp);
-            leader.Heal(5, 3, 10);
-            if ((leader.Hp, leader.Vp, leader.Evp) != before)
-                player.Send(new RefreshDigimonStatusPacket(leader));
+            foreach (var digimon in player.Character.Digimons)
+            {
+                var before = (digimon.Hp, digimon.Vp, digimon.Evp);
+                digimon.Heal(5, 3, 10);
+                if ((digimon.Hp, digimon.Vp, digimon.Evp) != before)
+                    player.Send(new RefreshDigimonStatusPacket(digimon));
+            }
         }
     }
 
@@ -242,6 +244,7 @@ public sealed class Zone
     }
 
     public ItemDrop? FindDrop(uint uid) => _drops.GetValueOrDefault(uid);
+    public IEnumerable<ItemDrop> Drops => _drops.Values;
 
     public void RemoveDrop(ItemDrop drop)
     {

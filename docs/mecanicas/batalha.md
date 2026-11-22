@@ -84,7 +84,13 @@ Dados: 67 batalhas v322 em `captures.db` (sessões 53, 54, 56 e 58; 362 golpes, 
 - No fim, o oficial cura **logo**: 0,04–0,34 s depois do `0x6D` (41 de 41 batalhas sem HP/VP cheio), ainda na tela de resultado. Depois o tick de 5,2 s segue a partir daí. Ver [tick do mapa](tick-mapa.md).
 - O emulador para a recuperação na batalha e agenda a próxima para 0,2 s depois do fim.
 
+## ✅ Skills, invocação e recompensas (sessão 56)
+- Skill: ícones `0x0B`/`0x0C` no `0x35`, só aprendida e com VP para o custo (20 + nível exigido); o id vai no fim do `0x67`. ❓ Multiplicador ajustado `1 + 0,0075·(nível exigido + 4) + 0,01·(nível − 1)` em 4 medidas.
+- Invocação: `0x35` ícone 2 (alvo = serial do digimon do time) → `0x35` 1; com a barra cheia `0x68` → `0x64` (720: `u8 2`, `u8 posição`, `u16 0`, `u32 0`, bloco, 16 zeros) → `0x35` 3. Entra com a barra zerada.
+- Inimigo derrubado: cada digimon do jogador que está de pé ganha a **EXP inteira** (um `0x6E` por digimon, quem derrubou primeiro); os **bits vêm uma vez**, no `0x6E` de quem derrubou.
+- Fim com vários: `0xB1`, `0x84` e `0x6D` um por digimon; o `0xB4` de cada um na saída do resultado.
+
 ## ❓ Em aberto
 - Derrota por nocaute: não capturada. O emulador manda `0x6D` 2 e deixa o digimon com 1 de HP.
-- Fator de atributo no dano, skills, itens em batalha, mais de um digimon do jogador.
+- Fator de atributo no dano, itens em batalha, precisão do multiplicador de skill.
 - Chance de acerto real e a chance de fuga (as 2 fugas capturadas deram certo).

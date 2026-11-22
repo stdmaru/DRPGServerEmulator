@@ -35,7 +35,7 @@ public sealed class WildDigimon
 
     /// <summary>Digimon novo com os dados de uma opção de spawn (membro do grupo ou cópia para uma batalha).</summary>
     public static Digimon CreateMember(GameData data, SpawnOption o) =>
-        new(data, data.Species[o.SpeciesId], o.Level, new Attributes(o.Str, o.Agi, o.Con, o.Int));
+        new(data, data.Species[o.SpeciesId], o.Level, o.Stats ?? WildFormulas.Combat(o.Level));
 
     public Serial Serial { get; } = Serial.New();
     public SpawnArea Spawn { get; }

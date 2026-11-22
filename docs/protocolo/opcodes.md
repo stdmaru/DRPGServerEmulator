@@ -49,5 +49,6 @@ Fonte: sessão 52 (proxy, login → mapa, 2026-11-21) contra as sessões 1–48.
 O protótipo mandava tamanhos diferentes do oficial. ✅ Corrigidos pelas capturas e cobertos pelo teste `PacketSizeTests`:
 - global `0x7B`: chave 1 + **68** × chave 2 = 1104 (eram 69 repetições).
 - map `0x7E`: índice + 1936 zeros = 1940 (eram 1820).
-- map `0x91`: 236 (o protótipo copiava o tamanho do pedido C2S, 250). ❓ O layout do oficial difere já no offset 0.
+- map `0x91`: 236 (o protótipo copiava o tamanho do pedido C2S, 250). ✅ Layout em [inventário](structs/inventario.md).
+- ✅ Tutorial (sessões 53, 56): `0x91` 236, `0xBD` 240, `0xC9` 604, `0xC8` 444, `0xFC` 4424, `0x72` 704, `0x80` 696, `0x81` 720, `0x82` 720, `0x64` 720, `0x9E` 8, `0xF1` 12, `0x173` 8. O C2S desses pacotes tem 14 bytes a mais (zeros no fim). Detalhes em [inventário](structs/inventario.md), [evolução](../mecanicas/evolucao.md) e [área inicial](../mecanicas/area-inicial.md).
 - C2S channel `0x18`: endereços MAC do cliente, sem resposta. C2S global `0x0E`: eco do hello, sem resposta.

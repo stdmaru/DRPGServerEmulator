@@ -24,6 +24,10 @@ public static class DigimonStatusBlock
         w.WriteZeros(Length - (w.Position - start));
     }
 
+    /// <summary>Bloco de outra forma do digimon (janela de evolução, 0x71 e 0x72 de uma forma que não é a atual).</summary>
+    public static void Write(PacketWriter w, Digimon d, DigimonForm form) =>
+        d.ViewAs(form, () => { Write(w, d); return 0; });
+
     /// <summary>Bloco vazio (posição sem digimon na batalha).</summary>
     public static void WriteEmpty(PacketWriter w) => w.WriteZeros(Length);
 

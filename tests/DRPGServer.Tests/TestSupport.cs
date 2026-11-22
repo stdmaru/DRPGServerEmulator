@@ -47,7 +47,7 @@ internal static class Entities
         new(TestSupport.Data, TestSupport.Data.Species[species], level) { Uid = 7, Name = "Guilmon" };
 
     public static DRPGServer.Game.Entities.Character Character(byte map = 79) =>
-        new(Digimon(), new DRPGServer.Game.Entities.Inventory(999))
+        new(Digimon(), new DRPGServer.Game.Entities.Inventory(TestSupport.Data.FindItem, 999))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = map, X = 56, Y = 56,
         };

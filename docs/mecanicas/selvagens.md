@@ -38,6 +38,13 @@ Dados: 592 grupos e 72 mil pacotes `0x11` nas sessões 53–58 (v322).
 - Casa: `<Point>` no `DigimonSpawns.xml` (capturado) ou célula andável sorteada no retângulo.
 - Grupo comum não sai do mapa na batalha; `Exclusive="true"` no `<Spawn>`: 11 na batalha e, se derrotado, 8 por 10,4 s, 12, e um grupo novo na mesma casa depois do `RespawnTime`.
 
+## ✅ Status e recompensas
+- Os status só dependem do nível (o `0x63` manda os atributos zerados), exatos em 21 combinações espécie × nível de L1 a L26:
+  **HP ⌊(13L + 220)/2⌋, VP 25L + 25, ATK 6L + 74, DEF 3L + 60, BR 5L + 80** (`Game/Stats/WildFormulas.cs`).
+- Exceções vão no `DigimonSpawns.xml` (HP, VP, ATK, DEF, BR juntos): o Yuramon L2 do tutorial tem 96/50/60/43/65. ❓ Chefes (byte 300 = 3) fogem da fórmula.
+- Bits: o oficial sorteia um inteiro de ⌊¾·máx⌋ até o máximo (Yuramon do tutorial: 5, 5, 6, 7; `BitReward="7"`). EXP do Yuramon do tutorial: 0. ❓ Fórmula de EXP dos outros.
+- Drop: cada item do grupo é sorteado à parte (o Yuramon do tutorial dá duas Yuramon's Seeds).
+
 ## ❓ Em aberto
 - Casas e espécies de todos os mapas: as capturas têm muitos grupos, mas a conexão nem sempre diz o mapa. Hoje só o
   mapa 79 está no `DigimonSpawns.xml`.

@@ -26,16 +26,22 @@ public sealed class ChatCommands
 
         Add("heal", "/heal", Authority.GameMaster, (p, _) =>
         {
-            p.Leader.RestoreAll();
-            p.Send(new SingleDigimonInfoPacket(p.Leader));
+            foreach (var d in p.Character.Digimons)
+            {
+                d.RestoreAll();
+                p.Send(new SingleDigimonInfoPacket(d));
+            }
         });
 
         Add("levelup", "/levelup [n]", Authority.GameMaster, (p, args) =>
         {
             int n = args.Length > 0 && int.TryParse(args[0], out var v) ? Math.Clamp(v, 1, maxLevel) : 1;
+            if (p.InBattle) return;
             for (int i = 0; i < n && p.Leader.Level < maxLevel; i++)
+            {
                 p.Leader.LevelUp();
-            p.Send(new LevelUpPacket(p.Leader));
+                Progression.AfterLevelUp(p, p.Leader, inBattle: false);
+            }
             p.Send(new SingleDigimonInfoPacket(p.Leader));
         });
 

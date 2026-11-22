@@ -74,6 +74,7 @@ services.AddSingleton<ZoneSystem>();
 services.AddSingleton<BattleSystem>();
 services.AddSingleton<PlayerSystem>();
 services.AddSingleton<CharacterFactory>();
+services.AddSingleton<NpcScripts>();
 services.AddSingleton<ChatCommands>();
 
 // rede

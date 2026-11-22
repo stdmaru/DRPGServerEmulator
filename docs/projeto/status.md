@@ -2,7 +2,7 @@
 
 > Atualize ao fim de cada sessão. Mantenha curto: só o estado presente, sem histórico (o histórico fica nas [decisões](decisoes.md)).
 
-**Última atualização:** 2026-11-21. **Cliente oficial: v322** (era 242).
+**Última atualização:** 2026-11-22. **Cliente oficial: v322** (era 242).
 
 ## Feito
 - ✅ Análise de viabilidade e plano: [visão geral](visao-geral.md), [roadmap](roadmap.md).
@@ -10,6 +10,7 @@
 - ✅ 52 pcaps antigos em `captures.db` (sessões 1–48, marcadas como v242).
 - ✅ Papel dos 4 servidores confirmado, e os 4 IPs localizados na tabela de texto da v322. Ver [servidores](../protocolo/servidores.md).
 - ✅ `patch_client.py`: remoção do XIGNCODE por assinatura (v242 e v322) e troca de IPs, incluindo `--proxy-config`. **Aplicado** em `client/DigimonRPG.bin` (v322); o original está em `DigimonRPG.bin.orig`. Ver [patch_client](../ferramentas/patch-cliente.md).
+- ✅ `patch_client.py --server IP [--port papel=N]`: troca IPs **e portas** (tabela de mundos do cliente). Gerado `client/DigimonRPG_local.bin` + `start_local.bat` para o emulador local (127.0.0.1, 7001/7000/7002/7003). ❓ Ainda não testado em jogo contra o emulador v322.
 - ✅ `drpg_wine.sh`: prefixo dedicado, `run` (args do `start_bin.bat`), `run --debug`, `hang` (backtrace de todas as threads + minidump). Ver [Wine](../cliente/wine.md).
 - ✅ **Tela congelada no loading resolvida** (patch `loadingbar`, aplicado em `client/DigimonRPG.bin` e `DigimonRPG_proxy.bin`). Causa: a thread da barra e a principal usavam o mesmo backbuffer DirectDraw sem trava. O backbuffer ficava preso (`SURFACEBUSY`), mas o jogo seguia até a seleção de servidor. Agora a tela fica preta durante o loading.
 - ✅ Primeira sessão no oficial pela v322 (sessão 52, login → mapa) e `drpg_diff.py` rodado. Ver [opcodes](../protocolo/opcodes.md#mudanças-v242--v322).
@@ -27,6 +28,7 @@
 - ✅ Espécies, itens, zonas e portais lidos do `table.pf` do cliente na partida (sem XML inventado). Crescimento da `dex_us`, estágio e atributo do `digimon_us`, MaxActionGauge constante, nível máximo 160 (❓ provisório). Ver [arquivos de dados](../cliente/arquivos-de-dados.md) e [portais](../mecanicas/portais.md).
 - ✅ Grade dos mapas lida do cliente (`extract-client` → `grids.bin`), 0x20 validado por célula e velocidade, roaming dos selvagens como no oficial (tick de 344 ms, casa ± 3, estados 1/4/11/8/12). Ver [movimento](../mecanicas/movimento.md) e [selvagens](../mecanicas/selvagens.md). Falta: casas e espécies dos selvagens nos outros mapas.
 - ✅ Batalha PvE refeita sobre 67 batalhas v322: fluxo e pacotes do oficial (0x35 marcar/desmarcar, 0x67, fuga 0x65/0x6A, fim 0xB1/0x10/0x84/0x6D, 0xB4 na saída), dano básico ⌊ATK²/(10·DEF)⌋, barra por nível/BR, grupo selvagem compartilhado, estado do tamer no 0x10, cura retomada 0,2 s após o fim. Ver [batalha](../mecanicas/batalha.md). Falta: fator de atributo, skills, derrota por nocaute, chance de acerto real.
+- ✅ **Área inicial / tutorial** (PR draft #2, 2026-11-22): digimon por forma (atributos e skills), in-training → rookie no L11, evolução automática no L21/31/41 em batalha e pelo menu, pontos e skills por forma (`0x71`, `0x72`, `0x82`), time de 5 (`0xF1`, `0x173`, invocação), inventário com duas bolsas (`0x91`, `0xBD`, `0xC9`, `0xC8`, `0xFC`), NPCs 1–5 e 8, status de selvagem pelo nível, EXP para todos os participantes e bits uma vez. Persistido (migração `0003`). 78 testes. Ver [evolução](../mecanicas/evolucao.md) e [área inicial](../mecanicas/area-inicial.md). ❓ Não testado em jogo com o cliente.
 - ✅ Tabelas de EXP trocadas por fórmulas exatas (digimon e tamer). Ver [fórmulas de EXP](../mecanicas/formulas-exp.md). ❓ Evento de EXP ainda sem pacote identificado.
 
 ## Em andamento / próximo passo

@@ -26,6 +26,8 @@ O 0xC4 aparece em channel, map e global. É um keep-alive vazio: o cliente envia
   | 0x92CE94… | 20.214.228.11, 20.214.227.249, 52.238.31.48, 20.214.227.129, 52.238.31.51, 52.238.30.192, 20.214.228.137 | ❓ |
   Há também `20.214.228.140` em 0x910E58.
   - No dump da v242 (`_backups/DigimonRPG.bin_unpacked`), as duas primeiras entradas **já estavam trocadas por `127.0.0.1`**. Por isso a v242 parecia não ter os IPs de login e global.
+- ✅ As **portas** são imediatos no código, numa tabela de mundos × slots (Login, Session, 255 mapas). Ver [patch_client](../ferramentas/patch-cliente.md#tabela-de-servidores---server). O 7001 do login vem do mundo 1; o 7000 do channel, do mundo 0.
+- Para pôr o cliente no emulador: `patch_client.py apply … --server 127.0.0.1`.
 - Para pôr o cliente no proxy (modo A): `patch_client.py apply … --proxy-config ../proxy/config.toml` (ver [patch_client](../ferramentas/patch-cliente.md)).
 - Linha de comando: `start_bin.bat` → `DigimonRPG.bin <conta> <hash>`; o launcher usa `nadigimonrpg:<hash>;<conta>;`.
 

@@ -1,14 +1,15 @@
 <!--
   Point: casa fixa de cada grupo (✅ capturada: centro da caixa de 7 × 7 onde ele anda). Com pontos, MaxCount
   é o número de pontos; sem pontos, cada grupo sorteia uma célula andável no retângulo PosX/PosY.
-  Ver docs/mecanicas/selvagens.md.
+  Status: pelo nível (WildFormulas); HP, VP, ATK, DEF e BR juntos substituem a fórmula.
+  BitReward é o máximo (o oficial sorteia de ¾ dele até ele). Ver docs/mecanicas/selvagens.md.
 -->
 <DigimonSpawns>
-    <!-- mapa 79 (tutorial): sessões 53 e 54, mesmas três casas -->
+    <!-- mapa 79 (tutorial): sessões 53 e 54, mesmas três casas. ✅ Yuramon enfraquecido, EXP 0, bits 5–7 -->
     <Spawn MapID="79" MaxCount="3" PosXMin="24" PosYMin="62" PosXMax="34" PosYMax="70" RespawnTime="1">
         <Point X="27" Y="65"/>
         <Point X="29" Y="66"/>
         <Point X="31" Y="67"/>
-        <SpawnOption DigimonID="14" Level="2" STR="0" AGI="0" CON="0" INT="0" ExpReward="0" BitReward="16" AppearanceRate="100" DropGroup="1"/>
+        <SpawnOption DigimonID="14" Level="2" HP="96" VP="50" ATK="60" DEF="43" BR="65" ExpReward="0" BitReward="7" AppearanceRate="100" DropGroup="1"/>
     </Spawn>
 </DigimonSpawns>

@@ -42,9 +42,10 @@ public sealed class Digimon
         RestoreAll();
     }
 
-    /// <summary>Chave no banco (0 = selvagem).</summary>
+    /// <summary>Chave no banco (0 = selvagem ou ainda não salvo).</summary>
     public uint Uid { get; init; }
-    public bool IsWild => Uid == 0;
+    /// <summary>Selvagem = tem status fixos. Não usa o uid: ele só é atribuído depois do construtor.</summary>
+    public bool IsWild => WildStats is not null;
     public Serial Serial { get; } = Serial.New();
     public string Name { get; set; }
     public ushort Level { get; private set; }
@@ -62,7 +63,7 @@ public sealed class Digimon
     public DigimonSpecies Species => Current.Species;
     public ushort SpeciesId => Species.Id;
 
-    /// <summary>Status fixos de selvagem (<see cref="WildFormulas"/> ou o XML).</summary>
+    /// <summary>Status fixos de selvagem (<see cref="WildFormulas"/> ou o XML); null no digimon do jogador.</summary>
     public CombatStats? WildStats { get; }
 
     public int TotalWins { get; set; }
@@ -75,7 +76,7 @@ public sealed class Digimon
     public Attributes Allocated => Current.Allocated;
     public Attributes Attributes => StatFormulas.BaseAttributes(Species, Level) + Current.Allocated;
 
-    public CombatStats Stats => WildStats ?? (IsWild ? WildFormulas.Combat(Level) : StatFormulas.Combat(Attributes, Level));
+    public CombatStats Stats => WildStats ?? StatFormulas.Combat(Attributes, Level);
     public long ExpToNextLevel => _data.DigimonExpToNext(Level);
     public bool IsKnockedOut => Hp <= 0;
 
@@ -259,11 +260,26 @@ public sealed class Digimon
         return true;
     }
 
-    public bool AllocatePoint(StatKind stat)
+    /// <summary>
+    /// Forma do estágio pedido pelo cliente (u8 no 0x71, 0x72 e 0x82). ✅ 0 = a atual; senão a espécie da linha nesse
+    /// estágio, desde que já liberado. Null para estágio sem forma (abaixo da base ou além do liberado).
+    /// </summary>
+    public DigimonForm? FormAtStage(byte stage)
     {
-        if (AbilityPoints == 0) return false;
-        var a = Current.Allocated;
-        Current.Allocated = stat switch
+        if (stage == 0 || stage == Current.Species.Stage) return Current;
+        if (stage == BaseForm.Species.Stage) return BaseForm;
+        if (stage < BaseForm.Species.Stage || stage > UnlockedStage) return null;
+        return LineSpecies(stage) is { } s ? FormOf(s) : null;
+    }
+
+    public bool AllocatePoint(StatKind stat) => AllocatePoint(Current, stat);
+
+    /// <summary>✅ 0x71: um ponto num atributo da forma (cada forma tem os seus pontos).</summary>
+    public bool AllocatePoint(DigimonForm form, StatKind stat)
+    {
+        if (PointsOf(form) == 0) return false;
+        var a = form.Allocated;
+        form.Allocated = stat switch
         {
             StatKind.Str => a with { Str = a.Str + 1 },
             StatKind.Agi => a with { Agi = a.Agi + 1 },

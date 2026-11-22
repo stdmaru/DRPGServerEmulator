@@ -18,15 +18,15 @@ public sealed class RefreshDigimonStatusPacket(Digimon digimon) : ServerPacket
     protected override void Write(PacketWriter w) => DigimonStatusBlock.Write(w, digimon);
 }
 
-/// <summary>0x71: resposta à distribuição de ponto: bloco de status + eco dos dois bytes finais do pedido.</summary>
-public sealed class AddAbilityPointPacket(Digimon digimon, byte requestFlag, byte stat) : ServerPacket
+/// <summary>0x71 (704 bytes): ✅ ponto distribuído: bloco da forma do estágio pedido + eco do u8 estágio e do u8 atributo + 6 zeros.</summary>
+public sealed class AddAbilityPointPacket(Digimon digimon, DigimonForm form, byte stage, byte stat) : ServerPacket
 {
     public override ushort Opcode => (ushort)MapOpcode.DigimonAddAbilityPoint;
 
     protected override void Write(PacketWriter w)
     {
-        DigimonStatusBlock.Write(w, digimon);
-        w.WriteU8(requestFlag);
+        DigimonStatusBlock.Write(w, digimon, form);
+        w.WriteU8(stage);
         w.WriteU8(stat);
         w.WriteZeros(6);
     }
@@ -61,19 +61,19 @@ public sealed class DigimonFormInfoPacket(uint stage, Digimon digimon, DigimonFo
     {
         w.WriteU32(stage);
         w.WriteU32(0);
-        digimon.ViewAs(form, () => { DigimonStatusBlock.Write(w, digimon); return 0; });
+        DigimonStatusBlock.Write(w, digimon, form);
         w.WriteZeros(16);
     }
 }
 
-/// <summary>0x72 (704 bytes): ✅ skill subiu: bloco + eco do u8 estágio e do u8 skill do pedido + 6 zeros.</summary>
-public sealed class SkillUpgradePacket(Digimon digimon, byte stage, byte skill) : ServerPacket
+/// <summary>0x72 (704 bytes): ✅ skill subiu: bloco da forma + eco do u8 estágio e do u8 skill (1/2) do pedido + 6 zeros.</summary>
+public sealed class SkillUpgradePacket(Digimon digimon, DigimonForm form, byte stage, byte skill) : ServerPacket
 {
     public override ushort Opcode => (ushort)MapOpcode.DigimonSkillUpgrade;
 
     protected override void Write(PacketWriter w)
     {
-        DigimonStatusBlock.Write(w, digimon);
+        DigimonStatusBlock.Write(w, digimon, form);
         w.WriteU8(stage);
         w.WriteU8(skill);
         w.WriteZeros(6);

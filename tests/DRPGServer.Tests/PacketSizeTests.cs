@@ -23,6 +23,7 @@ public class PacketSizeTests
         var combatant = new Combatant(digimon, BattleSide.A, null, null);
         var drop = new ItemDrop(10_001, 41, 50, 50, TimeSpan.Zero, null);
         var item = new Inventory(999).Add(41, 1)!;
+        var header = new ItemMoveHeader(ItemPlace.Ground, ItemPlace.Inventory, 64, 27, 0, 0);
         var wild = new WildDigimon(TestSupport.Data, TestSupport.Data.SpawnsOf(79)[0], 27, 65);
 
         var packets = new (ServerPacket Packet, int Size)[]
@@ -57,12 +58,23 @@ public class PacketSizeTests
             (new BattleEndPacket(BattleResult.Win), 1),
             (new RewardBitExpPacket(Serial.New(), 1, 1), 32),
             (new LevelUpPacket(digimon), 696),                         // ✅ v322 (sessões 54, 56)
-            (new AddAbilityPointPacket(digimon, 1, 1), 704),           // ✅ v322 (sessões 54, 56)
+            (new AddAbilityPointPacket(digimon, digimon.Current, 1, 1), 704), // ✅ v322 (sessões 54, 56)
+            (new SkillUpgradePacket(digimon, digimon.Current, 1, 1), 704),   // ✅ v322 (0x72, sessão 56)
+            (new DigimonFormInfoPacket(0, digimon, digimon.Current), 720),   // ✅ v322 (0x82)
+            (new DigimonEvolvedPacket(digimon), 696),                  // ✅ v322 (0x80)
+            (new BattleEvolvePacket(digimon), 720),                    // ✅ v322 (0x81)
+            (new BattleSummonPacket(1, digimon), 720),                 // ✅ v322 (0x64)
+            (new EvolutionListPacket([]), 8),                          // ✅ v322 (0x9E)
+            (new SetLeaderPacket(1, 7), 12),                           // ✅ v322 (0xF1)
+            (new PartySwapPacket(0), 8),                               // ✅ v322 (0x173)
             (new Unknown73Packet(), 280),
             (new Unknown74Packet(), 60),
             (new Unknown7EPacket(0x29), 1940),
             (new Unknown7FPacket(0x3D), 2708),
-            (new ItemDropGetPacket(drop, item), 236),
+            (new ItemMovePacket(header, item), 236),                   // ✅ v322 (0x91)
+            (new ItemDestroyPacket(header, item), 240),                // ✅ v322 (0xBD)
+            (new BattleItemReceivePacket([item]), 444),                // ✅ v322 (0xC8)
+            (new InventoryRefreshPacket(character), 4424),             // ✅ v322 (0xFC)
             (new TeleportCharacterPacket(79, 1, 1), 8),
             (new RefreshDigimonStatusPacket(digimon), 696),            // ✅ v322 (sessão 56)
             (new SingleDigimonInfoPacket(digimon), 696),               // ✅ v322 (0xB4)

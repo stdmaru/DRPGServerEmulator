@@ -40,7 +40,8 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 ### Mecânicas (lógica do servidor)
 - [Fórmulas de status](mecanicas/formulas-status.md): atributos = 10 + bônus do estágio + status-base × (L − 1) + pontos; ATK/DEF/BR/HP/VP = ⌊c₁√a + c₂√b⌋; MaxEVP L(L − 1).
 - [Fórmulas de EXP](mecanicas/formulas-exp.md): digimon ⌊20L·1,2^L⌋ em float32 (trava no nível 77), tamer 5(L+1), recompensa 0x6E, evento de EXP ❓.
-- [Evolução](mecanicas/evolucao.md): cada forma tem atributos, pontos e skills próprios; nível e EXP são do digimon.
+- [Evolução](mecanicas/evolucao.md): cada forma tem atributos, pontos e skills próprios; nível e EXP são do digimon; 0x70/0x80/0x81/0x82/0x9E, pontos por estágio.
+- [Área inicial e time](mecanicas/area-inicial.md): NPCs do tutorial (0x56 escolhas 1–5 e 8), 0xF1 líder, 0x173 troca de posições.
 - [Movimento](mecanicas/movimento.md): 0x20 a cada 0,87 s, até ~10,6 células/s, validação de célula e velocidade.
 - [Batalha](mecanicas/batalha.md): fluxo 0x61…0x6D, 0x67, dano ⌊ATK²/(10·DEF)⌋, barra por nível/BR, acerto, fuga, grupo compartilhado, recuperação.
 - [Selvagens](mecanicas/selvagens.md): 0x11, tick de 344 ms, casa fixa com caixa de 7 × 7, 5 % de chance de andar, estados.
@@ -59,6 +60,6 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 
 ### Ferramentas
 - [Proxy-logger](ferramentas/proxy.md): captura ao vivo para SQLite, marcadores, importação de pcap, consultas, **detecção de mudanças entre versões**.
-- [patch_client.py](ferramentas/patch-cliente.md): remove o XIGNCODE e troca IPs por assinatura. Fluxo para quando o oficial atualizar.
+- [patch_client.py](ferramentas/patch-cliente.md): remove o XIGNCODE, corrige o loading e troca IPs e portas (`--server`) por assinatura. Fluxo para quando o oficial atualizar.
 - [extract_status.py](ferramentas/extract-status.md): extrai amostras de status dos pcaps.
 - [drpg_replay.py](ferramentas/replay.md): reproduz uma sessão capturada contra o emulador e compara as respostas com as do oficial.

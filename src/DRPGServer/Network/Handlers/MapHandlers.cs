@@ -145,78 +145,170 @@ public sealed class ExitGameHandler : ISessionPacketHandler
     }
 }
 
-/// <summary>0x71: distribuir um ponto de atributo.</summary>
+/// <summary>
+/// 0x71 (C2S 718): ✅ bloco de status ecoado (uid em 0, serial em 4), u8 estágio da forma e u8 atributo (1..4).
+/// O ponto vai para a forma daquele estágio (a janela de evolução deixa distribuir nas formas liberadas).
+/// </summary>
 [PacketHandler(MapOpcode.DigimonAddAbilityPoint)]
 public sealed class AddAbilityPointHandler : PlayerHandler
 {
     protected override void Handle(Player player, PacketReader packet)
     {
-        packet.ReadU32();                       // UID do digimon
-        var serial = Serial.Read(packet);
-        packet.Skip(668);                       // resto do bloco de status que o cliente ecoa
-        var flag = packet.ReadU8();             // ❓ talvez a evolução
+        uint uid = packet.ReadU32();
+        packet.Skip(DigimonStatusBlock.Length - 4);
+        var stage = packet.ReadU8();
         var stat = packet.ReadU8();
 
-        var digimon = player.Leader;
-        if (serial != digimon.Serial || stat is < 1 or > 4) return;
-        if (digimon.AllocatePoint((StatKind)stat))
-            player.Send(new AddAbilityPointPacket(digimon, flag, stat));
+        if (player.InBattle || player.Character.FindDigimon(uid) is not { } digimon || stat is < 1 or > 4) return;
+        if (digimon.FormAtStage(stage) is not { } form) return;
+        if (digimon.AllocatePoint(form, (StatKind)stat))
+            player.Send(new AddAbilityPointPacket(digimon, form, stage, stat));
     }
 }
 
-/// <summary>0x56: escolha num diálogo de NPC.</summary>
-[PacketHandler(MapOpcode.NpcDialogChoice)]
-public sealed class NpcChoiceHandler : PlayerHandler
+/// <summary>0x72 (C2S 718): ✅ bloco ecoado, u8 estágio da forma e u8 skill (1 ou 2). Gasta um ponto de skill.</summary>
+[PacketHandler(MapOpcode.DigimonSkillUpgrade)]
+public sealed class SkillUpgradeHandler : PlayerHandler
 {
-    /// <summary>Escolha → (item dado, item cobrado, quantidade cobrada). Vila do Começo.</summary>
-    private static readonly Dictionary<uint, (uint Give, uint Cost, uint CostAmount)> Choices = new()
-    {
-        [1] = (22004, 0, 0),    // Patamon
-        [2] = (22005, 0, 0),    // Botamon
-        [3] = (22006, 0, 0),    // Mochimon
-        [4] = (22007, 0, 0),    // Pyocomon
-        [5] = (22008, 41, 5),   // Tunomon: troca 5 sementes de Yuramon
-        [7] = (0, 0, 0),        // Elecmon
-        [8] = (0, 0, 0),        // Elecmon
-    };
-
     protected override void Handle(Player player, PacketReader packet)
     {
-        uint choice = packet.ReadU32();
-        if (!Choices.TryGetValue(choice, out var c)) return;
+        uint uid = packet.ReadU32();
+        packet.Skip(DigimonStatusBlock.Length - 4);
+        var stage = packet.ReadU8();
+        var skill = packet.ReadU8();
 
-        var inventory = player.Character.Inventory;
-        if (c.Give == 0)
-        {
-            player.Send(new NpcChoicePacket(choice));
-            return;
-        }
-        if (!inventory.HasFreeSlot && inventory.Find(c.Give) is null) return;
-        if (c.Cost != 0 && !inventory.Remove(c.Cost, c.CostAmount)) return;
-        if (inventory.Add(c.Give, 1) is not { } item) return;
-        player.Send(new NpcChoicePacket(choice));
-        player.Send(new ItemReceivePacket(item));
+        if (player.InBattle || player.Character.FindDigimon(uid) is not { } digimon || skill is < 1 or > DigimonForm.SkillSlots) return;
+        if (digimon.FormAtStage(stage) is not { } form) return;
+        if (digimon.UpgradeSkill(form, skill - 1))
+            player.Send(new SkillUpgradePacket(digimon, form, stage, skill));
     }
 }
 
-/// <summary>0x91: pegar item do chão.</summary>
-[PacketHandler(MapOpcode.ItemDropGet)]
-public sealed class ItemDropGetHandler : PlayerHandler
+/// <summary>0x82 (C2S 734): ✅ janela de evolução: u32 estágio (0 = atual), u32 0, bloco ecoado. Responde o bloco da forma.</summary>
+[PacketHandler(MapOpcode.DigimonFormInfo)]
+public sealed class DigimonFormInfoHandler : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        uint stage = packet.ReadU32();
+        packet.ReadU32();
+        uint uid = packet.ReadU32();
+        if (stage > byte.MaxValue || player.Character.FindDigimon(uid) is not { } digimon) return;
+        if (digimon.FormAtStage((byte)stage) is not { } form) return;
+        player.Send(new DigimonFormInfoPacket(stage, digimon, form));
+    }
+}
+
+/// <summary>0x9E (C2S 18): ✅ u32 uid do digimon; o servidor responde as formas para evoluir agora (só em batalha).</summary>
+[PacketHandler(MapOpcode.EvolutionList)]
+public sealed class EvolutionListHandler : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        uint uid = packet.ReadU32();
+        if (player.Battle is { } battle)
+            player.Send(new EvolutionListPacket(battle.EvolutionOptions(player, uid)));
+    }
+}
+
+/// <summary>0xF1 (C2S 26): ✅ u32 0, u32 personagem, u32 digimon: o digimon vira líder (troca com a posição 0).</summary>
+[PacketHandler(MapOpcode.SetLeader)]
+public sealed class SetLeaderHandler : PlayerHandler
 {
     protected override void Handle(Player player, PacketReader packet)
     {
         packet.ReadU32();
-        packet.ReadI32();                       // Y
-        packet.ReadI32();                       // X
-        packet.ReadI32();
-        packet.ReadI32();
-        uint dropUid = packet.ReadU32();
-        uint itemId = packet.ReadU32();
+        uint characterUid = packet.ReadU32();
+        uint digimonUid = packet.ReadU32();
+        var c = player.Character;
+        if (player.InBattle || characterUid != c.Uid || c.FindDigimon(digimonUid) is not { } digimon) return;
+        if (c.SetLeader(digimon))
+            player.Send(new SetLeaderPacket(c.Uid, digimon.Uid));
+    }
+}
 
-        if (player.Zone is not { } zone || zone.FindDrop(dropUid) is not { } drop || drop.ItemId != itemId) return;
-        if (player.Character.Inventory.Add(drop.ItemId, 1) is not { } item) return;   // inventário cheio: fica no chão
-        zone.RemoveDrop(drop);
-        player.Send(new ItemDropGetPacket(drop, item));
+/// <summary>0x173 (C2S 22): ✅ u16 0, u16 botão k (0..2): troca as posições k + 1 e k + 2 do time.</summary>
+[PacketHandler(MapOpcode.PartySwap)]
+public sealed class PartySwapHandler : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        packet.ReadU16();
+        ushort button = packet.ReadU16();
+        if (player.InBattle || button > Character.PartySize - 3) return;
+        if (player.Character.SwapSlots(button + 1, button + 2))
+            player.Send(new PartySwapPacket(button));
+    }
+}
+
+/// <summary>0x56: escolha num diálogo de NPC (<see cref="NpcScripts"/>).</summary>
+[PacketHandler(MapOpcode.NpcDialogChoice)]
+public sealed class NpcChoiceHandler(NpcScripts scripts) : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        uint choice = packet.ReadU32();
+        if (!player.InBattle) scripts.Choose(player, choice);
+    }
+}
+
+/// <summary>
+/// 0x91 (C2S 250): ✅ mover item (<see cref="ItemMoveHeader"/> + registro do item). Do chão: origem (x, y) e destino
+/// "qualquer lugar"; o oficial tira o item do chão (0x13 zerado) e responde com a posição usada. Dentro do
+/// inventário: linha e coluna de origem e destino, trocando se o destino está ocupado.
+/// </summary>
+[PacketHandler(MapOpcode.ItemDropGet)]
+public sealed class ItemMoveHandler : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        var header = ItemMoveHeader.Read(packet);
+        uint uid = packet.ReadU32();
+        uint itemId = packet.ReadU32();
+        if (player.InBattle) return;
+        var bag = player.Character.Inventory.Main;
+
+        switch (header.From, header.To)
+        {
+            case (ItemPlace.Ground, ItemPlace.Inventory):
+            {
+                if (player.Zone is not { } zone || zone.FindDrop(uid) is not { } drop || drop.ItemId != itemId) return;
+                if (bag.Add(drop.ItemId, 1) is not [.., var item]) return;   // inventário cheio: fica no chão
+                zone.RemoveDrop(drop);
+                player.Send(new ItemMovePacket(header with { ToA = item.Row, ToB = item.Column }, item));
+                break;
+            }
+            case (ItemPlace.Inventory, ItemPlace.Inventory):
+            {
+                int from = SlotOf(header.FromA, header.FromB), to = SlotOf(header.ToA, header.ToB);
+                if (bag[from] is not { } item || item.Uid != uid) return;
+                if (bag.Move(from, to, out var displaced))
+                    player.Send(new ItemMovePacket(header, item, displaced));
+                break;
+            }
+            // ❓ bolsas extras (0x33, 0x3D) ainda não
+        }
+    }
+
+    internal static int SlotOf(int row, int column) =>
+        row is >= 0 and < Inventory.Size / Inventory.Columns && column is >= 0 and < Inventory.Columns
+            ? row * Inventory.Columns + column : -1;
+}
+
+/// <summary>0xBD (C2S 254): ✅ cabeçalho (inventário → chão, linha e coluna) + registro: o item é destruído.</summary>
+[PacketHandler(MapOpcode.ItemDestroy)]
+public sealed class ItemDestroyHandler : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        var header = ItemMoveHeader.Read(packet);
+        uint uid = packet.ReadU32();
+        if (player.InBattle || header.From != ItemPlace.Inventory) return;
+        var bag = player.Character.Inventory.Main;
+        int slot = ItemMoveHandler.SlotOf(header.FromA, header.FromB);
+        if (bag[slot] is not { } item || item.Uid != uid) return;
+        bag.Destroy(slot);
+        player.Send(new ItemDestroyPacket(header, item));
     }
 }
 
@@ -300,7 +392,7 @@ public sealed class DigimonInfoHandler : PlayerHandler
     {
         packet.ReadU32();
         var serial = Serial.Read(packet);
-        if (player.Leader.Serial == serial)
-            player.Send(new SingleDigimonInfoPacket(player.Leader));
+        if (player.Character.FindDigimon(serial) is { } digimon)
+            player.Send(new SingleDigimonInfoPacket(digimon));
     }
 }

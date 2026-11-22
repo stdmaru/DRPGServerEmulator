@@ -52,14 +52,14 @@ public sealed class Bag
     public bool HasFreeSlot => Array.IndexOf(_slots, null) >= 0;
 
     public InventoryItem? Find(uint itemId) => _slots.FirstOrDefault(i => i?.ItemId == itemId);
-    public uint Count(uint itemId) => (uint)Items.Where(i => i.ItemId == itemId).Sum(i => i.Amount);
+    public uint Count(uint itemId) => (uint)Items.Where(i => i.ItemId == itemId).Sum(i => (long)i.Amount);
 
     /// <summary>Quanto ainda cabe do item (pilhas existentes + posições livres).</summary>
     public uint Room(uint itemId)
     {
         uint max = _owner.MaxStackOf(itemId);
-        ulong room = Items.Where(i => i.ItemId == itemId).Sum(i => (ulong)(max - Math.Min(max, i.Amount)));
-        room += (ulong)_slots.Count(s => s is null) * max;
+        long room = Items.Where(i => i.ItemId == itemId).Sum(i => (long)(max - Math.Min(max, i.Amount)));
+        room += (long)_slots.Count(s => s is null) * max;
         return (uint)Math.Min(room, uint.MaxValue);
     }
 
