@@ -174,8 +174,10 @@ public class TutorialTests
         var drop = zone.Drop(41, 64, 27);
         _session.DrainOutgoing();
         new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, drop.X, drop.Y, 4, 6, drop.Uid, 41)));
-        // ✅ o oficial tira do chão (0x13 zerado) antes do 0x91
-        Assert.Equal([(ushort)0x13, (ushort)0x91], _session.SentOpcodes());
+        // ✅ o oficial tira do chão (0x13 com 108 zeros + x, y) antes do 0x91
+        var pickFrames = _session.DrainOutgoing();
+        Assert.Equal([(ushort)0x13, (ushort)0x91], pickFrames.Select(f => PacketHeader.Read(f).Opcode).ToArray());
+        AssertRemovalPacket(pickFrames[0], drop.X, drop.Y);
         Assert.Null(zone.FindDrop(drop.Uid));
         var bag = _player.Character.Inventory.Main;
         var seed = bag[0]!;
@@ -192,12 +194,104 @@ public class TutorialTests
     }
 
     [Fact]
+    public void Expired_ground_drops_are_removed_with_coordinates_after_lifetime()
+    {
+        var zone = _zones.Find(79)!;
+        var drop = zone.Drop(41, 64, 27);
+        _session.DrainOutgoing();
+
+        // antes do DropLifetime o item continua no chão e sem spam de 0x13
+        zone.Update(drop.DroppedAt + Zone.DropLifetime - TimeSpan.FromSeconds(1), Zone.DropCleanInterval);
+        Assert.NotNull(zone.FindDrop(drop.Uid));
+        Assert.DoesNotContain((ushort)0x13, _session.SentOpcodes());
+
+        // ao atingir DropLifetime, o item é removido e 0x13 leva 108 zeros + (X, Y)
+        zone.Update(drop.DroppedAt + Zone.DropLifetime, Zone.DropCleanInterval);
+        var frames = _session.DrainOutgoing().Where(f => PacketHeader.Read(f).Opcode == 0x13).ToList();
+        Assert.Single(frames);
+        AssertRemovalPacket(frames[0], drop.X, drop.Y);
+        Assert.Null(zone.FindDrop(drop.Uid));
+    }
+
+    [Fact]
+    public void Simultaneous_drops_do_not_collide_and_entering_player_sees_them()
+    {
+        var zone = _zones.Find(79)!;
+        var drops = Enumerable.Range(0, 5).Select(_ => zone.Drop(41, 64, 27)).ToList();
+        Assert.Equal(drops.Count, drops.Select(d => (d.X, d.Y)).Distinct().Count());
+
+        var otherSession = TestSupport.NewSession();
+        var other = new Player(otherSession, new AuthenticatedAccount(2, "u2", Authority.GameMaster), Entities.Character());
+        zone.Enter(other);
+        Assert.Equal(drops.Count, otherSession.SentOpcodes().Count(o => o == 0x13));
+    }
+
+    private static void AssertRemovalPacket(byte[] frame, short expectedX, short expectedY)
+    {
+        var payload = frame.AsSpan(PacketHeader.Length);
+        Assert.Equal(ItemRecord.Length + 4, payload.Length);
+        Assert.True(payload[..ItemRecord.Length].IndexOfAnyExcept((byte)0) < 0);
+        Assert.Equal(expectedX, BitConverter.ToInt16(payload[ItemRecord.Length..]));
+        Assert.Equal(expectedY, BitConverter.ToInt16(payload[(ItemRecord.Length + 2)..]));
+    }
+
+    [Fact]
     public void Seeds_stack_up_to_the_table_limit()
     {
         var bag = _player.Character.Inventory.Main;
-        var changed = bag.Add(41, 10);                         // pilha 8 na fixture
+        var changed = bag.Add(41, 10);                         // pilha 8 na fixture (col 26)
         Assert.Equal(new uint[] { 8, 2 }, changed.Select(i => i.Amount));
         Assert.Equal(10u, bag.Count(41));
+        Assert.Equal(1u, TestSupport.Data.Items[107].MaxStack); // duração em segundos (> 999) não empilha
+        Assert.Equal(1000u, TestSupport.Data.Items[41].BuyPrice);
+        Assert.Equal(100u, TestSupport.Data.Items[41].SellPrice);
+    }
+
+    [Fact]
+    public void Picking_up_stackable_drops_merges_into_same_slot_until_max()
+    {
+        var zone = _zones.Find(79)!;
+        var d1 = zone.Drop(41, 64, 27);
+        var d2 = zone.Drop(41, 64, 27);
+        _session.DrainOutgoing();
+
+        new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d1.X, d1.Y, 4, 6, d1.Uid, 41)));
+        new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d2.X, d2.Y, 4, 6, d2.Uid, 41)));
+
+        var bag = _player.Character.Inventory.Main;
+        Assert.Single(bag.Items);
+        Assert.Equal(2u, bag[0]!.Amount);
+    }
+
+    [Fact]
+    public void Inventory_sort_0x148_merges_stacks_orders_and_sends_0xFC()
+    {
+        var inv = _player.Character.Inventory;
+        var bag = inv.Main;
+        // coloca itens fora de ordem e duas pilhas parciais da mesma semente (MaxStack = 8 na fixture)
+        bag.Place(inv.Create(22004, slot: 10, amount: 1));
+        bag.Place(inv.Create(41, slot: 5, amount: 5));
+        bag.Place(inv.Create(41, slot: 12, amount: 5));
+        bag.Place(inv.Create(74, slot: 20, amount: 2));
+        _session.DrainOutgoing();
+
+        var payload = new byte[38];
+        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), (ushort)BagKind.Inventory);
+        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(10), 1);
+        new InventorySortHandler().Handle(_session, new PacketReader(payload));
+
+        Assert.Equal([(ushort)0xFC], _session.SentOpcodes());
+        // ordenado por Type (74: Type 4, 41: Type 5 [8 + 2], 22004: Type 26) nos slots 0..3
+        Assert.Equal(74u, bag[0]!.ItemId);
+        Assert.Equal(2u, bag[0]!.Amount);
+        Assert.Equal(41u, bag[1]!.ItemId);
+        Assert.Equal(8u, bag[1]!.Amount);
+        Assert.Equal(41u, bag[2]!.ItemId);
+        Assert.Equal(2u, bag[2]!.Amount);
+        Assert.Equal(22004u, bag[3]!.ItemId);
+        Assert.Null(bag[4]);
+        Assert.Null(bag[10]);
+        Assert.Null(bag[20]);
     }
 
     // ---------- NPCs ----------

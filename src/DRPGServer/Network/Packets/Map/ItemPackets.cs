@@ -6,9 +6,9 @@ namespace DRPGServer.Network.Packets.Map;
 
 /// <summary>
 /// Registro de item de 108 bytes (0x03, 0x13, 0x91, 0x97, 0xBD, 0xC9, 0xFC). ✅ Campos tirados do <c>item_info_us</c>
-/// (21 itens das sessões 52–56, ver docs/protocolo/structs/inventario.md):
-/// uid, item, u8 tipo (col. 2), u8 subtipo (3), u16 0, quantidade, pilha (27), preço (18), venda (19), ❓, nível (21),
-/// 52 B de efeitos ❓, u16 9999 (32000 nos do tipo 7), u16 col. 16, u32 col. 17, col. 24, 25, 0, 33, checagem uid + item, 0.
+/// (21 itens das sessões 52–61, ver docs/protocolo/structs/inventario.md):
+/// uid, item, u8 tipo (col. 2), u8 subtipo (3), u16 0, quantidade, pilha (26), preço (17), venda (18), ❓, nível (20),
+/// 52 B de efeitos ❓, u16 9999 (32000 nos do tipo 7), u16 col. 15, u32 col. 16, col. 23, 24, 0, 32, checagem uid + item, 0.
 /// </summary>
 public static class ItemRecord
 {
@@ -138,19 +138,15 @@ public sealed class InventoryRefreshPacket(Character character) : ServerPacket
     }
 }
 
-/// <summary>0x13 (112 bytes): item no chão (registro + x, y) ou remoção (tudo zero). ✅ sessão 53.</summary>
+/// <summary>0x13 (112 bytes): item no chão (registro + x, y) ou remoção (108 zeros + x, y). ✅ sessões 53, 56 e 61.</summary>
 public sealed class ItemDropPacket(ItemDrop drop, bool removed = false) : ServerPacket
 {
     public override ushort Opcode => (ushort)MapOpcode.ItemDrop;
 
     protected override void Write(PacketWriter w)
     {
-        if (removed)
-        {
-            w.WriteZeros(ItemRecord.Length + 4);
-            return;
-        }
-        ItemRecord.Write(w, drop.Uid, drop.ItemId, drop.Info, 1);
+        if (removed) w.WriteZeros(ItemRecord.Length);
+        else ItemRecord.Write(w, drop.Uid, drop.ItemId, drop.Info, 1);
         w.WriteI16(drop.X);
         w.WriteI16(drop.Y);
     }

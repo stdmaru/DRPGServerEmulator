@@ -150,6 +150,55 @@ public sealed class Bag
         _slots[slot] = null;
         return item;
     }
+
+    /// <summary>
+    /// 0x148: auto-organiza a bolsa — junta pilhas parciais do mesmo item até <see cref="Inventory.MaxStackOf"/>,
+    /// ordena por (tipo, subtipo, itemId, quantidade desc, uid) e compacta a partir do slot 0.
+    /// </summary>
+    public void Sort()
+    {
+        var items = Items.ToList();
+        if (items.Count == 0) return;
+
+        // 1. Junta pilhas parciais do mesmo item (preservando o menor uid de cada grupo)
+        var merged = new List<InventoryItem>(items.Count);
+        foreach (var group in items.GroupBy(i => i.ItemId))
+        {
+            uint max = _owner.MaxStackOf(group.Key);
+            var ordered = group.OrderBy(i => i.Uid).ToList();
+            long total = ordered.Sum(i => (long)i.Amount);
+            int idx = 0;
+            while (total > 0)
+            {
+                uint put = (uint)Math.Min(total, max);
+                var entry = idx < ordered.Count ? ordered[idx++] : _owner.Create(group.Key, 0, put);
+                entry.Amount = put;
+                merged.Add(entry);
+                total -= put;
+            }
+        }
+
+        // 2. Ordena por categoria (Type, SubType), ItemId, pilhas cheias primeiro e UID
+        merged.Sort((a, b) =>
+        {
+            int c = (a.Info?.Type ?? 0).CompareTo(b.Info?.Type ?? 0);
+            if (c != 0) return c;
+            c = (a.Info?.SubType ?? 0).CompareTo(b.Info?.SubType ?? 0);
+            if (c != 0) return c;
+            c = a.ItemId.CompareTo(b.ItemId);
+            if (c != 0) return c;
+            c = b.Amount.CompareTo(a.Amount);
+            return c != 0 ? c : a.Uid.CompareTo(b.Uid);
+        });
+
+        // 3. Reatribui slots contíguos 0..N-1
+        Array.Clear(_slots);
+        for (int i = 0; i < merged.Count && i < _slots.Length; i++)
+        {
+            merged[i].Slot = i;
+            _slots[i] = merged[i];
+        }
+    }
 }
 
 /// <summary>Inventário do personagem: as duas bolsas e o contador de uids (único por personagem).</summary>
