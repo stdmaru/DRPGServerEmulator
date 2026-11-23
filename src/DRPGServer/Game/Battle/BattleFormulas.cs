@@ -18,25 +18,71 @@ public static class BattleFormulas
     public const double HitChance = 0.90;
 
     /// <summary>
-    /// ✅ Ataque básico (skill 0 no fim do 0x67): ⌊ATK² / (10·DEF)⌋, ATK de quem ataca e DEF de quem apanha.
-    /// Exato nos pares sem atributo (in-training contra in-training). ❓ Entre atributos o dano sai ×0,90…×1,05
-    /// do base, fixo por par; ainda sem regra, então não entra aqui.
+    /// ✅ Ataque básico (skill 0 no fim do 0x67): ⌊ATK² / (10·DEF) · mult⌋, ATK de quem ataca e DEF de quem apanha,
+    /// com multiplicador de afinidade/atributo (0,90…1,05).
     /// </summary>
     public static Hit Attack(Digimon attacker, Digimon target, Random random)
     {
         if (random.NextDouble() >= HitChance) return new Hit(false, 0);
-        return new Hit(true, Math.Max(1, (int)BaseDamage(attacker.Stats.Atk, target.Stats.Def)));
+        double mult = AffinityMultiplier(attacker.Species.Attribute, attacker.Species.Element, target.Species.Attribute, target.Species.Element);
+        return new Hit(true, Math.Max(1, (int)Math.Floor(BaseDamage(attacker.Stats.Atk, target.Stats.Def) * mult)));
     }
 
     /// <summary>
-    /// Skill: o mesmo ataque com multiplicador. ❓ Medido: Hop Hip (nível exigido 6) ×1,075, Bunbun Punch (11) ×1,07,
-    /// V-mon Head (16) ×1,15 no nível 1 e Bunbun Punch nível 10 ×1,17. Ajuste: 1 + 0,0075·(nível exigido + 4) + 0,01·(nível − 1).
+    /// Skill: o mesmo ataque com multiplicador de skill e afinidade.
     /// </summary>
     public static Hit Skill(Digimon attacker, Digimon target, Data.GameData.SkillInfo skill, int skillLevel, Random random)
     {
         if (random.NextDouble() >= HitChance) return new Hit(false, 0);
-        double mult = SkillMultiplier(skill, skillLevel);
-        return new Hit(true, Math.Max(1, (int)(BaseDamage(attacker.Stats.Atk, target.Stats.Def) * mult)));
+        double mult = SkillMultiplier(skill, skillLevel) * AffinityMultiplier(attacker.Species.Attribute, attacker.Species.Element, target.Species.Attribute, target.Species.Element);
+        return new Hit(true, Math.Max(1, (int)Math.Floor(BaseDamage(attacker.Stats.Atk, target.Stats.Def) * mult)));
+    }
+
+    /// <summary>
+    /// Multiplicador de afinidade e atributo entre atacante e alvo.
+    /// - Atributos clássicos: Vacina (1), Dados (2), Vírus (3).
+    ///   Vacina > Vírus > Dados > Vacina (vantagem ~1.05, desvantagem ~0.90..0.95).
+    /// - Afinidade elemental (coluna 22 do digimon_us): Fogo (1) > Natureza (2, 9) > Água (8, 10) > Fogo (1).
+    /// </summary>
+    public static double AffinityMultiplier(byte attackerAttr, byte attackerElem, byte targetAttr, byte targetElem)
+    {
+        double mult = 1.0;
+
+        // Triângulo clássico de atributos (1: Vacina, 2: Dados, 3: Vírus)
+        if (attackerAttr != 0 && targetAttr != 0)
+        {
+            if ((attackerAttr == 1 && targetAttr == 3) ||
+                (attackerAttr == 3 && targetAttr == 2) ||
+                (attackerAttr == 2 && targetAttr == 1))
+            {
+                mult *= 1.05;
+            }
+            else if ((attackerAttr == 1 && targetAttr == 2) ||
+                     (attackerAttr == 2 && targetAttr == 3) ||
+                     (attackerAttr == 3 && targetAttr == 1))
+            {
+                mult *= (targetElem == 8 ? 0.95 : 0.90);
+            }
+        }
+
+        // Afinidade elemental (1: Fogo, 2/9: Vento/Natureza/Planta, 8/10: Gelo/Água)
+        if (attackerElem != 11 && targetElem != 11 && attackerElem != 0 && targetElem != 0)
+        {
+            if ((attackerElem == 1 && (targetElem == 2 || targetElem == 9)) ||
+                ((attackerElem == 2 || attackerElem == 9) && (targetElem == 8 || targetElem == 10)) ||
+                ((attackerElem == 8 || targetElem == 10) && targetElem == 1))
+            {
+                mult *= 1.05;
+            }
+            else if (((attackerElem == 2 || attackerElem == 9) && targetElem == 1) ||
+                     ((attackerElem == 8 || attackerElem == 10) && (targetElem == 2 || targetElem == 9)) ||
+                     (attackerElem == 1 && (targetElem == 8 || targetElem == 10)))
+            {
+                mult *= 0.90;
+            }
+        }
+
+        return mult;
     }
 
     public static double SkillMultiplier(Data.GameData.SkillInfo skill, int skillLevel) =>
@@ -45,23 +91,30 @@ public static class BattleFormulas
     public static double BaseDamage(int atk, int def) => (double)atk * atk / (10.0 * Math.Max(1, def));
 
     /// <summary>
-    /// Quanto a barra enche por passo de <see cref="Battle.TickInterval"/>.
-    /// Jogador: ✅ cresce com o nível (o BR pesa pouco), L1 42, L2 77, L3 89, L4 95 … L20 124, L160 132.
-    /// Ajuste ⌊60 + 17,5·ln L + 2·ln BR⌋ de L4 em diante (19 de 23 amostras a ±1), teto 132.
-    /// Selvagem: ✅ bem mais lento e pelo BR, ⌊15,98·BR^0,2 − 30,29⌋ (13 de 16 exatas, 2 a ±1; ❓ o Yuramon L2 com BR 65 enche 8, não 6), BR 85 → 8, 165 → 14, 1040 → 33.
+    /// Passo da barra visual do jogador no cliente (`DigimonRPG.bin @ 0x0085E0B8`): a cada ~33,3 ms (60 FPS,
+    /// pois o cliente checa `elapsed / 30` e descarta o resto de `timeGetTime()`), soma este inteiro até 500.
     /// </summary>
-    public static int GaugeGain(Digimon digimon, bool wild) => GaugeGain(digimon.Level, digimon.Stats.Br, wild);
+    public static int PlayerClientStep(int level, int agi) =>
+        Math.Max(1, Math.Min(50, (int)((4.0 - 2.5 / Math.Max(1, level)) * 4.0 + Math.Max(0, agi) / 25.0)));
 
-    public static int GaugeGain(int level, int br, bool wild)
+    /// <summary>
+    /// Quanto a barra enche por passo de <see cref="Battle.TickInterval"/> (200 ms).
+    /// Jogador: ✅ sincronizado com os 6 passos de ~33,3 ms que o cliente executa em 200 ms (`6 × PlayerClientStep`).
+    /// Selvagem: ✅ pelo BR, ⌊15,98·BR^0,2 − 30,29⌋ (13 de 16 exatas, 2 a ±1; ❓ o Yuramon L2 com BR 65 enche 8, não 6), BR 85 → 8, 165 → 14, 1040 → 33.
+    /// </summary>
+    public static int GaugeGain(Digimon digimon, bool wild) =>
+        wild ? WildGaugeGain(digimon.Stats.Br) : 6 * PlayerClientStep(digimon.Level, digimon.Attributes.Agi);
+
+    /// <summary>Valor do campo `off296` no bloco de status (fórmula contínua × 200/30, 0 erros nas 26 amostras L1–L160).</summary>
+    public static int StatusGaugeSpeed(Digimon digimon, bool wild) =>
+        wild ? WildGaugeGain(digimon.Stats.Br) : PlayerGaugeGain(digimon.Level, digimon.Attributes.Agi);
+
+    public static int PlayerGaugeGain(int level, int agi)
     {
-        br = Math.Max(1, br);
-        if (wild) return Math.Max(1, (int)(15.98 * Math.Pow(br, 0.2) - 30.29));
-        return level switch
-        {
-            <= 1 => 42,
-            2 => 77,
-            3 => 89,
-            _ => Math.Min(132, (int)(60 + 17.5 * Math.Log(level) + 2 * Math.Log(br))),
-        };
+        double per30ms = Math.Min(50.0, (4.0 - 2.5 / Math.Max(1, level)) * 4.0 + Math.Max(0, agi) / 25.0);
+        return Math.Max(1, (int)(per30ms * (200.0 / 30.0)));
     }
+
+    public static int WildGaugeGain(int br) =>
+        Math.Max(1, (int)(15.98 * Math.Pow(Math.Max(1, br), 0.2) - 30.29));
 }

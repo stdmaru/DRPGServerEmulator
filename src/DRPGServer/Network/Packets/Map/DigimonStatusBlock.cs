@@ -53,8 +53,9 @@ public static class DigimonStatusBlock
     public static void WriteBody(PacketWriter w, Digimon d)
     {
         // 64..191: zero nas capturas, exceto 160 estágio, 161 atributo (✅ colunas 2 e 3 do digimon_us)
-        // e o u16 em 162 (❓ 1, 2, 0x80, 0x200 nas capturas; varia por espécie)
-        w.WriteSparse(128, (96, [d.Species.Stage, d.Species.Attribute, 0x01, 0x00]));
+        // e o u16 em 162 (bitmask do elemento: 1 << (elem - 1))
+        ushort elemMask = d.Species.Element > 0 ? (ushort)(1 << (d.Species.Element - 1)) : (ushort)1;
+        w.WriteSparse(128, (96, [d.Species.Stage, d.Species.Attribute, (byte)(elemMask & 0xFF), (byte)(elemMask >> 8)]));
         WriteCombat(w, d);
         WriteProgress(w, d);
         WriteSkills(w, d);
@@ -106,7 +107,7 @@ public static class DigimonStatusBlock
             w.WriteI16((short)(id == 0 ? 0 : d.Current.SkillLevels[slot])); // 282 / 290
         }
         w.WriteU32(0);                          // 292
-        w.WriteU32((uint)Game.Battle.BattleFormulas.GaugeGain(d, d.IsWild)); // 296 ✅ barra por passo
+        w.WriteU32((uint)Game.Battle.BattleFormulas.StatusGaugeSpeed(d, d.IsWild)); // 296 ✅ barra por passo (off296)
         w.WriteU8(d.IsWild ? (byte)2 : (byte)0); // 300 ✅ 0 no digimon do jogador, 2 no selvagem
         w.WriteZeros(11);
         w.WriteU8(8);                           // 312 ? (7 ou 8 nas capturas)

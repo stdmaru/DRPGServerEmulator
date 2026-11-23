@@ -11,7 +11,7 @@ Dados: 67 batalhas v322 em `captures.db` (sessões 53, 54, 56 e 58; 362 golpes, 
    - C2S `0x69` (serial da batalha);
    - S2C `0x10` do tamer com estado 11;
    - S2C `0x69` vazio.
-2. **Barras:** a cada **~165 ms** o servidor manda um `0x6B` (serial, i32 barra, i32 0) para cada combatente vivo. A barra cheia vale **500**.
+2. **Barras:** a cada **200 ms** o servidor manda um `0x6B` (serial, i32 barra, i32 0) para cada combatente vivo com barra `< 500` (após ~540 ms na abertura e ~200 ms pós-animação). A barra cheia vale **500** (`0x6B` 500 enviado uma única vez).
 3. **Escolha (jogador):**
    - O cliente manda C2S `0x35` (50 B): u8 2, u16 ícone (`0x0A` ataque, `0x04` fuga), u8 0, quem age, alvo.
    - O servidor responde com S2C `0x35` (36 B), com o mesmo ícone e o mesmo alvo:
@@ -52,24 +52,28 @@ Dados: 67 batalhas v322 em `captures.db` (sessões 53, 54, 56 e 58; 362 golpes, 
 | 134 | u16 | ações feitas na batalha |
 
 ## ✅ Dano do ataque básico
-**dano = ⌊ATK² / (10·DEF)⌋**, com o ATK de quem ataca e o DEF de quem apanha, como estão no `0x63`.
+**dano = ⌊ATK² / (10·DEF) · mult⌋**, com o ATK de quem ataca e o DEF de quem apanha, como estão no `0x63`, multiplicado pelo fator de afinidade e atributo `mult`.
 - O `0x70` atualiza o ATK no meio da batalha: Mondrake L1 → L3 com 145 / 163 / 180 de ATK dá 33 / 42 / 51 de dano contra DEF 63.
-- O dano é exato nos pares sem atributo (in-training contra in-training): 28 de 28 pares.
-- ❓ Entre atributos (byte 161), o dano sai ×0,90…×1,05 do base, fixo para cada par. Exemplos: 1→2 ×0,90 / ×0,94, 1→1 ×1,00 / ×1,05, 1→0 ×0,95. Ainda não há regra; o emulador usa ×1.
-- Skills: o id vem no fim do `0x67` (236 ×1,08, 144/145 ×1,15 e ×2, 701/702 dos inimigos, 1078 multi-alvo). ❓ Ainda não implementadas.
+- **Ataques neutros:** O dano é exato nos pares sem vantagem/desvantagem (ex: Hopmon neutro contra Yuramon): $mult = 1{,}0$.
+- **Vantagem de afinidade e atributo:**
+  - Triângulo clássico (byte 161 do bloco): Vacina (1) > Vírus (3) > Dados (2) > Vacina (1). Vantagem dá $\times 1{,}05$, desvantagem dá $\times 0{,}90\dots 0{,}95$.
+  - Afinidade elemental (coluna 22 de `digimon_us`, bitmask no byte 162): Fogo (1) > Natureza (2, 9) > Água/Gelo (8, 10) > Fogo (1). Vantagem dá $\times 1{,}05$ (ex: Gigimon fogo vs Yuramon planta dá dano $+5\%$, explicando os 2~5 pontos a mais).
+- Skills: o id vem no fim do `0x67` (236 ×1,08, 144/145 ×1,15 e ×2, 701/702 dos inimigos, 1078 multi-alvo). Multiplicador de skill acumula com a afinidade.
 
 ## ❓ Acerto
 - O jogador erra 32 de 313 golpes (10 %). Os selvagens acertam 22 de 25, sem contar o Otamamon L50 contra o L160, que erra metade. Sem relação clara com nível ou BR.
 - O emulador usa 90 % de acerto para todos.
 
-## Barra de ação (por passo de 165 ms)
-- ✅ **Jogador:**
-  - A barra cresce com o **nível do digimon**; o BR pesa pouco. Valores: L1 42, L2 77, L3 89, L4 95, L5 99, L10 109, L12 115–118, L20 124, L160 132. O nível do tamer não entra.
-  - Ajuste: ⌊60 + 17,5·ln L + 2·ln BR⌋ de L4 em diante (19 de 23 amostras a ±1), com teto de 132.
+## Barra de ação (por passo de 200 ms)
+- ✅ **Jogador (fórmula exata do cliente, `DigimonRPG.bin @ 0x0085E0B8`):**
+  - O cliente só começa a encher a barra após a animação de entrada/retorno (`[digimon + 0x149]` sair dos estados `2..16`): **~540 ms** na abertura da batalha (mediana de 536 ms em 76 batalhas) e **~200 ms** na retomada pós-animação (mediana de 196 ms em 272 turnos).
+  - Depois disso, anima localmente a cada `30 ms` somando o inteiro `step = ⌊min(50, (4 − 2,5/L)·4 + AGI/25)⌋`. Como descarta o resto de `timeGetTime()`, a 60 FPS cada passo leva **~33,3 ms** (`6` passos a cada `200 ms`).
+  - No emulador, cada passo de `200 ms` soma `6 × step` (após `OpeningDelay = 540 ms` / `ResumeDelay = 200 ms`), mantendo L1 a L160 dentro de `0..+100 ms` da barra visual do cliente.
+  - O campo `off296` do bloco de status usa a versão contínua `⌊min(50, (4 − 2,5/L)·4 + AGI/25) · (200/30)⌋` (**26/26 amostras de L1 a L160 com 0 erros**): L1 (AGI 10) → 42, L2 (AGI 12) → 76, L3 (AGI 14) → 88, L10 (AGI 32) → 108, L11 (AGI 60) → 116, L20 (AGI 76) → 123, L160 (AGI 95) → 131.
+  - Ao atingir `500`, o servidor envia `0x6B(..., 500)` **uma única vez** e para de enviar para aquele combatente até a ação ocorrer.
 - ✅ **Selvagem:**
   - Pelo BR: ⌊15,98·BR^0,2 − 30,29⌋. Valores: BR 85 → 8, 165 → 14, 1040 → 33. Ficam 13 de 16 exatas e 2 a ±1.
   - ❓ O Yuramon L2 com BR 65 enche 8.
-- Os valores secundários (+8 %, como 42/45 ou 117/127) são passos mais longos do relógio do servidor, não outra fórmula.
 
 ## ✅ Selvagens no mapa
 - **Grupo comum:** a batalha é instanciada. O grupo **segue andando** (estado 1/4, nunca 11) durante e depois da batalha, e o mesmo serial é enfrentado várias vezes (`b1268476`, 6 vezes). Os inimigos voltam com HP cheio. O emulador cria cópias novas dos membros a cada batalha.

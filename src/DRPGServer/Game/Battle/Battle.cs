@@ -53,8 +53,12 @@ public sealed class Combatant(Digimon digimon, BattleSide side, Player? owner, W
 /// </summary>
 public sealed class Battle
 {
-    /// <summary>✅ Passo das barras: mediana de 0,16 s entre 0x6B do mesmo digimon (2927 de 4300 intervalos).</summary>
-    public static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(165);
+    /// <summary>✅ Passo das barras: 200 ms (6 passos visuais de ~33,3 ms do cliente a 60 FPS).</summary>
+    public static readonly TimeSpan TickInterval = TimeSpan.FromMilliseconds(200);
+    /// <summary>✅ Atraso após S2C 0x69 na abertura da batalha enquanto a animação de entrada bloqueia a barra no cliente (mediana 536 ms em 76 batalhas).</summary>
+    public static readonly TimeSpan OpeningDelay = TimeSpan.FromMilliseconds(540);
+    /// <summary>✅ Atraso após S2C 0x69 na retomada pós-animação antes da barra voltar a subir (mediana 196 ms em 272 turnos).</summary>
+    public static readonly TimeSpan ResumeDelay = TimeSpan.FromMilliseconds(200);
     public const int MaxPerSide = 5;
 
     private enum Phase { Opening, Running, Animating, Over }
@@ -112,20 +116,23 @@ public sealed class Battle
     /// <summary>0x69: o cliente terminou de carregar (abertura) ou de animar (depois de cada ação).</summary>
     public void ClientReady(Player player)
     {
+        TimeSpan delay;
         switch (_phase)
         {
             case Phase.Opening:
                 player.Zone?.Broadcast(new RefreshCharacterInfoPacket(player.Character, TamerState.InBattle));
+                delay = OpeningDelay;
                 break;
             case Phase.Animating:
                 ClearDeadChoices();
+                delay = ResumeDelay;
                 break;
             default:
                 return;
         }
         player.Send(new BattleBeginPacket());
         _phase = Phase.Running;
-        _timer = TimeSpan.Zero;
+        _timer = -delay;
     }
 
     internal void Update(TimeSpan dt)
@@ -141,9 +148,11 @@ public sealed class Battle
     {
         var alive = All.Where(c => !c.Digimon.IsKnockedOut).ToList();
         foreach (var c in alive)
+        {
+            if (c.GaugeFull) continue;
             c.Gauge = Math.Min(BattleFormulas.MaxGauge, c.Gauge + BattleFormulas.GaugeGain(c.Digimon, c.IsWild));
-        foreach (var c in alive)
             Broadcast(new ActionCooldownPacket(c.Digimon.Serial, c.Gauge));
+        }
 
         // ✅ quem tem a barra cheia e uma ação age; o selvagem age sozinho, o jogador espera a escolha
         if (alive.FirstOrDefault(c => c.GaugeFull && (c.IsWild || c.Choice != BattleIcon.None)) is { } actor)

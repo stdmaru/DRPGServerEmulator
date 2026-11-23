@@ -7,7 +7,7 @@ namespace DRPGServer.Data.GameData;
 /// <paramref name="Growth"/>: atributos ganhos por nível (✅ in-training e rookie nas capturas); null se a dex não tem a espécie.
 /// </summary>
 public sealed record DigimonSpecies(
-    ushort Id, string Name, byte Stage, byte Attribute, Game.Stats.Attributes? Growth, ushort Skill1, ushort Skill2);
+    ushort Id, string Name, byte Stage, byte Attribute, Game.Stats.Attributes? Growth, ushort Skill1, ushort Skill2, byte Element = 0);
 
 /// <summary>Item de <c>item_info_us</c> com as colunas que o registro de 108 bytes repete (ver <see cref="ClientTables.Items"/>).</summary>
 public sealed record ItemInfo(uint Id, string Name)

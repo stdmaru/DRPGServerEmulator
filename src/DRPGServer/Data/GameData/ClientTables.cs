@@ -47,7 +47,7 @@ public static class ClientTables
             // ✅ a dex usa o mesmo id da espécie quase sempre; se o nome não bate, procura pelo nome
             var row = byId is not null && byId[1] == name ? byId : dexByName.GetValueOrDefault(name) ?? byId;
             species.TryAdd(id, new DigimonSpecies(id, name, Byte(f, 2), Byte(f, 3), row is null ? null : Growth(row),
-                UShort(f, 5), UShort(f, 9)));
+                UShort(f, 5), UShort(f, 9), Byte(f, 22)));
         }
         return species.ToFrozenDictionary();
     }
