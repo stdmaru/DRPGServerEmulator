@@ -75,14 +75,12 @@ public sealed class DepositoryListPacket(ushort page, Character character) : Ser
         w.WriteU8(slotsOnPage);
         w.WriteZeros(3);
 
-        var stored = character.Depository;
-        int pageStart = (currentPage - 1) * Character.DepositoryPageSize;
+        var pageDigimons = character.DepositoryPage(currentPage);
         for (int i = 0; i < Character.DepositoryPageSize; i++)
         {
-            int index = pageStart + i;
-            if (index < stored.Count)
+            if (i < pageDigimons.Count)
             {
-                var digimon = stored[index];
+                var digimon = pageDigimons[i];
                 var baseSpecies = digimon.BaseForm.Species;
                 w.WriteU32(digimon.Uid);
                 w.WriteU32(baseSpecies.Id);

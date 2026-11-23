@@ -83,10 +83,9 @@ public sealed record CharacterSnapshot(
             forms.AddRange(d.Forms.Select(f => new FormRow(d.Uid, f.Species.Id, f.Allocated.Str, f.Allocated.Agi,
                 f.Allocated.Con, f.Allocated.Int, (byte)f.SkillLevels[0], (byte)f.SkillLevels[1])));
         }
-        for (int slot = 0; slot < c.Depository.Count; slot++)
+        for (int slot = 0; slot < Character.MaxDepositorySlots; slot++)
         {
-            var d = c.Depository[slot];
-            if (d.Uid == 0) continue;
+            if (c.DepositoryGrid[slot] is not { Uid: > 0 } d) continue;
             digimons.Add(new DigimonSnapshot(d.Uid, (byte)slot, false, true, d.BaseForm.Species.Id, d.Name, d.Level, d.Exp,
                 d.UnlockedStage, d.PointsOf(d.BaseForm), d.SkillPoints, d.TotalWins, d.TotalBattles, d.FreeRename));
             forms.AddRange(d.Forms.Select(f => new FormRow(d.Uid, f.Species.Id, f.Allocated.Str, f.Allocated.Agi,

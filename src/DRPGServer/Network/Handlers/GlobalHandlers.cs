@@ -62,7 +62,6 @@ public sealed class EncyclopediaDataHandler(AccountRegistry accounts, GameWorld 
 
     private static ushort[] CollectDepositorySpecies(Character character)
     {
-        if (character.Depository.Count == 0) return [];
         var species = new HashSet<ushort>();
         foreach (var digimon in character.Depository)
         {

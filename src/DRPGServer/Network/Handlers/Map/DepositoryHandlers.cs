@@ -38,7 +38,7 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
             }
             case DepositoryAction.Deposit:
             {
-                var result = character.Deposit(partyDigimonUid, chargeFee);
+                var result = character.Deposit(partyDigimonUid, clampedPage, chargeFee);
                 if (result == DepositoryResult.DepositOk)
                     player.Send(new DepositoryListPacket(clampedPage, character));
                 player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, 0, character.Bits, result));

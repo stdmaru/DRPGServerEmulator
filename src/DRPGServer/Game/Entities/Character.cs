@@ -29,7 +29,7 @@ public sealed class Character
     public const int MaxDepositorySlots = DepositoryPageSize * MaxDepositoryPages;
 
     private readonly Digimon?[] _party = new Digimon?[PartySize];
-    private readonly List<Digimon> _depository = [];
+    private readonly Digimon?[] _depository = new Digimon?[MaxDepositorySlots];
     private readonly HashSet<ushort> _flags = [];
 
     public Character(Digimon leader, Inventory inventory)
@@ -60,8 +60,9 @@ public sealed class Character
     public IReadOnlyList<Digimon?> Party => _party;
     public IEnumerable<Digimon> Digimons => _party.OfType<Digimon>();
 
-    /// <summary>✅ Digimons guardados no Digimon Depository (0..10) e quantidade de slots liberados.</summary>
-    public IReadOnlyList<Digimon> Depository => _depository;
+    /// <summary>✅ Digimons guardados no Digimon Depository (até 210 slots em 21 páginas) e slots liberados.</summary>
+    public IReadOnlyList<Digimon?> DepositoryGrid => _depository;
+    public IEnumerable<Digimon> Depository => _depository.OfType<Digimon>();
     public byte DepositorySlots { get; set; }
 
     /// <summary>Passos feitos com NPCs (tutorial), persistidos. Ver <c>Game/World/NpcScripts.cs</c>.</summary>
@@ -81,16 +82,36 @@ public sealed class Character
 
     public Digimon? FindDigimon(uint uid) => uid == 0 ? null : Digimons.FirstOrDefault(d => d.Uid == uid);
     public Digimon? FindDigimon(Serial serial) => Digimons.FirstOrDefault(d => d.Serial == serial);
-    public Digimon? FindInDepository(uint uid) => uid == 0 ? null : _depository.FirstOrDefault(d => d.Uid == uid);
+    public Digimon? FindInDepository(uint uid) => uid == 0 ? null : Depository.FirstOrDefault(d => d.Uid == uid);
     public int SlotOf(Digimon digimon) => Array.IndexOf(_party, digimon);
 
-    /// <summary>Adiciona um digimon direto ao Depository (carga do banco).</summary>
-    public bool AddToDepository(Digimon digimon)
+    /// <summary>Adiciona um digimon direto ao Depository na posição salva (carga do banco).</summary>
+    public bool AddToDepository(Digimon digimon, int slot = -1)
     {
-        if (_depository.Count >= MaxDepositorySlots || _party.Contains(digimon) || _depository.Contains(digimon))
-            return false;
-        _depository.Add(digimon);
+        if (_party.Contains(digimon) || _depository.Contains(digimon)) return false;
+        if (slot is >= 0 and < MaxDepositorySlots && _depository[slot] is null)
+        {
+            _depository[slot] = digimon;
+            return true;
+        }
+        int freeSlot = Array.IndexOf(_depository, null);
+        if (freeSlot < 0) return false;
+        _depository[freeSlot] = digimon;
         return true;
+    }
+
+    /// <summary>Digimons guardados na página <paramref name="page"/> (1-based).</summary>
+    public IReadOnlyList<Digimon> DepositoryPage(ushort page)
+    {
+        int start = (Math.Max((int)page, 1) - 1) * DepositoryPageSize;
+        int end = Math.Min(start + DepositoryPageSize, MaxDepositorySlots);
+        var list = new List<Digimon>(DepositoryPageSize);
+        for (int i = start; i < end; i++)
+        {
+            if (_depository[i] is { } digimon)
+                list.Add(digimon);
+        }
+        return list;
     }
 
     /// <summary>Libera +1 slot no Depository (até <see cref="MaxDepositorySlots"/>).</summary>
@@ -126,41 +147,57 @@ public sealed class Character
         _ => 70_000,
     };
 
-    /// <summary>Move um digimon do time (não-líder) para o Depository.</summary>
-    public DepositoryResult Deposit(uint partyDigimonUid, bool chargeFee)
+    /// <summary>Move um digimon do time (nunca o líder na posição 0) para a página escolhida do Depository.</summary>
+    public DepositoryResult Deposit(uint partyDigimonUid, ushort page, bool chargeFee)
     {
         if (FindDigimon(partyDigimonUid) is not { } digimon)
             return DepositoryResult.DepositFailed;
-        int slot = SlotOf(digimon);
-        if (slot <= 0 || _depository.Count >= DepositorySlots)
+        int partySlot = SlotOf(digimon);
+        if (partySlot <= 0)
             return DepositoryResult.DepositFailed;
+
+        int pageStart = (Math.Max((int)page, 1) - 1) * DepositoryPageSize;
+        int slotsOnPage = DepositorySlotsOnPage(page);
+        int freeDepSlot = -1;
+        for (int i = pageStart; i < pageStart + slotsOnPage; i++)
+        {
+            if (_depository[i] is null)
+            {
+                freeDepSlot = i;
+                break;
+            }
+        }
+        if (freeDepSlot < 0)
+            return DepositoryResult.DepositFailed;
+
         double fee = chargeFee ? DepositoryFeeForLevel(digimon.Level) : 0;
         if (!TrySpendBits(fee))
             return DepositoryResult.DepositNotEnoughBits;
 
-        _party[slot] = null;
-        _depository.Add(digimon);
+        _party[partySlot] = null;
+        _depository[freeDepSlot] = digimon;
         return DepositoryResult.DepositOk;
     }
 
-    /// <summary>Retira um digimon do Depository para a primeira posição livre do time.</summary>
+    /// <summary>Retira um digimon do Depository para a primeira posição livre do time (recusa se o grupo estiver cheio).</summary>
     public (DepositoryResult Result, Digimon? Digimon) Withdraw(uint depositoryDigimonUid, bool chargeFee)
     {
         if (FindInDepository(depositoryDigimonUid) is not { } digimon)
             return (DepositoryResult.WithdrawFailed, null);
-        int freeSlot = Array.IndexOf(_party, null);
-        if (freeSlot < 0)
+        int depSlot = Array.IndexOf(_depository, digimon);
+        int freePartySlot = Array.IndexOf(_party, null);
+        if (depSlot < 0 || freePartySlot < 0)
             return (DepositoryResult.WithdrawFailed, null);
         double fee = chargeFee ? DepositoryFeeForLevel(digimon.Level) : 0;
         if (!TrySpendBits(fee))
             return (DepositoryResult.WithdrawNotEnoughBits, null);
 
-        _depository.Remove(digimon);
-        _party[freeSlot] = digimon;
+        _depository[depSlot] = null;
+        _party[freePartySlot] = digimon;
         return (DepositoryResult.WithdrawOk, digimon);
     }
 
-    /// <summary>Troca um digimon do time com um digimon do Depository (✅ soma a taxa dos dois digimons).</summary>
+    /// <summary>Troca um digimon do time (nunca o líder na posição 0) com um digimon do Depository.</summary>
     public (DepositoryResult Result, Digimon? Withdrawn) Swap(uint partyDigimonUid, uint depositoryDigimonUid, bool chargeFee)
     {
         if (FindDigimon(partyDigimonUid) is not { } partyDigimon)
@@ -168,8 +205,8 @@ public sealed class Character
         if (FindInDepository(depositoryDigimonUid) is not { } storedDigimon)
             return (DepositoryResult.SwapFailed, null);
         int partySlot = SlotOf(partyDigimon);
-        int depIndex = _depository.IndexOf(storedDigimon);
-        if (partySlot < 0 || depIndex < 0)
+        int depSlot = Array.IndexOf(_depository, storedDigimon);
+        if (partySlot <= 0 || depSlot < 0)
             return (DepositoryResult.SwapFailed, null);
         double fee = chargeFee
             ? DepositoryFeeForLevel(partyDigimon.Level) + DepositoryFeeForLevel(storedDigimon.Level)
@@ -178,7 +215,7 @@ public sealed class Character
             return (DepositoryResult.SwapNotEnoughBits, null);
 
         _party[partySlot] = storedDigimon;
-        _depository[depIndex] = partyDigimon;
+        _depository[depSlot] = partyDigimon;
         return (DepositoryResult.SwapOk, storedDigimon);
     }
 

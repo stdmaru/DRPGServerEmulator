@@ -51,7 +51,7 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
         {
             if (d == leader) continue;
             if (r.InDepository)
-                character.AddToDepository(d!);
+                character.AddToDepository(d!, r.Slot);
             else if (!character.Place(r.Slot, d!))
                 character.Place(character.Party.ToList().IndexOf(null), d!);   // posição repetida: primeira livre
         }
