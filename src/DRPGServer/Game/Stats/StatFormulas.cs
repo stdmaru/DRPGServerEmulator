@@ -27,16 +27,27 @@ public static class StatFormulas
     /// <summary>✅ Nível em que o digimon chega a cada estágio: rookie no 11, champion 21, ultimate 31, mega 41.</summary>
     public static int StageLevel(byte stage) => stage switch
     {
-        <= InTraining => 1,
+        InTraining => 1,
         Rookie => 11,
-        _ => 21 + 10 * (stage - Champion),
+        Champion => 21,
+        Ultimate => 31,
+        Mega => 41,
+        _ => 1,
     };
 
     /// <summary>
     /// Último nível em que a forma ainda cresce: ✅ in-training 10, rookie 20 (Kotemon L160 = base de L20, sem pontos;
     /// V-mon igual no 20 e no 21), ❓ champion 30, ultimate 40; mega até o máximo.
     /// </summary>
-    public static int GrowthCap(byte stage) => stage >= Mega ? int.MaxValue : Math.Max(InTraining, (int)stage) * 10;
+    public static int GrowthCap(byte stage) => stage switch
+    {
+        InTraining => 10,
+        Rookie => 20,
+        Champion => 30,
+        Ultimate => 40,
+        >= Mega => int.MaxValue,
+        _ => 10,
+    };
 
     /// <summary>
     /// Atributos base da forma: 10 + 20 por estágio acima de in-training + status-base × (nível limitado − 1).
@@ -58,9 +69,22 @@ public static class StatFormulas
     /// </summary>
     public static int AbilityPointsEarned(byte stage, int level)
     {
-        int start = stage <= Rookie ? 1 : StageLevel(stage);
-        int end = stage >= Mega ? int.MaxValue : stage <= InTraining ? 11 : StageLevel((byte)(stage + 1));
-        return 2 * Math.Max(0, Math.Min(level, end) - start);
+        int startLevel = stage switch
+        {
+            <= Rookie => 1,
+            Champion => 21,
+            Ultimate => 31,
+            _ => 41,
+        };
+        int endLevel = stage switch
+        {
+            <= InTraining => 11,
+            Rookie => 21,
+            Champion => 31,
+            Ultimate => 41,
+            _ => int.MaxValue,
+        };
+        return 2 * Math.Max(0, Math.Min(level, endLevel) - startLevel);
     }
 
     /// <summary>

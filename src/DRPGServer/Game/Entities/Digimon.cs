@@ -105,8 +105,13 @@ public sealed class Digimon
     public ushort PointsOf(DigimonForm form) =>
         (ushort)Math.Max(0, StatFormulas.AbilityPointsEarned(form.Species.Stage, Level) - form.AllocatedTotal);
 
-    public static byte StageUnlockedAt(int level) =>
-        level >= 41 ? StatFormulas.Mega : level >= 31 ? StatFormulas.Ultimate : level >= 21 ? StatFormulas.Champion : (byte)0;
+    public static byte StageUnlockedAt(int level) => level switch
+    {
+        >= 41 => StatFormulas.Mega,
+        >= 31 => StatFormulas.Ultimate,
+        >= 21 => StatFormulas.Champion,
+        _ => 0,
+    };
 
     /// <summary>Forma existente ou nova (sem pontos, skills aprendidas pelo nível).</summary>
     public DigimonForm FormOf(DigimonSpecies species)
