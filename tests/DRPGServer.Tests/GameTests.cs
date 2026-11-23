@@ -470,6 +470,7 @@ public class CombatFormulaTests
     [InlineData(70, 60, 50, 50, 376, 195, 300, 273, 259)]    // rookie L11
     [InlineData(91, 76, 70, 69, 428, 231, 349, 319, 305)]    // V-mon L20
     [InlineData(114, 98, 91, 91, 481, 264, 399, 362, 349)]   // champion L21
+    [InlineData(927, 768, 528, 489, 1366, 630, 975, 928, 819)] // Tactimon L160 (mega oficial, 0 erros)
     public void Combat_stats_match_official_samples(int str, int agi, int con, int @int, int atk, int def, int br, int hp, int vp)
     {
         var s = StatFormulas.Combat(new Attributes(str, agi, con, @int), 1);
