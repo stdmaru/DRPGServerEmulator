@@ -174,8 +174,10 @@ public class TutorialTests
         var drop = zone.Drop(41, 64, 27);
         _session.DrainOutgoing();
         new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, drop.X, drop.Y, 4, 6, drop.Uid, 41)));
-        // ✅ o oficial tira do chão (0x13 zerado) antes do 0x91
-        Assert.Equal([(ushort)0x13, (ushort)0x91], _session.SentOpcodes());
+        // ✅ o oficial tira do chão (0x13 com 108 zeros + x, y) antes do 0x91
+        var pickFrames = _session.DrainOutgoing();
+        Assert.Equal([(ushort)0x13, (ushort)0x91], pickFrames.Select(f => PacketHeader.Read(f).Opcode).ToArray());
+        AssertRemovalPacket(pickFrames[0], drop.X, drop.Y);
         Assert.Null(zone.FindDrop(drop.Uid));
         var bag = _player.Character.Inventory.Main;
         var seed = bag[0]!;
@@ -189,6 +191,48 @@ public class TutorialTests
         new ItemDestroyHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Inventory, ItemPlace.Ground, 3, 5, 0, 0, seed.Uid, 41)));
         Assert.Equal([(ushort)0xBD], _session.SentOpcodes());
         Assert.Empty(bag.Items);
+    }
+
+    [Fact]
+    public void Expired_ground_drops_are_removed_with_coordinates_after_lifetime()
+    {
+        var zone = _zones.Find(79)!;
+        var drop = zone.Drop(41, 64, 27);
+        _session.DrainOutgoing();
+
+        // antes do DropLifetime o item continua no chão e sem spam de 0x13
+        zone.Update(drop.DroppedAt + Zone.DropLifetime - TimeSpan.FromSeconds(1), Zone.DropCleanInterval);
+        Assert.NotNull(zone.FindDrop(drop.Uid));
+        Assert.DoesNotContain((ushort)0x13, _session.SentOpcodes());
+
+        // ao atingir DropLifetime, o item é removido e 0x13 leva 108 zeros + (X, Y)
+        zone.Update(drop.DroppedAt + Zone.DropLifetime, Zone.DropCleanInterval);
+        var frames = _session.DrainOutgoing().Where(f => PacketHeader.Read(f).Opcode == 0x13).ToList();
+        Assert.Single(frames);
+        AssertRemovalPacket(frames[0], drop.X, drop.Y);
+        Assert.Null(zone.FindDrop(drop.Uid));
+    }
+
+    [Fact]
+    public void Simultaneous_drops_do_not_collide_and_entering_player_sees_them()
+    {
+        var zone = _zones.Find(79)!;
+        var drops = Enumerable.Range(0, 5).Select(_ => zone.Drop(41, 64, 27)).ToList();
+        Assert.Equal(drops.Count, drops.Select(d => (d.X, d.Y)).Distinct().Count());
+
+        var otherSession = TestSupport.NewSession();
+        var other = new Player(otherSession, new AuthenticatedAccount(2, "u2", Authority.GameMaster), Entities.Character());
+        zone.Enter(other);
+        Assert.Equal(drops.Count, otherSession.SentOpcodes().Count(o => o == 0x13));
+    }
+
+    private static void AssertRemovalPacket(byte[] frame, short expectedX, short expectedY)
+    {
+        var payload = frame.AsSpan(PacketHeader.Length);
+        Assert.Equal(ItemRecord.Length + 4, payload.Length);
+        Assert.True(payload[..ItemRecord.Length].IndexOfAnyExcept((byte)0) < 0);
+        Assert.Equal(expectedX, BitConverter.ToInt16(payload[ItemRecord.Length..]));
+        Assert.Equal(expectedY, BitConverter.ToInt16(payload[(ItemRecord.Length + 2)..]));
     }
 
     [Fact]

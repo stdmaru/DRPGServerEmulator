@@ -138,19 +138,15 @@ public sealed class InventoryRefreshPacket(Character character) : ServerPacket
     }
 }
 
-/// <summary>0x13 (112 bytes): item no chão (registro + x, y) ou remoção (tudo zero). ✅ sessão 53.</summary>
+/// <summary>0x13 (112 bytes): item no chão (registro + x, y) ou remoção (108 zeros + x, y). ✅ sessões 53, 56 e 61.</summary>
 public sealed class ItemDropPacket(ItemDrop drop, bool removed = false) : ServerPacket
 {
     public override ushort Opcode => (ushort)MapOpcode.ItemDrop;
 
     protected override void Write(PacketWriter w)
     {
-        if (removed)
-        {
-            w.WriteZeros(ItemRecord.Length + 4);
-            return;
-        }
-        ItemRecord.Write(w, drop.Uid, drop.ItemId, drop.Info, 1);
+        if (removed) w.WriteZeros(ItemRecord.Length);
+        else ItemRecord.Write(w, drop.Uid, drop.ItemId, drop.Info, 1);
         w.WriteI16(drop.X);
         w.WriteI16(drop.Y);
     }

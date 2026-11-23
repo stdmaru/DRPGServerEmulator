@@ -9,7 +9,6 @@ namespace DRPGServer.Game.World;
 /// <summary>Um mapa: jogadores, digimons selvagens, itens no chão e portais. Só na thread do mundo.</summary>
 public sealed class Zone
 {
-    private static readonly TimeSpan DropResendInterval = TimeSpan.FromMilliseconds(500);
     // ✅ v322: o oficial manda o 0x11 de cada selvagem a cada ~344 ms (mediana de 72 mil pacotes), parado ou não
     public static readonly TimeSpan WildTickInterval = TimeSpan.FromMilliseconds(344);
     // ✅ derrotado (8) por ~10,4 s antes de sair do mapa (12); ❓ só 2 amostras
@@ -18,8 +17,9 @@ public sealed class Zone
     public static readonly TimeSpan RecoveryInterval = TimeSpan.FromMilliseconds(5200);
     /// <summary>✅ Primeira recuperação depois da batalha: mediana 0,2 s depois do 0x6D (41 batalhas, 0,04–0,34 s).</summary>
     public static readonly TimeSpan RecoveryAfterBattle = TimeSpan.FromMilliseconds(200);
-    private static readonly TimeSpan DropCleanInterval = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan DropLifetime = TimeSpan.FromSeconds(60);
+    /// <summary>✅ Itens no chão expiram em ~60 s nas capturas v322 (sessões 56 e 61: 60,3–60,5 s).</summary>
+    public static readonly TimeSpan DropCleanInterval = TimeSpan.FromSeconds(1);
+    public static readonly TimeSpan DropLifetime = TimeSpan.FromSeconds(60);
     /// <summary>✅ Chance por tick de um selvagem parado começar a andar: 3276 de 65 462 ticks parados (5 %).</summary>
     public const double WildMoveChance = 0.05;
     private const int HomeAttempts = 32;
@@ -29,7 +29,7 @@ public sealed class Zone
     private readonly List<Player> _players = [];
     private readonly Dictionary<Serial, WildDigimon> _wild = [];
     private readonly Dictionary<uint, ItemDrop> _drops = [];
-    private TimeSpan _dropTimer, _wildTimer, _recoveryTimer, _cleanTimer;
+    private TimeSpan _wildTimer, _recoveryTimer, _cleanTimer;
     private uint _nextDropUid = 10_000;
 
     public Zone(byte mapId, GameData data, GameWorld world)
@@ -56,10 +56,6 @@ public sealed class Zone
 
     public void Update(TimeSpan now, TimeSpan dt)
     {
-        if (Every(ref _dropTimer, dt, DropResendInterval))
-            foreach (var drop in _drops.Values)
-                Broadcast(new ItemDropPacket(drop));
-
         if (Every(ref _wildTimer, dt, WildTickInterval))
             UpdateWild(now);
 
@@ -91,6 +87,8 @@ public sealed class Zone
         player.NextRecoveryAt = _world.Now + RecoveryInterval;
         foreach (var wild in _wild.Values)
             player.Send(new WildDigimonUpdatePacket(wild));
+        foreach (var drop in _drops.Values)
+            player.Send(new ItemDropPacket(drop));
     }
 
     public void Leave(Player player)
@@ -235,12 +233,36 @@ public sealed class Zone
 
     public ItemDrop Drop(uint itemId, short x, short y, uint? ownerCharacterUid = null)
     {
-        var random = _world.Random;
-        var drop = new ItemDrop(_nextDropUid++, itemId, (short)(x + random.Next(-1, 2)), (short)(y + random.Next(-1, 2)),
+        var (dx, dy) = PickDropCell(x, y);
+        var drop = new ItemDrop(_nextDropUid++, itemId, dx, dy,
             _world.Now, ownerCharacterUid) { Info = _data.FindItem(itemId) };
         _drops.Add(drop.Uid, drop);
         Broadcast(new ItemDropPacket(drop));
         return drop;
+    }
+
+    /// <summary>
+    /// Escolhe uma célula livre ao redor de (x, y) para evitar colisão de coordenadas — o cliente remove drops pelo
+    /// par (X, Y) no 0x13, então dois itens na mesma célula se sobrescreveriam.
+    /// </summary>
+    private (short X, short Y) PickDropCell(short x, short y)
+    {
+        var random = _world.Random;
+        for (int attempt = 0; attempt < 9; attempt++)
+        {
+            short cx = (short)(x + random.Next(-1, 2));
+            short cy = (short)(y + random.Next(-1, 2));
+            if (!_drops.Values.Any(d => d.X == cx && d.Y == cy))
+                return (cx, cy);
+        }
+        for (int dy = -2; dy <= 2; dy++)
+            for (int dx = -2; dx <= 2; dx++)
+            {
+                short cx = (short)(x + dx), cy = (short)(y + dy);
+                if (!_drops.Values.Any(d => d.X == cx && d.Y == cy))
+                    return (cx, cy);
+            }
+        return (x, y);
     }
 
     public ItemDrop? FindDrop(uint uid) => _drops.GetValueOrDefault(uid);
