@@ -65,11 +65,14 @@ public enum MapOpcode : ushort
     BattleEvolve = 0x81,           // S2C ✅ evolução escolhida no menu, quando a barra enche
     DigimonFormInfo = 0x82,        // ✅ janela de evolução: u32 estágio (0 = atual), u32 0, bloco
     BattleDigimonStatus = 0x84,    // S2C ✅ bloco de status do digimon no fim da batalha
+    DepositoryAction = 0x89,       // ✅ Digimon Depository: abrir (1), depositar (2), retirar (3), trocar (4) (736 B)
+    DepositoryList = 0x8A,         // S2C ✅ Digimon Depository: slots disponíveis + 10 × 80 B (808 B)
     Unknown73 = 0x73,
     Unknown74 = 0x74,
     Unknown7E = 0x7E,
     Unknown7F = 0x7F,
     ItemDropGet = 0x91,            // ✅ mover item: do chão para o inventário ou dentro do inventário
+    DepositoryExpand = 0x94,       // ✅ Digimon Depository: expansão de slot por item 901/929 (S2C 1 B)
     EvolutionList = 0x9E,          // ✅ C2S uid; S2C u8 1, u8 0, u16 × 3 formas liberadas
     TeleportCharacter = 0xB0,
     TamerExp = 0xB1,               // S2C ✅ nível e EXP do tamer no fim da batalha

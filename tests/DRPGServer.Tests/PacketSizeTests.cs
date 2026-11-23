@@ -63,6 +63,9 @@ public class PacketSizeTests
             (new DigimonFormInfoPacket(0, digimon, digimon.Current), 720),   // ✅ v322 (0x82)
             (new DigimonEvolvedPacket(digimon), 696),                  // ✅ v322 (0x80)
             (new BattleEvolvePacket(digimon), 720),                    // ✅ v322 (0x81)
+            (new DepositoryActionPacket(1, DepositoryAction.Open, 0, 0, 0, DepositoryResult.OpenOk), 736), // ✅ v322 (0x89)
+            (new DepositoryListPacket(1, character), 808),             // ✅ v322 (0x8A)
+            (new DepositoryExpandPacket(DepositoryExpandResult.Ok), 1),// ✅ v322 (0x94)
             (new BattleSummonPacket(1, digimon), 720),                 // ✅ v322 (0x64)
             (new EvolutionListPacket([]), 8),                          // ✅ v322 (0x9E)
             (new SetLeaderPacket(1, 7), 12),                           // ✅ v322 (0xF1)
@@ -90,8 +93,8 @@ public class PacketSizeTests
             (new Unknown152Packet(), 7048),
             (new UnknownE1Packet(), 1342),
             (new Unknown65Packet(), 0),
-            (new EncyclopediaDataPacket(new byte[16], new byte[16]), 1104),
-            (new EncyclopediaCollectionPacket(), 64),
+            (new EncyclopediaDataPacket(new byte[16], 0, []), 1104),
+            (new EncyclopediaCollectionPacket(new byte[16], []), 64),
         };
         var wrong = packets
             .Select(p => (Name: p.Packet.ToString(), p.Size, Actual: p.Packet.EncodePayload().Length))

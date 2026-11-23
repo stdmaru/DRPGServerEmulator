@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Packets.Login;
@@ -63,7 +64,14 @@ public sealed class MapLifecycle(GameWorld world, PlayerSystem players, AccountR
 public sealed class GlobalLifecycle(AccountRegistry accounts) : ISessionLifecycle
 {
     public ServerRole Role => ServerRole.Global;
-    public void OnConnected(Session session) => session.Send(new HelloPacket((ushort)GlobalOpcode.Hello));
+
+    public void OnConnected(Session session)
+    {
+        var seed = RandomNumberGenerator.GetBytes(GlobalSessionCipher.BlockSize);
+        session.GlobalAesKey = GlobalSessionCipher.DeriveKey(seed);
+        session.Send(new HelloPacket((ushort)GlobalOpcode.Hello, seed));
+    }
+
     public void OnDisconnected(Session session) => accounts.Release(session);
 }
 

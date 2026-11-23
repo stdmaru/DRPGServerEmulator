@@ -1,3 +1,6 @@
+using System.Buffers.Binary;
+using DRPGServer.Game.Entities;
+using DRPGServer.Game.Stats;
 using DRPGServer.Network.Protocol;
 
 namespace DRPGServer.Network.Packets.Login
@@ -37,32 +40,96 @@ namespace DRPGServer.Network.Packets.Global
         protected override void Write(PacketWriter w) { }
     }
 
-    /// <summary>0x7B: dados da enciclopédia: a primeira chave e 68 vezes a segunda (✅ 1104 bytes nas capturas).</summary>
-    public sealed class EncyclopediaDataPacket(byte[] key1, byte[] key2) : ServerPacket
+    /// <summary>
+    /// ✅ 0x7B (1104 bytes = 69 blocos AES-128-ECB): coleção permanente da enciclopédia.
+    /// Layout decifrado: <c>u32 digimonUid</c> + <c>u8 owned[1100]</c> (1 = espécie possuída).
+    /// Ver <c>docs/mecanicas/enciclopedia.md</c>.
+    /// </summary>
+    public sealed class EncyclopediaDataPacket(byte[] sessionKey, uint digimonUid, IEnumerable<ushort> ownedSpecies) : ServerPacket
     {
+        public const int MaxSpecies = 1100;
+        public const int PlaintextLength = 4 + MaxSpecies;
+
         public override ushort Opcode => (ushort)GlobalOpcode.EncyclopediaData;
+
+        public static byte[] BuildPlaintext(uint digimonUid, IEnumerable<ushort> ownedSpecies)
+        {
+            var plaintext = new byte[PlaintextLength];
+            BinaryPrimitives.WriteUInt32LittleEndian(plaintext, digimonUid);
+            foreach (ushort speciesId in ownedSpecies)
+            {
+                if (speciesId < MaxSpecies)
+                    plaintext[4 + speciesId] = 1;
+            }
+            return plaintext;
+        }
 
         protected override void Write(PacketWriter w)
         {
-            w.WriteBytes(key1);
-            for (int i = 0; i < 68; i++)
-                w.WriteBytes(key2);
+            var plaintext = BuildPlaintext(digimonUid, ownedSpecies);
+            w.WriteBytes(GlobalSessionCipher.EncryptBlocks(sessionKey, plaintext));
         }
     }
 
-    /// <summary>0x7C: coleção da enciclopédia (chaves capturadas).</summary>
-    public sealed class EncyclopediaCollectionPacket : ServerPacket
+    /// <summary>Uma posição do time para o pacote 0x7C da enciclopédia.</summary>
+    public readonly record struct EncyclopediaPartyEntry(
+        uint Uid, short BaseSpecies, short ChampionSpecies, short UltimateSpecies, short MegaSpecies)
     {
+        public static EncyclopediaPartyEntry From(Digimon? digimon)
+        {
+            if (digimon is null) return default;
+            return new EncyclopediaPartyEntry(
+                digimon.Uid,
+                (short)digimon.BaseForm.Species.Id,
+                UnlockedSpecies(digimon, StatFormulas.Champion),
+                UnlockedSpecies(digimon, StatFormulas.Ultimate),
+                UnlockedSpecies(digimon, StatFormulas.Mega));
+        }
+
+        private static short UnlockedSpecies(Digimon digimon, byte stage)
+        {
+            foreach (var form in digimon.Forms)
+            {
+                if (form.Species.Stage == stage)
+                    return (short)form.Species.Id;
+            }
+            if (digimon.UnlockedStage >= stage && digimon.LineSpecies(stage) is { } species)
+                return (short)species.Id;
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// ✅ 0x7C (64 bytes = 4 blocos AES-128-ECB): time atual e suas formas desbloqueadas.
+    /// Layout decifrado (60 bytes + 4 zeros): <c>u32 uid[5]</c>, <c>i16 base[5]</c>, <c>i16 champion[5]</c>,
+    /// <c>i16 ultimate[5]</c>, <c>i16 mega[5]</c>. Ver <c>docs/mecanicas/enciclopedia.md</c>.
+    /// </summary>
+    public sealed class EncyclopediaCollectionPacket(byte[] sessionKey, IReadOnlyList<EncyclopediaPartyEntry> party) : ServerPacket
+    {
+        public const int PlaintextLength = 64;
+
         public override ushort Opcode => (ushort)GlobalOpcode.EncyclopediaCollection;
+
+        public static byte[] BuildPlaintext(IReadOnlyList<EncyclopediaPartyEntry> party)
+        {
+            var plaintext = new byte[PlaintextLength];
+            int count = Math.Min(party.Count, Character.PartySize);
+            for (int i = 0; i < count; i++)
+            {
+                var entry = party[i];
+                BinaryPrimitives.WriteUInt32LittleEndian(plaintext.AsSpan(i * 4, 4), entry.Uid);
+                BinaryPrimitives.WriteInt16LittleEndian(plaintext.AsSpan(20 + i * 2, 2), entry.BaseSpecies);
+                BinaryPrimitives.WriteInt16LittleEndian(plaintext.AsSpan(30 + i * 2, 2), entry.ChampionSpecies);
+                BinaryPrimitives.WriteInt16LittleEndian(plaintext.AsSpan(40 + i * 2, 2), entry.UltimateSpecies);
+                BinaryPrimitives.WriteInt16LittleEndian(plaintext.AsSpan(50 + i * 2, 2), entry.MegaSpecies);
+            }
+            return plaintext;
+        }
 
         protected override void Write(PacketWriter w)
         {
-            ReadOnlySpan<byte> key1 = [0xA5, 0xEF, 0xC3, 0x17, 0x40, 0x2A, 0xD9, 0x90, 0xEF, 0x76, 0xB2, 0x13, 0xCF, 0x81, 0xA8, 0x12];
-            ReadOnlySpan<byte> key2 = [0x33, 0x09, 0x00, 0x87, 0xC7, 0xBF, 0xBA, 0xC2, 0xFA, 0x66, 0x7C, 0x07, 0x31, 0xD9, 0xFE, 0x1B];
-            w.WriteBytes(key1);
-            w.WriteBytes([0x8F, 0x11, 0x4E, 0x2F, 0xCB, 0x44, 0xE0, 0x66, 0x89, 0x74, 0x1F, 0x78, 0xA0, 0x4E, 0xF1, 0xC9]);
-            w.WriteBytes(key2);
-            w.WriteBytes(key2);
+            var plaintext = BuildPlaintext(party);
+            w.WriteBytes(GlobalSessionCipher.EncryptBlocks(sessionKey, plaintext));
         }
     }
 }
