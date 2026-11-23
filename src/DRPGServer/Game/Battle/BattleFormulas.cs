@@ -91,23 +91,30 @@ public static class BattleFormulas
     public static double BaseDamage(int atk, int def) => (double)atk * atk / (10.0 * Math.Max(1, def));
 
     /// <summary>
-    /// Quanto a barra enche por passo de <see cref="Battle.TickInterval"/>.
-    /// Jogador: ✅ cresce com o nível (o BR pesa pouco), L1 42, L2 77, L3 89, L4 95 … L20 124, L160 132.
-    /// Ajuste ⌊60 + 17,5·ln L + 2·ln BR⌋ de L4 em diante (19 de 23 amostras a ±1), teto 132.
-    /// Selvagem: ✅ bem mais lento e pelo BR, ⌊15,98·BR^0,2 − 30,29⌋ (13 de 16 exatas, 2 a ±1; ❓ o Yuramon L2 com BR 65 enche 8, não 6), BR 85 → 8, 165 → 14, 1040 → 33.
+    /// Passo da barra visual do jogador no cliente (`DigimonRPG.bin @ 0x0085E0B8`): a cada ~33,3 ms (60 FPS,
+    /// pois o cliente checa `elapsed / 30` e descarta o resto de `timeGetTime()`), soma este inteiro até 500.
     /// </summary>
-    public static int GaugeGain(Digimon digimon, bool wild) => GaugeGain(digimon.Level, digimon.Stats.Br, wild);
+    public static int PlayerClientStep(int level, int agi) =>
+        Math.Max(1, Math.Min(50, (int)((4.0 - 2.5 / Math.Max(1, level)) * 4.0 + Math.Max(0, agi) / 25.0)));
 
-    public static int GaugeGain(int level, int br, bool wild)
+    /// <summary>
+    /// Quanto a barra enche por passo de <see cref="Battle.TickInterval"/> (200 ms).
+    /// Jogador: ✅ sincronizado com os 6 passos de ~33,3 ms que o cliente executa em 200 ms (`6 × PlayerClientStep`).
+    /// Selvagem: ✅ pelo BR, ⌊15,98·BR^0,2 − 30,29⌋ (13 de 16 exatas, 2 a ±1; ❓ o Yuramon L2 com BR 65 enche 8, não 6), BR 85 → 8, 165 → 14, 1040 → 33.
+    /// </summary>
+    public static int GaugeGain(Digimon digimon, bool wild) =>
+        wild ? WildGaugeGain(digimon.Stats.Br) : 6 * PlayerClientStep(digimon.Level, digimon.Attributes.Agi);
+
+    /// <summary>Valor do campo `off296` no bloco de status (fórmula contínua × 200/30, 0 erros nas 26 amostras L1–L160).</summary>
+    public static int StatusGaugeSpeed(Digimon digimon, bool wild) =>
+        wild ? WildGaugeGain(digimon.Stats.Br) : PlayerGaugeGain(digimon.Level, digimon.Attributes.Agi);
+
+    public static int PlayerGaugeGain(int level, int agi)
     {
-        br = Math.Max(1, br);
-        if (wild) return Math.Max(1, (int)(15.98 * Math.Pow(br, 0.2) - 30.29));
-        return level switch
-        {
-            <= 1 => 42,
-            2 => 77,
-            3 => 89,
-            _ => Math.Min(132, (int)(60 + 17.5 * Math.Log(level) + 2 * Math.Log(br))),
-        };
+        double per30ms = Math.Min(50.0, (4.0 - 2.5 / Math.Max(1, level)) * 4.0 + Math.Max(0, agi) / 25.0);
+        return Math.Max(1, (int)(per30ms * (200.0 / 30.0)));
     }
+
+    public static int WildGaugeGain(int br) =>
+        Math.Max(1, (int)(15.98 * Math.Pow(Math.Max(1, br), 0.2) - 30.29));
 }

@@ -107,7 +107,7 @@ public static class DigimonStatusBlock
             w.WriteI16((short)(id == 0 ? 0 : d.Current.SkillLevels[slot])); // 282 / 290
         }
         w.WriteU32(0);                          // 292
-        w.WriteU32((uint)Game.Battle.BattleFormulas.GaugeGain(d, d.IsWild)); // 296 ✅ barra por passo
+        w.WriteU32((uint)Game.Battle.BattleFormulas.StatusGaugeSpeed(d, d.IsWild)); // 296 ✅ barra por passo (off296)
         w.WriteU8(d.IsWild ? (byte)2 : (byte)0); // 300 ✅ 0 no digimon do jogador, 2 no selvagem
         w.WriteZeros(11);
         w.WriteU8(8);                           // 312 ? (7 ou 8 nas capturas)

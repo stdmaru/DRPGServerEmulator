@@ -118,6 +118,8 @@ public class BattleTests
             _battles.Update(TimeSpan.Zero, Battle.TickInterval);
     }
 
+    private void Advance(TimeSpan duration) => _battles.Update(TimeSpan.Zero, duration);
+
     /// <summary>Abre a batalha até as barras começarem a encher.</summary>
     private Battle Open()
     {
@@ -148,7 +150,11 @@ public class BattleTests
         var battle = Open();
         var me = battle.TeamA[0];
         var enemy = battle.TeamB[0];
+        // ✅ na abertura o servidor aguarda OpeningDelay antes do primeiro passo
         Tick();
+        Assert.DoesNotContain((ushort)0x6B, _session.SentOpcodes());
+        Assert.Equal(0, me.Gauge);
+        Advance(Battle.OpeningDelay);
         Assert.Equal(1 + battle.TeamB.Count, _session.SentOpcodes().Count(o => o == 0x6B));
         Assert.Equal(BattleFormulas.GaugeGain(me.Digimon, wild: false), me.Gauge);
 
@@ -175,13 +181,30 @@ public class BattleTests
         Assert.Equal(1, me.Actions);
         Assert.Equal(BattleIcon.None, me.Choice);
 
-        // ✅ barras paradas até o cliente terminar a animação (0x69)
+        // ✅ barras paradas até o cliente terminar a animação (0x69) + ResumeDelay
         Tick(5);
         Assert.DoesNotContain((ushort)0x6B, _session.SentOpcodes());
         battle.ClientReady(_player);
         Assert.Contains((ushort)0x69, _session.SentOpcodes());
         Tick();
+        Assert.DoesNotContain((ushort)0x6B, _session.SentOpcodes());
+        Tick();
         Assert.Contains((ushort)0x6B, _session.SentOpcodes());
+    }
+
+    [Fact]
+    public void Full_gauge_sends_6B_once_and_does_not_spam()
+    {
+        var battle = Open();
+        var me = battle.TeamA[0];
+        foreach (var e in battle.TeamB) e.Gauge = int.MinValue / 2;
+        me.Gauge = BattleFormulas.MaxGauge - 1;
+        Advance(Battle.OpeningDelay + Battle.TickInterval);
+        _session.DrainOutgoing();
+
+        // já está em 500 e sem ação marcada: não deve reenviar 0x6B do jogador (apenas os inimigos)
+        Tick();
+        Assert.Equal(battle.TeamB.Count, _session.SentOpcodes().Count(o => o == 0x6B));
     }
 
     [Fact]
@@ -189,7 +212,7 @@ public class BattleTests
     {
         var battle = Open();
         battle.TeamB[0].Gauge = BattleFormulas.MaxGauge;
-        Tick();
+        Advance(Battle.OpeningDelay + Battle.TickInterval);
         var sent = _session.SentOpcodes();
         Assert.Equal([(ushort)0x68, (ushort)0x67], sent.Where(o => o is 0x68 or 0x67 or 0x35).ToList());
         Assert.False(battle.IsRunning);
@@ -226,7 +249,7 @@ public class BattleTests
         foreach (var c in battle.TeamB) c.Gauge = int.MinValue / 2;
         me.Gauge = BattleFormulas.MaxGauge;
         _session.DrainOutgoing();
-        Tick();
+        Advance(Battle.OpeningDelay + Battle.TickInterval);
         var sent = _session.SentOpcodes();
         Assert.Equal([(ushort)0x35, (ushort)0x65, (ushort)0x6A], sent.Where(o => o is 0x35 or 0x65 or 0x6A).ToList());
         Assert.Equal((ushort)0x6D, sent[^1]);
@@ -274,14 +297,18 @@ public class BattleFormulaTests
     [Fact]
     public void Gauge_gain_matches_captures()
     {
-        // ✅ v322: jogador pelo nível (L1 42, L2 77, L10 BR 201 → 109, L20 BR 349 → 124); selvagem pelo BR
-        Assert.Equal(42, BattleFormulas.GaugeGain(1, 131, wild: false));
-        Assert.Equal(77, BattleFormulas.GaugeGain(2, 139, wild: false));
-        Assert.InRange(BattleFormulas.GaugeGain(10, 201, wild: false), 108, 110);
-        Assert.Equal(124, BattleFormulas.GaugeGain(20, 349, wild: false));
-        Assert.Equal(8, BattleFormulas.GaugeGain(1, 85, wild: true));
-        Assert.Equal(14, BattleFormulas.GaugeGain(17, 165, wild: true));
-        Assert.Equal(33, BattleFormulas.GaugeGain(50, 1040, wild: true));
+        // ✅ v322: fórmula exata do cliente por (Level, AGI) — 0 erros de L1 a L160; selvagem pelo BR
+        Assert.Equal(42, BattleFormulas.PlayerGaugeGain(1, 10));
+        Assert.Equal(76, BattleFormulas.PlayerGaugeGain(2, 12));
+        Assert.Equal(88, BattleFormulas.PlayerGaugeGain(3, 14));
+        Assert.Equal(94, BattleFormulas.PlayerGaugeGain(4, 16));
+        Assert.Equal(108, BattleFormulas.PlayerGaugeGain(10, 32));
+        Assert.Equal(116, BattleFormulas.PlayerGaugeGain(11, 60));
+        Assert.Equal(123, BattleFormulas.PlayerGaugeGain(20, 76));
+        Assert.Equal(131, BattleFormulas.PlayerGaugeGain(160, 95));
+        Assert.Equal(8, BattleFormulas.WildGaugeGain(85));
+        Assert.Equal(14, BattleFormulas.WildGaugeGain(165));
+        Assert.Equal(33, BattleFormulas.WildGaugeGain(1040));
     }
 }
 public class InfrastructureTests
