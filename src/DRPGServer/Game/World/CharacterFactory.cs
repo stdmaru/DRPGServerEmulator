@@ -19,7 +19,9 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
             .Select(r => (Row: r, Digimon: BuildDigimon(r, formsByDigimon[r.Uid])))
             .Where(d => d.Digimon is not null)
             .ToList();
-        var leader = digimons.FirstOrDefault(d => d.Row.Slot == 0).Digimon ?? digimons.FirstOrDefault().Digimon;
+        var leader = digimons.FirstOrDefault(d => !d.Row.InDepository && d.Row.Slot == 0).Digimon
+                     ?? digimons.FirstOrDefault(d => !d.Row.InDepository).Digimon
+                     ?? digimons.FirstOrDefault().Digimon;
         if (leader is null) return null;
 
         var inventory = new Inventory(data.FindItem, (uint)options.Value.MaxStackPerItem);
@@ -30,6 +32,7 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
             bag.Place(inventory.Create(i.ItemId, i.Slot, i.Amount, i.Uid));
         }
 
+        byte defaultSlots = Math.Min(options.Value.DefaultDepositorySlots, (byte)Character.MaxDepositorySlots);
         var character = new Character(leader, inventory)
         {
             Uid = row.Uid,
@@ -43,10 +46,16 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
             Y = row.PosY,
             TotalWins = row.TotalWins,
             TotalBattles = row.TotalBattles,
+            DepositorySlots = Math.Min((byte)Character.MaxDepositorySlots, Math.Max(row.DepositorySlots, defaultSlots)),
         };
         foreach (var (r, d) in digimons)
-            if (d != leader && !character.Place(r.Slot, d!))
+        {
+            if (d == leader) continue;
+            if (r.InDepository)
+                character.AddToDepository(d!);
+            else if (!character.Place(r.Slot, d!))
                 character.Place(character.Party.ToList().IndexOf(null), d!);   // posição repetida: primeira livre
+        }
         foreach (var flag in record.Flags) character.SetFlag(flag);
         character.SetBits(row.Bits);
         return character;

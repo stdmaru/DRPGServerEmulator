@@ -74,4 +74,4 @@ Evidência: `DigimonRPG.bin` — 46 chamadores em par de `0x00AE3E10` (C2S `0x7B
   - Ao abrir a janela da enciclopédia (`0x00C2D4DA` / `0x00C2D4F3`).
   - Após captura, evolução, remoção/troca de Digimon e outras mutações de time no mapa.
 - O servidor não precisa empurrar `0x7B`/`0x7C` de forma não solicitada; basta responder com o estado atualizado do personagem sempre que receber `C2S 0x7B` e `C2S 0x7C`.
-- ❓ Em `captures.db`, as 36 amostras de `S2C 0x7B` têm os 1100 bytes zerados (contas de teste só tinham Digimons no time ativo). No emulador, não há tabela própria de enciclopédia: `0x7C` é derivado diretamente dos 5 slots atuais do time e `0x7B` ecoa o `uid` com array zerado (TODO: preencher `0x7B` com as espécies guardadas no Digimon Depository quando o armazém for implementado).
+- ✅ No emulador, não há tabela própria de enciclopédia: `0x7C` é derivado diretamente dos 5 slots atuais do time e `0x7B` ecoa o `uid` com `owned[speciesId] = 1` para as espécies (base e formas desbloqueadas) guardadas no [Digimon Depository](depository.md).

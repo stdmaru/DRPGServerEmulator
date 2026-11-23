@@ -144,7 +144,7 @@ public class EncyclopediaTests
         BinaryPrimitives.WriteUInt32LittleEndian(req7BPlain, character.Leader.Uid);
         var req7BCipher = GlobalSessionCipher.EncryptBlocks(key, req7BPlain);
 
-        var dataHandler = new EncyclopediaDataHandler();
+        var dataHandler = new EncyclopediaDataHandler(accounts, world);
         var collectionHandler = new EncyclopediaCollectionHandler(accounts, world);
 
         await world.StartAsync(CancellationToken.None);
