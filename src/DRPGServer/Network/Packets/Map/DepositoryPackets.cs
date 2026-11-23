@@ -55,10 +55,10 @@ public sealed class DepositoryActionPacket(
 }
 
 /// <summary>
-/// ✅ Map 0x8A (808 bytes = 8 + 10 × 80): slots disponíveis e lista dos Digimons guardados no Depository.
-/// Confirmado em <c>DigimonRPG.bin @ 0x00AC27F0</c> (<c>0x00B7C530</c> / <c>0x00B7BF50</c>).
+/// ✅ Map 0x8A (808 bytes = 8 + 10 × 80): página atual, total de páginas, slots disponíveis na página e até 10 Digimons.
+/// Confirmado em <c>DigimonRPG.bin @ 0x00AC27F0</c> (<c>0x00B7C530</c> / <c>0x00B7BF50</c> / <c>0x00B7B858</c>).
 /// </summary>
-public sealed class DepositoryListPacket(ushort npcId, Character character) : ServerPacket
+public sealed class DepositoryListPacket(ushort page, Character character) : ServerPacket
 {
     public const int EntryLength = 80;
 
@@ -66,17 +66,23 @@ public sealed class DepositoryListPacket(ushort npcId, Character character) : Se
 
     protected override void Write(PacketWriter w)
     {
-        var stored = character.Depository;
-        w.WriteU16(npcId);
-        w.WriteU16((ushort)stored.Count);
-        w.WriteU8(character.DepositorySlots);
+        ushort currentPage = Math.Clamp(page, (ushort)1, character.DepositoryTotalPages);
+        ushort totalPages = character.DepositoryTotalPages;
+        byte slotsOnPage = character.DepositorySlotsOnPage(currentPage);
+
+        w.WriteU16(currentPage);
+        w.WriteU16(totalPages);
+        w.WriteU8(slotsOnPage);
         w.WriteZeros(3);
 
-        for (int i = 0; i < Character.MaxDepositorySlots; i++)
+        var stored = character.Depository;
+        int pageStart = (currentPage - 1) * Character.DepositoryPageSize;
+        for (int i = 0; i < Character.DepositoryPageSize; i++)
         {
-            if (i < stored.Count)
+            int index = pageStart + i;
+            if (index < stored.Count)
             {
-                var digimon = stored[i];
+                var digimon = stored[index];
                 var baseSpecies = digimon.BaseForm.Species;
                 w.WriteU32(digimon.Uid);
                 w.WriteU32(baseSpecies.Id);
@@ -86,7 +92,7 @@ public sealed class DepositoryListPacket(ushort npcId, Character character) : Se
                 w.WriteU8(baseSpecies.Stage);
                 w.WriteU8((byte)baseSpecies.Attribute);
                 w.WriteU16(0);
-                w.WriteI32(digimon.TotalWins);
+                w.WriteI32(digimon.Hp);          // ✅ > 0 desenha o retrato colorido (0x00B7C14A); <= 0 desenha silhueta
                 w.WriteZeros(40);
             }
             else

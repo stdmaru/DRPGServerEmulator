@@ -32,7 +32,6 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
             bag.Place(inventory.Create(i.ItemId, i.Slot, i.Amount, i.Uid));
         }
 
-        byte defaultSlots = Math.Min(options.Value.DefaultDepositorySlots, (byte)Character.MaxDepositorySlots);
         var character = new Character(leader, inventory)
         {
             Uid = row.Uid,
@@ -46,7 +45,7 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
             Y = row.PosY,
             TotalWins = row.TotalWins,
             TotalBattles = row.TotalBattles,
-            DepositorySlots = Math.Min((byte)Character.MaxDepositorySlots, Math.Max(row.DepositorySlots, defaultSlots)),
+            DepositorySlots = Math.Min(row.DepositorySlots, (byte)Character.MaxDepositorySlots),
         };
         foreach (var (r, d) in digimons)
         {

@@ -53,11 +53,11 @@ public class DepositoryTests
     }
 
     [Fact]
-    public void Deposit_withdraw_and_swap_round_trip_with_bits_fee()
+    public void Deposit_withdraw_and_swap_round_trip_with_official_bits_fee()
     {
         var character = Entities.Character();
-        character.DepositorySlots = 5;
-        character.SetBits(1000);
+        character.DepositorySlots = 15; // 2 páginas (10 na pág 1, 5 na pág 2)
+        character.SetBits(500);
 
         var second = new Digimon(TestSupport.Data, TestSupport.Data.FindSpecies(14)!, 5) { Uid = 42, Name = "Seedmon" };
         Assert.True(character.Place(1, second));
@@ -65,49 +65,66 @@ public class DepositoryTests
         var session = TestSupport.NewSession(ServerRole.Map);
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
         session.Player = player;
-        var handler = new DepositoryActionHandler(TestSupport.GameOptions(o => o.DepositoryFeeBits = 250));
+        var handler = new DepositoryActionHandler(TestSupport.GameOptions(o => o.ChargeDepositoryFee = true));
 
-        // Não pode depositar o líder (slot 0)
+        // Sem Bits suficientes (lv 5 custa 1000 Bits) -> DepositNotEnoughBits (5)
+        handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: 42)));
+        var poorFail = Assert.Single(session.DrainOutgoing());
+        Assert.Equal((byte)DepositoryResult.DepositNotEnoughBits, poorFail[14 + 32]);
+        Assert.Equal(500, character.Bits);
+
+        // Com 5000 Bits: não pode depositar o líder (slot 0)
+        character.SetBits(5_000);
         handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: character.Leader.Uid)));
         var leaderFail = Assert.Single(session.DrainOutgoing());
         Assert.Equal((byte)DepositoryResult.DepositFailed, leaderFail[14 + 32]);
-        Assert.Equal(1000, character.Bits);
+        Assert.Equal(5_000, character.Bits);
 
-        // Deposita o slot 1 (uid 42)
+        // Deposita o slot 1 (uid 42, lv 5 -> 1000 Bits)
         handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: 42)));
         var depFrames = session.DrainOutgoing();
         Assert.Equal(2, depFrames.Count);
         Assert.Equal((byte)DepositoryResult.DepositOk, depFrames[1][14 + 32]);
-        Assert.Equal(750, character.Bits);
+        Assert.Equal(4_000, character.Bits);
         Assert.Null(character.Party[1]);
         var stored = Assert.Single(character.Depository);
         Assert.Equal(42u, stored.Uid);
 
-        // Verifica o layout de 80 bytes no 0x8A (entry 0 começa no offset 8 do payload)
+        // Verifica o layout de 80 bytes no 0x8A (pág 1 de 2, 10 slots na pág 1, HP > 0 em +36 para retrato colorido)
         var listPayload = depFrames[0][14..];
         Assert.Equal(808, listPayload.Length);
-        Assert.Equal(1, BinaryPrimitives.ReadUInt16LittleEndian(listPayload.AsSpan(2, 2)));   // usedSlots = 1
-        Assert.Equal(5, listPayload[4]);                                                       // availableSlots = 5
+        Assert.Equal(1, BinaryPrimitives.ReadUInt16LittleEndian(listPayload.AsSpan(0, 2)));   // currentPage = 1
+        Assert.Equal(2, BinaryPrimitives.ReadUInt16LittleEndian(listPayload.AsSpan(2, 2)));   // totalPages = 2
+        Assert.Equal(10, listPayload[4]);                                                      // availableSlotsOnPage = 10
         Assert.Equal(42u, BinaryPrimitives.ReadUInt32LittleEndian(listPayload.AsSpan(8, 4)));  // uid
         Assert.Equal(14u, BinaryPrimitives.ReadUInt32LittleEndian(listPayload.AsSpan(12, 4))); // speciesId
         Assert.Equal((ushort)5, BinaryPrimitives.ReadUInt16LittleEndian(listPayload.AsSpan(38, 2))); // level (+30)
+        Assert.Equal(second.Hp, BinaryPrimitives.ReadInt32LittleEndian(listPayload.AsSpan(44, 4)));  // HP (+36) > 0
+        Assert.True(second.Hp > 0);
 
-        // Troca (Swap) o líder (uid 7) com o guardado (uid 42)
+        // Abre página 2 -> 5 slots disponíveis na página 2
+        handler.Handle(session, new PacketReader(BuildActionRequest(2, DepositoryAction.Open)));
+        var page2Frames = session.DrainOutgoing();
+        Assert.Equal(2, BinaryPrimitives.ReadUInt16LittleEndian(page2Frames[0].AsSpan(14, 2)));     // currentPage = 2
+        Assert.Equal(2, BinaryPrimitives.ReadUInt16LittleEndian(page2Frames[0].AsSpan(14 + 2, 2))); // totalPages = 2
+        Assert.Equal(5, page2Frames[0][14 + 4]);                                                     // availableSlotsOnPage = 5
+
+        // Troca (Swap) o líder (uid 7, lv 1 -> 1000) com o guardado (uid 42, lv 5 -> 1000) = 2000 Bits
         handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Swap, partyUid: 7, depUid: 42)));
         var swapFrames = session.DrainOutgoing();
         Assert.Equal(2, swapFrames.Count);
         Assert.Equal((byte)DepositoryResult.SwapOk, swapFrames[1][14 + 32]);
-        Assert.Equal(500, character.Bits);
+        Assert.Equal(2_000, character.Bits);
         Assert.Equal(42u, character.Leader.Uid);
         Assert.Equal(7u, Assert.Single(character.Depository).Uid);
         Assert.Equal(42u, BinaryPrimitives.ReadUInt32LittleEndian(swapFrames[1].AsSpan(14 + 40, 4))); // DigimonStatusBlock @ 40
 
-        // Retira o uid 7 de volta para o time
+        // Retira o uid 7 (lv 1 -> 1000 Bits) de volta para o time
         handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Withdraw, depUid: 7)));
         var wdFrames = session.DrainOutgoing();
         Assert.Equal(2, wdFrames.Count);
         Assert.Equal((byte)DepositoryResult.WithdrawOk, wdFrames[1][14 + 32]);
-        Assert.Equal(250, character.Bits);
+        Assert.Equal(1_000, character.Bits);
         Assert.Empty(character.Depository);
         Assert.Equal(7u, character.Party[1]!.Uid);
     }

@@ -105,7 +105,8 @@ public sealed record DigimonSnapshot(
     ushort AbilityPoints, ushort SkillPoints, int TotalWins, int TotalBattles, bool FreeRename);
 
 public sealed record NewCharacter(
-    uint AccountUid, byte Slot, string Name, byte TamerId, ushort DigimonId, string DigimonName, byte MapId, short X, short Y);
+    uint AccountUid, byte Slot, string Name, byte TamerId, ushort DigimonId, string DigimonName, byte MapId, short X, short Y,
+    byte DepositorySlots = 0);
 
 public sealed class CharacterRepository(Database database, Game.DigimonUids uids)
 {
@@ -173,8 +174,8 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
         try
         {
             var uid = await db.ExecuteScalarAsync<uint>(new CommandDefinition("""
-                INSERT INTO `character` (account_uid, slot, name, tamer_id, map_id, pos_x, pos_y)
-                VALUES (@AccountUid, @Slot, @Name, @TamerId, @MapId, @X, @Y);
+                INSERT INTO `character` (account_uid, slot, name, tamer_id, map_id, pos_x, pos_y, depository_slots)
+                VALUES (@AccountUid, @Slot, @Name, @TamerId, @MapId, @X, @Y, @DepositorySlots);
                 SELECT LAST_INSERT_ID();
                 """, c, tx, cancellationToken: ct));
             await db.ExecuteAsync(new CommandDefinition("""

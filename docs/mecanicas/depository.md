@@ -1,6 +1,6 @@
 # Digimon Depository (Armazém de Digimons)
 
-O Digimon Depository (janela `CWindowDigimonDepository`, ID `0x29` no cliente) permite guardar até **10 Digimons** fora do time ativo (5 posições), retirar, trocar (swap) e expandir slots usando itens de expansão.
+O Digimon Depository (janela `CWindowDigimonDepository`, ID `0x29` no cliente) permite guardar até **210 Digimons** (**21 páginas × 10 slots por página**) fora do time ativo (5 posições), retirar, trocar (swap) e expandir slots usando itens de expansão.
 
 ---
 
@@ -13,8 +13,8 @@ Evidência: `DigimonRPG.bin` (S2C `0x00AC2498`, C2S `0x00AD9D80` abrir / `0x00AD
 
 | Offset | Tamanho | Tipo | Descrição |
 |---|---|---|---|
-| `0` | 2 | `u16` | `npcId` (`1` ao abrir; ecoado do `0x8A` nas demais ações) |
-| `2` | 1 | `u8` | `action`: `1` = Abrir, `2` = Depositar, `3` = Retirar, `4` = Trocar (Swap) |
+| `0` | 2 | `u16` | `page` (página 1-based `1..21`, ecoada do `0x8A` nas demais ações) |
+| `2` | 1 | `u8` | `action`: `1` = Abrir / trocar página, `2` = Depositar, `3` = Retirar, `4` = Trocar (Swap) |
 | `3` | 1 | `u8` | padding (`0`) |
 | `4` | 4 | `u32` | `partyDigimonUid` (Digimon do time a depositar ou trocar; o cliente remove via `0x00B5CEC0`) |
 | `8` | 4 | `u32` | `depositoryDigimonUid` (Digimon do armazém a retirar ou trocar) |
@@ -32,38 +32,42 @@ Evidência: `DigimonRPG.bin` (S2C `0x00AC2498`, C2S `0x00AD9D80` abrir / `0x00AD
 | `3` (Retirar) | `6` | `7` | `8` | — |
 | `4` (Trocar) | `9` | `10` | `11` | — |
 
-Regras:
-- O líder (posição `0` do time) não pode ser depositado se ficar sem nenhum Digimon no time; na troca (`action=4`), o Digimon retirado assume a posição do que saiu.
-- A taxa em Bits (`DepositoryFeeBits`) e a quantidade inicial de slots (`DefaultDepositorySlots`) são configuráveis em `GameOptions`.
+### Taxa oficial em Bits por nível (`DigimonRPG.bin @ 0x00BDFF10`) ✅
+| Nível | 1–10 | 11–20 | 21–30 | 31–40 | 41–50 | 51–60 | 61–70 | 71–80 | 81+ |
+|---|---|---|---|---|---|---|---|---|---|
+| **Bits** | 1 000 | 5 000 | 10 000 | 20 000 | 30 000 | 40 000 | 50 000 | 60 000 | 70 000 |
+
+- Na troca (`action=4`), a taxa é a **soma** dos dois Digimons envolvidos.
+- Configurável em `GameOptions`: `ChargeDepositoryFee` (`true` por padrão) e `DefaultDepositorySlots` (`10` por padrão na criação do personagem; personagens já existentes respeitam o valor de `character.depository_slots` no banco).
 
 ---
 
-## 2. Map `0x8A` — Slots disponíveis e lista do Depository ✅
+## 2. Map `0x8A` — Página, total de páginas e lista do Depository ✅
 
-Evidência: `DigimonRPG.bin` (S2C `0x00AC27F0` → `0x00B7C530` lista + `0x00B7BF50` renderização de cada entrada).
+Evidência: `DigimonRPG.bin` (S2C `0x00AC27F0` → `0x00B7C530` lista, `0x00B7BF50` renderização, `0x00B7B858` páginas).
 
 - **S2C:** **808 bytes** (`0x328` = `8 + 10 × 80`).
 
 | Offset | Tamanho | Tipo | Descrição |
 |---|---|---|---|
-| `0` | 2 | `u16` | `npcId` (salvo em `client + 0x3E88`, ecoado no C2S `0x89`) |
-| `2` | 2 | `u16` | `usedSlots` (salvo em `client + 0x3E8C`) |
-| `4` | 1 | `u8` | `availableSlots` (`0..10`, salvo em `Window(0x29) + 0x142D`, logado como `사용가능슬롯 %d`) |
+| `0` | 2 | `u16` | `currentPage` (1-based, salvo em `client + 0x3E88`) |
+| `2` | 2 | `u16` | `totalPages` (`1..21`, salvo em `client + 0x3E8C`; habilita botões de página) |
+| `4` | 1 | `u8` | `availableSlotsOnPage` (`0..10`, salvo em `Window(0x29) + 0x142D`, logado como `사용가능슬롯 %d`) |
 | `5` | 3 | `u8[3]` | padding (`0`) |
-| `8` | 800 | `Entry[10]` | 10 entradas de **80 bytes (`0x50`)**; entradas com `uid == 0` são ignoradas pelo cliente |
+| `8` | 800 | `Entry[10]` | 10 entradas de **80 bytes (`0x50`)**; o parser do cliente (`0x00B7C550`) ignora `uid == 0` e compacta os itens da página a partir do slot 0 |
 
 ### Entrada de 80 bytes (`0x50`) ✅
 | Offset | Tamanho | Tipo | Descrição |
 |---|---|---|---|
 | `0` | 4 | `u32` | `uid` (`0` = vazio) |
-| `4` | 4 | `u32` | `speciesId` (espécie base/atual; `> 9` desenha o retrato) |
+| `4` | 4 | `u32` | `speciesId` (espécie base; `> 9` desenha o retrato) |
 | `8` | 21 | `char[21]` | `name` (null-terminated) |
 | `29` | 1 | `u8` | padding (`0`) |
 | `30` | 2 | `u16` | `level` |
-| `32` | 1 | `u8` | `stage` / tipo (lookup tabela de texto `0x10D2`) |
+| `32` | 1 | `u8` | `stage` (lookup tabela de texto `0x10D2`) |
 | `33` | 1 | `u8` | `attribute` (lookup tabela de texto `0x10D3`) |
 | `34` | 2 | `u16` | padding (`0`) |
-| `36` | 4 | `i32` | `wins` / contador numérico (`> 0` desenha ícone) |
+| `36` | 4 | `i32` | **`hp`** (`0x00B7C14A`: `> 0` desenha retrato colorido; `<= 0` desenha silhueta) |
 | `40` | 40 | `u8[40]` | zeros |
 
 ---

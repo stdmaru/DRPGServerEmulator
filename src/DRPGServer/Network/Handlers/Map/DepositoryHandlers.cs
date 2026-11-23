@@ -17,50 +17,51 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
     {
         if (player.InBattle) return;
 
-        ushort npcId = packet.ReadU16();
+        ushort page = packet.ReadU16();
         var action = (DepositoryAction)packet.ReadU8();
         packet.ReadU8();
         uint partyDigimonUid = packet.ReadU32();
         uint depositoryDigimonUid = packet.ReadU32();
 
         var character = player.Character;
-        double feeBits = Math.Max(0, options.Value.DepositoryFeeBits);
+        ushort clampedPage = Math.Clamp(page, (ushort)1, character.DepositoryTotalPages);
+        bool chargeFee = options.Value.ChargeDepositoryFee;
 
         switch (action)
         {
             case DepositoryAction.Open:
             {
                 var result = character.DepositorySlots > 0 ? DepositoryResult.OpenOk : DepositoryResult.OpenFailed;
-                player.Send(new DepositoryListPacket(npcId, character));
-                player.Send(new DepositoryActionPacket(npcId, action, 0, 0, character.Bits, result));
+                player.Send(new DepositoryListPacket(clampedPage, character));
+                player.Send(new DepositoryActionPacket(clampedPage, action, 0, 0, character.Bits, result));
                 break;
             }
             case DepositoryAction.Deposit:
             {
-                var result = character.Deposit(partyDigimonUid, feeBits);
+                var result = character.Deposit(partyDigimonUid, chargeFee);
                 if (result == DepositoryResult.DepositOk)
-                    player.Send(new DepositoryListPacket(npcId, character));
-                player.Send(new DepositoryActionPacket(npcId, action, partyDigimonUid, 0, character.Bits, result));
+                    player.Send(new DepositoryListPacket(clampedPage, character));
+                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, 0, character.Bits, result));
                 break;
             }
             case DepositoryAction.Withdraw:
             {
-                var (result, withdrawn) = character.Withdraw(depositoryDigimonUid, feeBits);
+                var (result, withdrawn) = character.Withdraw(depositoryDigimonUid, chargeFee);
                 if (result == DepositoryResult.WithdrawOk)
-                    player.Send(new DepositoryListPacket(npcId, character));
-                player.Send(new DepositoryActionPacket(npcId, action, 0, depositoryDigimonUid, character.Bits, result, withdrawn));
+                    player.Send(new DepositoryListPacket(clampedPage, character));
+                player.Send(new DepositoryActionPacket(clampedPage, action, 0, depositoryDigimonUid, character.Bits, result, withdrawn));
                 break;
             }
             case DepositoryAction.Swap:
             {
-                var (result, withdrawn) = character.Swap(partyDigimonUid, depositoryDigimonUid, feeBits);
+                var (result, withdrawn) = character.Swap(partyDigimonUid, depositoryDigimonUid, chargeFee);
                 if (result == DepositoryResult.SwapOk)
-                    player.Send(new DepositoryListPacket(npcId, character));
-                player.Send(new DepositoryActionPacket(npcId, action, partyDigimonUid, depositoryDigimonUid, character.Bits, result, withdrawn));
+                    player.Send(new DepositoryListPacket(clampedPage, character));
+                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, depositoryDigimonUid, character.Bits, result, withdrawn));
                 break;
             }
             default:
-                player.Send(new DepositoryActionPacket(npcId, action, partyDigimonUid, depositoryDigimonUid, character.Bits, DepositoryResult.OpenCheckError));
+                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, depositoryDigimonUid, character.Bits, DepositoryResult.OpenCheckError));
                 break;
         }
     }
@@ -97,7 +98,7 @@ public sealed class DepositoryExpandHandler : PlayerHandler
         character.Inventory.Main.Consume(item, 1);
         character.ExpandDepository();
         player.Send(new InventoryRefreshPacket(character));
-        player.Send(new DepositoryListPacket(1, character));
+        player.Send(new DepositoryListPacket(character.DepositoryTotalPages, character));
         player.Send(new DepositoryExpandPacket(DepositoryExpandResult.Ok));
     }
 

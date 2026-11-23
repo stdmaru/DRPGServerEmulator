@@ -23,8 +23,10 @@ public sealed class Character
     /// <summary>✅ Cinco posições no time (cinco blocos no 0x02); pode haver buraco entre elas.</summary>
     public const int PartySize = 5;
 
-    /// <summary>✅ Máximo de 10 Digimons no Digimon Depository (10 × 80 bytes no 0x8A).</summary>
-    public const int MaxDepositorySlots = 10;
+    /// <summary>✅ 10 slots por página e até 21 páginas (210 slots) no Digimon Depository (DigimonRPG.bin @ 0x00B7B94B).</summary>
+    public const int DepositoryPageSize = 10;
+    public const int MaxDepositoryPages = 21;
+    public const int MaxDepositorySlots = DepositoryPageSize * MaxDepositoryPages;
 
     private readonly Digimon?[] _party = new Digimon?[PartySize];
     private readonly List<Digimon> _depository = [];
@@ -99,15 +101,41 @@ public sealed class Character
         return true;
     }
 
+    /// <summary>✅ Quantidade de páginas visíveis no Depository (1..21; cada página tem até 10 slots).</summary>
+    public ushort DepositoryTotalPages => (ushort)Math.Max(1, (DepositorySlots + DepositoryPageSize - 1) / DepositoryPageSize);
+
+    /// <summary>✅ Quantidade de slots liberados na página <paramref name="page"/> (1-based, 0..10).</summary>
+    public byte DepositorySlotsOnPage(ushort page)
+    {
+        int start = (Math.Max((int)page, 1) - 1) * DepositoryPageSize;
+        return (byte)Math.Clamp(DepositorySlots - start, 0, DepositoryPageSize);
+    }
+
+    /// <summary>✅ Taxa oficial em Bits por nível do Digimon (DigimonRPG.bin @ 0x00BDFF10).</summary>
+    public static double DepositoryFeeForLevel(ushort level) => level switch
+    {
+        0 => 0,
+        <= 10 => 1_000,
+        <= 20 => 5_000,
+        <= 30 => 10_000,
+        <= 40 => 20_000,
+        <= 50 => 30_000,
+        <= 60 => 40_000,
+        <= 70 => 50_000,
+        <= 80 => 60_000,
+        _ => 70_000,
+    };
+
     /// <summary>Move um digimon do time (não-líder) para o Depository.</summary>
-    public DepositoryResult Deposit(uint partyDigimonUid, double feeBits)
+    public DepositoryResult Deposit(uint partyDigimonUid, bool chargeFee)
     {
         if (FindDigimon(partyDigimonUid) is not { } digimon)
             return DepositoryResult.DepositFailed;
         int slot = SlotOf(digimon);
         if (slot <= 0 || _depository.Count >= DepositorySlots)
             return DepositoryResult.DepositFailed;
-        if (!TrySpendBits(feeBits))
+        double fee = chargeFee ? DepositoryFeeForLevel(digimon.Level) : 0;
+        if (!TrySpendBits(fee))
             return DepositoryResult.DepositNotEnoughBits;
 
         _party[slot] = null;
@@ -116,14 +144,15 @@ public sealed class Character
     }
 
     /// <summary>Retira um digimon do Depository para a primeira posição livre do time.</summary>
-    public (DepositoryResult Result, Digimon? Digimon) Withdraw(uint depositoryDigimonUid, double feeBits)
+    public (DepositoryResult Result, Digimon? Digimon) Withdraw(uint depositoryDigimonUid, bool chargeFee)
     {
         if (FindInDepository(depositoryDigimonUid) is not { } digimon)
             return (DepositoryResult.WithdrawFailed, null);
         int freeSlot = Array.IndexOf(_party, null);
         if (freeSlot < 0)
             return (DepositoryResult.WithdrawFailed, null);
-        if (!TrySpendBits(feeBits))
+        double fee = chargeFee ? DepositoryFeeForLevel(digimon.Level) : 0;
+        if (!TrySpendBits(fee))
             return (DepositoryResult.WithdrawNotEnoughBits, null);
 
         _depository.Remove(digimon);
@@ -131,8 +160,8 @@ public sealed class Character
         return (DepositoryResult.WithdrawOk, digimon);
     }
 
-    /// <summary>Troca um digimon do time com um digimon do Depository.</summary>
-    public (DepositoryResult Result, Digimon? Withdrawn) Swap(uint partyDigimonUid, uint depositoryDigimonUid, double feeBits)
+    /// <summary>Troca um digimon do time com um digimon do Depository (✅ soma a taxa dos dois digimons).</summary>
+    public (DepositoryResult Result, Digimon? Withdrawn) Swap(uint partyDigimonUid, uint depositoryDigimonUid, bool chargeFee)
     {
         if (FindDigimon(partyDigimonUid) is not { } partyDigimon)
             return (DepositoryResult.SwapFailed, null);
@@ -142,7 +171,10 @@ public sealed class Character
         int depIndex = _depository.IndexOf(storedDigimon);
         if (partySlot < 0 || depIndex < 0)
             return (DepositoryResult.SwapFailed, null);
-        if (!TrySpendBits(feeBits))
+        double fee = chargeFee
+            ? DepositoryFeeForLevel(partyDigimon.Level) + DepositoryFeeForLevel(storedDigimon.Level)
+            : 0;
+        if (!TrySpendBits(fee))
             return (DepositoryResult.SwapNotEnoughBits, null);
 
         _party[partySlot] = storedDigimon;
