@@ -150,13 +150,15 @@ public sealed class Character
     /// <summary>Move um digimon do time (nunca o líder na posição 0) para a página escolhida do Depository.</summary>
     public DepositoryResult Deposit(uint partyDigimonUid, ushort page, bool chargeFee)
     {
+        if (page < 1 || page > DepositoryTotalPages)
+            return DepositoryResult.DepositFailed;
         if (FindDigimon(partyDigimonUid) is not { } digimon)
             return DepositoryResult.DepositFailed;
         int partySlot = SlotOf(digimon);
         if (partySlot <= 0)
             return DepositoryResult.DepositFailed;
 
-        int pageStart = (Math.Max((int)page, 1) - 1) * DepositoryPageSize;
+        int pageStart = (page - 1) * DepositoryPageSize;
         int slotsOnPage = DepositorySlotsOnPage(page);
         int freeDepSlot = -1;
         for (int i = pageStart; i < pageStart + slotsOnPage; i++)
