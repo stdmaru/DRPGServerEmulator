@@ -3,3 +3,7 @@ bin/
 .vs/
 .vscode/
 .devcontainer/database
+*.user
+appsettings.Local.json
+# pacote de tabelas do cliente: copie o table.hf/table.pf do cliente para cá (não é publicado, docs/projeto/legal.md)
+src/DRPGServer/Resources/Client/

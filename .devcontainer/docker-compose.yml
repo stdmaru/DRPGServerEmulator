@@ -4,13 +4,24 @@ services:
     volumes:
       - ./database:/var/lib/mysql
     environment:
-      - MYSQL_ROOT_PASSWORD=root
+      - MARIADB_ROOT_PASSWORD=root
     ports:
       - 127.0.0.1:3306:3306
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
   server:
-    image: mcr.microsoft.com/dotnet/sdk:9.0
+    image: mcr.microsoft.com/dotnet/sdk:10.0
     tty: true
     volumes:
       - ../:/workspaces/DRPGServer:rw
     entrypoint: /bin/bash
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:7000-7003:7000-7003

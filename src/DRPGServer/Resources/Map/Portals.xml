@@ -1,0 +1,23 @@
+<!--
+  Pontos de chegada dos portais, confirmados nas capturas (0xB0 depois de pisar no portal).
+  O portal (MapID, PosX, PosY) precisa existir no map_us do cliente; o resto dos portais usa a chegada
+  estimada (docs/mecanicas/portais.md). DestMapID vale mais que o nome no map_us: o mapa 40 diz
+  "West of Gekomon Forest" no portal (4, 80), mas o oficial manda para o 44.
+-->
+<Portals>
+    <Portal MapID="1"  PosX="3"   PosY="120" DestMapID="2"  DestPosX="165" DestPosY="17"/>
+    <Portal MapID="1"  PosX="94"  PosY="147" DestMapID="3"  DestPosX="22"  DestPosY="12"/>
+    <Portal MapID="2"  PosX="170" PosY="12"  DestMapID="1"  DestPosX="7"   DestPosY="116"/>
+    <Portal MapID="2"  PosX="159" PosY="252" DestMapID="4"  DestPosX="17"  DestPosY="11"/>
+    <Portal MapID="3"  PosX="123" PosY="164" DestMapID="13" DestPosX="6"   DestPosY="59"/>
+    <Portal MapID="4"  PosX="17"  PosY="4"   DestMapID="2"  DestPosX="154" DestPosY="247"/>
+    <Portal MapID="4"  PosX="112" PosY="180" DestMapID="5"  DestPosX="56"  DestPosY="15"/>
+    <Portal MapID="5"  PosX="123" PosY="103" DestMapID="7"  DestPosX="10"  DestPosY="233"/>
+    <Portal MapID="6"  PosX="22"  PosY="3"   DestMapID="5"  DestPosX="79"  DestPosY="171"/>
+    <Portal MapID="7"  PosX="165" PosY="2"   DestMapID="13" DestPosX="59"  DestPosY="179"/>
+    <Portal MapID="7"  PosX="97"  PosY="255" DestMapID="8"  DestPosX="23"  DestPosY="12"/>
+    <Portal MapID="8"  PosX="22"  PosY="4"   DestMapID="7"  DestPosX="96"  DestPosY="246"/>
+    <Portal MapID="13" PosX="51"  PosY="14"  DestMapID="40" DestPosX="88"  DestPosY="161"/>
+    <Portal MapID="40" PosX="4"   PosY="80"  DestMapID="44" DestPosX="193" DestPosY="43"/>
+    <Portal MapID="44" PosX="197" PosY="46"  DestMapID="40" DestPosX="9"   DestPosY="79"/>
+</Portals>
