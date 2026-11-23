@@ -1,4 +1,8 @@
+using System.Buffers.Binary;
+using DRPGServer.Game.Entities;
+using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Global;
+using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
 using Microsoft.Extensions.Logging;
 
@@ -24,26 +28,76 @@ public sealed class GlobalUserAuthHandler(AccountRegistry accounts, ILogger<Glob
     }
 }
 
-/// <summary>0x7B: o cliente manda duas chaves e recebe a enciclopédia montada com elas.</summary>
+/// <summary>
+/// ✅ 0x7B: coleção permanente da enciclopédia (1104 bytes cifrados em AES-128-ECB).
+/// Ecoa o uid enviado pelo cliente e preenche <c>owned[speciesId]</c> na thread do <see cref="GameWorld"/>.
+/// </summary>
 [PacketHandler(GlobalOpcode.EncyclopediaData)]
-public sealed class EncyclopediaDataHandler : ISessionPacketHandler
+public sealed class EncyclopediaDataHandler(AccountRegistry accounts, GameWorld world) : ISessionPacketHandler
 {
     public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
     {
-        var key1 = packet.ReadBytes(16);
-        var key2 = packet.ReadBytes(16);
-        session.Send(new EncyclopediaDataPacket(key1, key2));
+        var aesKey = session.GlobalAesKey ?? GlobalSessionCipher.DeriveKey(HelloPacket.DefaultSeed);
+        uint digimonUid = 0;
+        if (packet.Remaining >= GlobalSessionCipher.BlockSize)
+        {
+            var firstBlock = GlobalSessionCipher.DecryptBlocks(aesKey, packet.ReadBytes(GlobalSessionCipher.BlockSize));
+            digimonUid = BinaryPrimitives.ReadUInt32LittleEndian(firstBlock);
+        }
+
+        if (session.Account is not { } account)
+        {
+            session.Send(new EncyclopediaDataPacket(aesKey, digimonUid, []));
+            return ValueTask.CompletedTask;
+        }
+
+        world.Post(() =>
+        {
+            var character = FindActiveCharacter(accounts, account.Username);
+            var owned = character is null ? Array.Empty<ushort>() : character.Encyclopedia.ToArray();
+            session.Send(new EncyclopediaDataPacket(aesKey, digimonUid, owned));
+        });
         return ValueTask.CompletedTask;
+    }
+
+    internal static Character? FindActiveCharacter(AccountRegistry accounts, string username)
+    {
+        foreach (var s in accounts.SessionsOf(username))
+        {
+            if (s.Role == ServerRole.Map && s.Player is { } player)
+                return player.Character;
+        }
+        return null;
     }
 }
 
-/// <summary>0x7C: coleção da enciclopédia.</summary>
+/// <summary>
+/// ✅ 0x7C: time atual e evoluções desbloqueadas para a enciclopédia (64 bytes cifrados em AES-128-ECB).
+/// Lê os 5 slots do personagem na thread do <see cref="GameWorld"/>.
+/// </summary>
 [PacketHandler(GlobalOpcode.EncyclopediaCollection)]
-public sealed class EncyclopediaCollectionHandler : ISessionPacketHandler
+public sealed class EncyclopediaCollectionHandler(AccountRegistry accounts, GameWorld world) : ISessionPacketHandler
 {
     public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
     {
-        session.Send(new EncyclopediaCollectionPacket());
+        var aesKey = session.GlobalAesKey ?? GlobalSessionCipher.DeriveKey(HelloPacket.DefaultSeed);
+        if (session.Account is not { } account)
+        {
+            session.Send(new EncyclopediaCollectionPacket(aesKey, []));
+            return ValueTask.CompletedTask;
+        }
+
+        world.Post(() =>
+        {
+            var character = EncyclopediaDataHandler.FindActiveCharacter(accounts, account.Username);
+            var entries = new EncyclopediaPartyEntry[Character.PartySize];
+            if (character is not null)
+            {
+                for (int i = 0; i < Character.PartySize; i++)
+                    entries[i] = EncyclopediaPartyEntry.From(character.Party[i]);
+            }
+            session.Send(new EncyclopediaCollectionPacket(aesKey, entries));
+        });
         return ValueTask.CompletedTask;
     }
 }

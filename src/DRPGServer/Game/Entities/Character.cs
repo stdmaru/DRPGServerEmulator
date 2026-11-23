@@ -8,11 +8,13 @@ public sealed class Character
 
     private readonly Digimon?[] _party = new Digimon?[PartySize];
     private readonly HashSet<ushort> _flags = [];
+    private readonly HashSet<ushort> _encyclopedia = [];
 
     public Character(Digimon leader, Inventory inventory)
     {
         _party[0] = leader;
         Inventory = inventory;
+        RegisterEncyclopedia(leader);
     }
 
     public required uint Uid { get; init; }
@@ -42,6 +44,19 @@ public sealed class Character
     public bool HasFlag(ushort flag) => _flags.Contains(flag);
     public bool SetFlag(ushort flag) => _flags.Add(flag);
 
+    /// <summary>✅ Espécies registradas na enciclopédia permanente (Global 0x7B), persistidas.</summary>
+    public IReadOnlySet<ushort> Encyclopedia => _encyclopedia;
+
+    public bool RegisterEncyclopedia(ushort speciesId) => speciesId > 0 && _encyclopedia.Add(speciesId);
+
+    public void RegisterEncyclopedia(Digimon digimon)
+    {
+        RegisterEncyclopedia(digimon.BaseForm.Species.Id);
+        RegisterEncyclopedia(digimon.Current.Species.Id);
+        foreach (var form in digimon.Forms)
+            RegisterEncyclopedia(form.Species.Id);
+    }
+
     public void SetBits(double bits) => Bits = Math.Max(0, bits);
     public void AddBits(double amount) => SetBits(Bits + amount);
 
@@ -54,6 +69,7 @@ public sealed class Character
     {
         if (slot is < 0 or >= PartySize || (_party[slot] is not null && slot != 0) || _party.Contains(digimon)) return false;
         _party[slot] = digimon;
+        RegisterEncyclopedia(digimon);
         return true;
     }
 

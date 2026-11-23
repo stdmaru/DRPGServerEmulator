@@ -56,6 +56,9 @@ public sealed class Session
     /// <summary>Personagem no mundo (servidor de mapa). Só ler e escrever na thread do mundo.</summary>
     public Player? Player { get; set; }
 
+    /// <summary>✅ Chave AES-128 derivada do 0x0E global (para cifrar/decifrar 0x7B e 0x7C).</summary>
+    public byte[]? GlobalAesKey { get; set; }
+
     public override string ToString() =>
         $"#{Id} {Role} {RemoteEndPoint}{(Account is null ? "" : $" [{Account.Username}]")}";
 

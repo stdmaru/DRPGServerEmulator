@@ -90,8 +90,8 @@ public class PacketSizeTests
             (new Unknown152Packet(), 7048),
             (new UnknownE1Packet(), 1342),
             (new Unknown65Packet(), 0),
-            (new EncyclopediaDataPacket(new byte[16], new byte[16]), 1104),
-            (new EncyclopediaCollectionPacket(), 64),
+            (new EncyclopediaDataPacket(new byte[16], 0, []), 1104),
+            (new EncyclopediaCollectionPacket(new byte[16], []), 64),
         };
         var wrong = packets
             .Select(p => (Name: p.Packet.ToString(), p.Size, Actual: p.Packet.EncodePayload().Length))

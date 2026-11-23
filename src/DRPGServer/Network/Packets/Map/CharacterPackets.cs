@@ -156,15 +156,16 @@ public sealed class JoinHandshakePacket : ServerPacket
     }
 }
 
-/// <summary>0x0E (mapa e global): primeiro pacote depois de conectar.</summary>
-public sealed class HelloPacket(ushort opcode) : ServerPacket
+/// <summary>0x0E (mapa e global): primeiro pacote depois de conectar (semente de 16 bytes da cifra global).</summary>
+public sealed class HelloPacket(ushort opcode, byte[]? seed = null) : ServerPacket
 {
-    // ❓ chave de sessão capturada; o cliente não parece validar
-    private static readonly byte[] SessionKey =
+    public static ReadOnlySpan<byte> DefaultSeed =>
         [0x35, 0x5B, 0x83, 0x6D, 0xFD, 0x18, 0x58, 0x11, 0xE8, 0x0C, 0x96, 0x46, 0xBC, 0x7D, 0xBF, 0x98];
 
+    private readonly byte[] _seed = seed ?? DefaultSeed.ToArray();
+
     public override ushort Opcode => opcode;
-    protected override void Write(PacketWriter w) => w.WriteBytes(SessionKey);
+    protected override void Write(PacketWriter w) => w.WriteBytes(_seed);
 }
 
 /// <summary>0xC4: resposta vazia ao keep-alive do cliente (channel, mapa e global).</summary>
