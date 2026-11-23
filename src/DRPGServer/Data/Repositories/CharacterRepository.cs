@@ -60,13 +60,13 @@ public sealed record ItemRow(byte Bag, byte Slot, uint Uid, uint ItemId, uint Am
 /// <summary>Personagem completo para entrar no mapa.</summary>
 public sealed record CharacterRecord(
     CharacterRow Character, IReadOnlyList<DigimonRow> Digimons, IReadOnlyList<FormRow> Forms,
-    IReadOnlyList<ItemRow> Items, IReadOnlyList<ushort> Flags, IReadOnlyList<ushort>? Encyclopedia = null);
+    IReadOnlyList<ItemRow> Items, IReadOnlyList<ushort> Flags);
 
 /// <summary>O que é salvo de um personagem. Montado na thread do mundo, gravado fora dela.</summary>
 public sealed record CharacterSnapshot(
     uint Uid, ushort Level, byte MapId, short X, short Y, double Bits, int TotalWins, int TotalBattles,
     IReadOnlyList<DigimonSnapshot> Digimons, IReadOnlyList<FormRow> Forms, IReadOnlyList<ItemRow> Items,
-    IReadOnlyList<ushort> Flags, IReadOnlyList<ushort> Encyclopedia)
+    IReadOnlyList<ushort> Flags)
 {
     public static CharacterSnapshot Of(Character c)
     {
@@ -84,7 +84,7 @@ public sealed record CharacterSnapshot(
             .SelectMany(b => b.Items.Select(i => new ItemRow((byte)b.Kind, (byte)i.Slot, i.Uid, i.ItemId, i.Amount)))
             .ToList();
         return new(c.Uid, c.Level, c.MapId, c.X, c.Y, c.Bits, c.TotalWins, c.TotalBattles, digimons, forms, items,
-            c.Flags.Order().ToList(), c.Encyclopedia.Order().ToList());
+            c.Flags.Order().ToList());
     }
 }
 
@@ -135,9 +135,7 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
             "SELECT bag, slot, uid, item_id, amount FROM inventory_item WHERE character_uid = @uid", new { uid }, cancellationToken: ct));
         var flags = await db.QueryAsync<ushort>(new CommandDefinition(
             "SELECT flag FROM character_flag WHERE character_uid = @uid", new { uid }, cancellationToken: ct));
-        var encyclopedia = await db.QueryAsync<ushort>(new CommandDefinition(
-            "SELECT species_id FROM character_encyclopedia WHERE character_uid = @uid", new { uid }, cancellationToken: ct));
-        return new CharacterRecord(row, digimons.ToList(), forms.ToList(), items.ToList(), flags.ToList(), encyclopedia.ToList());
+        return new CharacterRecord(row, digimons.ToList(), forms.ToList(), items.ToList(), flags.ToList());
     }
 
     /// <summary>Maior uid de digimon no banco (semente de <see cref="Game.DigimonUids"/>).</summary>
@@ -171,7 +169,6 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
                 INSERT INTO digimon (uid, character_uid, digimon_id, name, level, is_leader, slot)
                 VALUES (@digimonUid, @uid, @DigimonId, @DigimonName, 1, 1, 0);
                 INSERT INTO digimon_form (digimon_uid, species_id) VALUES (@digimonUid, @DigimonId);
-                INSERT IGNORE INTO character_encyclopedia (character_uid, species_id) VALUES (@uid, @DigimonId);
                 """, new { uid, digimonUid = uids.Next(), c.DigimonId, c.DigimonName }, tx, cancellationToken: ct));
             await tx.CommitAsync(ct);
             return uid;
@@ -238,9 +235,6 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
         await db.ExecuteAsync(new CommandDefinition(
             "INSERT IGNORE INTO character_flag (character_uid, flag) VALUES (@CharacterUid, @Flag)",
             s.Flags.Select(f => new { CharacterUid = s.Uid, Flag = f }), tx, cancellationToken: ct));
-        await db.ExecuteAsync(new CommandDefinition(
-            "INSERT IGNORE INTO character_encyclopedia (character_uid, species_id) VALUES (@CharacterUid, @SpeciesId)",
-            s.Encyclopedia.Select(speciesId => new { CharacterUid = s.Uid, SpeciesId = speciesId }), tx, cancellationToken: ct));
         await tx.CommitAsync(ct);
     }
 }

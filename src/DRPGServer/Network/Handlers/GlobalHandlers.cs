@@ -29,11 +29,12 @@ public sealed class GlobalUserAuthHandler(AccountRegistry accounts, ILogger<Glob
 }
 
 /// <summary>
-/// ✅ 0x7B: coleção permanente da enciclopédia (1104 bytes cifrados em AES-128-ECB).
-/// Ecoa o uid enviado pelo cliente e preenche <c>owned[speciesId]</c> na thread do <see cref="GameWorld"/>.
+/// ✅ 0x7B: enciclopédia (1104 bytes cifrados em AES-128-ECB: u32 digimonUid + u8 owned[1100]).
+/// Ecoa o uid enviado pelo cliente. Nas 36 capturas oficiais sem Digimon Depository, o array vem zerado
+/// e o time atual é informado pelo 0x7C.
 /// </summary>
 [PacketHandler(GlobalOpcode.EncyclopediaData)]
-public sealed class EncyclopediaDataHandler(AccountRegistry accounts, GameWorld world) : ISessionPacketHandler
+public sealed class EncyclopediaDataHandler : ISessionPacketHandler
 {
     public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
     {
@@ -45,18 +46,9 @@ public sealed class EncyclopediaDataHandler(AccountRegistry accounts, GameWorld 
             digimonUid = BinaryPrimitives.ReadUInt32LittleEndian(firstBlock);
         }
 
-        if (session.Account is not { } account)
-        {
-            session.Send(new EncyclopediaDataPacket(aesKey, digimonUid, []));
-            return ValueTask.CompletedTask;
-        }
-
-        world.Post(() =>
-        {
-            var character = FindActiveCharacter(accounts, account.Username);
-            var owned = character is null ? Array.Empty<ushort>() : character.Encyclopedia.ToArray();
-            session.Send(new EncyclopediaDataPacket(aesKey, digimonUid, owned));
-        });
+        // TODO: quando o Digimon Depository (armazém) for implementado, preencher owned[speciesId] = 1
+        // com as espécies dos digimons armazenados pelo personagem.
+        session.Send(new EncyclopediaDataPacket(aesKey, digimonUid, []));
         return ValueTask.CompletedTask;
     }
 

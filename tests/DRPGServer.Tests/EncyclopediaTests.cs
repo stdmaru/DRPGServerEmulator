@@ -84,27 +84,21 @@ public class EncyclopediaTests
     }
 
     [Fact]
-    public void Character_registers_encyclopedia_on_creation_taming_and_evolution()
+    public void Party_entry_reflects_tamed_and_evolved_digimons()
     {
         var character = Entities.Character();
-        Assert.Contains((ushort)10, character.Encyclopedia);
-
-        // Captura adiciona automaticamente a espécie na enciclopédia
         var uids = new DigimonUids();
         uids.Seed(50);
         var taming = new Taming(TestSupport.Data, uids, TestSupport.GameOptions());
         var tamed = taming.Tame(character, TestSupport.Data.FindSpecies(14)!)!;
-        Assert.Contains((ushort)14, character.Encyclopedia);
 
         // Evolução na árvore de teste: In-Training (14) -> Rookie (50) -> Champion (80)
         var player = new Player(TestSupport.NewSession(), new AuthenticatedAccount(1, "u", Authority.None), character);
         while (tamed.Level < StatFormulas.StageLevel(StatFormulas.Rookie)) tamed.LevelUp();
         Progression.AfterLevelUp(player, tamed, inBattle: false);
-        Assert.Contains((ushort)50, character.Encyclopedia);
 
         while (tamed.Level < StatFormulas.StageLevel(StatFormulas.Champion)) tamed.LevelUp();
         Progression.AfterLevelUp(player, tamed, inBattle: false);
-        Assert.Contains((ushort)80, character.Encyclopedia);
 
         // 0x7C reflete a forma-base (50) e o Champion desbloqueado (80) do capturado + espécie 10 do líder
         var leaderEntry = EncyclopediaPartyEntry.From(character.Leader);
@@ -117,7 +111,7 @@ public class EncyclopediaTests
     }
 
     [Fact]
-    public async Task Global_handlers_reply_with_live_character_encyclopedia_and_party()
+    public async Task Global_handlers_reply_with_live_character_party_and_echoed_uid()
     {
         var accounts = new AccountRegistry(TestSupport.GameOptions(), TimeProvider.System);
         var world = TestSupport.NewWorld();
@@ -130,8 +124,6 @@ public class EncyclopediaTests
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };
-        character.RegisterEncyclopedia(10);
-        character.RegisterEncyclopedia(80);
         var mapSession = TestSupport.NewSession(ServerRole.Map);
         accounts.Claim("tester", mapSession);
         mapSession.Player = new Player(mapSession, account, character);
@@ -152,7 +144,7 @@ public class EncyclopediaTests
         BinaryPrimitives.WriteUInt32LittleEndian(req7BPlain, character.Leader.Uid);
         var req7BCipher = GlobalSessionCipher.EncryptBlocks(key, req7BPlain);
 
-        var dataHandler = new EncyclopediaDataHandler(accounts, world);
+        var dataHandler = new EncyclopediaDataHandler();
         var collectionHandler = new EncyclopediaCollectionHandler(accounts, world);
 
         await world.StartAsync(CancellationToken.None);
@@ -170,17 +162,14 @@ public class EncyclopediaTests
         var replies = globalSession.DrainOutgoing();
         Assert.Equal(2, replies.Count);
 
-        // Valida S2C 0x7B
+        // Valida S2C 0x7B (uid ecoado e array zerado até existir Digimon Depository)
         var reply7B = replies[0][14..];
         Assert.Equal(1104, reply7B.Length);
         var pt7B = GlobalSessionCipher.DecryptBlocks(key, reply7B);
         Assert.Equal(character.Leader.Uid, BinaryPrimitives.ReadUInt32LittleEndian(pt7B.AsSpan(0, 4)));
-        Assert.Equal(1, pt7B[4 + 10]);
-        Assert.Equal(1, pt7B[4 + 50]);
-        Assert.Equal(1, pt7B[4 + 80]);
-        Assert.Equal(0, pt7B[4 + 14]);
+        Assert.True(pt7B.AsSpan(4).IndexOfAnyExcept((byte)0) < 0);
 
-        // Valida S2C 0x7C
+        // Valida S2C 0x7C (time atual)
         var reply7C = replies[1][14..];
         Assert.Equal(64, reply7C.Length);
         var pt7C = GlobalSessionCipher.DecryptBlocks(key, reply7C);

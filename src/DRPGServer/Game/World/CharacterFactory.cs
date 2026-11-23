@@ -48,8 +48,6 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
             if (d != leader && !character.Place(r.Slot, d!))
                 character.Place(character.Party.ToList().IndexOf(null), d!);   // posição repetida: primeira livre
         foreach (var flag in record.Flags) character.SetFlag(flag);
-        if (record.Encyclopedia is not null)
-            foreach (var speciesId in record.Encyclopedia) character.RegisterEncyclopedia(speciesId);
         character.SetBits(row.Bits);
         return character;
     }

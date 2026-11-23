@@ -193,7 +193,6 @@ public sealed class Battle
                 if (index >= options.Count) break;
                 Broadcast(new LockActionBarPacket());
                 actor.Digimon.EvolveTo(options[index]);
-                actor.Owner?.Character.RegisterEncyclopedia(actor.Digimon);
                 actor.Gauge = 0;
                 actor.Actions++;
                 Broadcast(new BattleEvolvePacket(actor.Digimon));
