@@ -74,4 +74,10 @@ public sealed class GameOptions
 
     /// <summary>Por quanto tempo o login no channel vale para entrar no mapa depois que a conexão do channel cai.</summary>
     public int AccountTicketGraceSeconds { get; set; } = 120;
+
+    /// <summary>Slots iniciais liberados no Digimon Depository ao criar personagem (0..210). Padrão 10; 0 exige item (901/929).</summary>
+    public byte DefaultDepositorySlots { get; set; } = 10;
+
+    /// <summary>Se true, cobra a taxa oficial em Bits por nível do Digimon no Depository (0x00BDFF10: 1k..70k).</summary>
+    public bool ChargeDepositoryFee { get; set; } = true;
 }

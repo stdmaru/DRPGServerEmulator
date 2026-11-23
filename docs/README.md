@@ -44,6 +44,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Área inicial e time](mecanicas/area-inicial.md): NPCs do tutorial (0x56 escolhas 1–5 e 8), 0xF1 líder, 0x173 troca de posições.
 - [Captura e renomeação](mecanicas/captura.md): Taming Net no mapa (`0x41`, `0xEF`, `0xC3`), captura comum na batalha (ícone 1, `0xB3`, 3 tentativas, só in-training), renomeação grátis (`0xF0`).
 - [Enciclopédia](mecanicas/enciclopedia.md): Global `0x7B` (1104 B, `uid` + `owned[1100]`) e `0x7C` (64 B, time + evoluções), cifrados em AES-128-ECB com chave derivada do `0x0E`.
+- [Digimon Depository](mecanicas/depository.md): Map `0x89` (736 B, abrir/depositar/retirar/trocar), `0x8A` (808 B, 10 × 80 B), `0x94` (1 B, expansão por item 901/929) e integração com Global `0x7B`.
 - [Movimento](mecanicas/movimento.md): 0x20 a cada 0,87 s, até ~10,6 células/s, validação de célula e velocidade.
 - [Batalha](mecanicas/batalha.md): fluxo 0x61…0x6D, 0x67, dano ⌊ATK²/(10·DEF)⌋, barra por nível/BR, acerto, fuga, grupo compartilhado, recuperação.
 - [Selvagens](mecanicas/selvagens.md): 0x11, tick de 344 ms, casa fixa com caixa de 7 × 7, 5 % de chance de andar, estados.

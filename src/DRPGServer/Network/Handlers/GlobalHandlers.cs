@@ -30,11 +30,10 @@ public sealed class GlobalUserAuthHandler(AccountRegistry accounts, ILogger<Glob
 
 /// <summary>
 /// ✅ 0x7B: enciclopédia (1104 bytes cifrados em AES-128-ECB: u32 digimonUid + u8 owned[1100]).
-/// Ecoa o uid enviado pelo cliente. Nas 36 capturas oficiais sem Digimon Depository, o array vem zerado
-/// e o time atual é informado pelo 0x7C.
+/// Ecoa o uid enviado pelo cliente e marca as espécies dos Digimons guardados no Digimon Depository.
 /// </summary>
 [PacketHandler(GlobalOpcode.EncyclopediaData)]
-public sealed class EncyclopediaDataHandler : ISessionPacketHandler
+public sealed class EncyclopediaDataHandler(AccountRegistry accounts, GameWorld world) : ISessionPacketHandler
 {
     public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
     {
@@ -46,10 +45,33 @@ public sealed class EncyclopediaDataHandler : ISessionPacketHandler
             digimonUid = BinaryPrimitives.ReadUInt32LittleEndian(firstBlock);
         }
 
-        // TODO: quando o Digimon Depository (armazém) for implementado, preencher owned[speciesId] = 1
-        // com as espécies dos digimons armazenados pelo personagem.
-        session.Send(new EncyclopediaDataPacket(aesKey, digimonUid, []));
+        if (session.Account is not { } account)
+        {
+            session.Send(new EncyclopediaDataPacket(aesKey, digimonUid, []));
+            return ValueTask.CompletedTask;
+        }
+
+        world.Post(() =>
+        {
+            var character = FindActiveCharacter(accounts, account.Username);
+            var storedSpecies = character is null ? Array.Empty<ushort>() : CollectDepositorySpecies(character);
+            session.Send(new EncyclopediaDataPacket(aesKey, digimonUid, storedSpecies));
+        });
         return ValueTask.CompletedTask;
+    }
+
+    private static ushort[] CollectDepositorySpecies(Character character)
+    {
+        var species = new HashSet<ushort>();
+        foreach (var digimon in character.Depository)
+        {
+            var entry = EncyclopediaPartyEntry.From(digimon);
+            if (entry.BaseSpecies > 0) species.Add((ushort)entry.BaseSpecies);
+            if (entry.ChampionSpecies > 0) species.Add((ushort)entry.ChampionSpecies);
+            if (entry.UltimateSpecies > 0) species.Add((ushort)entry.UltimateSpecies);
+            if (entry.MegaSpecies > 0) species.Add((ushort)entry.MegaSpecies);
+        }
+        return species.ToArray();
     }
 
     internal static Character? FindActiveCharacter(AccountRegistry accounts, string username)

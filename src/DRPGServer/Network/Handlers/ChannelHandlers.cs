@@ -139,7 +139,7 @@ public sealed partial class CharacterCreateHandler(
         }
 
         var uid = await characters.CreateAsync(new NewCharacter(account.Uid, (byte)slot, name, tamerId, digimonId, digimonName,
-            o.StartMapId, o.StartPosX, o.StartPosY), ct);
+            o.StartMapId, o.StartPosX, o.StartPosY, Math.Min(o.DefaultDepositorySlots, (byte)Character.MaxDepositorySlots)), ct);
         if (uid is null)
         {
             session.Send(reply(ChannelError.NameTaken));
