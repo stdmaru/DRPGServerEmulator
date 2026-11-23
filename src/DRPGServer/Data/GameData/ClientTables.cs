@@ -53,22 +53,25 @@ public static class ClientTables
     }
 
     /// <summary>
-    /// Itens: <c>item_info_us</c>. Linhas com id 0 são cartas sem id e ficam de fora. ✅ Colunas que o registro de
-    /// item de 108 bytes repete (sessões 52–56, 21 itens): 2 tipo, 3 subtipo, 16, 17, 18 preço, 19 venda, 21 nível,
-    /// 24, 25, 27 pilha máxima, 33 (ver docs/protocolo/structs/inventario.md).
+    /// Itens: <c>item_info_us</c> (33 colunas, índices 0..32). Linhas com id 0 são cartas sem id e ficam de fora.
+    /// ✅ Colunas que o registro de 108 bytes repete (sessões 52–61): 2 tipo, 3 subtipo, 15, 16, 17 preço, 18 venda,
+    /// 20 nível, 23, 24, 26 pilha máxima (1..999; &gt; 999 é duração em segundos de item temporário), 32 (ver docs/protocolo/structs/inventario.md).
     /// </summary>
     public static FrozenDictionary<uint, ItemInfo> Items(ClientPack pack)
     {
         var items = new Dictionary<uint, ItemInfo>();
         foreach (var f in pack.ReadTable(ItemTable))
             if (f.Length > 1 && uint.TryParse(f[0], CultureInfo.InvariantCulture, out var id) && id != 0)
+            {
+                uint col26 = UInt(f, 26);
                 items.TryAdd(id, new ItemInfo(id, f[1])
                 {
                     Type = Byte(f, 2), SubType = Byte(f, 3),
-                    Col16 = UShort(f, 16), Col17 = UInt(f, 17), BuyPrice = UInt(f, 18), SellPrice = UInt(f, 19),
-                    Level = UInt(f, 21), Flag24 = Byte(f, 24), Flag25 = Byte(f, 25),
-                    MaxStack = Math.Max(1u, UInt(f, 27)), Flag33 = Byte(f, 33),
+                    Col16 = UShort(f, 15), Col17 = UInt(f, 16), BuyPrice = UInt(f, 17), SellPrice = UInt(f, 18),
+                    Level = UInt(f, 20), Flag24 = Byte(f, 23), Flag25 = Byte(f, 24),
+                    MaxStack = col26 is >= 1 and <= 999 ? col26 : 1u, Flag33 = Byte(f, 32),
                 });
+            }
         return items.ToFrozenDictionary();
     }
 

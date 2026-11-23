@@ -239,9 +239,28 @@ public class TutorialTests
     public void Seeds_stack_up_to_the_table_limit()
     {
         var bag = _player.Character.Inventory.Main;
-        var changed = bag.Add(41, 10);                         // pilha 8 na fixture
+        var changed = bag.Add(41, 10);                         // pilha 8 na fixture (col 26)
         Assert.Equal(new uint[] { 8, 2 }, changed.Select(i => i.Amount));
         Assert.Equal(10u, bag.Count(41));
+        Assert.Equal(1u, TestSupport.Data.Items[107].MaxStack); // duração em segundos (> 999) não empilha
+        Assert.Equal(1000u, TestSupport.Data.Items[41].BuyPrice);
+        Assert.Equal(100u, TestSupport.Data.Items[41].SellPrice);
+    }
+
+    [Fact]
+    public void Picking_up_stackable_drops_merges_into_same_slot_until_max()
+    {
+        var zone = _zones.Find(79)!;
+        var d1 = zone.Drop(41, 64, 27);
+        var d2 = zone.Drop(41, 64, 27);
+        _session.DrainOutgoing();
+
+        new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d1.X, d1.Y, 4, 6, d1.Uid, 41)));
+        new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d2.X, d2.Y, 4, 6, d2.Uid, 41)));
+
+        var bag = _player.Character.Inventory.Main;
+        Assert.Single(bag.Items);
+        Assert.Equal(2u, bag[0]!.Amount);
     }
 
     // ---------- NPCs ----------
