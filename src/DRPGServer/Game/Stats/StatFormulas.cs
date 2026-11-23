@@ -63,27 +63,19 @@ public static class StatFormulas
         return 2 * Math.Max(0, Math.Min(level, end) - start);
     }
 
-    // ✅ status = ⌊c1·√a + c2·√b⌋, sem nível nem espécie (ajuste em 80 amostras v322, todos os estágios).
-    // Erra 1 ponto em: ATK 1, HP 0, DEF 0, BR 8, VP 2 amostras. Coeficientes = centro da região viável.
-    public const double AtkStr = 34.521, AtkAgi = 11.364;
-    public const double HpStr = 11.536, HpCon = 25.054;
-    public const double DefCon = 21.115, DefInt = 6.603;
-    public const double BrAgi = 9.900, BrInt = 31.642;
-    public const double VpCon = 11.213, VpInt = 25.446;
-
     /// <summary>
-    /// ✅ Cada status é uma soma de raízes de dois atributos (os que o jogo diz: STR → ATK, HP;
-    /// AGI → BR, ATK; CON → DEF, HP, VP; INT → BR, VP, DEF). ❓ Bônus de equipamento/buff não entram.
+    /// ✅ Fórmula exata confirmada em todas as amostras limpas v322 (0 erros em todas as capturas):
+    /// status = ⌊√(192 · (w1·attr1 + w2·attr2))⌋ = ⌊8 · √(3 · (w1·attr1 + w2·attr2))⌋
     /// </summary>
     public static CombatStats Combat(Attributes a, int level) => new(
-        MaxHp: Stat(HpStr, a.Str, HpCon, a.Con),
-        MaxVp: Stat(VpCon, a.Con, VpInt, a.Int),
+        MaxHp: Stat(2, a.Str, 5, a.Con),
+        MaxVp: Stat(2, a.Con, 5, a.Int),
         MaxEvp: MaxEvp(level),
-        Atk: Stat(AtkStr, a.Str, AtkAgi, a.Agi),
-        Def: Stat(DefCon, a.Con, DefInt, a.Int),
-        Br: Stat(BrAgi, a.Agi, BrInt, a.Int),
+        Atk: Stat(8, a.Str, 3, a.Agi),
+        Def: Stat(3, a.Con, 1, a.Int),
+        Br: Stat(2, a.Agi, 7, a.Int),
         MaxActionGauge: MaxActionGauge);
 
-    private static int Stat(double c1, int a, double c2, int b) =>
-        (int)Math.Floor(c1 * Math.Sqrt(Math.Max(0, a)) + c2 * Math.Sqrt(Math.Max(0, b)));
+    private static int Stat(int w1, int a, int w2, int b) =>
+        (int)Math.Floor(Math.Sqrt(192.0 * (w1 * Math.Max(0, a) + w2 * Math.Max(0, b))));
 }

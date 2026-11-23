@@ -464,6 +464,7 @@ public class CombatFormulaTests
     // amostras do oficial (v322): STR AGI CON INT → ATK DEF BR HP VP
     [Theory]
     [InlineData(10, 10, 10, 10, 145, 87, 131, 115, 115)]     // nível 1, qualquer espécie
+    [InlineData(13, 12, 12, 11, 163, 94, 139, 128, 123)]     // Gigimon L2 (DEF 94 exato)
     [InlineData(25, 16, 16, 13, 218, 108, 153, 157, 136)]    // Hopmon L4
     [InlineData(44, 32, 31, 21, 293, 147, 201, 216, 179)]    // Hopmon L10
     [InlineData(70, 60, 50, 50, 376, 195, 300, 273, 259)]    // rookie L11
@@ -473,6 +474,19 @@ public class CombatFormulaTests
     {
         var s = StatFormulas.Combat(new Attributes(str, agi, con, @int), 1);
         Assert.Equal((atk, def, br, hp, vp), (s.Atk, s.Def, s.Br, s.MaxHp, s.MaxVp));
+    }
+
+    [Theory]
+    [InlineData(1, 11, 3, 11, 1.05)]  // Vacina > Vírus
+    [InlineData(3, 11, 2, 11, 1.05)]  // Vírus > Dados
+    [InlineData(2, 11, 1, 11, 1.05)]  // Dados > Vacina
+    [InlineData(1, 11, 2, 11, 0.90)]  // Vacina < Dados
+    [InlineData(0, 1,  0, 2,  1.05)]  // Elemental: Fogo > Natureza (Gigimon vs Yuramon)
+    [InlineData(0, 11, 0, 2,  1.00)]  // Elemental: Neutro (Hopmon vs Yuramon)
+    public void Affinity_multipliers_match_expected(byte aAttr, byte aElem, byte tAttr, byte tElem, double expected)
+    {
+        double mult = DRPGServer.Game.Battle.BattleFormulas.AffinityMultiplier(aAttr, aElem, tAttr, tElem);
+        Assert.Equal(expected, mult, precision: 2);
     }
 }
 

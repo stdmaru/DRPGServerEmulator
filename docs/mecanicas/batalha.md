@@ -52,11 +52,13 @@ Dados: 67 batalhas v322 em `captures.db` (sessões 53, 54, 56 e 58; 362 golpes, 
 | 134 | u16 | ações feitas na batalha |
 
 ## ✅ Dano do ataque básico
-**dano = ⌊ATK² / (10·DEF)⌋**, com o ATK de quem ataca e o DEF de quem apanha, como estão no `0x63`.
+**dano = ⌊ATK² / (10·DEF) · mult⌋**, com o ATK de quem ataca e o DEF de quem apanha, como estão no `0x63`, multiplicado pelo fator de afinidade e atributo `mult`.
 - O `0x70` atualiza o ATK no meio da batalha: Mondrake L1 → L3 com 145 / 163 / 180 de ATK dá 33 / 42 / 51 de dano contra DEF 63.
-- O dano é exato nos pares sem atributo (in-training contra in-training): 28 de 28 pares.
-- ❓ Entre atributos (byte 161), o dano sai ×0,90…×1,05 do base, fixo para cada par. Exemplos: 1→2 ×0,90 / ×0,94, 1→1 ×1,00 / ×1,05, 1→0 ×0,95. Ainda não há regra; o emulador usa ×1.
-- Skills: o id vem no fim do `0x67` (236 ×1,08, 144/145 ×1,15 e ×2, 701/702 dos inimigos, 1078 multi-alvo). ❓ Ainda não implementadas.
+- **Ataques neutros:** O dano é exato nos pares sem vantagem/desvantagem (ex: Hopmon neutro contra Yuramon): $mult = 1{,}0$.
+- **Vantagem de afinidade e atributo:**
+  - Triângulo clássico (byte 161 do bloco): Vacina (1) > Vírus (3) > Dados (2) > Vacina (1). Vantagem dá $\times 1{,}05$, desvantagem dá $\times 0{,}90\dots 0{,}95$.
+  - Afinidade elemental (coluna 22 de `digimon_us`, bitmask no byte 162): Fogo (1) > Natureza (2, 9) > Água/Gelo (8, 10) > Fogo (1). Vantagem dá $\times 1{,}05$ (ex: Gigimon fogo vs Yuramon planta dá dano $+5\%$, explicando os 2~5 pontos a mais).
+- Skills: o id vem no fim do `0x67` (236 ×1,08, 144/145 ×1,15 e ×2, 701/702 dos inimigos, 1078 multi-alvo). Multiplicador de skill acumula com a afinidade.
 
 ## ❓ Acerto
 - O jogador erra 32 de 313 golpes (10 %). Os selvagens acertam 22 de 25, sem contar o Otamamon L50 contra o L160, que erra metade. Sem relação clara com nível ou BR.

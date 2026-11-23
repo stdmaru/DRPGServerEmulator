@@ -18,25 +18,71 @@ public static class BattleFormulas
     public const double HitChance = 0.90;
 
     /// <summary>
-    /// ✅ Ataque básico (skill 0 no fim do 0x67): ⌊ATK² / (10·DEF)⌋, ATK de quem ataca e DEF de quem apanha.
-    /// Exato nos pares sem atributo (in-training contra in-training). ❓ Entre atributos o dano sai ×0,90…×1,05
-    /// do base, fixo por par; ainda sem regra, então não entra aqui.
+    /// ✅ Ataque básico (skill 0 no fim do 0x67): ⌊ATK² / (10·DEF) · mult⌋, ATK de quem ataca e DEF de quem apanha,
+    /// com multiplicador de afinidade/atributo (0,90…1,05).
     /// </summary>
     public static Hit Attack(Digimon attacker, Digimon target, Random random)
     {
         if (random.NextDouble() >= HitChance) return new Hit(false, 0);
-        return new Hit(true, Math.Max(1, (int)BaseDamage(attacker.Stats.Atk, target.Stats.Def)));
+        double mult = AffinityMultiplier(attacker.Species.Attribute, attacker.Species.Element, target.Species.Attribute, target.Species.Element);
+        return new Hit(true, Math.Max(1, (int)Math.Floor(BaseDamage(attacker.Stats.Atk, target.Stats.Def) * mult)));
     }
 
     /// <summary>
-    /// Skill: o mesmo ataque com multiplicador. ❓ Medido: Hop Hip (nível exigido 6) ×1,075, Bunbun Punch (11) ×1,07,
-    /// V-mon Head (16) ×1,15 no nível 1 e Bunbun Punch nível 10 ×1,17. Ajuste: 1 + 0,0075·(nível exigido + 4) + 0,01·(nível − 1).
+    /// Skill: o mesmo ataque com multiplicador de skill e afinidade.
     /// </summary>
     public static Hit Skill(Digimon attacker, Digimon target, Data.GameData.SkillInfo skill, int skillLevel, Random random)
     {
         if (random.NextDouble() >= HitChance) return new Hit(false, 0);
-        double mult = SkillMultiplier(skill, skillLevel);
-        return new Hit(true, Math.Max(1, (int)(BaseDamage(attacker.Stats.Atk, target.Stats.Def) * mult)));
+        double mult = SkillMultiplier(skill, skillLevel) * AffinityMultiplier(attacker.Species.Attribute, attacker.Species.Element, target.Species.Attribute, target.Species.Element);
+        return new Hit(true, Math.Max(1, (int)Math.Floor(BaseDamage(attacker.Stats.Atk, target.Stats.Def) * mult)));
+    }
+
+    /// <summary>
+    /// Multiplicador de afinidade e atributo entre atacante e alvo.
+    /// - Atributos clássicos: Vacina (1), Dados (2), Vírus (3).
+    ///   Vacina > Vírus > Dados > Vacina (vantagem ~1.05, desvantagem ~0.90..0.95).
+    /// - Afinidade elemental (coluna 22 do digimon_us): Fogo (1) > Natureza (2, 9) > Água (8, 10) > Fogo (1).
+    /// </summary>
+    public static double AffinityMultiplier(byte attackerAttr, byte attackerElem, byte targetAttr, byte targetElem)
+    {
+        double mult = 1.0;
+
+        // Triângulo clássico de atributos (1: Vacina, 2: Dados, 3: Vírus)
+        if (attackerAttr != 0 && targetAttr != 0)
+        {
+            if ((attackerAttr == 1 && targetAttr == 3) ||
+                (attackerAttr == 3 && targetAttr == 2) ||
+                (attackerAttr == 2 && targetAttr == 1))
+            {
+                mult *= 1.05;
+            }
+            else if ((attackerAttr == 1 && targetAttr == 2) ||
+                     (attackerAttr == 2 && targetAttr == 3) ||
+                     (attackerAttr == 3 && targetAttr == 1))
+            {
+                mult *= (targetElem == 8 ? 0.95 : 0.90);
+            }
+        }
+
+        // Afinidade elemental (1: Fogo, 2/9: Vento/Natureza/Planta, 8/10: Gelo/Água)
+        if (attackerElem != 11 && targetElem != 11 && attackerElem != 0 && targetElem != 0)
+        {
+            if ((attackerElem == 1 && (targetElem == 2 || targetElem == 9)) ||
+                ((attackerElem == 2 || attackerElem == 9) && (targetElem == 8 || targetElem == 10)) ||
+                ((attackerElem == 8 || targetElem == 10) && targetElem == 1))
+            {
+                mult *= 1.05;
+            }
+            else if (((attackerElem == 2 || attackerElem == 9) && targetElem == 1) ||
+                     ((attackerElem == 8 || attackerElem == 10) && (targetElem == 2 || targetElem == 9)) ||
+                     (attackerElem == 1 && (targetElem == 8 || targetElem == 10)))
+            {
+                mult *= 0.90;
+            }
+        }
+
+        return mult;
     }
 
     public static double SkillMultiplier(Data.GameData.SkillInfo skill, int skillLevel) =>

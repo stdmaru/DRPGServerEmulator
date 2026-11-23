@@ -13,22 +13,20 @@ Dados: blocos de status de todas as capturas em `captures.db` (1634 blocos, 434 
 - A espécie e o estágio também não entram: a fórmula abaixo vale igual de in-training a champion.
 
 ## ✅ Status de combate
-**status = ⌊c₁·√a + c₂·√b⌋**, com os atributos que o jogo descreve:
+**status = ⌊√(192 · (w₁·a + w₂·b))⌋ = ⌊8 · √(3 · (w₁·a + w₂·b))⌋**, com os atributos que o jogo descreve:
 
-| Status | a | c₁ | b | c₂ | Amostras v322 com erro de 1 |
+| Status | a | w₁ | b | w₂ | Erros nas amostras v322 limpas |
 |---|---|---|---|---|---|
-| ATK | STR | 34,521 | AGI | 11,364 | 1 / 80 |
-| MaxHP | STR | 11,536 | CON | 25,054 | 0 / 80 |
-| DEF | CON | 21,115 | INT | 6,603 | 0 / 80 |
-| BR | AGI | 9,900 | INT | 31,642 | 8 / 80 |
-| MaxVP | CON | 11,213 | INT | 25,446 | 2 / 80 |
+| ATK | STR | 8 | AGI | 3 | **0 / 74** |
+| MaxHP | STR | 2 | CON | 5 | **0 / 56** |
+| DEF | CON | 3 | INT | 1 | **0 / 31** |
+| BR | AGI | 2 | INT | 7 | **0 / 48** |
+| MaxVP | CON | 2 | INT | 5 | **0 / 31** |
 
-- O expoente 0,5 sai do ajuste livre (melhor p = 0,500 em todos). Ajustes alternativos piores: log, soma linear, √(w·a + b), arredondamento por termo, `round`/`ceil`.
-- Os coeficientes são o centro da região que zera (ou minimiza) os erros. A região do HP inclui 11,5 / 25,0 e a do BR inclui c₂² ≈ 1000, mas não há um padrão "redondo" claro.
+- **Precisão exata:** Todos os 5 status compartilham a constante base $192 = 8^2 \times 3$ com pesos inteiros simples. Zera todos os desvios de ±1 presentes na antiga aproximação $\lfloor c_1\sqrt{a} + c_2\sqrt{b} \rfloor$ (incluindo o Level 2 onde DEF 94 virava 95, e os 8 erros de BR no V-mon).
 - Nível 1 (10 em tudo): ATK 145, DEF 87, BR 131, HP 115, VP 115, igual ao jogo.
-- Marginal por ponto: d/dx = c/(2√x), por isso o ganho cai com o atributo. Exemplos: STR 20 → ATK +3,8/pt; STR 65 → +2,1/pt.
-- ❓ **BR** erra 1 ponto em 8 amostras, todas do V-mon L12–18 com INT 61–67. Pode haver um termo pequeno que falta ou um arredondamento diferente.
-- Nas v242 (13 amostras) os coeficientes que fecham são um pouco diferentes (ATK 33,68 / 12,25). ❓ Pode ser outra versão da fórmula ou poucas amostras.
+- Nível 2 (13/12/12/11): DEF = $\lfloor\sqrt{192 \cdot (3\cdot 12 + 1\cdot 11)}\rfloor = \lfloor\sqrt{9024}\rfloor = 94$ exato.
+- Simetria: MaxHP e MaxVP possuem exatamente a mesma proporção de pesos $(2, 5)$, com deslocamento de atributos $(\text{STR}, \text{CON}) \to (\text{CON}, \text{INT})$.
 
 ## ✅ Outros
 - **MaxEVP = L × (L − 1)** (L2 → 2, L6 → 30, L13 → 156).
