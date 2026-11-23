@@ -263,6 +263,37 @@ public class TutorialTests
         Assert.Equal(2u, bag[0]!.Amount);
     }
 
+    [Fact]
+    public void Inventory_sort_0x148_merges_stacks_orders_and_sends_0xFC()
+    {
+        var inv = _player.Character.Inventory;
+        var bag = inv.Main;
+        // coloca itens fora de ordem e duas pilhas parciais da mesma semente (MaxStack = 8 na fixture)
+        bag.Place(inv.Create(22004, slot: 10, amount: 1));
+        bag.Place(inv.Create(41, slot: 5, amount: 5));
+        bag.Place(inv.Create(41, slot: 12, amount: 5));
+        bag.Place(inv.Create(74, slot: 20, amount: 2));
+        _session.DrainOutgoing();
+
+        var payload = new byte[38];
+        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), (ushort)BagKind.Inventory);
+        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(10), 1);
+        new InventorySortHandler().Handle(_session, new PacketReader(payload));
+
+        Assert.Equal([(ushort)0xFC], _session.SentOpcodes());
+        // ordenado por Type (74: Type 4, 41: Type 5 [8 + 2], 22004: Type 26) nos slots 0..3
+        Assert.Equal(74u, bag[0]!.ItemId);
+        Assert.Equal(2u, bag[0]!.Amount);
+        Assert.Equal(41u, bag[1]!.ItemId);
+        Assert.Equal(8u, bag[1]!.Amount);
+        Assert.Equal(41u, bag[2]!.ItemId);
+        Assert.Equal(2u, bag[2]!.Amount);
+        Assert.Equal(22004u, bag[3]!.ItemId);
+        Assert.Null(bag[4]);
+        Assert.Null(bag[10]);
+        Assert.Null(bag[20]);
+    }
+
     // ---------- NPCs ----------
 
     private NpcScripts Npcs => new(_zones);

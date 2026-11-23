@@ -312,6 +312,25 @@ public sealed class ItemDestroyHandler : PlayerHandler
     }
 }
 
+/// <summary>
+/// 0x148 (C2S 38): ✅ botão de auto-organizar inventário (u32 0, u32 0, u16 bolsa, u16 1).
+/// Ignorado em batalha (sessão 56); junta pilhas parciais, ordena os itens e devolve 0xFC.
+/// </summary>
+[PacketHandler(MapOpcode.InventorySort)]
+public sealed class InventorySortHandler : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        if (player.InBattle) return;
+        uint action = packet.ReadU32();
+        packet.ReadU32();
+        var bagKind = (BagKind)packet.ReadU16();
+        if (action != 0 || bagKind is not (BagKind.Inventory or BagKind.Battle)) return;
+        player.Character.Inventory.BagOf(bagKind).Sort();
+        player.Send(new InventoryRefreshPacket(player.Character));
+    }
+}
+
 /// <summary>0x121: o cliente pede; o servidor responde com o conteúdo capturado.</summary>
 [PacketHandler(MapOpcode.Unknown121)]
 public sealed class Unknown121Handler : ISessionPacketHandler

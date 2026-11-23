@@ -88,6 +88,7 @@ public enum MapOpcode : ushort
     DigimonReceived = 0xEF,        // S2C ✅ digimon novo no time (bloco)
     BattleCapture = 0xB3,          // S2C ✅ resultado da captura em batalha (2 = falhou)
     Unknown121 = 0x121,
+    InventorySort = 0x148,         // ✅ C2S botão de auto-organizar inventário (u32 0, u32 0, u16 bolsa, u16 1)
     Unknown152 = 0x152,
     PartySwap = 0x173,             // ✅ botão k troca as posições k + 1 e k + 2 do time
 }
