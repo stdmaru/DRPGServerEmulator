@@ -18,7 +18,7 @@ Evidência: `captures.db`, v242 (sessões 1–48) e v322 (52–56). Digimon: off
 **EXP para passar do nível L = 5·(L + 1)**. Capturas: L1 10, L5 30, L14 75, L15 80, L201 1010. A tabela antiga tinha só os níveis 1–8 dessa mesma conta.
 
 ## Recompensa de batalha (0x6E S2C, 32 bytes)
-`16 B serial`, `u32 EXP` em 16, `f64 bits` em 24. ✅ Com o evento de EXP ativo, a recompensa parou exatamente no que faltava para subir (sessão 54: 24, 57, 103 = EXP dos níveis 1, 2, 3). ❓ O ganho parece limitado a um nível por batalha.
+`16 B serial`, `u32 EXP` em 16, `f64 bits` em 24. ✅ Com o evento de EXP ativo, a recompensa parou exatamente no que faltava para subir (sessão 54: 24, 57, 103 = EXP dos níveis 1, 2, 3), descartando o excedente e deixando a EXP em 0. Configurável via `GameOptions.AllowMultiLevelUp` (`false` por padrão = comportamento oficial; `true` permite subir vários níveis de uma vez preservando o excedente).
 
 ## Evento de EXP (ex.: 1200%) ❓
 O cliente mostra o valor no canto superior esquerdo. O valor 1200 **não aparece** nas capturas v322 em nenhum formato simples (u16, u32, f32, f64 de 1200 ou de 12, nem em texto). Foram vistos `0x05`, `0x73`, `0x74`, `0xE6`, `0x152`, `0x121`, `0xCC` e os S2C do global.

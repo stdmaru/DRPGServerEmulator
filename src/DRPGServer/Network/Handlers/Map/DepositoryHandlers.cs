@@ -25,7 +25,7 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
 
         var character = player.Character;
         ushort clampedPage = Math.Clamp(page, (ushort)1, character.DepositoryTotalPages);
-        bool chargeFee = options.Value.ChargeDepositoryFee;
+        double depositoryFee = options.Value.DigimonDepositoryFee;
 
         switch (action)
         {
@@ -38,7 +38,7 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
             }
             case DepositoryAction.Deposit:
             {
-                var result = character.Deposit(partyDigimonUid, page, chargeFee);
+                var result = character.Deposit(partyDigimonUid, page, depositoryFee);
                 if (result == DepositoryResult.DepositOk)
                 {
                     player.RequestImmediateSave();
@@ -49,7 +49,7 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
             }
             case DepositoryAction.Withdraw:
             {
-                var (result, withdrawn) = character.Withdraw(depositoryDigimonUid, chargeFee);
+                var (result, withdrawn) = character.Withdraw(depositoryDigimonUid, depositoryFee);
                 if (result == DepositoryResult.WithdrawOk)
                 {
                     player.RequestImmediateSave();
@@ -60,7 +60,7 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
             }
             case DepositoryAction.Swap:
             {
-                var (result, withdrawn) = character.Swap(partyDigimonUid, depositoryDigimonUid, chargeFee);
+                var (result, withdrawn) = character.Swap(partyDigimonUid, depositoryDigimonUid, depositoryFee);
                 if (result == DepositoryResult.SwapOk)
                 {
                     player.RequestImmediateSave();

@@ -78,6 +78,15 @@ public sealed class GameOptions
     /// <summary>Slots iniciais liberados no Digimon Depository ao criar personagem (0..210). Padrão 10; 0 exige item (901/929).</summary>
     public byte DefaultDepositorySlots { get; set; } = 10;
 
-    /// <summary>Se true, cobra a taxa oficial em Bits por nível do Digimon no Depository (0x00BDFF10: 1k..70k).</summary>
-    public bool ChargeDepositoryFee { get; set; } = true;
+    /// <summary>
+    /// Taxa em Bits por Digimon no Depository: <c>0</c> = gratuito, <c>&gt; 0</c> = valor fixo em Bits,
+    /// <c>&lt; 0</c> = tabela oficial por nível (0x00BDFF10: 1k..70k). Padrão: <c>1000</c>.
+    /// </summary>
+    public double DigimonDepositoryFee { get; set; } = 1000;
+
+    /// <summary>
+    /// Se <c>true</c>, permite subir vários níveis de uma vez preservando o excedente de EXP.
+    /// Se <c>false</c> (padrão oficial), sobe apenas 1 nível por ganho de EXP e descarta o restante (EXP = 0).
+    /// </summary>
+    public bool AllowMultiLevelUp { get; set; } = false;
 }
