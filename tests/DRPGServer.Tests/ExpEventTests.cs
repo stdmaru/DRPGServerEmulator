@@ -57,6 +57,15 @@ public class ExpEventTests
         Assert.Equal((byte)20, onPlain[0]);
         Assert.Equal(2037u, BinaryPrimitives.ReadUInt32LittleEndian(onPlain.AsSpan(4, 4)));
         Assert.Equal((byte)1, onPlain[16]);
+
+        // Clamp do sprite acima do limite do cliente (80 = +2000% normal, 28 = +700% hot time), mantendo ExpMultiplier integral
+        var hugeNormal = new ActiveExpEvent(3, "3000%", BonusPercent: 3000, IsHotTime: false, DateTime.UtcNow, DateTime.UtcNow.AddDays(1));
+        Assert.Equal((byte)80, hugeNormal.SpriteIndex);
+        Assert.Equal(31.0, hugeNormal.ExpMultiplier);
+
+        var hugeHot = new ActiveExpEvent(4, "Hot 1000%", BonusPercent: 1000, IsHotTime: true, DateTime.UtcNow, DateTime.UtcNow.AddDays(1));
+        Assert.Equal((byte)28, hugeHot.SpriteIndex);
+        Assert.Equal(11.0, hugeHot.ExpMultiplier);
     }
 
     [Fact]

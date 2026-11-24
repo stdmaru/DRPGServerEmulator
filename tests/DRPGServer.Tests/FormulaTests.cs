@@ -27,6 +27,20 @@ public class ExpFormulaTests
     [InlineData(201, 1010)]
     public void Tamer_exp_matches_captures(int level, long expected) =>
         Assert.Equal(expected, ExpFormulas.TamerExpToNext(level));
+
+    [Theory]
+    [InlineData(28, 10, 12, 28)]  // diff -2 -> 100%
+    [InlineData(25, 9,  12, 25)]  // diff -3 -> 100%
+    [InlineData(22, 8,  12, 11)]  // diff -4 -> 50%
+    [InlineData(20, 7,  12, 10)]  // diff -5 -> 50%
+    [InlineData(12, 3,  9,  6)]   // diff -6 -> 50%
+    [InlineData(14, 4,  12, 2)]   // diff -8 -> 20%
+    [InlineData(12, 3,  12, 2)]   // diff -9 -> 20%
+    [InlineData(11, 2,  12, 0)]   // diff -10 -> 0%
+    [InlineData(159, 26, 16, 159)] // diff +10 -> 100%
+    [InlineData(0,  2,  2,  0)]   // override 0 (tutorial) continua 0
+    public void Exp_level_difference_penalty_matches_captures(long baseExp, int enemyLevel, int digimonLevel, long expected) =>
+        Assert.Equal(expected, ExpFormulas.ApplyLevelDifference(baseExp, enemyLevel, digimonLevel));
 }
 
 public class CombatFormulaTests

@@ -178,7 +178,7 @@
     <Spawn MapID="79" RespawnTime="1">
         <Point X="27" Y="65"/>
         <Point X="29" Y="66"/>
-        <Point X="31" Y="68"/>
+        <Point X="31" Y="67"/>
         <SpawnOption DigimonID="14" Level="2" HP="96" VP="50" ATK="60" DEF="43" BR="65" ExpReward="0" BitReward="7" AppearanceRate="100" DropGroup="1"/>
     </Spawn>
 
