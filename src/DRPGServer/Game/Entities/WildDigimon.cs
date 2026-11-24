@@ -86,6 +86,21 @@ public sealed class WildDigimon
 
     public void Stop() => State = WildState.Idle;
 
+    /// <summary>
+    /// ✅ Capturas v322 (conn=145, 179 — 3/3 grupos exclusivos): ao entrar em batalha (state 11) o oficial vira o
+    /// selvagem para uma diagonal de batalha (3 = NorthWest ou 7 = SouthEast) e mantém essa direção em state 8 (Dead),
+    /// pois os sprites só possuem animação de batalha/derrota nas diagonais.
+    /// </summary>
+    public void FaceBattleDiagonal(short targetX, short targetY) =>
+        Facing = targetX + targetY >= X + Y ? Direction.SouthEast : Direction.NorthWest;
+
+    /// <summary>Garante direção diagonal (NorthWest ou SouthEast) antes de exibir o estado Dead (8).</summary>
+    public void EnsureBattleDiagonal()
+    {
+        if (Facing is not (Direction.NorthWest or Direction.SouthEast))
+            Facing = Direction.SouthEast;
+    }
+
     /// <summary>✅ 0 = +y, 1 = (−x, +y), 2 = −x, 3 = (−x, −y), 4 = −y, 5 = (+x, −y), 6 = +x, 7 = (+x, +y).</summary>
     public static Direction FacingOf(int dx, int dy, Direction current) => (Math.Sign(dx), Math.Sign(dy)) switch
     {
