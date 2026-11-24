@@ -203,7 +203,7 @@ public class DigimonTitleTests
         var session = TestSupport.NewSession();
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
 
-        var unlocked = DigimonTitles.CheckAndNotify(player, digimon, data);
+        var unlocked = DigimonTitles.CheckAndNotify(player, digimon);
         Assert.Equal([DigimonTitles.FirstWin], unlocked);
 
         var frame = Assert.Single(session.DrainOutgoing());

@@ -31,7 +31,6 @@ public sealed class BattleSystem : IWorldSystem
     }
 
     internal Random Random => _world.Random;
-    internal GameData Data => _data;
     internal Taming Taming { get; }
     internal TimeSpan Now => _world.Now;
     public int Count => _battles.Count;

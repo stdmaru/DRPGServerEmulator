@@ -602,7 +602,7 @@ public sealed class Battle
                 {
                     c.Digimon.TotalBattles++;
                     if (result == BattleResult.Win) c.Digimon.TotalWins++;
-                    World.DigimonTitles.CheckAndNotify(player, c.Digimon, _system.Data);
+                    World.DigimonTitles.CheckAndNotify(player, c.Digimon);
                 }
                 // ✅ Vitória e derrota por nocaute (conn=408) mandam 0xB1 e 0x84 por digimon; fuga manda só 0x65/0x6A/0x6D
                 if (sendSummary)

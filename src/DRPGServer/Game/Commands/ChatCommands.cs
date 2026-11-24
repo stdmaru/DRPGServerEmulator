@@ -70,7 +70,7 @@ public sealed class ChatCommands
             if (p.Leader.UnlockTitle(titleId))
             {
                 p.RequestImmediateSave();
-                DigimonTitles.NotifyUnlocked(p, titleId);
+                DigimonTitles.NotifyUnlocked(p, p.Leader, titleId);
             }
             else
             {

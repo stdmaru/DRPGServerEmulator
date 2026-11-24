@@ -86,6 +86,7 @@ public sealed class Digimon
     /// <summary>✅ Títulos desbloqueados deste Digimon (enviados no 0x97, até <see cref="MaxTitles"/>).</summary>
     public IReadOnlyList<uint> Titles => _titles;
     public DigimonTitleInfo? EquippedTitle => TitleId == 0 ? null : _data.FindDigimonTitle(TitleId);
+    public string? FindTitleName(uint titleId) => _data.FindDigimonTitle(titleId)?.Name;
     public Attributes TitleAttributeBonus => EquippedTitle?.AttributeBonus ?? default;
 
     public int Hp { get; private set; }
