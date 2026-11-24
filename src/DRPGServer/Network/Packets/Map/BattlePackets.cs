@@ -1,5 +1,6 @@
 using DRPGServer.Game;
 using DRPGServer.Game.Battle;
+using DRPGServer.Game.Battle.Cards;
 using DRPGServer.Game.Entities;
 using DRPGServer.Network.Protocol;
 
@@ -141,7 +142,7 @@ public sealed class LockActionBarPacket : ServerPacket
 public sealed class ActionResultsPacket(
     IReadOnlyList<Combatant> actingTeam, IReadOnlyList<Combatant> otherTeam, Combatant actor,
     IReadOnlyDictionary<Combatant, bool> targetHits, byte attackType = Data.GameData.SkillInfo.TypeMelee,
-    ushort skillId = 0)
+    ushort skillId = 0, IReadOnlyDictionary<Combatant, ActivatedCards>? activatedCards = null)
     : ServerPacket
 {
     public const int EntryLength = 136;
@@ -176,7 +177,22 @@ public sealed class ActionResultsPacket(
             w.WriteI32(0);                      // 32
             w.WriteU8(c == actor ? attackType : (byte)0); // 36 ✅ quem age: 1 corpo-a-corpo/básico, 2 distância
             w.WriteU8(targetHits.TryGetValue(c, out bool landed) ? (byte)(landed ? 1 : 3) : (byte)0); // 37 ✅ alvo: 1 acertou, 3 errou
-            w.WriteZeros(96);                   // 38 ❓ 64/68/80 triggers de passivas/efeitos (DigimonRPG.bin @ 0xAF6350)
+            w.WriteZeros(2);                    // 38..39
+            if (activatedCards is not null && activatedCards.TryGetValue(c, out var cards))
+            {
+                // 40..63 ✅ Card Slash (conn=428, 433, 446): +40/+44/+48 CardId, +52/+56/+60 quantidade restante
+                w.WriteU32(cards[0]?.CardId ?? 0);
+                w.WriteU32(cards[1]?.CardId ?? 0);
+                w.WriteU32(cards[2]?.CardId ?? 0);
+                w.WriteU32(cards[0]?.RemainingAmount ?? 0);
+                w.WriteU32(cards[1]?.RemainingAmount ?? 0);
+                w.WriteU32(cards[2]?.RemainingAmount ?? 0);
+            }
+            else
+            {
+                w.WriteZeros(24);
+            }
+            w.WriteZeros(70);                   // 64..133 ❓ triggers de passivas/efeitos (DigimonRPG.bin @ 0xAF6350)
             w.WriteU16((ushort)c.Actions);      // 134 ações feitas na batalha
         }
     }

@@ -24,12 +24,22 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
                      ?? digimons.FirstOrDefault().Digimon;
         if (leader is null) return null;
 
-        var inventory = new Inventory(data.FindItem, (uint)options.Value.MaxStackPerItem);
+        var inventory = new Inventory(data.FindItem, (uint)options.Value.MaxStackPerItem, data.FindCard);
         foreach (var i in record.Items)
         {
-            if (data.FindItem(i.ItemId) is null || i.Amount == 0) continue;
-            var bag = inventory.BagOf(i.Bag == (byte)BagKind.Battle ? BagKind.Battle : BagKind.Inventory);
-            bag.Place(inventory.Create(i.ItemId, i.Slot, i.Amount, i.Uid));
+            if (i.Amount == 0) continue;
+            var bagKind = i.Bag switch
+            {
+                (byte)BagKind.Battle => BagKind.Battle,
+                (byte)BagKind.EquippedCards => BagKind.EquippedCards,
+                _ => BagKind.Inventory,
+            };
+            bool isCard = bagKind is BagKind.Battle or BagKind.EquippedCards;
+            bool valid = isCard
+                ? (data.Cards.Count > 0 ? data.FindCard(i.ItemId) is not null : data.FindItem(i.ItemId) is not null)
+                : data.FindItem(i.ItemId) is not null;
+            if (!valid) continue;
+            inventory.BagOf(bagKind).Place(inventory.Create(i.ItemId, i.Slot, i.Amount, i.Uid, isCard));
         }
 
         var character = new Character(leader, inventory)

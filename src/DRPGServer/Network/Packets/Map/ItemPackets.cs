@@ -53,48 +53,94 @@ public static class ItemRecord
 }
 
 /// <summary>
-/// ❓ Registro de 76 bytes da bolsa de batalha (os 24 primeiros do 0x03; 0xC8, 0x12). Só o Woodmon's Leaf do
-/// tutorial tem modelo capturado; os outros saem com as colunas da tabela no mesmo lugar do registro de 108.
+/// Registro de card de 76 bytes (0x02 offsets 784..1239, 0x03/0xFC primeiros 24 slots, 0x90, 0xC8).
+/// ✅ Layout confirmado contra capturas v322 (cards #74 Golden Drill X, #19 Recovery Floppy L, #3 Attack Plug-In, #5 Defense Plug-In C):
+/// +0 uid, +4 cardId, +8 tipo (col 2), +9 subtipo (col 3), +10 flag19 (col 19), +11 trigger (col 23: 1 ataque / 2 defesa),
+/// +12 restrição (col 24), +13 zero, +14 u16 quantidade, +16 pilha (col 21), +20 preço (col 12), +24 venda (col 13),
+/// +28..39 (duração, código e valor de efeito), +40..63 zeros, +64 u16 9999, +66 col 26, +68 col 28, +72..75 flags (col 27/29/30).
 /// </summary>
-public static class BattleItemRecord
+public static class CardRecord
 {
     public const int Length = 76;
 
+    private static (uint Duration, uint Code, uint Value) EffectFields(uint cardId) => cardId switch
+    {
+        3 => (3000, 7, 20),     // ✅ Attack Plug-In / +20% DMG (conn=442)
+        5 => (5000, 5, 20),     // ✅ Defense Plug-In C / +20% DEF (conn=446)
+        19 => (5000, 20, 50),   // ✅ Recovery Floppy L / +50 HP (conn=428/442)
+        74 => (0, 105, 1),      // ✅ Golden Drill X / AoE (conn=428/437)
+        _ => (0, 0, 0),
+    };
+
     public static void Write(PacketWriter w, InventoryItem item)
     {
-        var info = item.Info ?? new ItemInfo(item.ItemId, "");
-        w.WriteU32(item.Uid);                    // 0
-        w.WriteU32(item.ItemId);                 // 4
+        var card = item.CardInfo ?? FallbackCard(item);
+        var (duration, code, value) = EffectFields(item.ItemId);
+
+        w.WriteU32(item.Uid);                           // 0
+        w.WriteU32(item.ItemId);                        // 4
+        w.WriteU8(card.Type);                           // 8
+        w.WriteU8(card.SubType);                        // 9
+        w.WriteU8(card.Flag19);                         // 10
+        w.WriteU8((byte)card.Trigger);                  // 11
+        w.WriteU8(card.Restriction);                    // 12
+        w.WriteU8(0);                                   // 13
+        w.WriteU16((ushort)item.Amount);                // 14
+        w.WriteU32(card.MaxStack);                      // 16
+        w.WriteU32(card.BuyPrice);                      // 20
+        w.WriteU32(card.SellPrice);                     // 24
+        w.WriteU32(duration);                           // 28
+        w.WriteU32(code);                               // 32
+        w.WriteU32(value);                              // 36
+        w.WriteZeros(24);                               // 40..63
+        w.WriteU16(9999);                               // 64
+        w.WriteU16(card.Col26);                         // 66
+        w.WriteU32(card.Col28);                         // 68
+        w.WriteU8(card.Col30 != 0 ? card.Col27 : (byte)0); // 72
+        w.WriteU8(card.Col30 != 0 ? card.Col29 : (byte)0); // 73
+        w.WriteU8(0);                                   // 74
+        w.WriteU8(card.Col30);                          // 75
+    }
+
+    private static CardInfo FallbackCard(InventoryItem item)
+    {
         if (item.ItemId == 74)
         {
-            // ✅ Woodmon's Leaf (sessões 52–56): 04 01 00 01, u8 1, u8 0, u16 quantidade, 999, 1, …, 105, 1
-            w.WriteBytes([0x04, 0x01, 0x00, 0x01, 0x01, 0x00]);
-            w.WriteU16((ushort)item.Amount);
-            w.WriteU32(999);
-            w.WriteU32(1);
-            w.WriteZeros(8);
-            w.WriteU32(105);
-            w.WriteU32(1);
-            w.WriteZeros(24);
+            // ✅ Golden Drill X (fallback para pacotes sintéticos sem card_info_us.dat)
+            return new CardInfo(74, "Golden Drill X")
+            {
+                Type = 4,
+                SubType = 1,
+                Flag19 = 0,
+                Trigger = CardTrigger.Attack,
+                Restriction = 1,
+                MaxStack = 999,
+                BuyPrice = 1,
+                SellPrice = 0,
+                Col26 = 32000,
+                Col28 = 1_000_000,
+                Col30 = 0,
+            };
         }
-        else
+        var info = item.Info;
+        return new CardInfo(item.ItemId, info?.Name ?? "")
         {
-            w.WriteU8(info.Type);
-            w.WriteU8(info.SubType);
-            w.WriteU8(info.Flag24);
-            w.WriteU8(info.Flag33);
-            w.WriteU16(0);
-            w.WriteU16((ushort)item.Amount);     // 14 ✅ quantidade
-            w.WriteU32(info.MaxStack);
-            w.WriteU32(info.BuyPrice);
-            w.WriteU32(info.SellPrice);
-            w.WriteZeros(36);
-        }
-        w.WriteU16(9999);                        // 64
-        w.WriteU16(info.Col16);
-        w.WriteU32(info.Col17);
-        w.WriteU32(0);                           // 72
+            Type = info?.Type ?? 0,
+            SubType = info?.SubType ?? 0,
+            MaxStack = info?.MaxStack ?? 999,
+            BuyPrice = info?.BuyPrice ?? 0,
+            SellPrice = info?.SellPrice ?? 0,
+            Col26 = info?.Col16 ?? 32000,
+            Col28 = info?.Col17 ?? 1_000_000,
+        };
     }
+}
+
+/// <summary>Compatibilidade com código legado: delega para <see cref="CardRecord"/>.</summary>
+public static class BattleItemRecord
+{
+    public const int Length = CardRecord.Length;
+    public static void Write(PacketWriter w, InventoryItem item) => CardRecord.Write(w, item);
 }
 
 /// <summary>As duas bolsas como no 0x03: 24 × 76 (bolsa de batalha) e 24 × 108 (inventário), pela posição.</summary>
@@ -178,6 +224,23 @@ public readonly record struct ItemMoveHeader(ItemPlace From, ItemPlace To, int F
         w.WriteI32(FromB);
         w.WriteI32(ToA);
         w.WriteI32(ToB);
+    }
+}
+
+/// <summary>
+/// 0x90 (172 bytes): ✅ card movido, equipado, desequipado ou coletado (sessão 64+, conn=437, 442, 446).
+/// Cabeçalho de 20 bytes + registro de 76 bytes do card movido + registro de 76 bytes do card trocado (ou zeros).
+/// </summary>
+public sealed class CardMovePacket(ItemMoveHeader header, InventoryItem card, InventoryItem? displaced = null) : ServerPacket
+{
+    public override ushort Opcode => (ushort)MapOpcode.CardMove;
+
+    protected override void Write(PacketWriter w)
+    {
+        header.Write(w);
+        CardRecord.Write(w, card);
+        if (displaced is not null) CardRecord.Write(w, displaced);
+        else w.WriteZeros(CardRecord.Length);
     }
 }
 

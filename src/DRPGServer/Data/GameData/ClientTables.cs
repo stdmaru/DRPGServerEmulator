@@ -19,6 +19,7 @@ public static class ClientTables
     public const string DigimonTable = @"table\digimon_us.dat";
     public const string DexTable = @"table\dex_us.dat";
     public const string ItemTable = @"table\item_info_us.dat";
+    public const string CardTable = @"table\card_info_us.dat";
     public const string MapTable = @"table\map_us.dat";
     public const string SkillTable = @"table\digimon_skill_us.dat";
     public const string TreeTable = @"table\tree_us.dat";
@@ -73,6 +74,42 @@ public static class ClientTables
                 });
             }
         return items.ToFrozenDictionary();
+    }
+
+    /// <summary>
+    /// Cards: <c>card_info_us</c> (31 colunas, índices 0..30). ✅ Colunas mapeadas contra capturas v322 (0x02/0x03/0x90):
+    /// 0 id, 1 nome, 2 tipo, 3 subtipo, 12 preço, 13 venda, 19 flag, 21 pilha máxima (999), 23 momento de ativação
+    /// (1 ataque / 2 defesa), 24 restrição (0 normal, 1 PvE/evento, 3 Battle Zone), 25 descrição, 26..30 flags finais.
+    /// </summary>
+    public static FrozenDictionary<uint, CardInfo> Cards(ClientPack pack)
+    {
+        var cards = new Dictionary<uint, CardInfo>();
+        if (!pack.Contains(CardTable)) return cards.ToFrozenDictionary();
+        foreach (var f in pack.ReadTable(CardTable))
+            if (f.Length > 24 && uint.TryParse(f[0], CultureInfo.InvariantCulture, out var id) && id != 0)
+            {
+                uint col21 = UInt(f, 21);
+                byte trigger = Byte(f, 23);
+                string description = f.Length > 25 && f[25].Length > 0 ? f[25] : (f.Length > 4 ? f[4] : "");
+                cards.TryAdd(id, new CardInfo(id, f[1])
+                {
+                    Type = Byte(f, 2),
+                    SubType = Byte(f, 3),
+                    BuyPrice = UInt(f, 12),
+                    SellPrice = UInt(f, 13),
+                    Flag19 = Byte(f, 19),
+                    MaxStack = col21 is >= 1 and <= 999 ? col21 : 999u,
+                    Trigger = trigger == (byte)CardTrigger.Defense ? CardTrigger.Defense : CardTrigger.Attack,
+                    Restriction = Byte(f, 24),
+                    Col26 = UShort(f, 26),
+                    Col27 = Byte(f, 27),
+                    Col28 = UInt(f, 28),
+                    Col29 = Byte(f, 29),
+                    Col30 = Byte(f, 30),
+                    Description = description,
+                });
+            }
+        return cards.ToFrozenDictionary();
     }
 
     /// <summary>

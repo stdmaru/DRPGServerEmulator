@@ -7,6 +7,67 @@ using DRPGServer.Network.Protocol;
 namespace DRPGServer.Network.Handlers;
 
 /// <summary>
+/// 0x90 (C2S 186): ✅ mover, equipar, desequipar ou coletar card (<see cref="ItemMoveHeader"/> + registro de 76 B).
+/// Places: 1 = chão, 2 = 6 Card Slots equipados (row 0, col 0..5), 3 = mochila de Cards (row 0..3, col 0..5).
+/// Confirmado em conn=437, 442, 446: 3→2 (equipar), 2→3 (desequipar), 2→2, 3→3 e 1→3 (coletar).
+/// </summary>
+[PacketHandler(MapOpcode.CardMove)]
+public sealed class CardMoveHandler : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        var header = ItemMoveHeader.Read(packet);
+        uint uid = packet.ReadU32();
+        uint cardId = packet.ReadU32();
+        if (player.InBattle) return;
+
+        var cardBag = player.Character.Inventory.Battle;
+        var cardSlots = player.Character.Inventory.CardSlots;
+
+        switch (header.From, header.To)
+        {
+            case (ItemPlace.Ground, ItemPlace.Inventory):
+            {
+                if (player.Zone is not { } zone || zone.FindDrop(uid) is not { IsCard: true } drop || drop.ItemId != cardId) return;
+                if (cardBag.Add(drop.ItemId, 1) is not [.., var card]) return;
+                zone.RemoveDrop(drop);
+                player.RequestImmediateSave();
+                player.Send(new CardMovePacket(header with { ToA = card.Row, ToB = card.Column }, card));
+                break;
+            }
+            case (ItemPlace.Inventory, ItemPlace.Inventory):
+                MoveCard(player, header, uid, cardId, cardBag, ItemMoveHandler.SlotOf(header.FromA, header.FromB),
+                    cardBag, ItemMoveHandler.SlotOf(header.ToA, header.ToB));
+                break;
+            case (ItemPlace.Inventory, ItemPlace.CardSlots):
+                MoveCard(player, header, uid, cardId, cardBag, ItemMoveHandler.SlotOf(header.FromA, header.FromB),
+                    cardSlots, CardSlotOf(header.ToA, header.ToB));
+                break;
+            case (ItemPlace.CardSlots, ItemPlace.Inventory):
+                MoveCard(player, header, uid, cardId, cardSlots, CardSlotOf(header.FromA, header.FromB),
+                    cardBag, ItemMoveHandler.SlotOf(header.ToA, header.ToB));
+                break;
+            case (ItemPlace.CardSlots, ItemPlace.CardSlots):
+                MoveCard(player, header, uid, cardId, cardSlots, CardSlotOf(header.FromA, header.FromB),
+                    cardSlots, CardSlotOf(header.ToA, header.ToB));
+                break;
+        }
+    }
+
+    private static void MoveCard(Player player, ItemMoveHeader header, uint uid, uint cardId,
+        Bag fromBag, int fromSlot, Bag toBag, int toSlot)
+    {
+        if (fromBag[fromSlot] is not { } card || card.Uid != uid || card.ItemId != cardId) return;
+        if (!fromBag.MoveTo(fromSlot, toBag, toSlot, out var displaced)) return;
+        player.MarkDirty();
+        player.Send(new CardMovePacket(header, card, displaced));
+    }
+
+    internal static int CardSlotOf(int row, int column) =>
+        row == 0 && column is >= 0 and < Inventory.CardSlotCount ? column : -1;
+}
+
+/// <summary>
 /// 0x91 (C2S 250): ✅ mover item (<see cref="ItemMoveHeader"/> + registro do item). Do chão: origem (x, y) e destino
 /// "qualquer lugar"; o oficial tira o item do chão (0x13 zerado com x, y) e responde com a posição usada. Dentro do
 /// inventário: linha e coluna de origem e destino, trocando se o destino está ocupado.
@@ -26,7 +87,7 @@ public sealed class ItemMoveHandler : PlayerHandler
         {
             case (ItemPlace.Ground, ItemPlace.Inventory):
             {
-                if (player.Zone is not { } zone || zone.FindDrop(uid) is not { } drop || drop.ItemId != itemId) return;
+                if (player.Zone is not { } zone || zone.FindDrop(uid) is not { IsCard: false } drop || drop.ItemId != itemId) return;
                 if (bag.Add(drop.ItemId, 1) is not [.., var item]) return;   // inventário cheio: fica no chão
                 zone.RemoveDrop(drop);
                 player.RequestImmediateSave();

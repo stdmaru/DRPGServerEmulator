@@ -132,4 +132,8 @@ Em vez de um `switch` gigante em `Battle.cs`, usar uma estrutura modular dedicad
 ## 4. Checklist de Validação antes de começar a Fase 1
 - [x] Capturar movimentação de card da aba Cards ↔ 6 Card Slots (`C2S/S2C 0x90`) — ✅ `conn=437, 442, 446`.
 - [x] Capturar ativação de card de **Defesa** (`col 23 == 2`, `Defense Plug-In C` #5) em batalha — ✅ `conn=446`.
-- [ ] Revisar e aprovar este plano para iniciar a Fase 1.
+- [x] Revisar e aprovar este plano para iniciar a Fase 1.
+- [x] **Fase 1 implementada:** `CardInfo` (`card_info_us.dat`), `CardRecord` (76 B), 6 `CardSlots` no `Inventory` + `0x02` (`784..1239`) + persistência (`BagKind.EquippedCards = 4`) + `0x90` (`CardMoveHandler`).
+- [x] **Fase 2 implementada:** slots `0..2` em batalha (`0xA0`/`0xA1`), contador de `20` Card Slash por batalha, consumo de 1 unidade por ativação e escrita dos offsets `40..63` no `S2C 0x67` (atacante e defensor).
+- [x] **Fase 3 implementada:** `CardEffectRegistry` extensível cobrindo os cards padrão de Ataque (`col 23 == 1`) e Defesa (`col 23 == 2`).
+- [x] **Fase 4 implementada:** suíte `CardSlashTests.cs` completa e documentação sincronizada em `docs/mecanicas/batalha.md` e `docs/protocolo/structs/inventario.md`.

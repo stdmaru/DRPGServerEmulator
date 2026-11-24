@@ -7,8 +7,10 @@ Evidência: `captures.db`, sessões 52–56 (v322), 20 pacotes `0x03` S2C de 441
 
 | off | conteúdo |
 |---|---|
-| 0 | 24 registros de 76 bytes. ❓ Bolsa de itens de evolução: aparecem Woodmon's Leaf (74, sempre no 1º), Digimental of Hope (19), Crest of Friendship (128). Flags em +64 (`0F 27 00 7D 40 42 0F`), sem checagem. |
+| 0 | 24 registros de 76 bytes (`CardRecord`). ✅ Aba Cards (`card_info_us.dat`: ex. #74 `Golden Drill X`, #19 `Recovery Floppy L`, #5 `Defense Plug-In C`). Flags em +64 (`0F 27 00 7D 40 42 0F`), sem checagem. |
 | 1824 | 24 registros de item (108 bytes), pela posição no inventário (6 colunas). Vazio = zeros. |
+
+Os **6 Card Slots equipados** ficam em `S2C 0x02` (`CharacterDataPacket`) nos offsets **`784..1239`** (`6 × 76 = 456 bytes`, logo antes dos 5 blocos do time em `1240`). ✅ Confirmado em `conn=428, 437, 442, 446`.
 
 ## Registro de item (108 bytes) ✅
 O mesmo registro aparece no `0x97` (item recebido: 12 bytes, `u32` posição, registro, zeros).
@@ -32,6 +34,7 @@ Cabeçalho comum de 20 bytes: `u8 origem`, `u8 destino` (1 chão, 3 inventário,
 
 | Pacote | C2S | S2C | Conteúdo |
 |---|---|---|---|
+| `0x90` mover card | 186 | 172 | ✅ cabeçalho (`1` chão, `2` 6 Card Slots equipados `[row=0, col=0..5]`, `3` mochila de Cards `[row=0..3, col=0..5]`) + `CardRecord` (76 B) + `CardRecord` trocado (76 B ou zeros) |
 | `0x91` mover | 250 | 236 | cabeçalho + registro do item (108) + 108 zeros. Do chão: o oficial manda `0x13` zerado (item sai do chão) e responde com a posição usada |
 | `0xBD` jogar no chão | 254 | 240 | eco do cabeçalho e do registro, 108 zeros, `u32 1`. ✅ O item é destruído (não fica no chão) |
 | `0xC9` receber | — | 604 | `u32 n` (≤ 5) + n × (`u32 3`, `u32 linha`, `u32 coluna`, registro 108) com o estado novo da posição (posição esvaziada = registro zerado) |

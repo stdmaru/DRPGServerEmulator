@@ -91,7 +91,7 @@ public sealed record CharacterSnapshot(
             forms.AddRange(d.Forms.Select(f => new FormRow(d.Uid, f.Species.Id, f.Allocated.Str, f.Allocated.Agi,
                 f.Allocated.Con, f.Allocated.Int, (byte)f.SkillLevels[0], (byte)f.SkillLevels[1])));
         }
-        var items = new[] { c.Inventory.Main, c.Inventory.Battle }
+        var items = new[] { c.Inventory.Main, c.Inventory.Battle, c.Inventory.CardSlots }
             .SelectMany(b => b.Items.Select(i => new ItemRow((byte)b.Kind, (byte)i.Slot, i.Uid, i.ItemId, i.Amount)))
             .ToList();
         return new(c.Uid, c.Level, c.MapId, c.X, c.Y, c.Bits, c.TotalWins, c.TotalBattles, c.DepositorySlots,
