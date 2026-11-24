@@ -72,15 +72,15 @@ public sealed class ItemDestroyHandler : PlayerHandler
 }
 
 /// <summary>
-/// 0x148 (C2S 38): ✅ botão de auto-organizar inventário (DigimonRPG.bin @ 0x00B1310F / 0x00AE3820).
-/// Layout: u32 action (0), u32 0, u16 bagType (1 = bolsa de batalha, 2 = inventário principal; 3/4 = warehouse).
-/// Ignorado em batalha; junta pilhas parciais, ordena os itens e devolve 0xFC.
+/// 0x148 (C2S 38): ✅ botão de auto-organizar inventário (DigimonRPG.bin @ 0x00B1310F / 0x00B13355 / 0x00AE3820).
+/// Layout: u32 action (0), u32 0, u16 bagType (1 = inventário principal [aba 1, +0x1ED8], 2 = bolsa de batalha
+/// [aba 0, +0x17B8]; 3/4 = warehouse). Ignorado em batalha; junta pilhas parciais, ordena os itens e devolve 0xFC.
 /// </summary>
 [PacketHandler(MapOpcode.InventorySort)]
 public sealed class InventorySortHandler : PlayerHandler
 {
-    public const ushort BattleBagType = 1;
-    public const ushort MainInventoryType = 2;
+    public const ushort MainInventoryType = 1;
+    public const ushort BattleBagType = 2;
 
     protected override void Handle(Player player, PacketReader packet)
     {
@@ -92,8 +92,8 @@ public sealed class InventorySortHandler : PlayerHandler
 
         BagKind? bagKind = bagType switch
         {
-            BattleBagType => BagKind.Battle,
             MainInventoryType => BagKind.Inventory,
+            BattleBagType => BagKind.Battle,
             _ => null,
         };
         if (bagKind is null) return;
