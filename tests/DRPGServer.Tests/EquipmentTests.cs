@@ -3,6 +3,7 @@ using System.Collections.Frozen;
 using DRPGServer.Configuration;
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
+using DRPGServer.Game.Battle;
 using DRPGServer.Game.Battle.Cards;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Stats;
@@ -11,6 +12,7 @@ using DRPGServer.Network;
 using DRPGServer.Network.Handlers;
 using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace DRPGServer.Tests;
@@ -308,5 +310,156 @@ public class EquipmentTests
         Assert.Equal(220, reloaded.Leader.Stats.Atk); // 145 base + 75 Crest
         Assert.Equal(23, reloaded.TotalEquipmentBonus.CardSlashLimit);
         Assert.Equal(23, new CardBattleState(reloaded.TotalEquipmentBonus.CardSlashLimit).SlashesRemaining);
+    }
+
+    [Fact]
+    public void ParseEquipmentBonus_extracts_auras_and_combat_modifiers()
+    {
+        var deva = ClientTables.ParseEquipmentBonus(
+            "An aura that maintains the Digimon's current Evolution Stage. / It is maintained even when entering battle. / HP Recovery Amount 8 / EVP Recovery Amount 13");
+        Assert.True(deva.MaintainEvolution);
+        Assert.Equal(8, deva.HpRecovery);
+        Assert.Equal(13, deva.EvpRecovery);
+
+        // Aura of Evolution (#555) tem col 28 vazia
+        var evo555 = ClientTables.ParseEquipmentBonus("", "", itemId: 555);
+        Assert.True(evo555.MaintainEvolution);
+
+        // Aura of High-Velocity (#529): texto de auto-summon nas colunas 4..12
+        var highVel = ClientTables.ParseEquipmentBonus(
+            "VP Recovery Amount 8 / EVP Recovery Amount 15",
+            "At the start of battle, an aura that summons the leader and Partner Digimon at the same time.",
+            itemId: 529);
+        Assert.Equal(1, highVel.AutoSummonPartners);
+        Assert.Equal(8, highVel.VpRecovery);
+        Assert.Equal(15, highVel.EvpRecovery);
+
+        var combat = ClientTables.ParseEquipmentBonus(
+            "Damage +5% / Single Skill Damage +20% / Multi Skill Damage +15% / Melee Skill Damage +10% / Ranged Skill Damage +12% / Extra Card Slash 3 Times / Recover 30 HP, when attacking. / Recover 15 VP, when attacking.");
+        Assert.Equal(5, combat.BonusDamagePercent);
+        Assert.Equal(20, combat.SingleSkillDamagePercent);
+        Assert.Equal(15, combat.MultiSkillDamagePercent);
+        Assert.Equal(10, combat.MeleeSkillDamagePercent);
+        Assert.Equal(12, combat.RangedSkillDamagePercent);
+        Assert.Equal(3, combat.ExtraCardSlashes);
+        Assert.Equal(30, combat.OnHitHealHp);
+        Assert.Equal(15, combat.OnHitHealVp);
+    }
+
+    [Fact]
+    public void Aura_recovery_bonus_applies_to_zone_auto_recovery_tick()
+    {
+        var auraDeva = new ItemInfo(718, "Aura T of Deva")
+        {
+            Type = 27, SubType = 2, Level = 1, MaxStack = 1,
+            EquipmentBonus = ClientTables.ParseEquipmentBonus("HP Recovery Amount 8 / VP Recovery Amount 4 / EVP Recovery Amount 13"),
+        };
+        var items = new Dictionary<uint, ItemInfo>(TestItems) { [718] = auraDeva };
+        var inv = new Inventory(id => items.GetValueOrDefault(id), 99);
+        inv.Equipment.Place(inv.Create(718, (int)ItemPlace.Aura, 1));
+
+        var leader = new Digimon(TestSupport.Data, InTrainingSpecies, 10);
+        leader.Load(0, 0, 0, 0, hp: leader.Stats.MaxHp - 50, vp: leader.Stats.MaxVp - 30, evp: leader.Stats.MaxEvp - 40);
+        var (hp0, vp0, evp0) = (leader.Hp, leader.Vp, leader.Evp);
+
+        var character = new Character(leader, inv)
+        {
+            Uid = 10, AccountUid = 1, Slot = 0, Name = "Tamer", TamerId = 1, Level = 10, MapId = 79, X = 30, Y = 30,
+        };
+        var world = TestSupport.NewWorld();
+        var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var session = TestSupport.NewSession();
+        var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
+        session.Player = player;
+        zone.Enter(player);
+
+        // Avança além do RecoveryInterval (5.2s) -> deve curar base (5/3/10) + aura (8/4/13) = 13/7/23
+        zone.Update(Zone.RecoveryInterval + TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(50));
+        Assert.Equal(hp0 + 13, leader.Hp);
+        Assert.Equal(vp0 + 7, leader.Vp);
+        Assert.Equal(evp0 + 23, leader.Evp);
+    }
+
+    [Fact]
+    public void Aura_maintains_evolution_across_battle_end_and_devolves_on_unequip()
+    {
+        var auraDeva = new ItemInfo(718, "Aura T of Deva")
+        {
+            Type = 27, SubType = 2, Level = 1, MaxStack = 1,
+            EquipmentBonus = ClientTables.ParseEquipmentBonus(
+                "An aura that maintains the Digimon's current Evolution Stage. / It is maintained even when entering battle."),
+        };
+        var items = new Dictionary<uint, ItemInfo>(TestItems) { [718] = auraDeva };
+        var inv = new Inventory(id => items.GetValueOrDefault(id), 99);
+        var auraItem = inv.Create(718, (int)ItemPlace.Aura, 1);
+        inv.Equipment.Place(auraItem);
+
+        // Encontra espécie que possua evolução na tabela de testes
+        var baseSpecies = TestSupport.Data.Species.Values.First(s => TestSupport.Data.NextForm(s) is not null);
+        var evolvedSpecies = TestSupport.Data.NextForm(baseSpecies)!;
+        var leader = new Digimon(TestSupport.Data, baseSpecies, 21);
+
+        var character = new Character(leader, inv)
+        {
+            Uid = 10, AccountUid = 1, Slot = 0, Name = "Tamer", TamerId = 1, Level = 21, MapId = 79, X = 30, Y = 30,
+        };
+        var world = TestSupport.NewWorld();
+        var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var battles = new BattleSystem(world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        var session = TestSupport.NewSession();
+        var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
+        session.Player = player;
+        zone.Enter(player);
+
+        var battle = battles.StartPve(player, zone.WildDigimons.First().Serial)!;
+        Assert.True(leader.EvolveTo(evolvedSpecies));
+        Assert.True(leader.IsEvolved);
+
+        // Vitória com Aura equipada -> permanece evoluído
+        battle.KnockOut(BattleSide.B);
+        Assert.True(leader.IsEvolved);
+        Assert.Equal(evolvedSpecies.Id, leader.SpeciesId);
+
+        // Ao desequipar a Aura no mapa -> reverte para a forma-base
+        new ItemMoveHandler().Handle(session, MovePacket(ItemPlace.Aura, ItemPlace.Inventory, 0, 0, 0, 0, auraItem.Uid, 718));
+        Assert.False(leader.IsEvolved);
+        Assert.Equal(baseSpecies.Id, leader.SpeciesId);
+    }
+
+    [Fact]
+    public void High_velocity_aura_auto_summons_partner_on_battle_start()
+    {
+        var highVel = new ItemInfo(529, "Aura of High-Velocity")
+        {
+            Type = 8, SubType = 3, Level = 1, MaxStack = 1,
+            EquipmentBonus = ClientTables.ParseEquipmentBonus(
+                "VP Recovery Amount 8 / EVP Recovery Amount 15",
+                "At the start of battle, an aura that summons the leader and Partner Digimon at the same time.",
+                itemId: 529),
+        };
+        var items = new Dictionary<uint, ItemInfo>(TestItems) { [529] = highVel };
+        var inv = new Inventory(id => items.GetValueOrDefault(id), 99);
+        inv.Equipment.Place(inv.Create(529, (int)ItemPlace.Aura, 1));
+
+        var leader = new Digimon(TestSupport.Data, InTrainingSpecies, 5);
+        var partner = new Digimon(TestSupport.Data, InTrainingSpecies, 5);
+        var character = new Character(leader, inv)
+        {
+            Uid = 10, AccountUid = 1, Slot = 0, Name = "Tamer", TamerId = 1, Level = 5, MapId = 79, X = 30, Y = 30,
+        };
+        character.Place(1, partner);
+
+        var world = TestSupport.NewWorld();
+        var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var battles = new BattleSystem(world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        var session = TestSupport.NewSession();
+        var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
+        session.Player = player;
+        zone.Enter(player);
+
+        var battle = battles.StartPve(player, zone.WildDigimons.First().Serial)!;
+        Assert.Equal(2, battle.TeamA.Count);
+        Assert.Contains(battle.TeamA, c => c.Digimon == leader);
+        Assert.Contains(battle.TeamA, c => c.Digimon == partner);
     }
 }

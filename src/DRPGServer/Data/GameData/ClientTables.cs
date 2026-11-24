@@ -69,6 +69,7 @@ public static class ClientTables
                 uint col26 = UInt(f, 26);
                 byte type = Byte(f, 2);
                 string desc = f.Length > 28 ? f[28] : "";
+                string extraDesc = string.Join(' ', f.Skip(4).Take(Math.Min(9, Math.Max(0, f.Length - 4))).Where(s => !string.IsNullOrWhiteSpace(s)));
                 items.TryAdd(id, new ItemInfo(id, f[1])
                 {
                     Type = type, SubType = Byte(f, 3),
@@ -76,7 +77,7 @@ public static class ClientTables
                     Level = UInt(f, 20), Flag24 = Byte(f, 23), Flag25 = Byte(f, 24),
                     MaxStack = col26 is >= 1 and <= 999 ? col26 : 1u, Flag33 = Byte(f, 32),
                     Description = desc,
-                    EquipmentBonus = IsEquipmentItemType(type) ? ParseEquipmentBonus(desc) : EquipmentBonus.Empty,
+                    EquipmentBonus = IsEquipmentItemType(type) ? ParseEquipmentBonus(desc, extraDesc, id) : EquipmentBonus.Empty,
                 });
             }
         return items.ToFrozenDictionary();
@@ -93,77 +94,126 @@ public static class ClientTables
     };
 
     /// <summary>
-    /// Extrai os bônus de equipamento da coluna 28 de <c>item_info_us.dat</c>
-    /// (ex.: <c>ATK +75 / DEF +40 / Battle Rating +350</c>, <c>STR +6 / AGI +6 / CON +6</c>,
-    /// <c>Card Slash 23 times</c>, <c>Digimon EXP +100% / Tamer EXP +5</c>).
+    /// Extrai os bônus de equipamento da coluna 28 (e colunas 4..12 para Auras como <c>Aura of High-Velocity</c>)
+    /// de <c>item_info_us.dat</c>.
     /// </summary>
-    public static EquipmentBonus ParseEquipmentBonus(string description)
+    public static EquipmentBonus ParseEquipmentBonus(string description, string extraDescription = "", uint itemId = 0)
     {
-        if (string.IsNullOrWhiteSpace(description)) return EquipmentBonus.Empty;
-
         int str = 0, agi = 0, con = 0, intl = 0;
         int hp = 0, vp = 0, atk = 0, def = 0, br = 0;
         int atkPct = 0, defPct = 0, brPct = 0;
-        int cardSlash = 0, digimonExpPct = 0, tamerExp = 0;
+        int cardSlash = 0, extraCardSlashes = 0, digimonExpPct = 0, tamerExp = 0;
         int hpRec = 0, vpRec = 0, evpRec = 0;
+        bool maintainEvolution = itemId == 555; // Aura of Evolution (col 28 vazia na tabela)
+        int autoSummonPartners = 0;
+        int bonusDamagePct = 0, singleSkillPct = 0, multiSkillPct = 0, meleeSkillPct = 0, rangedSkillPct = 0;
+        int onHitHealHp = 0, onHitHealVp = 0;
 
-        foreach (string rawPart in description.Split('/'))
+        if (!string.IsNullOrWhiteSpace(extraDescription)
+            && extraDescription.Contains("summons the leader and Partner Digimon", StringComparison.OrdinalIgnoreCase))
         {
-            string part = rawPart.Trim();
-            if (part.Length == 0) continue;
+            autoSummonPartners += 1;
+        }
 
-            if (CardSlashRegex.Match(part) is { Success: true } cs)
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            foreach (string rawPart in description.Split('/'))
             {
-                cardSlash = Math.Max(cardSlash, int.Parse(cs.Groups[1].Value, CultureInfo.InvariantCulture));
-                continue;
-            }
-            if (DigimonExpRegex.Match(part) is { Success: true } de)
-            {
-                digimonExpPct += int.Parse(de.Groups[1].Value, CultureInfo.InvariantCulture);
-                continue;
-            }
-            if (TamerExpRegex.Match(part) is { Success: true } te)
-            {
-                tamerExp += int.Parse(te.Groups[1].Value, CultureInfo.InvariantCulture);
-                continue;
-            }
-            if (RecoveryRegex.Match(part) is { Success: true } rec)
-            {
-                int val = int.Parse(rec.Groups[2].Value, CultureInfo.InvariantCulture);
-                switch (rec.Groups[1].Value.ToUpperInvariant())
+                string part = rawPart.Trim();
+                if (part.Length == 0) continue;
+
+                if (part.Contains("maintains the Digimon's current Evolution Stage", StringComparison.OrdinalIgnoreCase))
                 {
-                    case "HP": hpRec += val; break;
-                    case "VP": vpRec += val; break;
-                    case "EVP": evpRec += val; break;
+                    maintainEvolution = true;
+                    continue;
                 }
-                continue;
-            }
-
-            foreach (Match m in TitleStatRegex.Matches(part))
-            {
-                string stat = m.Groups[1].Value.Trim().ToUpperInvariant();
-                int val = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
-                bool isPercent = m.Groups[3].Value == "%";
-                switch (stat)
+                if (CardSlashRegex.Match(part) is { Success: true } cs)
                 {
-                    case "ALL STATS":
-                        str += val; agi += val; con += val; intl += val;
-                        break;
-                    case "STR": str += val; break;
-                    case "AGI": agi += val; break;
-                    case "CON": con += val; break;
-                    case "INT": intl += val; break;
-                    case "HP" or "MAX HP": hp += val; break;
-                    case "VP" or "MAX VP": vp += val; break;
-                    case "ATK":
-                        if (isPercent) atkPct += val; else atk += val;
-                        break;
-                    case "DEF":
-                        if (isPercent) defPct += val; else def += val;
-                        break;
-                    case "BR" or "BATTLE RATING":
-                        if (isPercent) brPct += val; else br += val;
-                        break;
+                    cardSlash = Math.Max(cardSlash, int.Parse(cs.Groups[1].Value, CultureInfo.InvariantCulture));
+                    continue;
+                }
+                if (ExtraCardSlashRegex.Match(part) is { Success: true } ecs)
+                {
+                    extraCardSlashes += int.Parse(ecs.Groups[1].Value, CultureInfo.InvariantCulture);
+                    continue;
+                }
+                if (SummonMoreRegex.Match(part) is { Success: true } sm)
+                {
+                    autoSummonPartners += int.Parse(sm.Groups[1].Value, CultureInfo.InvariantCulture);
+                    continue;
+                }
+                if (DigimonExpRegex.Match(part) is { Success: true } de)
+                {
+                    digimonExpPct += int.Parse(de.Groups[1].Value, CultureInfo.InvariantCulture);
+                    continue;
+                }
+                if (TamerExpRegex.Match(part) is { Success: true } te)
+                {
+                    tamerExp += int.Parse(te.Groups[1].Value, CultureInfo.InvariantCulture);
+                    continue;
+                }
+                if (RecoveryRegex.Match(part) is { Success: true } rec)
+                {
+                    int val = int.Parse(rec.Groups[2].Value, CultureInfo.InvariantCulture);
+                    switch (rec.Groups[1].Value.ToUpperInvariant())
+                    {
+                        case "HP": hpRec += val; break;
+                        case "VP": vpRec += val; break;
+                        case "EVP": evpRec += val; break;
+                    }
+                    continue;
+                }
+                if (SkillDamageRegex.Match(part) is { Success: true } sd)
+                {
+                    int val = int.Parse(sd.Groups[2].Value, CultureInfo.InvariantCulture);
+                    switch (sd.Groups[1].Value.ToUpperInvariant())
+                    {
+                        case "SINGLE": singleSkillPct += val; break;
+                        case "MULTI": multiSkillPct += val; break;
+                        case "MELEE": meleeSkillPct += val; break;
+                        case "RANGED": rangedSkillPct += val; break;
+                    }
+                    continue;
+                }
+                if (GeneralDamageRegex.Match(part) is { Success: true } gd)
+                {
+                    bonusDamagePct += int.Parse(gd.Groups[1].Value, CultureInfo.InvariantCulture);
+                    continue;
+                }
+                if (OnHitHealRegex.Match(part) is { Success: true } oh)
+                {
+                    int val = int.Parse(oh.Groups[1].Value, CultureInfo.InvariantCulture);
+                    if (oh.Groups[2].Value.Equals("HP", StringComparison.OrdinalIgnoreCase)) onHitHealHp += val;
+                    else onHitHealVp += val;
+                    continue;
+                }
+
+                foreach (Match m in TitleStatRegex.Matches(part))
+                {
+                    string stat = m.Groups[1].Value.Trim().ToUpperInvariant();
+                    int val = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
+                    bool isPercent = m.Groups[3].Value == "%";
+                    switch (stat)
+                    {
+                        case "ALL STATS":
+                            str += val; agi += val; con += val; intl += val;
+                            break;
+                        case "STR": str += val; break;
+                        case "AGI": agi += val; break;
+                        case "CON": con += val; break;
+                        case "INT": intl += val; break;
+                        case "HP" or "MAX HP": hp += val; break;
+                        case "VP" or "MAX VP": vp += val; break;
+                        case "ATK":
+                            if (isPercent) atkPct += val; else atk += val;
+                            break;
+                        case "DEF":
+                            if (isPercent) defPct += val; else def += val;
+                            break;
+                        case "BR" or "BATTLE RATING":
+                            if (isPercent) brPct += val; else br += val;
+                            break;
+                    }
                 }
             }
         }
@@ -179,21 +229,41 @@ public static class ClientTables
             BonusDefPercent: defPct,
             BonusBrPercent: brPct,
             CardSlashLimit: cardSlash,
+            ExtraCardSlashes: extraCardSlashes,
             DigimonExpPercent: digimonExpPct,
             TamerExpFlat: tamerExp,
             HpRecovery: hpRec,
             VpRecovery: vpRec,
-            EvpRecovery: evpRec);
+            EvpRecovery: evpRec,
+            MaintainEvolution: maintainEvolution,
+            AutoSummonPartners: autoSummonPartners,
+            BonusDamagePercent: bonusDamagePct,
+            SingleSkillDamagePercent: singleSkillPct,
+            MultiSkillDamagePercent: multiSkillPct,
+            MeleeSkillDamagePercent: meleeSkillPct,
+            RangedSkillDamagePercent: rangedSkillPct,
+            OnHitHealHp: onHitHealHp,
+            OnHitHealVp: onHitHealVp);
     }
 
     private static readonly Regex CardSlashRegex = new(
         @"^Card Slash\s+(\d+)\s+times?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ExtraCardSlashRegex = new(
+        @"^Extra Card Slash\s+(\d+)\s+times?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex SummonMoreRegex = new(
+        @"^Summon\s+(\d+)\s+more Digimon$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex DigimonExpRegex = new(
         @"^Digimon EXP\s*\+?\s*(\d+)\s*%$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex TamerExpRegex = new(
         @"^Tamer EXP\s*\+?\s*(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex RecoveryRegex = new(
         @"^(HP|VP|EVP)\s+Recovery Amount\s+(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex SkillDamageRegex = new(
+        @"^(Single|Multi|Melee|Ranged)\s+Skill Damage\s*\+?\s*(\d+)\s*%$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex GeneralDamageRegex = new(
+        @"^Damag?e\s*\+?\s*(\d+)\s*%$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex OnHitHealRegex = new(
+        @"^Recover\s+(\d+)\s+(HP|VP),?\s*when attacking\.?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
     /// Cards: <c>card_info_us</c> (31 colunas, índices 0..30). ✅ Colunas mapeadas contra capturas v322 (0x02/0x03/0x90):
