@@ -143,18 +143,6 @@ public sealed class Digimon
         TitleId = equippedTitleId != 0 && HasTitle(equippedTitleId) ? equippedTitleId : 0;
     }
 
-    /// <summary>
-    /// Carga do banco: restaura HP/VP/EVP salvos, limitados ao intervalo válido <c>0..Max</c>.
-    /// Valores <c>null</c> (registros antigos ou recém-criados) mantêm o respectivo máximo cheio.
-    /// </summary>
-    public void LoadVitals(int? hp, int? vp, int? evp)
-    {
-        var s = Stats;
-        Hp = hp.HasValue ? Math.Clamp(hp.Value, 0, s.MaxHp) : s.MaxHp;
-        Vp = vp.HasValue ? Math.Clamp(vp.Value, 0, s.MaxVp) : s.MaxVp;
-        Evp = evp.HasValue ? Math.Clamp(evp.Value, 0, s.MaxEvp) : s.MaxEvp;
-    }
-
     private CombatStats ComputePlayerStats()
     {
         var title = EquippedTitle;
@@ -240,12 +228,16 @@ public sealed class Digimon
     }
 
     /// <summary>Restaura o estado salvo no banco (antes das formas).</summary>
-    public void Load(long exp, byte unlockedStage, int wins, int battles)
+    public void Load(long exp, byte unlockedStage, int wins, int battles, int? hp = null, int? vp = null, int? evp = null)
     {
         Exp = Math.Max(0, exp);
         UnlockedStage = Math.Max(UnlockedStage, unlockedStage);
         TotalWins = wins;
         TotalBattles = battles;
+        var s = Stats;
+        Hp = hp.HasValue ? Math.Clamp(hp.Value, 0, s.MaxHp) : s.MaxHp;
+        Vp = vp.HasValue ? Math.Clamp(vp.Value, 0, s.MaxVp) : s.MaxVp;
+        Evp = evp.HasValue ? Math.Clamp(evp.Value, 0, s.MaxEvp) : s.MaxEvp;
     }
 
     /// <summary>Restaura uma forma salva.</summary>

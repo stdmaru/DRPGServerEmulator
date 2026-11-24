@@ -189,11 +189,11 @@ public class PersistenceTests
         var d = Entities.Digimon(level: 10);
         // Registros antigos/novos (NULL) carregam cheios
         d.TakeDamage(40);
-        d.LoadVitals(null, null, null);
+        d.Load(0, 0, 0, 0, null, null, null);
         Assert.Equal((d.Stats.MaxHp, d.Stats.MaxVp, d.Stats.MaxEvp), (d.Hp, d.Vp, d.Evp));
 
         // Valores fora da faixa são limitados a 0..Max
-        d.LoadVitals(-50, 999_999, -1);
+        d.Load(0, 0, 0, 0, -50, 999_999, -1);
         Assert.Equal(0, d.Hp);
         Assert.Equal(d.Stats.MaxVp, d.Vp);
         Assert.Equal(0, d.Evp);
