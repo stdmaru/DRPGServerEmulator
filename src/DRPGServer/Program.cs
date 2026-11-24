@@ -6,6 +6,7 @@ using DRPGServer.Data.Persistence;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Battle;
 using DRPGServer.Game.Commands;
+using DRPGServer.Game.Npcs;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
 using DRPGServer.Network.Handlers;
@@ -78,7 +79,9 @@ services.AddSingleton<ZoneSystem>();
 services.AddSingleton<BattleSystem>();
 services.AddSingleton<PlayerSystem>();
 services.AddSingleton<CharacterFactory>();
-services.AddSingleton<NpcScripts>();
+services.AddSingleton<NpcScriptBase, VillageOfBeginningNpcs>();
+services.AddSingleton<NpcScriptBase, DigitalBureauNpcs>();
+services.AddSingleton<NpcScriptRegistry>();
 services.AddSingleton<Taming>();
 services.AddSingleton<ChatCommands>();
 
