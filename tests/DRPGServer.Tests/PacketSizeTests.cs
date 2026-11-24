@@ -76,6 +76,7 @@ public class PacketSizeTests
             (new Unknown74Packet(), 60),
             (new Unknown7EPacket(0x29), 1940),
             (new Unknown7FPacket(0x3D), 2708),
+            (new CardMovePacket(header, item), 172),                   // ✅ v322 (0x90)
             (new ItemMovePacket(header, item), 236),                   // ✅ v322 (0x91)
             (new ItemDestroyPacket(header, item), 240),                // ✅ v322 (0xBD)
             (new BattleItemReceivePacket([item]), 444),                // ✅ v322 (0xC8)
@@ -170,5 +171,27 @@ public class PacketSizeTests
         Assert.Equal(new short[] { 57, 91, 57, 91 }, Enumerable.Range(0, 4).Select(k => BitConverter.ToInt16(payload, 44 + 2 * k)));
         Assert.Equal(character.Leader.SpeciesId, BitConverter.ToUInt16(payload, 72));
         Assert.Equal(character.Leader.Level, BitConverter.ToInt32(payload, 96));
+    }
+
+    [Fact]
+    public void Character_data_writes_six_equipped_card_slots_at_offset_784()
+    {
+        // ✅ 0x02 v322 (conn=428/437/442/446): 6 × 76 bytes de CardSlots nos offsets 784..1239
+        var character = Entities.Character();
+        var card0 = character.Inventory.CardSlots.Add(74, 50)[0];
+        var card1 = character.Inventory.CardSlots.Add(19, 2)[0];
+        var payload = new CharacterDataPacket(character).EncodePayload();
+
+        Assert.Equal(7600, payload.Length);
+        var slot0 = payload.AsSpan(784, CardRecord.Length);
+        var slot1 = payload.AsSpan(784 + CardRecord.Length, CardRecord.Length);
+        Assert.Equal(card0.Uid, BitConverter.ToUInt32(slot0));
+        Assert.Equal(74u, BitConverter.ToUInt32(slot0[4..]));
+        Assert.Equal((ushort)50, BitConverter.ToUInt16(slot0[14..]));
+        Assert.Equal(card1.Uid, BitConverter.ToUInt32(slot1));
+        Assert.Equal(19u, BitConverter.ToUInt32(slot1[4..]));
+        Assert.Equal((ushort)2, BitConverter.ToUInt16(slot1[14..]));
+        // slots 2..5 vazios
+        Assert.True(payload.AsSpan(784 + 2 * CardRecord.Length, 4 * CardRecord.Length).IndexOfAnyExcept((byte)0) < 0);
     }
 }

@@ -72,6 +72,7 @@ public enum MapOpcode : ushort
     Unknown74 = 0x74,
     Unknown7E = 0x7E,
     Unknown7F = 0x7F,
+    CardMove = 0x90,               // ✅ mover/equipar/desequipar/coletar card (76 B)
     ItemDropGet = 0x91,            // ✅ mover item: do chão para o inventário ou dentro do inventário
     DepositoryExpand = 0x94,       // ✅ Digimon Depository: expansão de slot por item 901/929 (S2C 1 B)
     EvolutionList = 0x9E,          // ✅ C2S uid; S2C u8 1, u8 0, u16 × 3 formas liberadas

@@ -25,6 +25,32 @@ public sealed record ItemInfo(uint Id, string Name)
     public byte Flag33 { get; init; }
 }
 
+/// <summary>Momento de ativação de um card em batalha (coluna 23 de <c>card_info_us</c>).</summary>
+public enum CardTrigger : byte
+{
+    Attack = 1,
+    Defense = 2,
+}
+
+/// <summary>Card de <c>card_info_us</c> (469 entradas, 31 colunas; ver <see cref="ClientTables.Cards"/>).</summary>
+public sealed record CardInfo(uint Id, string Name)
+{
+    public byte Type { get; init; }
+    public byte SubType { get; init; }
+    public uint BuyPrice { get; init; }
+    public uint SellPrice { get; init; }
+    public byte Flag19 { get; init; }
+    public uint MaxStack { get; init; } = 999;
+    public CardTrigger Trigger { get; init; } = CardTrigger.Attack;
+    public byte Restriction { get; init; }
+    public ushort Col26 { get; init; } = 32000;
+    public byte Col27 { get; init; } = 1;
+    public uint Col28 { get; init; } = 1_000_000;
+    public byte Col29 { get; init; } = 1;
+    public byte Col30 { get; init; }
+    public string Description { get; init; } = "";
+}
+
 /// <summary>
 /// Skill de <c>digimon_skill_us</c>. ✅ Custo em VP = 20 + nível exigido.
 /// <paramref name="Type"/>: ✅ 1 = corpo-a-corpo, 2 = à distância (offset 36 do 0x67).
@@ -86,6 +112,7 @@ public sealed class GameData
 {
     public required FrozenDictionary<ushort, DigimonSpecies> Species { get; init; }
     public required FrozenDictionary<uint, ItemInfo> Items { get; init; }
+    public FrozenDictionary<uint, CardInfo> Cards { get; init; } = FrozenDictionary<uint, CardInfo>.Empty;
     public FrozenDictionary<ushort, SkillInfo> Skills { get; init; } = FrozenDictionary<ushort, SkillInfo>.Empty;
     /// <summary>Espécie → próxima forma da linha evolutiva (<c>tree_us</c>).</summary>
     public FrozenDictionary<ushort, ushort> Evolutions { get; init; } = FrozenDictionary<ushort, ushort>.Empty;
@@ -101,6 +128,7 @@ public sealed class GameData
     public DigimonSpecies? FindSpecies(ushort id) => Species.GetValueOrDefault(id);
     public SkillInfo? FindSkill(ushort id) => id == 0 ? null : Skills.GetValueOrDefault(id);
     public ItemInfo? FindItem(uint id) => Items.GetValueOrDefault(id);
+    public CardInfo? FindCard(uint id) => Cards.GetValueOrDefault(id);
 
     /// <summary>Próxima forma da linha (null no fim da linha ou se a espécie não está na árvore).</summary>
     public DigimonSpecies? NextForm(DigimonSpecies species) =>

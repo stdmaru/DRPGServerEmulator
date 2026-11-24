@@ -69,6 +69,10 @@ public class RealClientTablesTests
         var data = GameDataLoader.Load(resources, ClientPack.Open(table), File.Exists(grids) ? MapGrid.Load(grids) : null);
         Assert.True(data.Species.Count > 700);
         Assert.True(data.Items.Count > 10_000);
+        Assert.True(data.Cards.Count > 400);
+        Assert.Equal(("Golden Drill X", CardTrigger.Attack), (data.Cards[74].Name, data.Cards[74].Trigger));
+        Assert.Equal(CardTrigger.Attack, data.Cards[19].Trigger);
+        Assert.Equal(CardTrigger.Defense, data.Cards[5].Trigger);
         Assert.Equal((SkillInfo.TypeMelee, (byte)1), (data.Skills[236].Type, data.Skills[236].TargetCount));   // Hop Hip
         Assert.Equal((SkillInfo.TypeRanged, (byte)2), (data.Skills[9].Type, data.Skills[9].TargetCount));      // Double Fire
         Assert.Equal((SkillInfo.TypeRanged, (byte)5), (data.Skills[1078].Type, data.Skills[1078].TargetCount)); // Sun of Sorrows

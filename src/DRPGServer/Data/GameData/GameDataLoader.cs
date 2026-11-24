@@ -95,6 +95,7 @@ public static class GameDataLoader
         {
             Species = species,
             Items = items,
+            Cards = ClientTables.Cards(pack),
             Skills = ClientTables.Skills(pack),
             Evolutions = ClientTables.Evolutions(pack),
             DropGroups = drops.ToFrozenDictionary(),

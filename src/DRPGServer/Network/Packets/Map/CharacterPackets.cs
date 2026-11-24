@@ -31,7 +31,13 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
         w.WriteI16(0);                          // batalhas ranqueadas
         w.WriteI32(1800);                       // pontos ranqueados
         w.WriteU8((byte)Rank.ChromeDigizoid);
-        w.WriteZeros(1151);
+        w.WriteZeros(695);                      // 89..783
+        // 784..1239: ✅ 6 Card Slots equipados (6 × 76 = 456 bytes, conn=428/437/442/446)
+        for (int slot = 0; slot < Inventory.CardSlotCount; slot++)
+        {
+            if (c.Inventory.CardSlots[slot] is { } card) CardRecord.Write(w, card);
+            else w.WriteZeros(CardRecord.Length);
+        }
 
         // 1240: ✅ 5 blocos de status, um por posição do time (líder na 0; pode haver posição vazia, sessão 56)
         foreach (var d in c.Party)

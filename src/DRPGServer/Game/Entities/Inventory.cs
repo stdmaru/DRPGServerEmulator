@@ -3,52 +3,60 @@ using DRPGServer.Data.GameData;
 namespace DRPGServer.Game.Entities;
 
 /// <summary>
-/// Onde fica um item, pelo código que o 0x91/0xBD usam como origem e destino. ✅ 1 chão, 3 inventário
-/// (sessões 53 e 56); 0x33 é a bolsa extra equipada (❓ não implementada).
+/// Onde fica um item ou card, pelo código que o 0x90/0x91/0xBD usam como origem e destino.
+/// ✅ 1 chão, 2 os 6 Card Slots equipados (0x90), 3 inventário / mochila de cards (sessões 53, 56, 64);
+/// 0x33 é a bolsa extra equipada (❓ não implementada).
 /// </summary>
 public enum ItemPlace : byte
 {
     Ground = 1,
+    CardSlots = 2,
     Inventory = 3,
     ExtraBag = 0x33,
 }
 
-/// <summary>Bolsa: o inventário (registros de 108 bytes) e a bolsa de batalha (❓ registros de 76 bytes no 0x03).</summary>
+/// <summary>Bolsa: o inventário (108 B), a mochila de cards (76 B no 0x03) e os 6 Card Slots equipados (76 B no 0x02).</summary>
 public enum BagKind : byte
 {
-    Inventory = 3,
     Battle = 2,
+    Inventory = 3,
+    EquippedCards = 4,
 }
 
 public sealed class InventoryItem
 {
     public required uint Uid { get; init; }
     public required uint ItemId { get; init; }
-    /// <summary>Linha do <c>item_info_us</c> (null se a tabela não tem o item).</summary>
+    /// <summary>Linha do <c>item_info_us</c> (null se for card ou se a tabela não tem o item).</summary>
     public ItemInfo? Info { get; init; }
+    /// <summary>Linha do <c>card_info_us</c> (null se for item normal ou se a tabela não tem o card).</summary>
+    public CardInfo? CardInfo { get; init; }
     public int Slot { get; set; }
     public uint Amount { get; set; }
 
-    /// <summary>A grade tem 6 colunas (✅ 0x91: linha 3, coluna 5 é a última posição).</summary>
+    /// <summary>A grade tem 6 colunas (✅ 0x91/0x90: linha 3, coluna 5 é a última posição).</summary>
     public int Row => Slot / Inventory.Columns;
     public int Column => Slot % Inventory.Columns;
 }
 
-/// <summary>Uma bolsa de 24 posições.</summary>
+/// <summary>Uma bolsa de itens ou cards (24 posições nas mochilas; 6 nos Card Slots equipados).</summary>
 public sealed class Bag
 {
-    private readonly InventoryItem?[] _slots = new InventoryItem?[Inventory.Size];
+    private readonly InventoryItem?[] _slots;
     private readonly Inventory _owner;
 
-    internal Bag(Inventory owner, BagKind kind)
+    internal Bag(Inventory owner, BagKind kind, int size = Inventory.Size)
     {
         _owner = owner;
         Kind = kind;
+        _slots = new InventoryItem?[size];
     }
 
     public BagKind Kind { get; }
+    public int Capacity => _slots.Length;
+    public bool IsCardBag => Kind is BagKind.Battle or BagKind.EquippedCards;
     public IEnumerable<InventoryItem> Items => _slots.OfType<InventoryItem>();
-    public InventoryItem? this[int slot] => slot is >= 0 and < Inventory.Size ? _slots[slot] : null;
+    public InventoryItem? this[int slot] => slot >= 0 && slot < _slots.Length ? _slots[slot] : null;
     public bool HasFreeSlot => Array.IndexOf(_slots, null) >= 0;
 
     public InventoryItem? Find(uint itemId) => _slots.FirstOrDefault(i => i?.ItemId == itemId);
@@ -57,7 +65,7 @@ public sealed class Bag
     /// <summary>Quanto ainda cabe do item (pilhas existentes + posições livres).</summary>
     public uint Room(uint itemId)
     {
-        uint max = _owner.MaxStackOf(itemId);
+        uint max = _owner.MaxStackOf(itemId, IsCardBag);
         long room = Items.Where(i => i.ItemId == itemId).Sum(i => (long)(max - Math.Min(max, i.Amount)));
         room += (long)_slots.Count(s => s is null) * max;
         return (uint)Math.Min(room, uint.MaxValue);
@@ -70,7 +78,7 @@ public sealed class Bag
     public IReadOnlyList<InventoryItem> Add(uint itemId, uint amount)
     {
         if (amount == 0 || Room(itemId) < amount) return [];
-        uint max = _owner.MaxStackOf(itemId);
+        uint max = _owner.MaxStackOf(itemId, IsCardBag);
         var changed = new List<InventoryItem>();
         foreach (var stack in _slots.Where(s => s?.ItemId == itemId && s.Amount < max).Cast<InventoryItem>())
         {
@@ -84,7 +92,7 @@ public sealed class Bag
         {
             int slot = Array.IndexOf(_slots, null);
             uint put = Math.Min(amount, max);
-            var item = _owner.Create(itemId, slot, put);
+            var item = _owner.Create(itemId, slot, put, isCard: IsCardBag);
             _slots[slot] = item;
             amount -= put;
             changed.Add(item);
@@ -123,20 +131,40 @@ public sealed class Bag
     /// <summary>Coloca um item salvo (carga do banco).</summary>
     public bool Place(InventoryItem item)
     {
-        if (item.Slot is < 0 or >= Inventory.Size || _slots[item.Slot] is not null) return false;
+        if (item.Slot < 0 || item.Slot >= _slots.Length || _slots[item.Slot] is not null) return false;
         _slots[item.Slot] = item;
         _owner.SeenUid(item.Uid);
         return true;
     }
 
-    /// <summary>✅ 0x91 dentro do inventário: move para a posição; se estiver ocupada, troca. Devolve o que estava lá.</summary>
+    /// <summary>✅ 0x91/0x90 dentro da mesma bolsa: move para a posição; se estiver ocupada, troca. Devolve o que estava lá.</summary>
     public bool Move(int from, int to, out InventoryItem? displaced)
     {
         displaced = null;
-        if (from is < 0 or >= Inventory.Size || to is < 0 or >= Inventory.Size || from == to || _slots[from] is not { } item)
+        if (from < 0 || from >= _slots.Length || to < 0 || to >= _slots.Length || from == to || _slots[from] is not { } item)
             return false;
         displaced = _slots[to];
         _slots[to] = item;
+        item.Slot = to;
+        _slots[from] = displaced;
+        if (displaced is not null) displaced.Slot = from;
+        return true;
+    }
+
+    /// <summary>
+    /// ✅ 0x90 entre bolsas compatíveis (mochila de cards ↔ 6 Card Slots): move para o destino; se ocupado, troca.
+    /// </summary>
+    public bool MoveTo(int from, Bag destination, int to, out InventoryItem? displaced)
+    {
+        if (ReferenceEquals(this, destination))
+            return Move(from, to, out displaced);
+
+        displaced = null;
+        if (from < 0 || from >= _slots.Length || to < 0 || to >= destination._slots.Length || _slots[from] is not { } item)
+            return false;
+
+        displaced = destination._slots[to];
+        destination._slots[to] = item;
         item.Slot = to;
         _slots[from] = displaced;
         if (displaced is not null) displaced.Slot = from;
@@ -164,14 +192,14 @@ public sealed class Bag
         var merged = new List<InventoryItem>(items.Count);
         foreach (var group in items.GroupBy(i => i.ItemId))
         {
-            uint max = _owner.MaxStackOf(group.Key);
+            uint max = _owner.MaxStackOf(group.Key, IsCardBag);
             var ordered = group.OrderBy(i => i.Uid).ToList();
             long total = ordered.Sum(i => (long)i.Amount);
             int idx = 0;
             while (total > 0)
             {
                 uint put = (uint)Math.Min(total, max);
-                var entry = idx < ordered.Count ? ordered[idx++] : _owner.Create(group.Key, 0, put);
+                var entry = idx < ordered.Count ? ordered[idx++] : _owner.Create(group.Key, 0, put, isCard: IsCardBag);
                 entry.Amount = put;
                 merged.Add(entry);
                 total -= put;
@@ -181,9 +209,13 @@ public sealed class Bag
         // 2. Ordena por categoria (Type, SubType), ItemId, pilhas cheias primeiro e UID
         merged.Sort((a, b) =>
         {
-            int c = (a.Info?.Type ?? 0).CompareTo(b.Info?.Type ?? 0);
+            byte typeA = IsCardBag ? (a.CardInfo?.Type ?? a.Info?.Type ?? 0) : (a.Info?.Type ?? 0);
+            byte typeB = IsCardBag ? (b.CardInfo?.Type ?? b.Info?.Type ?? 0) : (b.Info?.Type ?? 0);
+            int c = typeA.CompareTo(typeB);
             if (c != 0) return c;
-            c = (a.Info?.SubType ?? 0).CompareTo(b.Info?.SubType ?? 0);
+            byte subA = IsCardBag ? (a.CardInfo?.SubType ?? a.Info?.SubType ?? 0) : (a.Info?.SubType ?? 0);
+            byte subB = IsCardBag ? (b.CardInfo?.SubType ?? b.Info?.SubType ?? 0) : (b.Info?.SubType ?? 0);
+            c = subA.CompareTo(subB);
             if (c != 0) return c;
             c = a.ItemId.CompareTo(b.ItemId);
             if (c != 0) return c;
@@ -201,44 +233,72 @@ public sealed class Bag
     }
 }
 
-/// <summary>Inventário do personagem: as duas bolsas e o contador de uids (único por personagem).</summary>
+/// <summary>Inventário do personagem: aba Items, aba Cards, 6 Card Slots equipados e contador de uids.</summary>
 public sealed class Inventory
 {
     public const int Size = 24;
     public const int Columns = 6;
+    public const int CardSlotCount = 6;
 
     private readonly Func<uint, ItemInfo?> _lookup;
+    private readonly Func<uint, CardInfo?> _cardLookup;
     private readonly uint _maxStackCap;
     private uint _nextUid = 1;
 
-    /// <param name="lookup">Linha do item na tabela.</param>
-    /// <param name="maxStackCap">Teto de pilha (configuração); a pilha de cada item é a coluna 27 do <c>item_info_us</c>.</param>
-    public Inventory(Func<uint, ItemInfo?> lookup, uint maxStackCap)
+    /// <param name="lookup">Linha do item em <c>item_info_us</c>.</param>
+    /// <param name="maxStackCap">Teto de pilha (configuração).</param>
+    /// <param name="cardLookup">Linha do card em <c>card_info_us</c> (opcional em testes sintéticos).</param>
+    public Inventory(Func<uint, ItemInfo?> lookup, uint maxStackCap, Func<uint, CardInfo?>? cardLookup = null)
     {
         _lookup = lookup;
+        _cardLookup = cardLookup ?? (_ => null);
         _maxStackCap = Math.Max(1, maxStackCap);
-        Main = new Bag(this, BagKind.Inventory);
-        Battle = new Bag(this, BagKind.Battle);
+        Main = new Bag(this, BagKind.Inventory, Size);
+        Battle = new Bag(this, BagKind.Battle, Size);
+        CardSlots = new Bag(this, BagKind.EquippedCards, CardSlotCount);
     }
 
     /// <summary>Sem tabela de itens: toda pilha vai até <paramref name="maxStack"/>.</summary>
-    public Inventory(uint maxStack) : this(_ => null, maxStack) { }
+    public Inventory(uint maxStack) : this(_ => null, maxStack, null) { }
 
     public Bag Main { get; }
-    /// <summary>❓ Bolsa dos registros de 76 bytes do 0x03 (Woodmon's Leaf, Meat, Digimentals); recebe pelo 0xC8.</summary>
+    /// <summary>✅ Aba Cards (24 slots, registros de 76 bytes no 0x03/0xFC; recebe pelo 0xC8; move pelo 0x90).</summary>
     public Bag Battle { get; }
+    /// <summary>✅ 6 Card Slots equipados no inventário (0x02 offsets 784..1239; 0x90 place = 2).</summary>
+    public Bag CardSlots { get; }
     public IEnumerable<InventoryItem> Items => Main.Items;
 
-    public Bag BagOf(BagKind kind) => kind == BagKind.Battle ? Battle : Main;
+    public Bag BagOf(BagKind kind) => kind switch
+    {
+        BagKind.Battle => Battle,
+        BagKind.EquippedCards => CardSlots,
+        _ => Main,
+    };
 
-    internal uint MaxStackOf(uint itemId) => Math.Min(_maxStackCap, _lookup(itemId)?.MaxStack ?? _maxStackCap);
+    internal uint MaxStackOf(uint itemId, bool isCard = false)
+    {
+        uint tableMax = isCard
+            ? _cardLookup(itemId)?.MaxStack ?? _lookup(itemId)?.MaxStack ?? _maxStackCap
+            : _lookup(itemId)?.MaxStack ?? _maxStackCap;
+        return Math.Min(_maxStackCap, tableMax);
+    }
 
-    /// <summary>Item novo com uid novo (ou o salvo, na carga).</summary>
-    public InventoryItem Create(uint itemId, int slot, uint amount, uint uid = 0)
+    /// <summary>Item ou card novo com uid novo (ou o salvo, na carga).</summary>
+    public InventoryItem Create(uint itemId, int slot, uint amount, uint uid = 0, bool isCard = false)
     {
         if (uid == 0) uid = _nextUid++;
         else SeenUid(uid);
-        return new InventoryItem { Uid = uid, ItemId = itemId, Info = _lookup(itemId), Slot = slot, Amount = amount };
+        var cardInfo = isCard ? _cardLookup(itemId) : null;
+        var itemInfo = isCard && cardInfo is not null ? null : _lookup(itemId);
+        return new InventoryItem
+        {
+            Uid = uid,
+            ItemId = itemId,
+            Info = itemInfo,
+            CardInfo = cardInfo,
+            Slot = slot,
+            Amount = amount,
+        };
     }
 
     internal void SeenUid(uint uid) => _nextUid = Math.Max(_nextUid, uid + 1);
