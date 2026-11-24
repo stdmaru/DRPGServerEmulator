@@ -64,8 +64,7 @@ public sealed record FormRow(uint DigimonUid, ushort SpeciesId, int AllocStr, in
 public sealed record TitleRow(uint DigimonUid, uint TitleId);
 
 /// <summary>Um item de uma bolsa (tabela <c>inventory_item</c>).</summary>
-public sealed record ItemRow(byte Bag, byte Slot, uint Uid, uint ItemId, uint Amount,
-    uint ExpiresAt = 0, uint DurationSeconds = 0);
+public sealed record ItemRow(byte Bag, byte Slot, uint Uid, uint ItemId, uint Amount, uint ExpiresAt = 0);
 
 /// <summary>Personagem completo para entrar no mapa.</summary>
 public sealed record CharacterRecord(
@@ -105,7 +104,7 @@ public sealed record CharacterSnapshot(
             titles.AddRange(d.Titles.Select(t => new TitleRow(d.Uid, t)));
         }
         var items = new[] { c.Inventory.Main, c.Inventory.Battle, c.Inventory.CardSlots, c.Inventory.Equipment }
-            .SelectMany(b => b.Items.Select(i => new ItemRow((byte)b.Kind, (byte)i.Slot, i.Uid, i.ItemId, i.Amount, i.ExpiresAt, i.DurationSeconds)))
+            .SelectMany(b => b.Items.Select(i => new ItemRow((byte)b.Kind, (byte)i.Slot, i.Uid, i.ItemId, i.Amount, i.ExpiresAt)))
             .ToList();
         return new(c.Uid, c.Level, c.MapId, c.X, c.Y, c.Bits, c.TotalWins, c.TotalBattles, c.DepositorySlots,
             digimons, forms, items, c.Flags.Order().ToList(), titles);
@@ -164,7 +163,7 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
             ORDER BY t.title_id
             """, new { uid }, cancellationToken: ct));
         var items = await db.QueryAsync<ItemRow>(new CommandDefinition(
-            "SELECT bag, slot, uid, item_id, amount, expires_at, duration_seconds FROM inventory_item WHERE character_uid = @uid", new { uid }, cancellationToken: ct));
+            "SELECT bag, slot, uid, item_id, amount, expires_at FROM inventory_item WHERE character_uid = @uid", new { uid }, cancellationToken: ct));
         var flags = await db.QueryAsync<ushort>(new CommandDefinition(
             "SELECT flag FROM character_flag WHERE character_uid = @uid", new { uid }, cancellationToken: ct));
         return new CharacterRecord(row, digimons.ToList(), forms.ToList(), items.ToList(), flags.ToList(), titles.ToList());
@@ -268,9 +267,9 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
         await db.ExecuteAsync(new CommandDefinition(
             "DELETE FROM inventory_item WHERE character_uid = @Uid", new { s.Uid }, tx, cancellationToken: ct));
         await db.ExecuteAsync(new CommandDefinition("""
-            INSERT INTO inventory_item (character_uid, bag, slot, uid, item_id, amount, expires_at, duration_seconds)
-            VALUES (@CharacterUid, @Bag, @Slot, @Uid, @ItemId, @Amount, @ExpiresAt, @DurationSeconds)
-            """, s.Items.Select(i => new { CharacterUid = s.Uid, i.Bag, i.Slot, i.Uid, i.ItemId, i.Amount, i.ExpiresAt, i.DurationSeconds }), tx, cancellationToken: ct));
+            INSERT INTO inventory_item (character_uid, bag, slot, uid, item_id, amount, expires_at)
+            VALUES (@CharacterUid, @Bag, @Slot, @Uid, @ItemId, @Amount, @ExpiresAt)
+            """, s.Items.Select(i => new { CharacterUid = s.Uid, i.Bag, i.Slot, i.Uid, i.ItemId, i.Amount, i.ExpiresAt }), tx, cancellationToken: ct));
 
         await db.ExecuteAsync(new CommandDefinition(
             "INSERT IGNORE INTO character_flag (character_uid, flag) VALUES (@CharacterUid, @Flag)",

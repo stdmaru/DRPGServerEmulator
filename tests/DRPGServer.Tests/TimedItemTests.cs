@@ -66,7 +66,6 @@ public class TimedItemTests
         Assert.True(player.GiveItems([(718, 86400)]));
         var oneDay = player.Character.Inventory.Main[0]!;
         Assert.True(oneDay.IsTimed);
-        Assert.Equal(86400u, oneDay.DurationSeconds);
         Assert.InRange(oneDay.ExpiresAt, (uint)(before + 86395), (uint)(before + 86410));
 
         // 2. Permanente (-1): mesmo item #718 (que tem col 26 = 2593000) vira permanente
@@ -74,19 +73,18 @@ public class TimedItemTests
         var permanent = player.Character.Inventory.Main[1]!;
         Assert.False(permanent.IsTimed);
         Assert.Equal(0u, permanent.ExpiresAt);
-        Assert.Equal(0u, permanent.DurationSeconds);
 
         // 3. Padrão (1): usa a duração padrão do ItemInfo (2593000 s)
         Assert.True(player.GiveItems([(718, 1)]));
         var defaultTimed = player.Character.Inventory.Main[2]!;
         Assert.True(defaultTimed.IsTimed);
-        Assert.Equal(2_593_000u, defaultTimed.DurationSeconds);
+        Assert.InRange(defaultTimed.ExpiresAt, (uint)(before + 2_592_995), (uint)(before + 2_593_010));
 
         // 4. Item não empilhável originalmente permanente (#1) pode receber período arbitrário (3600 s)
         Assert.True(player.GiveItems([(1, 3600)]));
         var timedCrest = player.Character.Inventory.Main[3]!;
         Assert.True(timedCrest.IsTimed);
-        Assert.Equal(3600u, timedCrest.DurationSeconds);
+        Assert.InRange(timedCrest.ExpiresAt, (uint)(before + 3595), (uint)(before + 3610));
 
         // 5. Item empilhável (#25) trata o valor como quantidade normal (e rejeita -1)
         Assert.False(player.GiveItems([(25, -1)]));
@@ -104,13 +102,13 @@ public class TimedItemTests
         var timed = player.Character.Inventory.Main[0]!;
         var perm = player.Character.Inventory.Main[1]!;
 
-        // ItemRecord de item de período: +12 = ExpiresAt, +16 = DurationSeconds (> 999)
+        // ItemRecord de item de período: +12 = ExpiresAt, +16 >= 1000
         var w1 = new PacketWriter();
         ItemRecord.Write(w1, timed);
         var recTimed = w1.ToFrame(0).AsSpan(PacketHeader.Length).ToArray();
         Assert.Equal(ItemRecord.Length, recTimed.Length);
         Assert.Equal(timed.ExpiresAt, BinaryPrimitives.ReadUInt32LittleEndian(recTimed.AsSpan(12)));
-        Assert.Equal(86400u, BinaryPrimitives.ReadUInt32LittleEndian(recTimed.AsSpan(16)));
+        Assert.Equal(2_593_000u, BinaryPrimitives.ReadUInt32LittleEndian(recTimed.AsSpan(16)));
 
         // ItemRecord de item permanente (-1): +12 = 1, +16 = 1 (MaxStack)
         var w2 = new PacketWriter();
@@ -136,12 +134,12 @@ public class TimedItemTests
         uint futureTs = (uint)(DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600);
 
         // 1. Guarda de segurança: item já expirado não pode ser equipado
-        var expiredBagItem = inv.Create(718, 0, 1, expiresAt: pastTs, durationSeconds: 86400);
+        var expiredBagItem = inv.Create(718, 0, 1, expiresAt: pastTs);
         inv.Main.Place(expiredBagItem);
         Assert.False(EquipmentSlots.CanEquip(ItemPlace.Aura, expiredBagItem, player.Character.Level));
 
         // 2. Expiração em tempo real no tick da zona: remove item vencido equipado e recalcula status
-        var expiredEquip = inv.Create(1, (int)ItemPlace.Crest1, 1, expiresAt: pastTs, durationSeconds: 86400);
+        var expiredEquip = inv.Create(1, (int)ItemPlace.Crest1, 1, expiresAt: pastTs);
         inv.Equipment.Place(expiredEquip);
         player.Character.SyncEquipmentBonuses();
         int boostedAtk = player.Leader.Stats.Atk;
@@ -161,10 +159,10 @@ public class TimedItemTests
         Assert.Contains((ushort)MapOpcode.BattleDigimonStatus, ops);
 
         // 3. Persistência e recarga: item válido permanece com ExpiresAt; item vencido é descartado no login
-        var validTimed = inv.Create(718, (int)ItemPlace.Aura, 1, expiresAt: futureTs, durationSeconds: 3600);
+        var validTimed = inv.Create(718, (int)ItemPlace.Aura, 1, expiresAt: futureTs);
         inv.Equipment.Place(validTimed);
         var snap = CharacterSnapshot.Of(player.Character);
-        var itemsWithExpired = snap.Items.Concat([new ItemRow((byte)BagKind.Inventory, 2, 999, 718, 1, pastTs, 86400)]).ToList();
+        var itemsWithExpired = snap.Items.Concat([new ItemRow((byte)BagKind.Inventory, 2, 999, 718, 1, pastTs)]).ToList();
 
         var data = new GameData
         {
@@ -195,6 +193,5 @@ public class TimedItemTests
         Assert.Null(reloaded.Inventory.Main[2]); // expirado descartado na carga
         var reloadedAura = reloaded.Inventory.EquippedAt(ItemPlace.Aura)!;
         Assert.Equal(futureTs, reloadedAura.ExpiresAt);
-        Assert.Equal(3600u, reloadedAura.DurationSeconds);
     }
 }
