@@ -196,7 +196,7 @@ public sealed class WildDigimonUpdatePacket(WildDigimon wild) : ServerPacket
         w.WriteU16(leader.SpeciesId);
         w.WriteU16(leader.Species.Stage);       // ❓ estágio (era 1 fixo)
         w.WriteU16(leader.Level);
-        w.WriteU8(2);                           // ✅ 2 em todos os selvagens (como o byte 300 do bloco de status)
+        w.WriteU8(wild.Spawn.Grade);            // ✅ grau do grupo: 2 Beginner, 3 Veteran (como byte 300 do 0x63)
         w.WriteU8(wild.StateCode);              // ✅ 1 parado, 4 andando, 11 batalha, 8 derrotado, 12 saindo
         w.WriteU16((ushort)wild.Facing);
         w.WriteI16(wild.X);
