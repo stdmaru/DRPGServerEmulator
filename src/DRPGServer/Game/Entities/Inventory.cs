@@ -71,6 +71,14 @@ public sealed class InventoryItem
     public CardInfo? CardInfo { get; init; }
     public int Slot { get; set; }
     public uint Amount { get; set; }
+    /// <summary>✅ Unix timestamp UTC de expiração (0 = permanente; gravado em +12 do ItemRecord quando &gt; 0).</summary>
+    public uint ExpiresAt { get; set; }
+    /// <summary>✅ Duração original em segundos (0 = permanente; gravado em +16 do ItemRecord quando &gt; 999).</summary>
+    public uint DurationSeconds { get; set; }
+
+    public bool IsTimed => ExpiresAt > 0;
+    public bool IsExpired(long unixNow) => ExpiresAt > 0 && unixNow >= ExpiresAt;
+    public bool IsExpired() => IsExpired(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
     /// <summary>A grade tem 6 colunas (✅ 0x91/0x90: linha 3, coluna 5 é a última posição).</summary>
     public int Row => Slot / Inventory.Columns;
@@ -112,30 +120,68 @@ public sealed class Bag
     /// <summary>
     /// Empilha nas pilhas existentes e depois ocupa posições livres. Devolve as posições alteradas (vazio se não
     /// coube nada; nada é adicionado se não couber tudo).
+    /// Para itens não empilháveis (<c>MaxStack == 1</c>), <paramref name="durationSeconds"/> pode ser:
+    /// <c>null</c> (usa duração padrão do <see cref="ItemInfo"/>), <c>-1</c> (permanente) ou <c>&gt; 0</c> (duração arbitrária em segundos).
     /// </summary>
-    public IReadOnlyList<InventoryItem> Add(uint itemId, uint amount)
+    public IReadOnlyList<InventoryItem> Add(uint itemId, uint amount, long? durationSeconds = null)
     {
         if (amount == 0 || Room(itemId) < amount) return [];
         uint max = _owner.MaxStackOf(itemId, IsCardBag);
         var changed = new List<InventoryItem>();
-        foreach (var stack in _slots.Where(s => s?.ItemId == itemId && s.Amount < max).Cast<InventoryItem>())
+        if (max > 1)
         {
-            uint put = Math.Min(amount, max - stack.Amount);
-            stack.Amount += put;
-            amount -= put;
-            changed.Add(stack);
-            if (amount == 0) return changed;
+            foreach (var stack in _slots.Where(s => s?.ItemId == itemId && s.Amount < max).Cast<InventoryItem>())
+            {
+                uint put = Math.Min(amount, max - stack.Amount);
+                stack.Amount += put;
+                amount -= put;
+                changed.Add(stack);
+                if (amount == 0) return changed;
+            }
         }
+        var (expiresAt, duration) = ResolvePeriod(itemId, max, durationSeconds);
         while (amount > 0)
         {
             int slot = Array.IndexOf(_slots, null);
             uint put = Math.Min(amount, max);
-            var item = _owner.Create(itemId, slot, put, isCard: IsCardBag);
+            var item = _owner.Create(itemId, slot, put, isCard: IsCardBag, expiresAt: expiresAt, durationSeconds: duration);
             _slots[slot] = item;
             amount -= put;
             changed.Add(item);
         }
         return changed;
+    }
+
+    private (uint ExpiresAt, uint DurationSeconds) ResolvePeriod(uint itemId, uint maxStack, long? durationSeconds)
+    {
+        if (IsCardBag || maxStack > 1) return (0, 0);
+        if (durationSeconds == Inventory.PermanentDuration) return (0, 0);
+
+        uint effectiveDuration;
+        if (durationSeconds is > 0)
+            effectiveDuration = (uint)Math.Min(durationSeconds.Value, uint.MaxValue);
+        else
+            effectiveDuration = _owner.FindInfo(itemId)?.DurationSeconds ?? 0u;
+
+        if (effectiveDuration == 0) return (0, 0);
+        long expires = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + effectiveDuration;
+        uint wireDuration = Math.Max(Inventory.MinClientDurationSeconds, effectiveDuration);
+        return ((uint)Math.Clamp(expires, 1, uint.MaxValue), wireDuration);
+    }
+
+    /// <summary>Remove todos os itens cujo <see cref="InventoryItem.ExpiresAt"/> já venceu em <paramref name="unixNow"/>.</summary>
+    public int RemoveExpired(long unixNow)
+    {
+        int removed = 0;
+        for (int i = 0; i < _slots.Length; i++)
+        {
+            if (_slots[i] is { } item && item.IsExpired(unixNow))
+            {
+                _slots[i] = null;
+                removed++;
+            }
+        }
+        return removed;
     }
 
     /// <summary>Tira a quantidade das pilhas do item (as primeiras posições antes). Devolve as posições alteradas.</summary>
@@ -277,6 +323,10 @@ public sealed class Inventory
     public const int Size = 24;
     public const int Columns = 6;
     public const int CardSlotCount = 6;
+    /// <summary>Valor sentinela para entregar um item não empilhável como permanente (sem expiração).</summary>
+    public const int PermanentDuration = -1;
+    /// <summary>O cliente interpreta +12 como timestamp de expiração somente quando +16 &gt; 999.</summary>
+    public const uint MinClientDurationSeconds = 1000;
 
     private readonly Func<uint, ItemInfo?> _lookup;
     private readonly Func<uint, CardInfo?> _cardLookup;
@@ -341,8 +391,11 @@ public sealed class Inventory
         return Math.Min(_maxStackCap, tableMax);
     }
 
+    public ItemInfo? FindInfo(uint itemId) => _lookup(itemId);
+
     /// <summary>Item ou card novo com uid novo (ou o salvo, na carga).</summary>
-    public InventoryItem Create(uint itemId, int slot, uint amount, uint uid = 0, bool isCard = false)
+    public InventoryItem Create(uint itemId, int slot, uint amount, uint uid = 0, bool isCard = false,
+        uint expiresAt = 0, uint durationSeconds = 0)
     {
         if (uid == 0) uid = _nextUid++;
         else SeenUid(uid);
@@ -356,6 +409,8 @@ public sealed class Inventory
             CardInfo = cardInfo,
             Slot = slot,
             Amount = amount,
+            ExpiresAt = expiresAt,
+            DurationSeconds = durationSeconds,
         };
     }
 
@@ -364,6 +419,7 @@ public sealed class Inventory
     // atalhos do inventário principal
     public InventoryItem? Find(uint itemId) => Main.Find(itemId);
     public bool HasFreeSlot => Main.HasFreeSlot;
-    public InventoryItem? Add(uint itemId, uint amount) => Main.Add(itemId, amount) is [.., var last] ? last : null;
+    public InventoryItem? Add(uint itemId, uint amount, long? durationSeconds = null) =>
+        Main.Add(itemId, amount, durationSeconds) is [.., var last] ? last : null;
     public bool Remove(uint itemId, uint amount) => Main.Remove(itemId, amount).Count > 0;
 }

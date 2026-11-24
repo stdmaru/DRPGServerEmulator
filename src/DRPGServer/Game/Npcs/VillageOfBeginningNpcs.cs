@@ -26,7 +26,7 @@ public sealed class VillageOfBeginningNpcs : NpcScriptBase
     public const uint TunomonCard = 22008;
 
     /// <summary>✅ Escolhas 7/8 (fim do tutorial): 24171 e 24172 na aba Items + teleporte para o Mapa 1 (58, 82).</summary>
-    private static readonly (uint ItemId, uint Amount)[] FinalItems = [(24171, 1), (24172, 1)];
+    private static readonly (uint ItemId, int Amount)[] FinalItems = [(24171, 1), (24172, 1)];
     public const byte FinalMap = 1;
     public const short FinalX = 58, FinalY = 82;
 

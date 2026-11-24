@@ -138,10 +138,12 @@ public sealed class Zone
     /// </summary>
     private void AutoRecovery(TimeSpan now)
     {
+        long unixNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         foreach (var player in _players)
         {
             if (player.InBattle || now < player.NextRecoveryAt) continue;
             player.NextRecoveryAt = now + RecoveryInterval;
+            ExpireTimedItems(player, unixNow);
             var equip = player.Character.TotalEquipmentBonus;
             int hpGain = 5 + equip.HpRecovery;
             int vpGain = 3 + equip.VpRecovery;
@@ -155,6 +157,30 @@ public sealed class Zone
                 if ((digimon.Hp, digimon.Vp, digimon.Evp) != before)
                     player.Send(new RefreshDigimonStatusPacket(digimon));
             }
+        }
+    }
+
+    /// <summary>Remove itens de período vencidos no inventário e nos equipamentos do jogador fora de batalha.</summary>
+    private void ExpireTimedItems(Player player, long unixNow)
+    {
+        var c = player.Character;
+        int expiredBag = c.Inventory.Main.RemoveExpired(unixNow);
+        int expiredEquip = c.Inventory.Equipment.RemoveExpired(unixNow);
+        if (expiredBag == 0 && expiredEquip == 0) return;
+
+        player.RequestImmediateSave();
+        if (expiredBag > 0)
+            player.RefreshInventory();
+        if (expiredEquip > 0)
+        {
+            c.SyncEquipmentBonuses();
+            if (!c.TotalEquipmentBonus.MaintainEvolution)
+                foreach (var d in c.Digimons)
+                    if (d.IsEvolved) d.Devolve();
+            player.Send(new TamerExpPacket(c));
+            foreach (var d in c.Digimons)
+                player.Send(new BattleDigimonStatusPacket(d));
+            Broadcast(new RefreshCharacterInfoPacket(c));
         }
     }
 

@@ -34,14 +34,17 @@ public abstract class NpcScriptBase
         player.Character.SetFlag((ushort)choiceId);
 
     /// <summary>Entrega um item na aba Items uma única vez (usa o próprio <paramref name="choiceId"/> como flag).</summary>
-    protected static bool GiveItemOnce(Player player, uint choiceId, uint itemId, uint amount = 1)
+    protected static bool GiveItemOnce(Player player, uint choiceId, uint itemId, int amountOrDuration = 1)
     {
         if (HasDone(player, choiceId)) return false;
-        if (player.Character.Inventory.Main.Room(itemId) < amount) return false;
+        uint slotsNeeded = amountOrDuration > 1 && player.Character.Inventory.FindInfo(itemId) is { MaxStack: > 1 }
+            ? (uint)amountOrDuration
+            : 1u;
+        if (player.Character.Inventory.Main.Room(itemId) < slotsNeeded) return false;
 
         MarkDone(player, choiceId);
         player.Send(new NpcChoicePacket(choiceId));
-        player.GiveItem(itemId, amount, refresh: true);
+        player.GiveItem(itemId, amountOrDuration, refresh: true);
         return true;
     }
 
