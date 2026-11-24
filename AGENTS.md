@@ -79,3 +79,21 @@ public static int StageLevel(byte stage) => stage switch
   1. O código em `src/DRPGServer/`.
   2. Os testes unitários em `tests/DRPGServer.Tests/`.
   3. A documentação correspondente em `docs/`.
+
+---
+
+## 4. Segurança e Validação Server-Side
+
+**Nunca confie em dados vindos do cliente.** Todo handler de pacote (`C2S`) deve assumir que o pacote pode ser forjado, repetido, truncado ou enviado fora de ordem, aplicando guards explícitos no servidor antes de alterar qualquer estado de jogo:
+
+- **Propriedade e origem do recurso:**
+  - Sempre valide que o `Uid` / `Serial` pertence ao jogador autenticado e está na bolsa, mapa ou batalha esperada (ex.: cards equipáveis em batalha só podem vir dos `CardSlots` do próprio jogador, nunca da mochila comum ou de outro jogador).
+  - Confira todos os identificadores enviados pelo cliente contra o estado autoritativo do servidor (`Uid` + `ItemId`/`CardId` + tipo de drop/bolsa), impedindo conversão indevida entre tipos (ex.: item comum coletado como card).
+- **Estado e pré-condições:**
+  - Bloqueie operações incompatíveis com o estado atual (ex.: movimentar/destruir itens ou cards durante batalha, agir em batalha encerrada, interagir com NPC de outro mapa, executar comandos sem `Authority` suficiente).
+- **Limites, índices e anti-duplicação:**
+  - Valide limites de índices (`slot`, `row`, `col`, `bag`, `amount`) **antes** de casts de tipos sem sinal (`uint` → `int`) para evitar overflow/índices negativos.
+  - Impeça duplicação de referências ou consumo sem saldo (ex.: mesma pilha equipada em múltiplos slots de batalha, troca atômica sem espaço, consumo de quantidade maior que o disponível).
+  - Revalide a existência e quantidade do recurso no momento efetivo do uso/consumo (não apenas ao selecionar/equipar) e acione `RequestImmediateSave()` em operações críticas (itens, captura, batalha, depository, NPC).
+- **Cobertura em testes:**
+  - Todo novo handler ou mecânica deve incluir testes unitários exercitando entradas inválidas (índices fora do intervalo, IDs trocados, duplicação, estado inválido ou falta de permissão).
