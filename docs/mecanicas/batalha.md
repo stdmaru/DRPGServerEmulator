@@ -31,11 +31,15 @@ Dados: 67 batalhas v322 em `captures.db` (sessões 53, 54, 56 e 58; 362 golpes, 
 7. **Vitória** (o último inimigo cai):
    - `0x68`, `0x6E`, [`0x70`], `0x67`;
    - logo depois, `0xB1` (EXP do tamer), `0x10` (estado 1), `0x84` (bloco do digimon) e `0x6D` 1.
-8. **Fuga:**
+8. **Derrota por nocaute** (✅ sessão 64, `conn=408`):
+   - Quando um digimon do jogador é nocauteado, perde **1 % de `ExpToNext(L)`** via `0x6E` negativo (`EXP = −⌊ExpToNext/100⌋`, `bits = 0`) antes do `0x67`.
+   - Ao cair o último digimon do jogador: `0xB1`, `0x10` (estado 1), `[0x4F se ganhou título]`, `0x84` (**com `HP = 0`**) e `0x6D` **2** (um por digimon), **sem teleporte (`0xB0`)**.
+   - Na volta ao mapa (`S2C 0xB4`), **apenas o líder** revive (`HP = 10` em `conn=408`) e volta a regenerar via `0xB2` (`15 → 20 → ...`); os demais digimons nocauteados permanecem com `HP = 0` e **não** regeneram automaticamente.
+9. **Fuga:**
    - `0x35` 3;
    - `0x65` (serial do digimon), `0x6A` (serial do tamer);
    - `0x6D` **2**. Conta como derrota: o jogo dá o título "First Lose".
-9. **Saída da tela de resultado:** 6,6 s depois do `0x6D`, o cliente manda C2S `0xB4` com o bloco de cada digimon, e o servidor devolve cada um.
+10. **Saída da tela de resultado:** 6,6 s depois do `0x6D`, o cliente manda C2S `0xB4` com o bloco de cada digimon, e o servidor devolve cada um.
 
 ## ✅ `0x67` (1372 bytes)
 - Posições 0..4 são o time de quem age e 5..9 o outro time, com 136 bytes por posição.
@@ -100,6 +104,5 @@ Dados: 67 batalhas v322 em `captures.db` (sessões 53, 54, 56 e 58; 362 golpes, 
 - Fim com vários: `0xB1`, `0x84` e `0x6D` um por digimon; o `0xB4` de cada um na saída do resultado.
 
 ## ❓ Em aberto
-- Derrota por nocaute: não capturada. O emulador manda `0x6D` 2 e deixa o digimon com 1 de HP.
 - Fator de atributo no dano, itens em batalha, precisão do multiplicador de skill.
 - Chance de acerto real e a chance de fuga (as 2 fugas capturadas deram certo).

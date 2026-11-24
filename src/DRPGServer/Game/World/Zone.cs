@@ -144,6 +144,8 @@ public sealed class Zone
             player.NextRecoveryAt = now + RecoveryInterval;
             foreach (var digimon in player.Character.Digimons)
             {
+                // ✅ conn=408: digimons nocauteados (HP = 0) não regeneram automaticamente no mapa
+                if (digimon.IsKnockedOut) continue;
                 var before = (digimon.Hp, digimon.Vp, digimon.Evp);
                 digimon.Heal(5, 3, 10);
                 if ((digimon.Hp, digimon.Vp, digimon.Evp) != before)

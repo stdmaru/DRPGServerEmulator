@@ -195,6 +195,52 @@ public class BattleTests
         Assert.DoesNotContain((ushort)0x35, _session.SentOpcodes());
     }
 
+    [Fact]
+    public void Knockout_defeat_loses_one_percent_exp_and_keeps_zero_hp_in_0x84()
+    {
+        var battle = Open();
+        var me = battle.TeamA[0];
+        // Coloca o digimon no nível 15 (ExpToNext = 4622 -> 1% = 46) com 1000 EXP e 1 HP
+        while (me.Digimon.Level < 15) me.Digimon.LevelUp();
+        me.Digimon.Load(1000, me.Digimon.UnlockedStage, 0, 0);
+        me.Digimon.TakeDamage(me.Digimon.Hp - 1);
+        var enemy = battle.TeamB[0];
+        enemy.Gauge = BattleFormulas.MaxGauge;
+
+        // Garante golpe fatal (pode errar em 10%, então tenta até derrubar)
+        List<byte[]> frames = [];
+        for (int attempt = 0; attempt < 20 && !battle.IsOver; attempt++)
+        {
+            enemy.Gauge = BattleFormulas.MaxGauge;
+            Advance(Battle.OpeningDelay + Battle.TickInterval);
+            frames.AddRange(_session.DrainOutgoing());
+            if (!battle.IsOver && !battle.IsRunning)
+                battle.ClientReady(_player);
+        }
+
+        Assert.True(battle.IsOver);
+        // ✅ 0x84 sai com HP = 0, mas o líder revive com 10 HP no mapa (conn=408 S2C 0xB4) para regenerar via 0xB2
+        Assert.Equal(10, me.Digimon.Hp);
+        Assert.Equal(1000 - 46, me.Digimon.Exp);
+
+        var opcodes = frames.Select(f => PacketHeader.Read(f).Opcode).ToList();
+        int expIdx = opcodes.LastIndexOf((ushort)MapOpcode.BattleRewardBitExp);
+        int resIdx = opcodes.LastIndexOf((ushort)MapOpcode.BattleActionResults);
+        Assert.True(expIdx >= 0 && expIdx < resIdx);
+        var expPayload = frames[expIdx].AsSpan(PacketHeader.Length);
+        Assert.Equal(-46L, BitConverter.ToInt64(expPayload.Slice(16, 8)));
+        Assert.Equal(0.0, BitConverter.ToDouble(expPayload.Slice(24, 8)));
+
+        // ✅ derrota por nocaute envia 0xB1, 0x10, 0x84 (com HP = 0) e 0x6D (2), sem teleporte 0xB0
+        Assert.Equal([(ushort)0xB1, (ushort)0x10, (ushort)0x84, (ushort)0x6D],
+            opcodes.Where(o => o is 0xB1 or 0x10 or 0x84 or 0x6D).ToList());
+        Assert.DoesNotContain((ushort)0xB0, opcodes);
+        var statusFrame = frames.Last(f => PacketHeader.Read(f).Opcode == (ushort)MapOpcode.BattleDigimonStatus);
+        Assert.Equal(0, BitConverter.ToInt32(statusFrame.AsSpan(PacketHeader.Length + 192, 4)));
+        var endFrame = frames.Last(f => PacketHeader.Read(f).Opcode == (ushort)MapOpcode.BattleEnd);
+        Assert.Equal((byte)BattleResult.Lose, endFrame[PacketHeader.Length]);
+    }
+
     private static (Battle Battle, BattleSystem Battles, Player Player, Session Session) StartBattleWithSkill(
         Data.GameData.SkillInfo skill, int enemyCount, Game.Stats.CombatStats? enemyStats = null)
     {

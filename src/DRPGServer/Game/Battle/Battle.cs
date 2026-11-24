@@ -248,13 +248,24 @@ public sealed class Battle
         actor.Actions++;
         actor.Gauge = 0;
 
-        // ✅ AoE pode derrubar vários inimigos no mesmo golpe: envia um 0x6E por inimigo derrotado antes do 0x67
+        // ✅ AoE pode derrubar vários combatentes no mesmo golpe: envia um 0x6E por alvo derrotado antes do 0x67
         if (actor.Owner is { } owner)
         {
             var standing = _teamA.Where(c => c.Owner == owner && !c.Digimon.IsKnockedOut).ToList();
             foreach (var victim in targets)
                 if (victim.Digimon.IsKnockedOut && victim.Wild is { } member)
                     _system.GrantRewards(owner, actor, standing, member);
+        }
+        else
+        {
+            // ✅ captura v322 (conn=408): ao ser nocauteado em batalha, perde 1 % de ExpToNextLevel e recebe 0x6E negativo antes do 0x67
+            foreach (var victim in targets)
+                if (victim.Digimon.IsKnockedOut && victim.Owner is { } victimOwner)
+                {
+                    long lost = victim.Digimon.LoseExp(victim.Digimon.ExpToNextLevel / 100);
+                    if (lost > 0)
+                        victimOwner.Send(new RewardBitExpPacket(victim.Digimon.Serial, -lost, 0));
+                }
         }
 
         byte attackType = skill?.Type ?? Data.GameData.SkillInfo.TypeMelee;
@@ -360,7 +371,7 @@ public sealed class Battle
         Broadcast(new FleeDigimonPacket(actor.Digimon.Serial));
         if (actor.Owner is { } owner)
             Broadcast(new FleeTamerPacket(owner.Character.Serial));
-        End(BattleResult.Lose);
+        End(BattleResult.Lose, fled: true);
     }
 
     /// <summary>✅ Escolha apontando para um inimigo derrubado: o oficial desmarca (0x35 4, ícone e alvo zerados).</summary>
@@ -460,27 +471,31 @@ public sealed class Battle
             End(BattleResult.Cancel);
     }
 
-    private void End(BattleResult result)
+    private void End(BattleResult result, bool fled = false)
     {
         if (IsOver) return;
         _phase = Phase.Over;
 
         if (result != BattleResult.Cancel)
         {
+            bool sendSummary = !fled;
             foreach (var player in _participants)
             {
                 var mine = _teamA.Where(c => c.Owner == player).ToList();
-                if (result == BattleResult.Win)
+                // ✅ Vitória e derrota por nocaute (conn=408) mandam 0xB1 e 0x84 por digimon; fuga manda só 0x65/0x6A/0x6D
+                if (sendSummary)
                     foreach (var _ in mine)
                         player.Send(new TamerExpPacket(player.Character));
                 player.Zone?.Broadcast(new RefreshCharacterInfoPacket(player.Character, TamerState.Idle));
                 foreach (var c in mine)
                 {
-                    // ❓ derrota por nocaute não capturada; o digimon volta com 1 de HP para não ficar zerado no mapa
-                    if (c.Digimon.IsKnockedOut) c.Digimon.Heal(1, 0, 0);
-                    // ✅ evoluído volta para a forma-base no fim (sem Aura): o 0x84 já traz o bloco do rookie
+                    // ✅ evoluído volta para a forma-base no fim (sem Aura); 0x84 sai com HP = 0 nos nocauteados
                     c.Digimon.Devolve();
-                    if (result == BattleResult.Win) player.Send(new BattleDigimonStatusPacket(c.Digimon));
+                    if (sendSummary) player.Send(new BattleDigimonStatusPacket(c.Digimon));
+                    // ✅ conn=408 (S2C 0xB4 pid=313462): apenas o líder revive no mapa (HP = 10) para voltar a regenerar;
+                    // os demais digimons nocauteados permanecem com HP = 0 (sem regeneração automática)
+                    if (c.Digimon == player.Leader && c.Digimon.IsKnockedOut)
+                        c.Digimon.Heal(10, 0, 0);
                 }
                 foreach (var _ in mine)
                     player.Send(new BattleEndPacket(result));
