@@ -121,15 +121,37 @@ public sealed class TeleportCharacterPacket(byte mapId, short x, short y) : Serv
     }
 }
 
-/// <summary>0x21: mensagem de chat normal.</summary>
+/// <summary>
+/// 0x21 (277 bytes): ✅ mensagem de chat normal (21 B remetente + 256 B mensagem; DigimonRPG.bin @ 0x00ABE221 → 0x00AEDFF0).
+/// Se o remetente não existe no mapa, vai direto para a janela de chat em branco sem balão de fala.
+/// </summary>
 public sealed class ChatNormalPacket(string nickname, string message) : ServerPacket
 {
+    public const int NicknameLength = 21;
+    public const int MessageLength = 256;
+
     public override ushort Opcode => (ushort)MapOpcode.ChatNormal;
 
     protected override void Write(PacketWriter w)
     {
-        w.WriteFixedString(nickname, 21);
-        w.WriteFixedString(message, 44);
+        w.WriteFixedString(nickname, NicknameLength);
+        w.WriteFixedString(message, MessageLength);
+    }
+}
+
+/// <summary>
+/// 0x22 (277 bytes): ✅ mensagem de chat colorida no Map Server (21 B remetente + 256 B mensagem; DigimonRPG.bin @ 0x00ABE247 → 0x00AF18C0).
+/// Quando o remetente não existe no mapa, imprime <c>[remetente] mensagem</c> em cor de destaque sem balão de fala —
+/// ideal para avisos direcionados e echo de debug de administradores.
+/// </summary>
+public sealed class ChatNoticePacket(string sender, string message) : ServerPacket
+{
+    public override ushort Opcode => (ushort)MapOpcode.ChatNotice;
+
+    protected override void Write(PacketWriter w)
+    {
+        w.WriteFixedString(sender, ChatNormalPacket.NicknameLength);
+        w.WriteFixedString(message, ChatNormalPacket.MessageLength);
     }
 }
 

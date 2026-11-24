@@ -40,7 +40,8 @@ public enum MapOpcode : ushort
     FieldDigimonUpdate = 0x11,
     ItemDrop = 0x13,
     MoveCharacter = 0x20,
-    ChatNormal = 0x21,
+    ChatNormal = 0x21,             // ✅ S2C (277 B): chat normal branco (21 B remetente + 256 B mensagem; DigimonRPG.bin @ 0x00ABE221)
+    ChatNotice = 0x22,             // ✅ S2C (277 B): chat colorido de destaque (21 B remetente + 256 B mensagem; DigimonRPG.bin @ 0x00ABE247)
     ExitGame = 0x2B,
     JoinHandshakeRes = 0x33,
     BattleActionReq = 0x35,
@@ -104,11 +105,12 @@ public enum GlobalOpcode : ushort
     EncyclopediaData = 0x7B,
     EncyclopediaCollection = 0x7C,
     KeepAlive = 0xC4,
-    ChatWhisper = 0xC8,
-    ChatMegaphone = 0xCA,
-    PlayerEvent = 0xCC,
+    ChatWhisper = 0xC8,            // ✅ S2C: whisper privado (DigimonRPG.bin @ 0x00ACECE9)
+    ChatMegaphone = 0xCA,          // ✅ S2C: megafone global (DigimonRPG.bin @ 0x00ACF039)
+    PlayerEvent = 0xCC,            // ✅ S2C: eventos de jogador (DigimonRPG.bin @ 0x00ACDE87)
     CharacterJoin = 0xDE,
     UnknownE1 = 0xE1,              // S2C grande depois do join, seguido de 0x65
+    ChatNotice = 0xE6,             // ✅ S2C: anúncio/aviso global colorido (4 tipos: 4..7; DigimonRPG.bin @ 0x00ACF3A4)
     UnknownCB = 0xCB,              // C2S grande depois do join
 }
 

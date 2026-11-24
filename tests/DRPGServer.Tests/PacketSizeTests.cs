@@ -42,6 +42,8 @@ public class PacketSizeTests
             (new WildDigimonUpdatePacket(wild), 56),
             (new ItemDropPacket(drop), 112),
             (new ItemDropPacket(drop, removed: true), 112),
+            (new ChatNormalPacket("[server]", "ok"), 277),             // ✅ v322 (0x21, DigimonRPG.bin @ 0x00ABE221)
+            (new ChatNoticePacket("[DEBUG]", "ok"), 277),              // ✅ v322 (0x22, DigimonRPG.bin @ 0x00ABE247)
             (new ExitGamePacket(), 0),
             (new JoinHandshakePacket(), 504),
             (new ActionRequestPacket(BattleAction.Selected, BattleIcon.Attack, Serial.New(), Serial.New()), 36), // ✅ v322

@@ -30,9 +30,15 @@ public sealed class NpcScriptRegistry
     public bool Choose(Player player, uint choice)
     {
         if (choice > ushort.MaxValue || !_routes.TryGetValue(choice, out var route))
+        {
+            player.SendDebug($"NPC Choice ID {choice} not registered (map={player.Character.MapId})");
             return false;
+        }
         if (player.Character.MapId != route.Script.MapId)
+        {
+            player.SendDebug($"NPC Choice ID {choice} requires map {route.Script.MapId} (current={player.Character.MapId})");
             return false;
+        }
         return route.Handler(player);
     }
 }
