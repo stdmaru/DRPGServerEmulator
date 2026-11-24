@@ -307,7 +307,7 @@ public class TutorialTests
 
     // ---------- NPCs ----------
 
-    private NpcScripts Npcs => new(_zones);
+    private DRPGServer.Game.Npcs.NpcScriptRegistry Npcs => new([new DRPGServer.Game.Npcs.VillageOfBeginningNpcs(_zones)]);
 
     [Fact]
     public void Manuals_are_given_once()
@@ -324,21 +324,21 @@ public class TutorialTests
     public void Tunomon_takes_five_seeds_and_the_end_of_the_tutorial_needs_it()
     {
         var c = _player.Character;
-        Assert.False(Npcs.Choose(_player, NpcScripts.FinalChoice));
-        Assert.False(Npcs.Choose(_player, NpcScripts.TunomonChoice));   // sem sementes
-        c.Inventory.Main.Add(NpcScripts.YuramonSeed, 8);
-        Assert.True(Npcs.Choose(_player, NpcScripts.TunomonChoice));
+        Assert.False(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice));
+        Assert.False(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice));   // sem sementes
+        c.Inventory.Main.Add(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.YuramonSeed, 8);
+        Assert.True(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice));
         Assert.Equal([(ushort)0x56, (ushort)0xC9, (ushort)0xFC], _session.SentOpcodes());
-        Assert.Equal(3u, c.Inventory.Main.Count(NpcScripts.YuramonSeed));
-        Assert.Equal(1u, c.Inventory.Main.Count(NpcScripts.TunomonCard));
+        Assert.Equal(3u, c.Inventory.Main.Count(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.YuramonSeed));
+        Assert.Equal(1u, c.Inventory.Main.Count(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonCard));
 
-        Assert.True(Npcs.Choose(_player, NpcScripts.FinalChoice));
+        Assert.True(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice));
         var sent = _session.SentOpcodes();
         Assert.Equal([(ushort)0xB0, (ushort)0x56, (ushort)0xC8, (ushort)0xC9, (ushort)0xFC], sent.Take(5));
         Assert.Equal(7, sent.Count(o => o == 0x7E));
         Assert.Equal(7, sent.Count(o => o == 0x7F));
-        Assert.Equal(NpcScripts.FinalMap, c.MapId);
-        Assert.Equal(NpcScripts.LeavesAtEnd, c.Inventory.Battle.Count(NpcScripts.WoodmonLeaf));
+        Assert.Equal(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalMap, c.MapId);
+        Assert.Equal(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.LeavesAtEnd, c.Inventory.Battle.Count(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.WoodmonLeaf));
     }
 
     // ---------- recompensas ----------

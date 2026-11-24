@@ -65,7 +65,7 @@ public sealed class Character
     public IEnumerable<Digimon> Depository => _depository.OfType<Digimon>();
     public byte DepositorySlots { get; set; }
 
-    /// <summary>Passos feitos com NPCs (tutorial), persistidos. Ver <c>Game/World/NpcScripts.cs</c>.</summary>
+    /// <summary>Passos feitos com NPCs (escolhas 0x56), persistidos. Ver <c>Game/Npcs/</c>.</summary>
     public IReadOnlySet<ushort> Flags => _flags;
     public bool HasFlag(ushort flag) => _flags.Contains(flag);
     public bool SetFlag(ushort flag) => _flags.Add(flag);

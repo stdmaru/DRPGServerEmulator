@@ -1,5 +1,6 @@
 using DRPGServer.Game.World;
 using DRPGServer.Network;
+using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
 
 namespace DRPGServer.Game.Entities;
@@ -61,6 +62,90 @@ public sealed class Player(Session session, AuthenticatedAccount account, Charac
     }
 
     public void Send(ServerPacket packet) => Session.Send(packet);
+
+    /// <summary>Envia o estado completo do inventário (aba Cards + aba Items + Bits, <c>0xFC</c>).</summary>
+    public void RefreshInventory() => Send(new InventoryRefreshPacket(Character));
+
+    /// <summary>
+    /// Entrega um item na aba <b>Items</b> (uso fora de batalha), enviando <c>0xC9</c> (e <c>0xFC</c> se <paramref name="refresh"/>).
+    /// Devolve <c>false</c> sem alterar o inventário se não houver espaço suficiente.
+    /// </summary>
+    public bool GiveItem(uint itemId, uint amount = 1, bool refresh = true) =>
+        GiveItems([(itemId, amount)], refresh);
+
+    /// <summary>
+    /// Entrega um lote de itens na aba <b>Items</b> (uso fora de batalha), enviando um único <c>0xC9</c>
+    /// (e <c>0xFC</c> se <paramref name="refresh"/>). Devolve <c>false</c> sem alterar nada se faltar espaço.
+    /// </summary>
+    public bool GiveItems(IReadOnlyList<(uint ItemId, uint Amount)> items, bool refresh = true)
+    {
+        var bag = Character.Inventory.Main;
+        foreach (var (itemId, amount) in items)
+            if (bag.Room(itemId) < amount)
+                return false;
+
+        var added = new List<InventoryItem>();
+        foreach (var (itemId, amount) in items)
+            added.AddRange(bag.Add(itemId, amount));
+
+        if (added.Count > 0) Send(new ItemReceivePacket(added));
+        if (refresh) RefreshInventory();
+        return true;
+    }
+
+    /// <summary>
+    /// Entrega um card na aba <b>Cards</b> (uso em batalha), enviando <c>0xC8</c> (e <c>0xFC</c> se <paramref name="refresh"/>).
+    /// Devolve <c>false</c> sem alterar o inventário se não houver espaço suficiente.
+    /// </summary>
+    public bool GiveCard(uint itemId, uint amount = 1, bool refresh = true)
+    {
+        var bag = Character.Inventory.Battle;
+        if (bag.Room(itemId) < amount) return false;
+
+        var added = bag.Add(itemId, amount);
+        if (added.Count > 0) Send(new BattleItemReceivePacket(added));
+        if (refresh) RefreshInventory();
+        return true;
+    }
+
+    /// <summary>
+    /// Troca atômica na aba <b>Items</b>: remove <paramref name="takeAmount"/> de <paramref name="takeItemId"/> e
+    /// entrega <paramref name="giveItems"/>, fazendo rollback se faltar espaço. Envia <c>0xC9</c> (posições alteradas)
+    /// e <c>0xFC</c>. Opcionalmente executa <paramref name="beforeNotify"/> após a troca ser confirmada em memória
+    /// e antes de enviar <c>0xC9</c>/<c>0xFC</c>.
+    /// </summary>
+    public bool ExchangeItems(
+        uint takeItemId,
+        uint takeAmount,
+        IReadOnlyList<(uint ItemId, uint Amount)> giveItems,
+        bool refresh = true,
+        Action? beforeNotify = null)
+    {
+        var bag = Character.Inventory.Main;
+        if (bag.Count(takeItemId) < takeAmount) return false;
+
+        var removed = bag.Remove(takeItemId, takeAmount);
+        var added = new List<InventoryItem>();
+        foreach (var (itemId, amount) in giveItems)
+        {
+            if (bag.Room(itemId) < amount)
+            {
+                foreach (var item in added)
+                    bag.Remove(item.ItemId, item.Amount);
+                bag.Add(takeItemId, takeAmount);
+                return false;
+            }
+            added.AddRange(bag.Add(itemId, amount));
+        }
+
+        beforeNotify?.Invoke();
+
+        // posição esvaziada e ocupada de novo na mesma troca: vale o último estado
+        var changed = removed.Concat(added).GroupBy(i => i.Slot).Select(g => g.Last()).ToList();
+        if (changed.Count > 0) Send(new ItemReceivePacket(changed));
+        if (refresh) RefreshInventory();
+        return true;
+    }
 
     public override string ToString() => $"{Character.Name}({Account.Username})";
 }
