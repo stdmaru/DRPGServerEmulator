@@ -18,9 +18,10 @@ Evidência: `captures.db`, v242 (sessões 1–48) e v322 (52–56). Digimon: off
 **EXP para passar do nível L = 5·(L + 1)**. Capturas: L1 10, L5 30, L14 75, L15 80, L201 1010. A tabela antiga tinha só os níveis 1–8 dessa mesma conta.
 
 ## Recompensa de batalha (0x6E S2C, 32 bytes)
-`16 B serial`, `u32 EXP` em 16, `f64 bits` em 24. ✅ Com o evento de EXP ativo, a recompensa parou exatamente no que faltava para subir (sessão 54: 24, 57, 103 = EXP dos níveis 1, 2, 3), descartando o excedente e deixando a EXP em 0. Configurável via `GameOptions.AllowMultiLevelUp` (`false` por padrão = comportamento oficial; `true` permite subir vários níveis de uma vez preservando o excedente).
-- **Penalidade por diferença de nível (`diff = enemyLevel − digimonLevel`)** (`ExpFormulas.ApplyLevelDifference`): ✅ 132 amostras v322: `diff ≥ −3` → 100%; `−6..−4` → 50% (`⌊base/2⌋`); `−9..−7` → 20% (`⌊base/5⌋`, ❓); `diff ≤ −10` → 0%.
-- **Bits**: ✅ **não** sofrem penalidade por diferença de nível (mesmo com `diff = −14` ou `−110`, continuam sorteando entre `⌊¾·máx⌋` e `máx`, onde `máx = 2·L + 3` nos Beginner).
+`16 B serial`, `i64 EXP` em 16, `f64 bits` em 24. ✅ Com o evento de EXP ativo, a recompensa parou exatamente no que faltava para subir (sessão 54: 24, 57, 103 = EXP dos níveis 1, 2, 3; sessão 64: 102 em L14→L15 e 24 em L1→L2), descartando o excedente e deixando a EXP em 0. Configurável via `GameOptions.AllowMultiLevelUp` (`false` por padrão = comportamento oficial; `true` permite subir vários níveis de uma vez preservando o excedente).
+- **Perda de EXP por nocaute em batalha:** ✅ `conn=408` (L15 com `ExpToNext = 4622` → `0x6E` com `EXP = −46`, `bits = 0`): perde **1 % de `ExpToNext(L)`** (`⌊ExpToNext / 100⌋`), sem ficar abaixo de 0.
+- **Diferença de nível (`diff = enemyLevel − digimonLevel`)** (`ExpFormulas.ApplyLevelDifference`): ✅ amostras v322: `diff ≥ −3` → **100 %** (sem bônus para `diff > 0`, confirmado em `diff = +1..+5` de L15 a L20); `−6..−4` → 50 % (`⌊base/2⌋`); `−9..−7` → 20 % (`⌊base/5⌋`, ❓); `diff ≤ −10` → 0 %.
+- **Bits**: ✅ **não** sofrem penalidade por diferença de nível (mesmo com `diff = −14` ou `−110`, continuam sorteando entre `⌊¾·máx⌋` e `máx`, onde `máx = 2·L + 3` nos Beginner e Veteran).
 
 ## Evento de EXP (`Map S2C 0xE6`) ✅
 Confirmado em `DigimonRPG.bin` (`0x00AC0093` → `0x00AEF8B0`, renderização em `0x00B8AF52..0x00B8B116`) e decifrado em 100% das capturas v322 (`captures.db`):

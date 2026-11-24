@@ -182,6 +182,15 @@ public sealed class Digimon
 
     public void TakeDamage(int damage) => Hp = Math.Max(0, Hp - Math.Max(0, damage));
 
+    /// <summary>✅ Perde EXP (ex.: −1 % de ExpToNext ao ser nocauteado em batalha); nunca fica negativa.</summary>
+    public long LoseExp(long amount)
+    {
+        if (amount <= 0 || Exp <= 0) return 0;
+        long lost = Math.Min(Exp, amount);
+        Exp -= lost;
+        return lost;
+    }
+
     public bool SpendVp(int amount)
     {
         if (Vp < amount) return false;
