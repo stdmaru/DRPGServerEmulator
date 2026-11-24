@@ -64,9 +64,16 @@ Dados: 67 batalhas v322 em `captures.db` (sessões 53, 54, 56 e 58; 362 golpes, 
   - Afinidade elemental (coluna 22 de `digimon_us`, bitmask no byte 162): Fogo (1) > Natureza (2, 9) > Água/Gelo (8, 10) > Fogo (1). Vantagem dá $\times 1{,}05$ (ex: Gigimon fogo vs Yuramon planta dá dano $+5\%$, explicando os 2~5 pontos a mais).
 - Skills: o id vem no fim do `0x67` (236 ×1,08, 144/145 ×1,15 e ×2, 701/702 dos inimigos, 1078 multi-alvo). Multiplicador de skill acumula com a afinidade.
 
-## ❓ Acerto
-- O jogador erra 32 de 313 golpes (10 %). Os selvagens acertam 22 de 25, sem contar o Otamamon L50 contra o L160, que erra metade. Sem relação clara com nível ou BR.
-- O emulador usa 90 % de acerto para todos.
+## ❓ Acerto e Esquiva *(precisa de revisão)*
+- Análise de **661 golpes limpos** (sem Card Slash) em `captures.db` (167 batalhas, sessões 13–64) mostra forte dependência da razão **`BR_atacante / BR_defensor`** ($2\Delta\text{LL} = 65{,}0$, $p < 10^{-14}$ contra taxa fixa):
+  - `BR_a / BR_d ≥ 2,50`: **0 erros em 120 golpes (0,0 %)** — maior razão que já errou foi `2,407` (`BR 1377 → 572`).
+  - `BR_a / BR_d ≈ 2,00`: **8,0 %** de erro (9/112).
+  - `BR_a / BR_d ≈ 1,00`: **21,5 %** de erro (14/65).
+  - `BR_a / BR_d < 0,80`: **26,3 %** de erro (35/133).
+  - Controlando por `BR_a / BR_d`, lado (`P→W` vs `W→P`), tipo de golpe (básico vs skill), diferença de nível e atributo não apresentam efeito residual significativo.
+- **Fórmula provisória no emulador:** $\text{HitChance} = \operatorname{clamp}(0{,}66 + 0{,}13 \cdot \text{BR}_a / \text{BR}_d,\; 0{,}05,\; 1{,}00)$, aplicando os bônus de `BR` dos cards de ataque/defesa (`BrBonusPercent`).
+- ✅ **Cards de acerto garantido (*100% Hit*):** `Golden Drill X` (card `74`) teve **77/77 acertos (0 % erro)** nas capturas; cards da família *Golden Drill* e *Fenrir Sword* usam `GuaranteedHit = true`.
+- ⚠️ **Revisão pendente:** a menor razão capturada foi `BR_a / BR_d ≈ 0,35`. Faltam capturas com `BR_a ≪ BR_d` (ex.: Digimon nível baixo atacando alvo de BR muito superior) para confirmar o piso real da curva e se há mudança de inclinação em extremos.
 
 ## Barra de ação (por passo de 200 ms)
 - ✅ **Jogador (fórmula exata do cliente, `DigimonRPG.bin @ 0x0085E0B8`):**
