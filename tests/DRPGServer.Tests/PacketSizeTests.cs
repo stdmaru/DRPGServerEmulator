@@ -47,7 +47,7 @@ public class PacketSizeTests
             (new ActionRequestPacket(BattleAction.Selected, BattleIcon.Attack, Serial.New(), Serial.New()), 36), // ✅ v322
             (new NpcChoicePacket(1), 4),
             (new StartBattlePacket(Serial.New()), 20),
-            (new ActionResultsPacket([combatant], [combatant], combatant, combatant, true), 1372), // ✅ v322
+            (new ActionResultsPacket([combatant], [combatant], combatant, new Dictionary<Combatant, bool> { [combatant] = true }), 1372), // ✅ v322
             (new FleeDigimonPacket(Serial.New()), 16),                 // ✅ v322 (sessão 53)
             (new FleeTamerPacket(Serial.New()), 16),
             (new BattleDigimonStatusPacket(digimon), 696),             // ✅ v322 (0x84)

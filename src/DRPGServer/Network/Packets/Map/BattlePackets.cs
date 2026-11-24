@@ -139,7 +139,8 @@ public sealed class LockActionBarPacket : ServerPacket
 /// depois u32 lado (1 inimigo, 2 jogador), u32 skill (0 = ataque básico), u32 0. Layout em docs/mecanicas/batalha.md.
 /// </summary>
 public sealed class ActionResultsPacket(
-    IReadOnlyList<Combatant> actingTeam, IReadOnlyList<Combatant> otherTeam, Combatant actor, Combatant target, bool landed,
+    IReadOnlyList<Combatant> actingTeam, IReadOnlyList<Combatant> otherTeam, Combatant actor,
+    IReadOnlyDictionary<Combatant, bool> targetHits, byte attackType = Data.GameData.SkillInfo.TypeMelee,
     ushort skillId = 0)
     : ServerPacket
 {
@@ -173,9 +174,9 @@ public sealed class ActionResultsPacket(
             w.WriteI32(d.Evp);                  // 24
             w.WriteI32(c.Gauge);                // 28 barra de ação
             w.WriteI32(0);                      // 32
-            w.WriteBool(c == actor);            // 36 quem age
-            w.WriteU8(c == target ? (byte)(landed ? 1 : 3) : (byte)0); // 37 alvo: 1 acertou, 3 errou
-            w.WriteZeros(96);                   // 38 ❓ 64/68/80 só aparecem em skills
+            w.WriteU8(c == actor ? attackType : (byte)0); // 36 ✅ quem age: 1 corpo-a-corpo/básico, 2 distância
+            w.WriteU8(targetHits.TryGetValue(c, out bool landed) ? (byte)(landed ? 1 : 3) : (byte)0); // 37 ✅ alvo: 1 acertou, 3 errou
+            w.WriteZeros(96);                   // 38 ❓ 64/68/80 triggers de passivas/efeitos (DigimonRPG.bin @ 0xAF6350)
             w.WriteU16((ushort)c.Actions);      // 134 ações feitas na batalha
         }
     }

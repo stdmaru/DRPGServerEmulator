@@ -25,10 +25,17 @@ public sealed record ItemInfo(uint Id, string Name)
     public byte Flag33 { get; init; }
 }
 
-/// <summary>Skill de <c>digimon_skill_us</c>. ✅ Custo em VP = 20 + nível exigido.</summary>
-public sealed record SkillInfo(ushort Id, string Name, ushort RequiredLevel, byte Type)
+/// <summary>
+/// Skill de <c>digimon_skill_us</c>. ✅ Custo em VP = 20 + nível exigido.
+/// <paramref name="Type"/>: ✅ 1 = corpo-a-corpo, 2 = à distância (offset 36 do 0x67).
+/// <paramref name="TargetCount"/>: ✅ coluna 5 da tabela (1 = alvo único, 2 = 2 alvos, 5 = área / todos).
+/// </summary>
+public sealed record SkillInfo(ushort Id, string Name, ushort RequiredLevel, byte Type, byte TargetCount = 1)
 {
     public const int MaxLevel = 10;
+    public const byte TypeMelee = 1;
+    public const byte TypeRanged = 2;
+
     public int VpCost => 20 + RequiredLevel;
 }
 
