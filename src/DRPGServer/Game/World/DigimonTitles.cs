@@ -1,5 +1,7 @@
+using DRPGServer.Data.GameData;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Stats;
+using DRPGServer.Network.Packets.Map;
 
 namespace DRPGServer.Game.World;
 
@@ -65,4 +67,43 @@ public static class DigimonTitles
 
         return unlocked;
     }
+
+    /// <summary>
+    /// Verifica os marcos do Digimon e envia <c>S2C 0x4F</c> (<c>You gained the Title of [Nome].</c>) para cada
+    /// título recém-desbloqueado (✅ 18 capturas v322: conn=92/100/137/145/205/408/480).
+    /// </summary>
+    public static IReadOnlyList<uint> CheckAndNotify(Player owner, Digimon digimon, GameData? data = null)
+    {
+        var unlocked = CheckUnlocks(digimon);
+        foreach (uint titleId in unlocked)
+            NotifyUnlocked(owner, titleId, data);
+        return unlocked;
+    }
+
+    /// <summary>Envia o aviso oficial cinza <c>S2C 0x4F</c> de título desbloqueado.</summary>
+    public static void NotifyUnlocked(Player owner, uint titleId, GameData? data = null)
+    {
+        string name = data?.FindDigimonTitle(titleId)?.Name ?? DefaultNameOf(titleId);
+        owner.Send(new SystemMessagePacket($"You gained the Title of [{name}]."));
+    }
+
+    private static string DefaultNameOf(uint titleId) => titleId switch
+    {
+        NewStart => "A New Start",
+        BreakThroughFixedExp => "Break Through Fixed EXP",
+        LordOfDigimon => "Lord of Digimon",
+        EndlessJourney => "Endless Journey",
+        AnotherStart => "Another Start",
+        LimitBreak => "LIMIT BREAK",
+        FirstWin => "First Win",
+        Win10 => "10th Win",
+        Win100 => "100th Win",
+        Win1000 => "1000th Win",
+        Win10000 => "10000th Win",
+        FirstLose => "First Lose",
+        Lose100 => "100th Lose",
+        Lose1000 => "1000th Lose",
+        KingOfLose => "King of Lose",
+        _ => titleId.ToString(),
+    };
 }

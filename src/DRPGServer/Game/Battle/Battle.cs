@@ -597,6 +597,13 @@ public sealed class Battle
             foreach (var player in _participants)
             {
                 var mine = _teamA.Where(c => c.Owner == player).ToList();
+                // ✅ conn=92 pid=5614..5618: atualiza vitórias/derrotas e envia 0x4F (título ganho) ANTES de 0xB1/0x10/0x84/0x6D
+                foreach (var c in mine)
+                {
+                    c.Digimon.TotalBattles++;
+                    if (result == BattleResult.Win) c.Digimon.TotalWins++;
+                    World.DigimonTitles.CheckAndNotify(player, c.Digimon, _system.Data);
+                }
                 // ✅ Vitória e derrota por nocaute (conn=408) mandam 0xB1 e 0x84 por digimon; fuga manda só 0x65/0x6A/0x6D
                 if (sendSummary)
                     foreach (var _ in mine)

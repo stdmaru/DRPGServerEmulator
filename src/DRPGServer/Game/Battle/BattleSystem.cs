@@ -31,6 +31,7 @@ public sealed class BattleSystem : IWorldSystem
     }
 
     internal Random Random => _world.Random;
+    internal GameData Data => _data;
     internal Taming Taming { get; }
     internal TimeSpan Now => _world.Now;
     public int Count => _battles.Count;
@@ -74,14 +75,6 @@ public sealed class BattleSystem : IWorldSystem
     {
         if (result != BattleResult.Cancel)
         {
-            foreach (var c in battle.TeamA)
-            {
-                c.Digimon.TotalBattles++;
-                if (result == BattleResult.Win) c.Digimon.TotalWins++;
-                var unlocked = DigimonTitles.CheckUnlocks(c.Digimon);
-                if (unlocked.Count > 0 && c.Owner is { } owner)
-                    owner.SendDebug($"Unlocked title(s) for {c.Digimon.Name}: {string.Join(", ", unlocked)}");
-            }
             foreach (var player in battle.Participants)
             {
                 player.Character.TotalBattles++;

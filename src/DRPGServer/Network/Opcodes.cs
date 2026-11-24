@@ -46,6 +46,7 @@ public enum MapOpcode : ushort
     JoinHandshakeRes = 0x33,
     BattleActionReq = 0x35,
     JoinHandshakeReq = 0x49,
+    SystemMessage = 0x4F,          // ✅ S2C (257 B): aviso de sistema cinza no chat (u8 tipo + char[256]; ex.: "You gained the Title of [First Win].")
     NpcDialogChoice = 0x56,
     BattleStartReq = 0x61,
     BattleStartRes = 0x62,

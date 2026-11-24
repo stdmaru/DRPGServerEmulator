@@ -44,6 +44,7 @@ public class PacketSizeTests
             (new ItemDropPacket(drop, removed: true), 112),
             (new ChatNormalPacket("[server]", "ok"), 277),             // ✅ v322 (0x21, DigimonRPG.bin @ 0x00ABE221)
             (new ChatNoticePacket("[DEBUG]", "ok"), 277),              // ✅ v322 (0x22, DigimonRPG.bin @ 0x00ABE247)
+            (new SystemMessagePacket("You gained the Title of [First Win]."), 257), // ✅ v322 (0x4F, conn=92/100/137)
             (new ExitGamePacket(), 0),
             (new JoinHandshakePacket(), 504),
             (new ActionRequestPacket(BattleAction.Selected, BattleIcon.Attack, Serial.New(), Serial.New()), 36), // ✅ v322

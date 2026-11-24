@@ -8,6 +8,7 @@ Evidências: `captures.db` (sessão 56, marca 72 — `conn=55, 57, 76, 112, 141,
 
 | Opcode | C2S | S2C | Layout e Comportamento |
 |---:|---:|---:|---|
+| `0x4F` (`SystemMessage`) | — | **257 B** | **Aviso cinza de título obtido no chat (18 capturas v322: `conn=92/100/137/145/205/408/480`).**<br>• S2C: `u8 1`, `char[256]` `"You gained the Title of [<Nome>]."` |
 | `0x97` (`DigimonTitleList`) | 1622 B | **1608 B** | **Abrir janela de títulos do Digimon.**<br>• C2S: `u32 2`, `u32 digimonUid`, zeros.<br>• S2C (`0x00AC47DA`): `u32 result` (`1` ok / `0` erro), `u32 digimonUid`, seguido de **`200 × 8 B`** `(u32 titleId, u32 1)` para cada título desbloqueado (restante zerado). Abre as janelas `0x69` e `0x12A` no cliente. |
 | `0x99` (`DigimonTitleEquip`) | 26 B | **12 B** | **Equipar / desequipar título do Digimon.**<br>• C2S: `u32 2`, `u32 digimonUid`, `u32 titleId` (`0` = desequipar).<br>• Servidor responde na ordem (`conn=76/141`): `0xB4` (bloco atualizado), `0x10` (broadcast na zona se for o líder) e `0x99` (`u32 1`, `u32 digimonUid`, `u32 titleId`). |
 

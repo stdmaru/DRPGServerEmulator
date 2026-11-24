@@ -162,6 +162,23 @@ public sealed class ChatNoticePacket(string sender, string message) : ServerPack
     }
 }
 
+/// <summary>
+/// 0x4F (257 bytes): ✅ mensagem de sistema no chat (u8 tipo [1 = aviso cinza] + char[256] texto).
+/// Confirmado em 18 capturas v322 (conn=92/100/137/145/205/408/480): <c>You gained the Title of [First Win].</c>.
+/// </summary>
+public sealed class SystemMessagePacket(string message, byte type = 1) : ServerPacket
+{
+    public const int MessageLength = 256;
+
+    public override ushort Opcode => (ushort)MapOpcode.SystemMessage;
+
+    protected override void Write(PacketWriter w)
+    {
+        w.WriteU8(type);
+        w.WriteFixedString(message, MessageLength);
+    }
+}
+
 /// <summary>0x2B: confirma a saída do jogo. Vazio.</summary>
 public sealed class ExitGamePacket : ServerPacket
 {

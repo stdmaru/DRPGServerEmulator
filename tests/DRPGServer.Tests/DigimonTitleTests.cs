@@ -188,4 +188,30 @@ public class DigimonTitleTests
         Assert.True(loaded.Leader.HasTitle(DigimonTitles.FirstWin));
         Assert.True(loaded.Leader.HasTitle(DigimonTitles.FirstLose));
     }
+
+    [Fact]
+    public void CheckAndNotify_sends_0x4F_system_message_with_official_text()
+    {
+        var data = DataWithTitles();
+        var digimon = new Digimon(data, data.Species[50], 10) { Uid = 88, Name = "V-mon" };
+        digimon.TotalBattles = 1;
+        digimon.TotalWins = 1;
+        var character = new Character(digimon, new Inventory(data.FindItem, 999))
+        {
+            Uid = 1, AccountUid = 1, Slot = 0, Name = "NotifyTester", TamerId = 1, MapId = 79,
+        };
+        var session = TestSupport.NewSession();
+        var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
+
+        var unlocked = DigimonTitles.CheckAndNotify(player, digimon, data);
+        Assert.Equal([DigimonTitles.FirstWin], unlocked);
+
+        var frame = Assert.Single(session.DrainOutgoing());
+        Assert.Equal((ushort)MapOpcode.SystemMessage, PacketHeader.Read(frame).Opcode);
+        var payload = frame.AsSpan(PacketHeader.Length);
+        Assert.Equal(257, payload.Length);
+        Assert.Equal((byte)1, payload[0]);
+        string msg = System.Text.Encoding.ASCII.GetString(payload[1..]).TrimEnd('\0');
+        Assert.Equal("You gained the Title of [First Win].", msg);
+    }
 }

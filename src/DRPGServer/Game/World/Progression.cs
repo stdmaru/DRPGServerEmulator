@@ -43,11 +43,8 @@ public static class Progression
                 owner.Send(new DigimonEvolvedPacket(digimon));
         }
 
-        var unlocked = DigimonTitles.CheckUnlocks(digimon);
+        var unlocked = DigimonTitles.CheckAndNotify(owner, digimon);
         if (unlocked.Count > 0)
-        {
             owner.RequestImmediateSave();
-            owner.SendDebug($"Unlocked title(s) for {digimon.Name}: {string.Join(", ", unlocked)}");
-        }
     }
 }
