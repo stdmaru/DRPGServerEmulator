@@ -82,7 +82,7 @@ public enum MapOpcode : ushort
     KeepAlive = 0xC4,
     BattleItemReceive = 0xC8,      // S2C ✅ item na bolsa de batalha (registro de 76)
     InventoryItemReceive = 0xC9,
-    UnknownE6 = 0xE6,
+    ExpEvent = 0xE6,
     Rename = 0xF0,                 // ✅ renomear: u8 resultado, u8 tipo (1 tamer, 2 digimon), u32 uid, nome[20]
     SetLeader = 0xF1,              // ✅ trocar o líder: u32 0, u32 personagem, u32 digimon
     InventoryRefresh = 0xFC,

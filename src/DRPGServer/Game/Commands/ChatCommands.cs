@@ -16,7 +16,8 @@ public sealed class ChatCommands
     private readonly Dictionary<string, Command> _commands = new(StringComparer.OrdinalIgnoreCase);
     private readonly ILogger<ChatCommands> _log;
 
-    public ChatCommands(ZoneSystem zones, IOptions<GameOptions> options, ILogger<ChatCommands> log)
+    public ChatCommands(ZoneSystem zones, IOptions<GameOptions> options, ILogger<ChatCommands> log,
+        ExpEventService? expEvents = null)
     {
         _log = log;
         int maxLevel = options.Value.DigimonMaxLevel;
@@ -49,6 +50,12 @@ public sealed class ChatCommands
 
         Add("reloadspawns", "/reloadspawns", Authority.Administrator, (p, _) => p.Zone?.ReloadSpawns());
 
+        Add("reloadevents", "/reloadevents", Authority.Administrator, (p, args) =>
+        {
+            if (expEvents is null) return;
+            _ = ReloadEventsAsync(p, expEvents);
+        });
+
         Add("teleport", "/teleport x y [mapa]", Authority.GameMaster, (p, args) =>
         {
             if (args.Length < 2 || !short.TryParse(args[0], out var x) || !short.TryParse(args[1], out var y)) return;
@@ -56,6 +63,23 @@ public sealed class ChatCommands
             if (args.Length >= 3 && !byte.TryParse(args[2], out map)) return;
             zones.Teleport(p, map, x, y);
         });
+    }
+
+    private async Task ReloadEventsAsync(Player requester, ExpEventService expEvents)
+    {
+        try
+        {
+            var active = await expEvents.ReloadAsync(forceNotify: true);
+            string msg = active is null
+                ? "Nenhum evento de EXP ativo."
+                : $"EXP +{active.BonusPercent}% ate {active.EndsAt:yyyy-MM-dd}";
+            Reply(requester, msg);
+        }
+        catch (Exception e)
+        {
+            _log.LogWarning(e, "Falha em /reloadevents");
+            Reply(requester, "Erro ao recarregar eventos.");
+        }
     }
 
     private void Add(string name, string usage, Authority required, Action<Player, string[]> run) =>

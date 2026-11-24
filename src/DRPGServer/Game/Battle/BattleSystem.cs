@@ -15,14 +15,16 @@ public sealed class BattleSystem : IWorldSystem
     private readonly GameWorld _world;
     private readonly GameData _data;
     private readonly GameOptions _options;
+    private readonly ExpEventService? _expEvents;
     private readonly ILogger<BattleSystem> _log;
 
     public BattleSystem(GameWorld world, GameData data, IOptions<GameOptions> options, ILogger<BattleSystem> log,
-        Taming? taming = null)
+        Taming? taming = null, ExpEventService? expEvents = null)
     {
         _world = world;
         _data = data;
         _options = options.Value;
+        _expEvents = expEvents;
         _log = log;
         Taming = taming ?? new Taming(data, new Game.DigimonUids(), options);
         world.AddSystem(this);
@@ -104,7 +106,8 @@ public sealed class BattleSystem : IWorldSystem
     /// </summary>
     internal void GrantRewards(Player owner, Combatant killer, IReadOnlyList<Combatant> participants, WildMember defeated)
     {
-        long exp = (long)(defeated.Option.ExpReward * _options.ExpRate);
+        double eventMultiplier = _expEvents?.ExpMultiplier ?? 1.0;
+        long exp = (long)(defeated.Option.ExpReward * _options.ExpRate * eventMultiplier);
         double bits = RollBits(defeated.Option.BitReward) * _options.BitRate;
         owner.Character.AddBits(bits);
 

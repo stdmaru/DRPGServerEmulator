@@ -72,6 +72,9 @@ public sealed class GameOptions
     /// <summary>Intervalo (segundos) para gravar jogadores marcados como dirty (eventos críticos gravam imediatamente).</summary>
     public int AutosaveSeconds { get; set; } = 60;
 
+    /// <summary>Intervalo (segundos) para consultar a tabela <c>exp_event</c> no banco de dados. Padrão: 60 s.</summary>
+    public int EventPollSeconds { get; set; } = 60;
+
     /// <summary>Por quanto tempo o login no channel vale para entrar no mapa depois que a conexão do channel cai.</summary>
     public int AccountTicketGraceSeconds { get; set; } = 120;
 
