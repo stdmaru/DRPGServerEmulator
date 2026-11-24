@@ -200,6 +200,7 @@ public sealed class Character
 
         _party[partySlot] = null;
         _depository[freeDepSlot] = digimon;
+        digimon.SetEquipmentBonus(Data.GameData.EquipmentBonus.Empty);
         return DepositoryResult.DepositOk;
     }
 
