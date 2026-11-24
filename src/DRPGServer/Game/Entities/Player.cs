@@ -1,5 +1,6 @@
 using DRPGServer.Game.World;
 using DRPGServer.Network;
+using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
 
 namespace DRPGServer.Game.Entities;
@@ -61,6 +62,51 @@ public sealed class Player(Session session, AuthenticatedAccount account, Charac
     }
 
     public void Send(ServerPacket packet) => Session.Send(packet);
+
+    /// <summary>Envia o estado completo do inventário (aba Cards + aba Items + Bits, <c>0xFC</c>).</summary>
+    public void RefreshInventory() => Send(new InventoryRefreshPacket(Character));
+
+    /// <summary>
+    /// Entrega um item na aba <b>Items</b> (uso fora de batalha), enviando <c>0xC9</c> (e <c>0xFC</c> se <paramref name="refresh"/>).
+    /// Devolve <c>false</c> sem alterar o inventário se não houver espaço suficiente.
+    /// </summary>
+    public bool GiveItem(uint itemId, uint amount = 1, bool refresh = true) =>
+        GiveItems([(itemId, amount)], refresh);
+
+    /// <summary>
+    /// Entrega um lote de itens na aba <b>Items</b> (uso fora de batalha), enviando um único <c>0xC9</c>
+    /// (e <c>0xFC</c> se <paramref name="refresh"/>). Devolve <c>false</c> sem alterar nada se faltar espaço.
+    /// </summary>
+    public bool GiveItems(IReadOnlyList<(uint ItemId, uint Amount)> items, bool refresh = true)
+    {
+        var bag = Character.Inventory.Main;
+        foreach (var (itemId, amount) in items)
+            if (bag.Room(itemId) < amount)
+                return false;
+
+        var added = new List<InventoryItem>();
+        foreach (var (itemId, amount) in items)
+            added.AddRange(bag.Add(itemId, amount));
+
+        if (added.Count > 0) Send(new ItemReceivePacket(added));
+        if (refresh) RefreshInventory();
+        return true;
+    }
+
+    /// <summary>
+    /// Entrega um card na aba <b>Cards</b> (uso em batalha), enviando <c>0xC8</c> (e <c>0xFC</c> se <paramref name="refresh"/>).
+    /// Devolve <c>false</c> sem alterar o inventário se não houver espaço suficiente.
+    /// </summary>
+    public bool GiveCard(uint itemId, uint amount = 1, bool refresh = true)
+    {
+        var bag = Character.Inventory.Battle;
+        if (bag.Room(itemId) < amount) return false;
+
+        var added = bag.Add(itemId, amount);
+        if (added.Count > 0) Send(new BattleItemReceivePacket(added));
+        if (refresh) RefreshInventory();
+        return true;
+    }
 
     public override string ToString() => $"{Character.Name}({Account.Username})";
 }

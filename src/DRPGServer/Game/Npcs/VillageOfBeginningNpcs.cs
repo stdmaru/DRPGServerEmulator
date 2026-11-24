@@ -23,8 +23,8 @@ public sealed class VillageOfBeginningNpcs : NpcScriptBase
     /// <summary>✅ Escolha 5 (Tunomon): carta 22008 em troca das sementes.</summary>
     public const uint TunomonCard = 22008;
 
-    /// <summary>✅ Escolha 8 (fim do tutorial): 24171 e 24172 no inventário + teleporte para o Mapa 1 (58, 82).</summary>
-    private static readonly uint[] FinalItems = [24171, 24172];
+    /// <summary>✅ Escolha 8 (fim do tutorial): 24171 e 24172 na aba Items + teleporte para o Mapa 1 (58, 82).</summary>
+    private static readonly (uint ItemId, uint Amount)[] FinalItems = [(24171, 1), (24172, 1)];
     public const byte FinalMap = 1;
     public const short FinalX = 58, FinalY = 82;
 
@@ -54,17 +54,15 @@ public sealed class VillageOfBeginningNpcs : NpcScriptBase
         if (HasDone(player, FinalChoice) || !HasDone(player, TunomonChoice))
             return false;
 
-        var c = player.Character;
-        var inventory = c.Inventory;
-        if (FinalItems.Any(i => inventory.Main.Room(i) < 1) || inventory.Battle.Room(WoodmonLeaf) < LeavesAtEnd)
+        var inventory = player.Character.Inventory;
+        if (FinalItems.Any(i => inventory.Main.Room(i.ItemId) < i.Amount) || inventory.Battle.Room(WoodmonLeaf) < LeavesAtEnd)
             return false;
 
         _zones.Teleport(player, FinalMap, FinalX, FinalY);
         player.Send(new NpcChoicePacket(FinalChoice));
         MarkDone(player, FinalChoice);
-        player.Send(new BattleItemReceivePacket(inventory.Battle.Add(WoodmonLeaf, LeavesAtEnd)));
-        player.Send(new ItemReceivePacket(FinalItems.SelectMany(i => inventory.Main.Add(i, 1)).ToList()));
-        player.Send(new InventoryRefreshPacket(c));
+        player.GiveCard(WoodmonLeaf, LeavesAtEnd, refresh: false);
+        player.GiveItems(FinalItems, refresh: true);
 
         // ✅ o oficial repete aqui os 0x7E e 0x7F da entrada
         for (int i = 0x29; i <= 0x2F; i++) player.Send(new Unknown7EPacket(i));

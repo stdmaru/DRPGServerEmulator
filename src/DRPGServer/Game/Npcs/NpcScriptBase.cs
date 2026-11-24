@@ -32,15 +32,15 @@ public abstract class NpcScriptBase
     protected static void MarkDone(Player player, uint choiceId) =>
         player.Character.SetFlag((ushort)choiceId);
 
-    /// <summary>Entrega um item uma única vez (usa o próprio <paramref name="choiceId"/> como flag).</summary>
+    /// <summary>Entrega um item na aba Items uma única vez (usa o próprio <paramref name="choiceId"/> como flag).</summary>
     protected static bool GiveItemOnce(Player player, uint choiceId, uint itemId, uint amount = 1)
     {
         if (HasDone(player, choiceId)) return false;
-        var bag = player.Character.Inventory.Main;
-        if (bag.Room(itemId) < amount) return false;
+        if (player.Character.Inventory.Main.Room(itemId) < amount) return false;
 
-        var changed = bag.Add(itemId, amount);
-        FinishChoice(player, choiceId, changed);
+        MarkDone(player, choiceId);
+        player.Send(new NpcChoicePacket(choiceId));
+        player.GiveItem(itemId, amount, refresh: true);
         return true;
     }
 
@@ -83,7 +83,7 @@ public abstract class NpcScriptBase
         var distinctBySlot = changed.GroupBy(i => i.Slot).Select(g => g.Last()).ToList();
         if (distinctBySlot.Count > 0)
             player.Send(new ItemReceivePacket(distinctBySlot));
-        player.Send(new InventoryRefreshPacket(player.Character));
+        player.RefreshInventory();
     }
 
     /// <summary>Envia o código oficial de erro/fechar janela (<c>S2C 0x56 = 99</c>).</summary>
