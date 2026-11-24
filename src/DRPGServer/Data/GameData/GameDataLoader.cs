@@ -22,7 +22,7 @@ public static class GameDataLoader
     {
         grids ??= FrozenDictionary<byte, MapGrid>.Empty;
         var species = ClientTables.Species(pack);
-        var items = ClientTables.Items(pack);
+        var items = ApplyEquipmentEffects(ClientTables.Items(pack), LoadEquipmentEffects(Path.Combine(root, "Item/EquipmentEffects.xml")));
         var maps = ClientTables.Maps(pack);
 
         var drops = new Dictionary<uint, IReadOnlyList<DropEntry>>();
@@ -144,6 +144,64 @@ public static class GameDataLoader
         }
         return result.ToFrozenDictionary();
     }
+
+    /// <summary>
+    /// Carrega os efeitos estruturados de equipamentos de <c>Resources/Item/EquipmentEffects.xml</c>
+    /// (fonte autoritativa server-side, sem parsear texto de descrição do cliente em runtime).
+    /// </summary>
+    public static FrozenDictionary<uint, EquipmentBonus> LoadEquipmentEffects(string path)
+    {
+        if (!File.Exists(path)) return FrozenDictionary<uint, EquipmentBonus>.Empty;
+        var doc = XDocument.Load(path);
+        var top = doc.Element("EquipmentEffects") ?? throw new GameDataException($"{path}: falta a raiz <EquipmentEffects>");
+        var effects = new Dictionary<uint, EquipmentBonus>();
+        foreach (var e in top.Elements("Equipment"))
+        {
+            uint id = U32(e, "ItemID");
+            var bonus = new EquipmentBonus(
+                Attributes: new Game.Stats.Attributes(OptI32(e, "Str"), OptI32(e, "Agi"), OptI32(e, "Con"), OptI32(e, "Int")),
+                BonusHp: OptI32(e, "Hp"),
+                BonusVp: OptI32(e, "Vp"),
+                BonusAtk: OptI32(e, "Atk"),
+                BonusDef: OptI32(e, "Def"),
+                BonusBr: OptI32(e, "Br"),
+                BonusAtkPercent: OptI32(e, "AtkPercent"),
+                BonusDefPercent: OptI32(e, "DefPercent"),
+                BonusBrPercent: OptI32(e, "BrPercent"),
+                CardSlashLimit: OptI32(e, "CardSlashLimit"),
+                ExtraCardSlashes: OptI32(e, "ExtraCardSlashes"),
+                DigimonExpPercent: OptI32(e, "DigimonExpPercent"),
+                TamerExpFlat: OptI32(e, "TamerExp"),
+                HpRecovery: OptI32(e, "HpRecovery"),
+                VpRecovery: OptI32(e, "VpRecovery"),
+                EvpRecovery: OptI32(e, "EvpRecovery"),
+                MaintainEvolution: (bool?)e.Attribute("MaintainEvolution") ?? false,
+                AutoSummonPartners: OptI32(e, "AutoSummonPartners"),
+                BonusDamagePercent: OptI32(e, "DamagePercent"),
+                SingleSkillDamagePercent: OptI32(e, "SingleSkillDamagePercent"),
+                MultiSkillDamagePercent: OptI32(e, "MultiSkillDamagePercent"),
+                MeleeSkillDamagePercent: OptI32(e, "MeleeSkillDamagePercent"),
+                RangedSkillDamagePercent: OptI32(e, "RangedSkillDamagePercent"),
+                OnHitHealHp: OptI32(e, "OnHitHealHp"),
+                OnHitHealVp: OptI32(e, "OnHitHealVp"));
+            if (!effects.TryAdd(id, bonus))
+                throw new GameDataException($"EquipmentEffects.xml: ItemID {id} duplicado");
+        }
+        return effects.ToFrozenDictionary();
+    }
+
+    private static FrozenDictionary<uint, ItemInfo> ApplyEquipmentEffects(
+        FrozenDictionary<uint, ItemInfo> items, FrozenDictionary<uint, EquipmentBonus> effects)
+    {
+        if (effects.Count == 0) return items;
+        var merged = new Dictionary<uint, ItemInfo>(items.Count);
+        foreach (var (id, info) in items)
+            merged[id] = effects.TryGetValue(id, out var bonus) ? info with { EquipmentBonus = bonus } : info;
+        return merged.ToFrozenDictionary();
+    }
+
+    private static int OptI32(XElement e, string name) =>
+        e.Attribute(name) is { } a ? int.Parse(a.Value, CultureInfo.InvariantCulture) : 0;
 
     /// <summary>Status fixos de um selvagem (HP, VP, ATK, DEF, BR, todos ou nenhum).</summary>
     private static Game.Stats.CombatStats? FixedStats(XElement o, int level)

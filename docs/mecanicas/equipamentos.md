@@ -56,9 +56,9 @@ Confirmado em `captures.db` (`conn=234`, `pid=115772..115794`):
 
 ---
 
-## ✅ Bônus de Status e Auras (`item_info_us.dat` col. 28 e cols. 4–12)
+## ✅ Bônus de Status e Auras (`Resources/Item/EquipmentEffects.xml`)
 
-Os bônus são extraídos automaticamente na carga do servidor (`ClientTables.ParseEquipmentBonus`):
+Os efeitos de equipamentos são carregados diretamente de **`src/DRPGServer/Resources/Item/EquipmentEffects.xml`** (`GameDataLoader.LoadEquipmentEffects`, 9.152 itens extraídos offline de `item_info_us.dat` v322 via `work/tools/extract_equipment_effects.py`), sem parsear texto de UI em runtime:
 - **Atributos (`STR`, `AGI`, `CON`, `INT`, `All stats`):** somam antes de `StatFormulas.Combat` (✅ exato em `conn=234`: `Digimental #215` `+6 STR/AGI/CON` eleva `InputName L1` de `145/87/131/115/115` para `183/105/139/146/125`).
 - **Status flat (`ATK`, `DEF`, `BR`, `HP`, `VP`) e `%` (`ATK%`, `DEF%`, `BR%`):** somam após `StatFormulas.Combat` (✅ exato em `conn=234`: `Crest #107` `+75 ATK / +40 DEF / +350 BR` leva `InputName L1` a `258/145/489/146/125` com 1 Crest + 1 Digimental e `333/185/839/146/125` com 2 Crests + 1 Digimental).
 - **Auras (`Type 8` e `Type 27`, 29 itens):**
