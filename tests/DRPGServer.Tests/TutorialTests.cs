@@ -276,8 +276,7 @@ public class TutorialTests
         _session.DrainOutgoing();
 
         var payload = new byte[38];
-        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), (ushort)BagKind.Inventory);
-        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(10), 1);
+        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), InventorySortHandler.MainInventoryType);
         new InventorySortHandler().Handle(_session, new PacketReader(payload));
 
         Assert.Equal([(ushort)0xFC], _session.SentOpcodes());

@@ -123,7 +123,7 @@ public class PersistenceTests
         // Sort interno (0x148) -> apenas MarkDirty (Tier 2)
         character.Inventory.Main.Place(character.Inventory.Create(41, 2, 1, 10));
         var sortPayload = new byte[12];
-        sortPayload[8] = (byte)BagKind.Inventory;
+        sortPayload[8] = (byte)InventorySortHandler.MainInventoryType;
         new InventorySortHandler().Handle(session, new PacketReader(sortPayload));
         Assert.True(player.IsDirty);
         Assert.False(player.NeedsImmediateSave);
