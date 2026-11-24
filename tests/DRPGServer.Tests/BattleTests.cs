@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using DRPGServer.Game;
 using DRPGServer.Game.Battle;
 using DRPGServer.Game.Entities;
@@ -192,6 +193,116 @@ public class BattleTests
         battle.RequestAction(_player, BattleIcon.Attack, enemy, battle.TeamA[0].Digimon.Serial);
         battle.RequestAction(_player, BattleIcon.Attack, battle.TeamA[0].Digimon.Serial, battle.TeamA[0].Digimon.Serial);
         Assert.DoesNotContain((ushort)0x35, _session.SentOpcodes());
+    }
+
+    private static (Battle Battle, BattleSystem Battles, Player Player, Session Session) StartBattleWithSkill(
+        Data.GameData.SkillInfo skill, int enemyCount, Game.Stats.CombatStats? enemyStats = null)
+    {
+        var baseSpecies = TestSupport.Data.Species[10] with { Skill1 = skill.Id };
+        var options = Enumerable.Range(0, enemyCount)
+            .Select(_ => new Data.GameData.SpawnOption(10, 1, 10, 5, 100, 0) { Stats = enemyStats })
+            .ToList();
+        var spawn = new Data.GameData.SpawnArea(79, 50, 50, 50, 50, 1, TimeSpan.FromSeconds(10), options, [(50, 50)]);
+        var spawns = new Dictionary<byte, IReadOnlyList<Data.GameData.SpawnArea>>(TestSupport.Data.Spawns) { [79] = [spawn] }.ToFrozenDictionary();
+        var data = new Data.GameData.GameData
+        {
+            Species = new Dictionary<ushort, Data.GameData.DigimonSpecies>(TestSupport.Data.Species) { [baseSpecies.Id] = baseSpecies }.ToFrozenDictionary(),
+            Items = TestSupport.Data.Items,
+            Skills = new Dictionary<ushort, Data.GameData.SkillInfo>(TestSupport.Data.Skills) { [skill.Id] = skill }.ToFrozenDictionary(),
+            Evolutions = TestSupport.Data.Evolutions,
+            Maps = TestSupport.Data.Maps,
+            Grids = TestSupport.Data.Grids,
+            DropGroups = TestSupport.Data.DropGroups,
+            TamingNets = TestSupport.Data.TamingNets,
+            Portals = TestSupport.Data.Portals,
+            Spawns = spawns,
+            ZoneIds = TestSupport.Data.ZoneIds,
+        };
+
+        var world = TestSupport.NewWorld();
+        var zones = new ZoneSystem(data, world, NullLogger<ZoneSystem>.Instance);
+        var battles = new BattleSystem(world, data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        var session = TestSupport.NewSession();
+        var leader = new Digimon(data, baseSpecies, 50) { Uid = 7, Name = "Testermon" };
+        var character = new Character(leader, new Inventory(data.FindItem, 999)) { Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79 };
+        var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
+        var zone = zones.Find(79)!;
+        zone.Enter(player);
+        session.DrainOutgoing();
+
+        var wild = zone.WildDigimons.First();
+        var battle = battles.StartPve(player, wild.Serial)!;
+        battle.SendTeams(player);
+        battle.ClientReady(player);
+        session.DrainOutgoing();
+        return (battle, battles, player, session);
+    }
+
+    [Fact]
+    public void Aoe_skill_hits_all_living_enemies_with_ranged_flag_and_multiple_rewards()
+    {
+        var aoeSkill = new Data.GameData.SkillInfo(1078, "Sun of Sorrows", 1, Data.GameData.SkillInfo.TypeRanged, TargetCount: 5);
+        var (battle, battles, player, session) = StartBattleWithSkill(
+            aoeSkill, enemyCount: 3, enemyStats: new Game.Stats.CombatStats(1, 10, 0, 5, 5, 50, BattleFormulas.MaxGauge));
+
+        // Derruba o inimigo 2 antes do golpe para garantir que mortos ficam com offset 37 = 0
+        battle.TeamB[2].Digimon.TakeDamage(battle.TeamB[2].Digimon.Hp);
+        foreach (var e in battle.TeamB) e.Gauge = int.MinValue / 2;
+
+        var me = battle.TeamA[0];
+        battle.RequestAction(player, BattleIcon.Skill1, me.Digimon.Serial, battle.TeamB[0].Digimon.Serial);
+        me.Gauge = BattleFormulas.MaxGauge;
+        session.DrainOutgoing();
+
+        battles.Update(TimeSpan.Zero, Battle.OpeningDelay + Battle.TickInterval);
+        var frames = session.DrainOutgoing();
+        var resultFrame = Assert.Single(frames, f => PacketHeader.Read(f).Opcode == (ushort)MapOpcode.BattleActionResults);
+        var payload = resultFrame.AsSpan(PacketHeader.Length);
+
+        // ✅ offset 36 do atacante = 2 (skill à distância)
+        Assert.Equal(Data.GameData.SkillInfo.TypeRanged, payload[36]);
+        // ✅ skill id no fim do 0x67
+        Assert.Equal(aoeSkill.Id, BitConverter.ToInt32(payload.Slice(1364, 4)));
+        // ✅ os dois inimigos vivos (slots 5 e 6) foram alvejados (1 acertou ou 3 errou), o já morto (slot 7) ficou em 0
+        byte hit0 = payload[5 * ActionResultsPacket.EntryLength + 37];
+        byte hit1 = payload[6 * ActionResultsPacket.EntryLength + 37];
+        byte hit2 = payload[7 * ActionResultsPacket.EntryLength + 37];
+        Assert.True(hit0 is 1 or 3);
+        Assert.True(hit1 is 1 or 3);
+        Assert.Equal((byte)0, hit2);
+
+        // ✅ um 0x6E por inimigo derrubado antes do 0x67
+        int knocked = (hit0 == 1 ? 1 : 0) + (hit1 == 1 ? 1 : 0);
+        int rewardCount = frames.Count(f => PacketHeader.Read(f).Opcode == (ushort)MapOpcode.BattleRewardBitExp);
+        Assert.Equal(knocked, rewardCount);
+    }
+
+    [Fact]
+    public void Two_target_skill_hits_primary_and_one_other_living_enemy()
+    {
+        var dualSkill = new Data.GameData.SkillInfo(9, "Double Fire", 1, Data.GameData.SkillInfo.TypeRanged, TargetCount: 2);
+        var (battle, battles, player, session) = StartBattleWithSkill(dualSkill, enemyCount: 3);
+        foreach (var e in battle.TeamB) e.Gauge = int.MinValue / 2;
+
+        var me = battle.TeamA[0];
+        // Seleciona o 3º inimigo (índice 2) como alvo principal
+        battle.RequestAction(player, BattleIcon.Skill1, me.Digimon.Serial, battle.TeamB[2].Digimon.Serial);
+        me.Gauge = BattleFormulas.MaxGauge;
+        session.DrainOutgoing();
+
+        battles.Update(TimeSpan.Zero, Battle.OpeningDelay + Battle.TickInterval);
+        var resultFrame = Assert.Single(session.DrainOutgoing(), f => PacketHeader.Read(f).Opcode == (ushort)MapOpcode.BattleActionResults);
+        var payload = resultFrame.AsSpan(PacketHeader.Length);
+
+        byte[] flags = [
+            payload[5 * ActionResultsPacket.EntryLength + 37],
+            payload[6 * ActionResultsPacket.EntryLength + 37],
+            payload[7 * ActionResultsPacket.EntryLength + 37],
+        ];
+        // Alvo principal (slot 2) sempre atingido + 1 outro vivo (total exatamente 2 alvos)
+        Assert.True(flags[2] is 1 or 3);
+        Assert.Equal(2, flags.Count(f => f is 1 or 3));
+        Assert.Equal(1, flags.Count(f => f == 0));
     }
 }
 

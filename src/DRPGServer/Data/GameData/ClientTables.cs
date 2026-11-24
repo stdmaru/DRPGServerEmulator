@@ -76,9 +76,9 @@ public static class ClientTables
     }
 
     /// <summary>
-    /// Skills: <c>digimon_skill_us</c> (0 id, 1 nível para aprender, 4 tipo). ✅ O nível da coluna 1 é o u16 depois do
-    /// id no bloco de status, a skill passa a nível 1 quando o digimon chega nele, e o custo é 20 + esse nível em VP
-    /// (sessão 56). Sem a tabela (pacote de testes antigo), nenhuma skill.
+    /// Skills: <c>digimon_skill_us</c> (0 id, 1 nível para aprender, 3 nome, 4 tipo [1 melee / 2 ranged], 5 alvos [1 / 2 / 5]).
+    /// ✅ O nível da coluna 1 é o u16 depois do id no bloco de status, a skill passa a nível 1 quando o digimon chega nele,
+    /// e o custo é 20 + esse nível em VP (sessão 56). Sem a tabela (pacote de testes antigo), nenhuma skill.
     /// </summary>
     public static FrozenDictionary<ushort, SkillInfo> Skills(ClientPack pack)
     {
@@ -86,7 +86,16 @@ public static class ClientTables
         if (!pack.Contains(SkillTable)) return skills.ToFrozenDictionary();
         foreach (var f in pack.ReadTable(SkillTable))
             if (f.Length > 4 && ushort.TryParse(f[0], CultureInfo.InvariantCulture, out var id) && id != 0)
-                skills.TryAdd(id, new SkillInfo(id, f.Length > 3 ? f[3] : "", UShort(f, 1), Byte(f, 4)));
+            {
+                byte type = Byte(f, 4);
+                byte targetCount = Byte(f, 5);
+                skills.TryAdd(id, new SkillInfo(
+                    id,
+                    f.Length > 3 ? f[3] : "",
+                    UShort(f, 1),
+                    type > 0 ? type : SkillInfo.TypeMelee,
+                    targetCount > 0 ? targetCount : (byte)1));
+            }
         return skills.ToFrozenDictionary();
     }
 
