@@ -1,7 +1,8 @@
 namespace DRPGServer.Game.Entities;
 
-/// <summary>Item no chão.</summary>
+/// <summary>Item ou card no chão.</summary>
 public sealed record ItemDrop(uint Uid, uint ItemId, short X, short Y, TimeSpan DroppedAt, uint? OwnerCharacterUid)
 {
     public Data.GameData.ItemInfo? Info { get; init; }
+    public bool IsCard { get; init; }
 }

@@ -58,6 +58,10 @@ public sealed class CardBattleState
         if (slot < 0 || slot >= SlotCount) return false;
         var card = player.Character.Inventory.CardSlots.FindByUid(uid);
         if (card is null || card.ItemId != cardId || card.Amount == 0) return false;
+        // Impede equipar a mesma pilha (mesmo UID) em múltiplos slots de batalha simultaneamente
+        for (int i = 0; i < SlotCount; i++)
+            if (i != slot && _slots[i]?.Uid == uid)
+                return false;
         _slots[slot] = card;
         return true;
     }

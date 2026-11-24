@@ -61,6 +61,7 @@ public sealed class BattleCardEquipHandler : PlayerHandler
         uint slot = packet.ReadU32();
         uint uid = packet.ReadU32();
         uint cardId = packet.ReadU32();
+        if (slot >= DRPGServer.Game.Battle.Cards.CardBattleState.SlotCount) return;
         player.Battle?.EquipCard(player, (int)slot, uid, cardId);
     }
 }
@@ -72,6 +73,7 @@ public sealed class BattleCardUnequipHandler : PlayerHandler
     protected override void Handle(Player player, PacketReader packet)
     {
         uint slot = packet.ReadU32();
+        if (slot >= DRPGServer.Game.Battle.Cards.CardBattleState.SlotCount) return;
         player.Battle?.UnequipCard(player, (int)slot);
     }
 }

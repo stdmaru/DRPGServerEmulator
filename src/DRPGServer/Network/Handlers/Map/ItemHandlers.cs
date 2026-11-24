@@ -28,7 +28,7 @@ public sealed class CardMoveHandler : PlayerHandler
         {
             case (ItemPlace.Ground, ItemPlace.Inventory):
             {
-                if (player.Zone is not { } zone || zone.FindDrop(uid) is not { } drop || drop.ItemId != cardId) return;
+                if (player.Zone is not { } zone || zone.FindDrop(uid) is not { IsCard: true } drop || drop.ItemId != cardId) return;
                 if (cardBag.Add(drop.ItemId, 1) is not [.., var card]) return;
                 zone.RemoveDrop(drop);
                 player.RequestImmediateSave();
@@ -36,28 +36,28 @@ public sealed class CardMoveHandler : PlayerHandler
                 break;
             }
             case (ItemPlace.Inventory, ItemPlace.Inventory):
-                MoveCard(player, header, uid, cardBag, ItemMoveHandler.SlotOf(header.FromA, header.FromB),
+                MoveCard(player, header, uid, cardId, cardBag, ItemMoveHandler.SlotOf(header.FromA, header.FromB),
                     cardBag, ItemMoveHandler.SlotOf(header.ToA, header.ToB));
                 break;
             case (ItemPlace.Inventory, ItemPlace.CardSlots):
-                MoveCard(player, header, uid, cardBag, ItemMoveHandler.SlotOf(header.FromA, header.FromB),
+                MoveCard(player, header, uid, cardId, cardBag, ItemMoveHandler.SlotOf(header.FromA, header.FromB),
                     cardSlots, CardSlotOf(header.ToA, header.ToB));
                 break;
             case (ItemPlace.CardSlots, ItemPlace.Inventory):
-                MoveCard(player, header, uid, cardSlots, CardSlotOf(header.FromA, header.FromB),
+                MoveCard(player, header, uid, cardId, cardSlots, CardSlotOf(header.FromA, header.FromB),
                     cardBag, ItemMoveHandler.SlotOf(header.ToA, header.ToB));
                 break;
             case (ItemPlace.CardSlots, ItemPlace.CardSlots):
-                MoveCard(player, header, uid, cardSlots, CardSlotOf(header.FromA, header.FromB),
+                MoveCard(player, header, uid, cardId, cardSlots, CardSlotOf(header.FromA, header.FromB),
                     cardSlots, CardSlotOf(header.ToA, header.ToB));
                 break;
         }
     }
 
-    private static void MoveCard(Player player, ItemMoveHeader header, uint uid,
+    private static void MoveCard(Player player, ItemMoveHeader header, uint uid, uint cardId,
         Bag fromBag, int fromSlot, Bag toBag, int toSlot)
     {
-        if (fromBag[fromSlot] is not { } card || card.Uid != uid) return;
+        if (fromBag[fromSlot] is not { } card || card.Uid != uid || card.ItemId != cardId) return;
         if (!fromBag.MoveTo(fromSlot, toBag, toSlot, out var displaced)) return;
         player.MarkDirty();
         player.Send(new CardMovePacket(header, card, displaced));
@@ -87,7 +87,7 @@ public sealed class ItemMoveHandler : PlayerHandler
         {
             case (ItemPlace.Ground, ItemPlace.Inventory):
             {
-                if (player.Zone is not { } zone || zone.FindDrop(uid) is not { } drop || drop.ItemId != itemId) return;
+                if (player.Zone is not { } zone || zone.FindDrop(uid) is not { IsCard: false } drop || drop.ItemId != itemId) return;
                 if (bag.Add(drop.ItemId, 1) is not [.., var item]) return;   // inventário cheio: fica no chão
                 zone.RemoveDrop(drop);
                 player.RequestImmediateSave();

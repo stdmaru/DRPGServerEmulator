@@ -257,6 +257,13 @@ public class CardSlashTests
         // Card apenas na mochila (não nos 6 CardSlots) é rejeitado
         Assert.False(battle.EquipCard(player, 0, bagOnlyDefense!.Uid, 5));
 
+        // Impede equipar a mesma pilha (mesmo UID) em dois slots de batalha ao mesmo tempo
+        Assert.False(battle.EquipCard(player, 2, equippedDrill.Uid, 74));
+
+        // Rejeita slot fora do intervalo (0..2) e mismatch de cardId
+        Assert.False(battle.EquipCard(player, 3, equippedDrill.Uid, 74));
+        Assert.False(battle.EquipCard(player, 0, equippedDrill.Uid, 5));
+
         // Desequipar slot 1 via 0xA1 (sem resposta S2C)
         unequip.Handle(session, new PacketReader(BattleCardPayload(1, equippedDrill.Uid, 74)));
         Assert.Empty(session.DrainOutgoing());
