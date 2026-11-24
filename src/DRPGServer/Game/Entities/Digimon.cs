@@ -52,7 +52,7 @@ public sealed class Digimon
     public uint Uid { get; init; }
     /// <summary>Selvagem = tem status fixos. Não usa o uid: ele só é atribuído depois do construtor.</summary>
     public bool IsWild => WildStats is not null;
-    public Serial Serial { get; } = Serial.New();
+    public Serial Serial { get; init; } = Serial.New();
     public string Name { get; set; }
     public ushort Level { get; private set; }
     public long Exp { get; private set; }

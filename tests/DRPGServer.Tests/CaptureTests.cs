@@ -244,8 +244,30 @@ public class CaptureTests
 
         for (int i = 0; i < enemies && !battle.IsOver; i++)
         {
-            var sent = TryCapture(battle, player, actor);
-            Assert.Contains((ushort)0xEF, sent);
+            foreach (var e in battle.TeamB) e.Gauge = int.MinValue / 2;
+            var targetSerial = battle.TeamB.First(c => !c.Digimon.IsKnockedOut).Digimon.Serial;
+            battle.RequestAction(player, BattleIcon.Capture, actor.Serial, targetSerial);
+            var frames = new List<byte[]>();
+            for (int t = 0; t < 200 && !frames.Any(f => PacketHeader.Read(f).Opcode == 0xB3) && !battle.IsOver; t++)
+            {
+                _battleSystem!.Update(TimeSpan.Zero, Battle.TickInterval);
+                frames.AddRange(player.Session.DrainOutgoing());
+            }
+            for (int t = 0; t < 50 && !battle.IsRunning && !battle.IsOver; t++)
+            {
+                battle.ClientReady(player);
+                _battleSystem!.Update(TimeSpan.Zero, Battle.TickInterval);
+                frames.AddRange(player.Session.DrainOutgoing());
+            }
+
+            // ✅ Captura em batalha usa apenas 0xB3 (result = 1) com o serial do alvo, sem 0xEF
+            Assert.DoesNotContain(frames, f => PacketHeader.Read(f).Opcode == 0xEF);
+            var b3 = Assert.Single(frames, f => PacketHeader.Read(f).Opcode == 0xB3);
+            Assert.Equal(1u, BinaryPrimitives.ReadUInt32LittleEndian(b3.AsSpan(PacketHeader.Length, 4)));
+            var blockSerial = new Serial(
+                BinaryPrimitives.ReadUInt64LittleEndian(b3.AsSpan(PacketHeader.Length + 28, 8)),
+                BinaryPrimitives.ReadUInt64LittleEndian(b3.AsSpan(PacketHeader.Length + 36, 8)));
+            Assert.Equal(targetSerial, blockSerial);
         }
 
         Assert.True(battle.IsOver);

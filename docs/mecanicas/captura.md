@@ -42,16 +42,15 @@ Evidência: amostras em `work/packets/item_packet/` (Taming Net) e sessão 56 (c
 
 | Offset | Campo |
 |---|---|
-| 0 | `u32` resultado: ✅ 2 = falhou; ❓ 1 = sucesso (chute) |
+| 0 | `u32` resultado: ✅ `1` = sucesso, `2` = falhou (`DigimonRPG.bin @ 0x00AF9A89`) |
 | 4 | serial do tamer (16 bytes, o do `0x02`) |
 | 20 | `u32 0` |
-| 24 | bloco de 696. Na falha, só o serial do alvo em +4 (offset 28); ❓ no sucesso, o bloco do digimon novo |
+| 24 | bloco de 696. Na falha, só o serial do alvo em +4 (offset 28); ✅ no sucesso, o bloco do digimon capturado **mantendo o mesmo serial do alvo em +4** (`0x00AF9B7F`) |
 | 720 | `u32 0` |
 | 724 | serial do digimon que tentou |
 | 740 | `u32 0` |
 
-- ❓ Sucesso (nunca capturado): o selvagem sai da batalha sem dar recompensa, o novo chega por `0xEF`, e a batalha termina
-  em vitória se não sobrar inimigo.
+- ✅ Sucesso (`DigimonRPG.bin @ 0x00AF9B37..0x00AF9C5E`): o cliente localiza o inimigo na batalha pelo serial em `0xB3+28` (`0x00AF9B7F`), toca a animação de captura com sucesso (`0x7A` + `0x79` com param `1`), faz o inimigo sumir da batalha (`[esi+0x210] = 8`), adiciona o bloco de 696 bytes ao time do jogador (`0x00B5A7D0`) — **não** usa `0xEF` — e zera a barra do atacante. A batalha termina em vitória se não sobrar inimigo.
 
 ## Renomeação (`0xF0`)
 - C2S (42): `u8 0`, `u8 tipo` (1 = tamer, 2 = digimon), `u16 0`, `u32 uid`, nome (20 bytes).
