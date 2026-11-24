@@ -160,23 +160,27 @@ public class PersistenceTests
 
         var factory = new CharacterFactory(TestSupport.Data, TestSupport.GameOptions());
         var record = new CharacterRecord(
-            new CharacterRow { Uid = 42, AccountUid = 1, Slot = 0, Name = "Hero", TamerId = 1, Level = 10, MapId = 79, PosX = 50, PosY = 50 },
+            new CharacterRow { Uid = 42, AccountUid = 1, Slot = 0, Name = "Hero", TamerId = 1, Level = 10, MapId = 79, PosX = 50, PosY = 50, DepositorySlots = 10 },
             [
                 new DigimonRow { Uid = 7, Slot = 0, DigimonId = 10, Name = "Guilmon", Level = 10, Hp = snap.Digimons[0].Hp, Vp = snap.Digimons[0].Vp, Evp = snap.Digimons[0].Evp },
                 new DigimonRow { Uid = 8, Slot = 1, DigimonId = 10, Name = "Guilmon2", Level = 10, Hp = 0, Vp = 15, Evp = 20 },
+                new DigimonRow { Uid = 9, Slot = 0, InDepository = true, DigimonId = 10, Name = "Stored", Level = 10, Hp = 45, Vp = 33, Evp = 12 },
             ],
-            [new FormRow(7, 10, 0, 0, 0, 0, 0, 0), new FormRow(8, 10, 0, 0, 0, 0, 0, 0)],
+            [new FormRow(7, 10, 0, 0, 0, 0, 0, 0), new FormRow(8, 10, 0, 0, 0, 0, 0, 0), new FormRow(9, 10, 0, 0, 0, 0, 0, 0)],
             [],
             []);
         var reloaded = factory.Build(record)!;
 
-        // Não recupera HP/VP/EVP ao relogar
+        // Não recupera HP/VP/EVP ao relogar (nem na party, nem no Depository)
         Assert.Equal(leader.Hp, reloaded.Leader.Hp);
         Assert.Equal(leader.Vp, reloaded.Leader.Vp);
         Assert.Equal(leader.Evp, reloaded.Leader.Evp);
         Assert.Equal(0, reloaded.Party[1]!.Hp);
         Assert.Equal(15, reloaded.Party[1]!.Vp);
         Assert.Equal(20, reloaded.Party[1]!.Evp);
+
+        var stored = reloaded.FindInDepository(9)!;
+        Assert.Equal((45, 33, 12), (stored.Hp, stored.Vp, stored.Evp));
     }
 
     [Fact]
