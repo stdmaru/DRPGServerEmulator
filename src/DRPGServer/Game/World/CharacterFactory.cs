@@ -16,10 +16,12 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
         var row = record.Character;
 
         // 1. Monta o inventário e equipamentos primeiro para que os Digimons da party já nasçam com os bônus certos
+        long unixNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var inventory = new Inventory(data.FindItem, (uint)options.Value.MaxStackPerItem, data.FindCard);
         foreach (var i in record.Items)
         {
             if (i.Amount == 0) continue;
+            if (i.ExpiresAt > 0 && unixNow >= i.ExpiresAt) continue; // descarta itens de período já expirados
             var bagKind = i.Bag switch
             {
                 (byte)BagKind.Battle => BagKind.Battle,
@@ -32,7 +34,7 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
                 ? (data.Cards.Count > 0 ? data.FindCard(i.ItemId) is not null : data.FindItem(i.ItemId) is not null)
                 : data.FindItem(i.ItemId) is not null;
             if (!valid) continue;
-            var created = inventory.Create(i.ItemId, i.Slot, i.Amount, i.Uid, isCard);
+            var created = inventory.Create(i.ItemId, i.Slot, i.Amount, i.Uid, isCard, i.ExpiresAt, i.DurationSeconds);
             if (bagKind == BagKind.Equipment && !EquipmentSlots.CanEquip((ItemPlace)i.Slot, created, row.Level))
                 continue;
             inventory.BagOf(bagKind).Place(created);

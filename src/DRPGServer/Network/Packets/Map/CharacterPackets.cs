@@ -63,11 +63,23 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
     private static void WriteEquipmentTail(PacketWriter w, Inventory inventory)
     {
         const int tailLength = 2876;
+        // ✅ DigimonRPG.bin @ 0x00ABE028 & captures.db (conn=238/428): offset 0x19B0 (6576 = 4724 + 1852)
+        // envia o Unix timestamp UTC atual do servidor (u32) para o cliente calcular o tempo restante de itens de período.
+        const int serverTimeTailOffset = 0x19B0 - 4724; // 1852 (entre Spirit3 [1736..1844] e Wings [2144..2252])
         int tailStart = w.Position;
         int cursor = 0;
+        bool wroteServerTime = false;
 
         foreach (var (place, offset) in EquipmentSlots.TailSlots)
         {
+            if (!wroteServerTime && offset > serverTimeTailOffset)
+            {
+                if (serverTimeTailOffset > cursor)
+                    w.WriteZeros(serverTimeTailOffset - cursor);
+                w.WriteU32((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                cursor = serverTimeTailOffset + 4;
+                wroteServerTime = true;
+            }
             if (offset > cursor)
                 w.WriteZeros(offset - cursor);
             if (inventory.EquippedAt(place) is { } eq)

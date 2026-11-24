@@ -98,6 +98,9 @@ public sealed record ItemInfo(uint Id, string Name)
     public byte Flag24 { get; init; }
     public byte Flag25 { get; init; }
     public uint MaxStack { get; init; } = 1;
+    /// <summary>✅ Duração padrão em segundos (col. 26 &gt; 999 em <c>item_info_us.dat</c>; 0 = permanente).</summary>
+    public uint DurationSeconds { get; init; }
+    public bool IsTimed => DurationSeconds > 0;
     public byte Flag33 { get; init; }
     public string Description { get; init; } = "";
     public EquipmentBonus EquipmentBonus { get; init; }

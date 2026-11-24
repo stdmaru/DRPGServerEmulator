@@ -73,4 +73,15 @@ Os efeitos de equipamentos são carregados diretamente de **`src/DRPGServer/Reso
 
 ## ✅ Persistência no Banco de Dados
 
-Usa a tabela existente `inventory_item` com `bag = 5` (`BagKind.Equipment`) e `slot = (byte)ItemPlace` (`4..86`), sem exigir nova migração SQL. Na recarga (`CharacterFactory.Build`), cada item equipado passa novamente por `EquipmentSlots.CanEquip` antes de ser colocado no slot.
+Usa a tabela existente `inventory_item` com `bag = 5` (`BagKind.Equipment`) e `slot = (byte)ItemPlace` (`4..86`). Na recarga (`CharacterFactory.Build`), cada item equipado passa novamente por `EquipmentSlots.CanEquip` antes de ser colocado no slot.
+
+---
+
+## ✅ Itens de Período (Temporários / Permanentes)
+
+Confirmado em `DigimonRPG.bin @ 0x00ABE028` e `captures.db` (`conn=238`, `conn=428`):
+- **`item_info_us.dat` (col. 26):** valores `1..999` são `MaxStack`; valores `> 999` são a duração padrão em segundos (ex.: `2.593.000 s` ≈ 30 dias em `#107`/`#215`).
+- **`ItemRecord` (108 B):** quando o item é de período (`ExpiresAt > 0`), `+12` envia o **Unix timestamp UTC de expiração** e `+16` envia a **duração em segundos (`≥ 1000`)**. Quando permanente (`ExpiresAt = 0`), `+12` envia `Amount` (`1`) e `+16` envia `MaxStack` (`1`).
+- **`S2C 0x02` offset `0x19B0` (`6576`):** envia o Unix timestamp UTC atual do servidor (`u32`) para o cliente sincronizar o cronômetro de expiração independente do relógio local.
+- **API de entrega (`Player.GiveItems` / `Bag.Add`):** para qualquer item não empilhável (`MaxStack == 1`), aceita duração arbitrária em segundos (ex.: `player.GiveItems([(718, 86400)])` = 1 dia), `-1` para permanente (`player.GiveItems([(718, -1)])`) ou `0`/`1` para a duração padrão do `ItemInfo`.
+- **Persistência (`sql/upgrade/0009_item_expiration.sql`):** colunas `expires_at` e `duration_seconds` em `inventory_item`. Itens vencidos são descartados na carga (`CharacterFactory.Build`), bloqueados em `EquipmentSlots.CanEquip` e removidos automaticamente no tick da zona (`Zone.AutoRecovery`).

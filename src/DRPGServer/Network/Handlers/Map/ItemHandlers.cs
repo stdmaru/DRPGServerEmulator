@@ -97,7 +97,7 @@ public sealed class ItemMoveHandler : PlayerHandler
         if (header.From == ItemPlace.Inventory && header.To == ItemPlace.Inventory)
         {
             int from = SlotOf(header.FromA, header.FromB), to = SlotOf(header.ToA, header.ToB);
-            if (bag[from] is not { } item || item.Uid != uid || item.ItemId != itemId) return;
+            if (bag[from] is not { } item || item.Uid != uid || item.ItemId != itemId || item.IsExpired()) return;
             if (bag.Move(from, to, out var displaced))
             {
                 player.MarkDirty();

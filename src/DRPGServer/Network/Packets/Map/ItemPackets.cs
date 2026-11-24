@@ -23,18 +23,26 @@ public static class ItemRecord
         _ => 0,
     };
 
-    public static void Write(PacketWriter w, InventoryItem item) => Write(w, item.Uid, item.ItemId, item.Info, item.Amount);
+    public static void Write(PacketWriter w, InventoryItem item) =>
+        Write(w, item.Uid, item.ItemId, item.Info, item.Amount, item.ExpiresAt, item.DurationSeconds);
 
-    public static void Write(PacketWriter w, uint uid, uint itemId, ItemInfo? info, uint amount)
+    public static void Write(PacketWriter w, uint uid, uint itemId, ItemInfo? info, uint amount,
+        uint expiresAt = 0, uint durationSeconds = 0)
     {
         info ??= new ItemInfo(itemId, "");
+        bool isTimed = expiresAt > 0;
+        uint wireAmount = isTimed ? expiresAt : amount;
+        uint wireStack = isTimed
+            ? Math.Max(Inventory.MinClientDurationSeconds, durationSeconds > 0 ? durationSeconds : info.DurationSeconds)
+            : info.MaxStack;
+
         w.WriteU32(uid);                         // 0
         w.WriteU32(itemId);                      // 4
         w.WriteU8(info.Type);                    // 8
         w.WriteU8(info.SubType);
         w.WriteU16(0);
-        w.WriteU32(amount);                      // 12
-        w.WriteU32(info.MaxStack);               // 16
+        w.WriteU32(wireAmount);                  // 12 ✅ quantidade ou Unix timestamp UTC de expiração (conn=238/428)
+        w.WriteU32(wireStack);                   // 16 ✅ pilha (1..999) ou duração em segundos (> 999)
         w.WriteU32(info.BuyPrice);               // 20
         w.WriteU32(info.SellPrice);              // 24
         w.WriteU32(Unknown28(itemId));           // 28 ❓

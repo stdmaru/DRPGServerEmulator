@@ -72,7 +72,9 @@ public static class ClientTables
                     Type = Byte(f, 2), SubType = Byte(f, 3),
                     Col16 = UShort(f, 15), Col17 = UInt(f, 16), BuyPrice = UInt(f, 17), SellPrice = UInt(f, 18),
                     Level = UInt(f, 20), Flag24 = Byte(f, 23), Flag25 = Byte(f, 24),
-                    MaxStack = col26 is >= 1 and <= 999 ? col26 : 1u, Flag33 = Byte(f, 32),
+                    MaxStack = col26 is >= 1 and <= 999 ? col26 : 1u,
+                    DurationSeconds = col26 > 999 ? col26 : 0u,
+                    Flag33 = Byte(f, 32),
                 });
             }
         return items.ToFrozenDictionary();
