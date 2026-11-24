@@ -92,7 +92,6 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
             Name = string.IsNullOrEmpty(r.Name) ? species.Name : r.Name,
             FreeRename = r.FreeRename,
         };
-        digimon.Load(r.Exp, r.UnlockedStage, r.TotalWins, r.TotalBattles);
         foreach (var f in forms)
             if (data.FindSpecies(f.SpeciesId) is { } formSpecies)
                 digimon.LoadForm(formSpecies, new Attributes(f.AllocStr, f.AllocAgi, f.AllocCon, f.AllocInt),
@@ -100,7 +99,7 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
         digimon.LoadTitles(r.TitleId, titles);
         if (!equipBonus.IsEmpty)
             digimon.SetEquipmentBonus(equipBonus);
-        digimon.LoadVitals(r.Hp, r.Vp, r.Evp);
+        digimon.Load(r.Exp, r.UnlockedStage, r.TotalWins, r.TotalBattles, r.Hp, r.Vp, r.Evp);
         return digimon;
     }
 
