@@ -94,6 +94,7 @@ public class PacketSizeTests
             (new DigimonReceivedPacket(digimon), 696),                 // ✅ v322 (0xEF, sessão 56)
             (new ItemUsePacket(item, digimon), 808),                   // ✅ v322 (0x41, sessão 56)
             (new ItemUseFailedPacket(), 0),                            // ✅ 0xC3
+            (new ItemTeleportPacket(80, 162, item), 124),              // ✅ v322 (0x85, conn=125/234/469)
             (new BattleCapturePacket(false, Serial.New(), combatant, combatant, null), 744), // ✅ v322 (0xB3)
             (new Unknown121Packet(), 10304),
             (new Unknown152Packet(), 7048),

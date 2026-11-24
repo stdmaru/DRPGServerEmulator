@@ -346,3 +346,21 @@ public sealed class ItemUseFailedPacket : ServerPacket
     public override ushort Opcode => (ushort)MapOpcode.ItemUseFailed;
     protected override void Write(PacketWriter w) { }
 }
+
+/// <summary>
+/// 0x85 (124 bytes): ✅ confirmação de teleporte no mesmo mapa via item 900/907 (Teleport / Teleport X).
+/// Confirmado em captures.db (conn=16/125/137/158/234/469): i32 X, i32 Y, u32 3 (inventário), ItemRecord (108 B), u32 3.
+/// </summary>
+public sealed class ItemTeleportPacket(int targetX, int targetY, InventoryItem item) : ServerPacket
+{
+    public override ushort Opcode => (ushort)MapOpcode.ItemTeleport;
+
+    protected override void Write(PacketWriter w)
+    {
+        w.WriteI32(targetX);
+        w.WriteI32(targetY);
+        w.WriteU32((uint)ItemPlace.Inventory);
+        ItemRecord.Write(w, item);
+        w.WriteU32(3);                          // ✅ sempre 3 nas capturas (conn=16/125/137/158)
+    }
+}
