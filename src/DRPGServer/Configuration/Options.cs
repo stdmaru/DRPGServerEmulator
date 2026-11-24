@@ -69,8 +69,8 @@ public sealed class GameOptions
     public short StartPosX { get; set; } = 56;
     public short StartPosY { get; set; } = 56;
 
-    /// <summary>Intervalo do salvamento automático de quem está online.</summary>
-    public int AutosaveSeconds { get; set; } = 300;
+    /// <summary>Intervalo (segundos) para gravar jogadores marcados como dirty (eventos críticos gravam imediatamente).</summary>
+    public int AutosaveSeconds { get; set; } = 60;
 
     /// <summary>Por quanto tempo o login no channel vale para entrar no mapa depois que a conexão do channel cai.</summary>
     public int AccountTicketGraceSeconds { get; set; } = 120;

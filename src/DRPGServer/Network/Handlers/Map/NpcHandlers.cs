@@ -11,6 +11,10 @@ public sealed class NpcChoiceHandler(NpcScripts scripts) : PlayerHandler
     protected override void Handle(Player player, PacketReader packet)
     {
         uint choice = packet.ReadU32();
-        if (!player.InBattle) scripts.Choose(player, choice);
+        if (!player.InBattle)
+        {
+            scripts.Choose(player, choice);
+            player.RequestImmediateSave();
+        }
     }
 }

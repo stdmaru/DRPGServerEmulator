@@ -40,7 +40,10 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
             {
                 var result = character.Deposit(partyDigimonUid, page, chargeFee);
                 if (result == DepositoryResult.DepositOk)
+                {
+                    player.RequestImmediateSave();
                     player.Send(new DepositoryListPacket(clampedPage, character));
+                }
                 player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, 0, character.Bits, result));
                 break;
             }
@@ -48,7 +51,10 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
             {
                 var (result, withdrawn) = character.Withdraw(depositoryDigimonUid, chargeFee);
                 if (result == DepositoryResult.WithdrawOk)
+                {
+                    player.RequestImmediateSave();
                     player.Send(new DepositoryListPacket(clampedPage, character));
+                }
                 player.Send(new DepositoryActionPacket(clampedPage, action, 0, depositoryDigimonUid, character.Bits, result, withdrawn));
                 break;
             }
@@ -56,7 +62,10 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
             {
                 var (result, withdrawn) = character.Swap(partyDigimonUid, depositoryDigimonUid, chargeFee);
                 if (result == DepositoryResult.SwapOk)
+                {
+                    player.RequestImmediateSave();
                     player.Send(new DepositoryListPacket(clampedPage, character));
+                }
                 player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, depositoryDigimonUid, character.Bits, result, withdrawn));
                 break;
             }
@@ -97,6 +106,7 @@ public sealed class DepositoryExpandHandler : PlayerHandler
 
         character.Inventory.Main.Consume(item, 1);
         character.ExpandDepository();
+        player.RequestImmediateSave();
         player.Send(new InventoryRefreshPacket(character));
         player.Send(new DepositoryListPacket(character.DepositoryTotalPages, character));
         player.Send(new DepositoryExpandPacket(DepositoryExpandResult.Ok));

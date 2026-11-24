@@ -81,6 +81,7 @@ public sealed class BattleSystem : IWorldSystem
             {
                 player.Character.TotalBattles++;
                 if (result == BattleResult.Win) player.Character.TotalWins++;
+                player.RequestImmediateSave();
             }
         }
 

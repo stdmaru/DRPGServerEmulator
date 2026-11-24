@@ -34,7 +34,8 @@ public sealed class ZoneSystem : IWorldSystem
     /// <summary>Move o jogador (mesmo mapa ou outro) e avisa o cliente com 0xB0.</summary>
     public bool Teleport(Player player, byte mapId, short x, short y)
     {
-        if (player.Zone?.MapId != mapId)
+        bool changedMap = player.Zone?.MapId != mapId;
+        if (changedMap)
         {
             if (Find(mapId) is not { } target)
             {
@@ -49,6 +50,8 @@ public sealed class ZoneSystem : IWorldSystem
         player.Character.X = x;
         player.Character.Y = y;
         player.LastMoveAt = _world.Now;
+        if (changedMap) player.RequestImmediateSave();
+        else player.MarkDirty();
         player.Send(new TeleportCharacterPacket(mapId, x, y));
         return true;
     }
@@ -72,6 +75,7 @@ public sealed class ZoneSystem : IWorldSystem
         c.X = x;
         c.Y = y;
         player.LastMoveAt = _world.Now;
+        player.MarkDirty();
         if (zone.Portals.FirstOrDefault(p => p.Contains(x, y)) is { } portal)
             Teleport(player, portal.DestMapId, portal.DestX, portal.DestY);
     }
