@@ -19,11 +19,19 @@ Evidência: `captures.db`, v242 (sessões 1–48) e v322 (52–56). Digimon: off
 
 ## Recompensa de batalha (0x6E S2C, 32 bytes)
 `16 B serial`, `u32 EXP` em 16, `f64 bits` em 24. ✅ Com o evento de EXP ativo, a recompensa parou exatamente no que faltava para subir (sessão 54: 24, 57, 103 = EXP dos níveis 1, 2, 3), descartando o excedente e deixando a EXP em 0. Configurável via `GameOptions.AllowMultiLevelUp` (`false` por padrão = comportamento oficial; `true` permite subir vários níveis de uma vez preservando o excedente).
+- **Penalidade por diferença de nível (`diff = enemyLevel − digimonLevel`)** (`ExpFormulas.ApplyLevelDifference`): ✅ 132 amostras v322: `diff ≥ −3` → 100%; `−6..−4` → 50% (`⌊base/2⌋`); `−9..−7` → 20% (`⌊base/5⌋`, ❓); `diff ≤ −10` → 0%.
+- **Bits**: ✅ **não** sofrem penalidade por diferença de nível (mesmo com `diff = −14` ou `−110`, continuam sorteando entre `⌊¾·máx⌋` e `máx`, onde `máx = 2·L + 3` nos Beginner).
 
-## Evento de EXP (ex.: 1200%) ❓
-O cliente mostra o valor no canto superior esquerdo. O valor 1200 **não aparece** nas capturas v322 em nenhum formato simples (u16, u32, f32, f64 de 1200 ou de 12, nem em texto). Foram vistos `0x05`, `0x73`, `0x74`, `0xE6`, `0x152`, `0x121`, `0xCC` e os S2C do global.
-- O cliente tem `Sprite\Exp_Bonus_Event.spr`, `Exp_Bonus_Hot.spr`, `Exp_Bonus.spr` e o formato `(+%d%%)`.
-- Próximo passo: engenharia reversa (referências a esses sprites até o handler do pacote) ou uma captura com o evento mudando de valor.
+## Evento de EXP (`Map S2C 0xE6`) ✅
+Confirmado em `DigimonRPG.bin` (`0x00AC0093` → `0x00AEF8B0`, renderização em `0x00B8AF52..0x00B8B116`) e decifrado em 100% das capturas v322 (`captures.db`):
+- **Criptografia**: **32 bytes** cifrados em **AES-128-ECB** usando a mesma cifra de sessão do Global (`GlobalSessionCipher`: `K = AES_C(hello_0x0E XOR W)`), com os 16 bytes do `Map S2C 0x0E`.
+- **Plaintext (32 bytes)**:
+  - `+0` (`u8`): `spriteIndex` (`0` desliga o badge; `k > 0` seleciona o frame em passos de **+25%**: `20` = `+500%` na sessão 62, `48` = `+1200%` nas sessões 53–61). Limite de frames do cliente (`resource.pf`): `Exp_Bonus.spr` tem **81 frames** (`0..80`, máx. `+2000%`) e `Exp_Bonus_Hot.spr` tem **29 frames** (`0..28`, máx. `+700%`). O emulador limita o `spriteIndex` ao teto do sprite mantendo o `ExpMultiplier` integral em batalha.
+  - `+4`, `+8`, `+12` (`u32 × 3`): `year`, `month`, `day` de expiração (formatados com `TextAttach_US` `3683`: `Expiration date is %d-%d-%d. (Year-Month-Day)`; o cliente ignora o pacote se `year == 2038`).
+  - `+16` (`u8`): `isHotTime` (`0` = `Exp_Bonus.spr` com data no tooltip; `1` = `Exp_Bonus_Hot.spr`).
+  - `+17` (`u8`): `mode` (`0` = data `0xE63`, `1` = texto fixo `0xE62` expirado).
+  - `+18..31`: zeros.
+- **No emulador**: tabela `exp_event` (`sql/upgrade/0006_exp_events.sql`), `ExpEventService` (polling periódico configurável via `Game:EventPollSeconds`, padrão 60 s), broadcast automático de `0xE6` ao mudar, aplicação de `1 + bonus_percent / 100` em `BattleSystem.GrantRewards`, e comando admin `/reloadevents`.
 
 ## No emulador
 `Game/Stats/ExpFormulas.cs` (`DigimonExpToNext`, `TamerExpToNext`). O `0x02` manda a EXP do próximo nível do tamer pela fórmula. Testes: `ExpFormulaTests`.

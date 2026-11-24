@@ -53,6 +53,7 @@ services.AddSingleton<DatabaseMigrator>();
 services.AddSingleton<AccountRepository>();
 services.AddSingleton<DRPGServer.Game.DigimonUids>();
 services.AddSingleton<CharacterRepository>();
+services.AddSingleton<ExpEventRepository>();
 services.AddSingleton(sp =>
 {
     var o = sp.GetRequiredService<IOptions<GameOptions>>().Value;
@@ -71,6 +72,8 @@ services.AddSingleton<NetworkHost>();
 services.AddHostedService(sp => sp.GetRequiredService<NetworkHost>());
 
 // jogo
+services.AddSingleton<ExpEventService>();
+services.AddHostedService(sp => sp.GetRequiredService<ExpEventService>());
 services.AddSingleton<ZoneSystem>();
 services.AddSingleton<BattleSystem>();
 services.AddSingleton<PlayerSystem>();
@@ -101,12 +104,20 @@ try
         await host.Services.GetRequiredService<DatabaseMigrator>().MigrateAsync(cts.Token);
         var maxUid = await host.Services.GetRequiredService<CharacterRepository>().MaxDigimonUidAsync(cts.Token);
         host.Services.GetRequiredService<DRPGServer.Game.DigimonUids>().Seed(maxUid);
+        await host.Services.GetRequiredService<ExpEventService>().ReloadAsync(forceNotify: false, cts.Token);
     }
 
     // os sistemas se registram no mundo ao serem criados; criar antes da thread do mundo subir
+    var world = host.Services.GetRequiredService<GameWorld>();
     host.Services.GetRequiredService<ZoneSystem>();
     host.Services.GetRequiredService<BattleSystem>();
-    host.Services.GetRequiredService<PlayerSystem>();
+    var players = host.Services.GetRequiredService<PlayerSystem>();
+    host.Services.GetRequiredService<ExpEventService>().Changed += active =>
+        world.Post(() =>
+        {
+            foreach (var player in players.Online)
+                player.Send(new DRPGServer.Network.Packets.Map.ExpEventPacket(player.Session.MapAesKey, active));
+        });
 }
 catch (Exception e)
 {

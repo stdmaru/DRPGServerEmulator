@@ -50,16 +50,6 @@ public sealed class Unknown7FPacket(int index) : ServerPacket
     }
 }
 
-/// <summary>0xE6: 32 bytes capturados (❓ chave).</summary>
-public sealed class UnknownE6Packet : ServerPacket
-{
-    public override ushort Opcode => (ushort)MapOpcode.UnknownE6;
-
-    protected override void Write(PacketWriter w) => w.WriteBytes([
-        0x42, 0xB0, 0xAE, 0x11, 0x87, 0x90, 0x92, 0x67, 0xE6, 0xD6, 0x21, 0x1A, 0x2A, 0x7F, 0x98, 0xEA,
-        0xAC, 0x9B, 0xE3, 0xBA, 0x9E, 0x0C, 0x7C, 0x21, 0xCE, 0x1E, 0xD5, 0x34, 0xD3, 0xE1, 0xD6, 0x89]);
-}
-
 /// <summary>0x121: resposta ao C2S 0x121 (template capturado de 10304 bytes).</summary>
 public sealed class Unknown121Packet : ServerPacket
 {

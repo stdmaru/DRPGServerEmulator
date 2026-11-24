@@ -52,7 +52,12 @@ public sealed class MapLifecycle(GameWorld world, PlayerSystem players, AccountR
 {
     public ServerRole Role => ServerRole.Map;
 
-    public void OnConnected(Session session) => session.Send(new HelloPacket((ushort)MapOpcode.Hello));
+    public void OnConnected(Session session)
+    {
+        var seed = RandomNumberGenerator.GetBytes(GlobalSessionCipher.BlockSize);
+        session.MapAesKey = GlobalSessionCipher.DeriveKey(seed);
+        session.Send(new HelloPacket((ushort)MapOpcode.Hello, seed));
+    }
 
     public void OnDisconnected(Session session)
     {

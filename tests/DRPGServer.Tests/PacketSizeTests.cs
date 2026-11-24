@@ -83,7 +83,7 @@ public class PacketSizeTests
             (new SingleDigimonInfoPacket(digimon), 696),               // ✅ v322 (0xB4)
             (new KeepAlivePacket(0xC4), 0),
             (new ItemReceivePacket(item), 604),
-            (new UnknownE6Packet(), 32),
+            (new ExpEventPacket(null, null), 32),                      // ✅ v322 (0xE6, AES-128-ECB)
             (new RenamePacket(RenameResult.NotAvailable, RenameKind.Tamer, 0, ""), 28), // ✅ 0xF0
             (new DigimonReceivedPacket(digimon), 696),                 // ✅ v322 (0xEF, sessão 56)
             (new ItemUsePacket(item, digimon), 808),                   // ✅ v322 (0x41, sessão 56)

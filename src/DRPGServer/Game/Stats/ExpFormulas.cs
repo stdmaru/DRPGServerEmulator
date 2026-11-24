@@ -22,4 +22,21 @@ public static class ExpFormulas
 
     /// <summary>Tamer: 5·(L + 1). ✅ níveis 1, 5, 14, 15 e 201 (0x02, v242 e v322).</summary>
     public static long TamerExpToNext(int level) => 5L * (Math.Max(level, 1) + 1);
+
+    /// <summary>
+    /// Penalidade de EXP por diferença de nível (<c>enemyLevel - digimonLevel</c>).
+    /// ✅ 132 amostras v322 (<c>captures.db</c>): ≥ −3 dá 100%, −6..−4 dá 50%, −9..−7 dá 20% (❓), ≤ −10 dá 0%.
+    /// </summary>
+    public static long ApplyLevelDifference(long baseExp, int enemyLevel, int digimonLevel)
+    {
+        if (baseExp <= 0) return 0;
+        int diff = enemyLevel - digimonLevel;
+        return diff switch
+        {
+            >= -3 => baseExp,
+            >= -6 => baseExp / 2,
+            >= -9 => baseExp / 5,
+            _ => 0,
+        };
+    }
 }
