@@ -48,14 +48,14 @@ public sealed class BattleSystem : IWorldSystem
         bool exclusive = wild.Spawn.Exclusive;
         Func<WildMember, Digimon> enemyOf = exclusive
             ? m => { m.Digimon.RestoreAll(); return m.Digimon; }
-            : m => WildDigimon.CreateMember(_data, m.Option);
+            : m => WildDigimon.CreateMember(_data, m.Option, wild.Spawn.Grade);
         var battle = new Battle(this, player, wild, enemyOf, _world.Random);
         _battles.Add(battle);
         battle.Start();
         if (exclusive)
         {
             wild.State = WildState.InBattle;
-            zone.Broadcast(new WildDigimonUpdatePacket(wild));
+            zone.BroadcastNear(wild.X, wild.Y, new WildDigimonUpdatePacket(wild));
         }
         _log.LogDebug("{Player} começou {Battle} contra {Wild}", player, battle, wild.Leader.Name);
         return battle;
@@ -93,7 +93,7 @@ public sealed class BattleSystem : IWorldSystem
             else
             {
                 battle.Wild.Reset();
-                zone.Broadcast(new WildDigimonUpdatePacket(battle.Wild));
+                zone.BroadcastNear(battle.Wild.X, battle.Wild.Y, new WildDigimonUpdatePacket(battle.Wild));
             }
         }
         _log.LogDebug("{Battle} terminou: {Result}", battle, result);

@@ -72,9 +72,10 @@ public static class GameDataLoader
             short yMin = hasPoints ? (short)0 : I16(e, "PosYMin");
             short yMax = hasPoints ? (short)0 : I16(e, "PosYMax");
             int maxCount = hasPoints ? points.Count : I32(e, "MaxCount");
+            byte grade = e.Attribute("Grade") is not null ? U8(e, "Grade") : Game.Stats.WildFormulas.GradeBeginner;
             var area = new SpawnArea(U8(e, "MapID"), xMin, xMax, yMin, yMax,
                 maxCount, TimeSpan.FromSeconds(F64(e, "RespawnTime")), options, points,
-                (bool?)e.Attribute("Exclusive") ?? false);
+                (bool?)e.Attribute("Exclusive") ?? false, grade);
             if (grids.GetValueOrDefault(area.MapId) is { } grid)
                 foreach (var (x, y) in points)
                     if (!grid.IsWalkable(x, y)) throw new GameDataException($"spawn no mapa {area.MapId}: ponto ({x}, {y}) não é andável");

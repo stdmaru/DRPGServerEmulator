@@ -73,4 +73,38 @@ public class CombatFormulaTests
         double mult = BattleFormulas.AffinityMultiplier(aAttr, aElem, tAttr, tElem);
         Assert.Equal(expected, mult, precision: 2);
     }
+
+    // ✅ capturas v322: status dos Veteran (grau 3) de L11 a L50 — 0 erro em todas as 5 amostras
+    [Theory]
+    [InlineData(11, 823,  2100, 237, 175, 533)]   // Piyomon L11 Veteran
+    [InlineData(13, 859,  2450, 251, 185, 559)]   // Kunemon L13 Veteran
+    [InlineData(15, 895,  2800, 265, 195, 585)]   // Palmon L15 Veteran
+    [InlineData(17, 931,  3150, 279, 205, 611)]   // Plotmon L17 Veteran
+    [InlineData(50, 1525, 8925, 510, 370, 1040)]  // Otamamon L50 Veteran
+    public void Veteran_wild_stats_match_official_samples(int level, int hp, int vp, int atk, int def, int br)
+    {
+        var s = WildFormulas.Combat(level, WildFormulas.GradeVeteran);
+        Assert.Equal((hp, vp, atk, def, br), (s.MaxHp, s.MaxVp, s.Atk, s.Def, s.Br));
+    }
+
+    [Fact]
+    public void Veteran_spawn_writes_grade_3_in_0x11_and_status_block()
+    {
+        var spawn = new Data.GameData.SpawnArea(
+            79, 50, 50, 50, 50, 1, TimeSpan.FromSeconds(10),
+            [new Data.GameData.SpawnOption(10, 11, 67, 25, 100, 0)],
+            [(50, 50)],
+            Exclusive: true,
+            Grade: WildFormulas.GradeVeteran);
+        var wild = new Game.Entities.WildDigimon(TestSupport.Data, spawn, 50, 50);
+
+        Assert.Equal(WildFormulas.Veteran(11), wild.Leader.Stats);
+        Assert.Equal(WildFormulas.GradeVeteran, wild.Leader.WildGrade);
+
+        var fieldPayload = new Network.Packets.Map.WildDigimonUpdatePacket(wild).EncodePayload();
+        Assert.Equal(WildFormulas.GradeVeteran, fieldPayload[44]);
+
+        var statusPayload = new Network.Packets.Map.BattleDigimonStatusPacket(wild.Leader).EncodePayload();
+        Assert.Equal(WildFormulas.GradeVeteran, statusPayload[300]);
+    }
 }

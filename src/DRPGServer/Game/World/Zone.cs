@@ -22,6 +22,13 @@ public sealed class Zone
     public static readonly TimeSpan DropLifetime = TimeSpan.FromSeconds(60);
     /// <summary>✅ Chance por tick de um selvagem parado começar a andar: 3276 de 65 462 ticks parados (5 %).</summary>
     public const double WildMoveChance = 0.05;
+    /// <summary>
+    /// ✅ Janela de visibilidade (AOI) dos selvagens nas capturas v322 (~100 mil pacotes 0x11 com jogador parado):
+    /// |dx| ≤ 12 e |dy| ≤ 23 (grade isométrica onde X vale o dobro de Y na tela; usamos 24 em Y por margem).
+    /// Quando o jogador se afasta, o servidor simplesmente deixa de enviar o 0x11 (não manda estado 12).
+    /// </summary>
+    public const int WildViewRangeX = 12;
+    public const int WildViewRangeY = 24;
     private const int HomeAttempts = 32;
 
     private readonly GameData _data;
@@ -86,7 +93,8 @@ public sealed class Zone
         player.Zone = this;
         player.NextRecoveryAt = _world.Now + RecoveryInterval;
         foreach (var wild in _wild.Values)
-            player.Send(new WildDigimonUpdatePacket(wild));
+            if (wild.State != WildState.Gone && IsInView(player, wild.X, wild.Y))
+                player.Send(new WildDigimonUpdatePacket(wild));
         foreach (var drop in _drops.Values)
             player.Send(new ItemDropPacket(drop));
     }
@@ -98,6 +106,10 @@ public sealed class Zone
         if (player.Zone == this) player.Zone = null;
     }
 
+    public static bool IsInView(Player player, short x, short y) =>
+        Math.Abs(x - player.Character.X) <= WildViewRangeX
+        && Math.Abs(y - player.Character.Y) <= WildViewRangeY;
+
     public void Broadcast(ServerPacket packet, Player? except = null)
     {
         if (_players.Count == 0) return;
@@ -105,6 +117,18 @@ public sealed class Zone
         foreach (var player in _players)
             if (player != except)
                 player.Session.SendFrame(frame);
+    }
+
+    public void BroadcastNear(short x, short y, ServerPacket packet, Player? except = null)
+    {
+        if (_players.Count == 0) return;
+        byte[]? frame = null;
+        foreach (var player in _players)
+        {
+            if (player == except || !IsInView(player, x, y)) continue;
+            frame ??= packet.Encode();
+            player.Session.SendFrame(frame);
+        }
     }
 
     /// <summary>
@@ -189,13 +213,13 @@ public sealed class Zone
                     if (Spawn(wild.Spawn, wild.Slot) is { } fresh)
                     {
                         AddWild(fresh);
-                        Broadcast(new WildDigimonUpdatePacket(fresh));
+                        BroadcastNear(fresh.X, fresh.Y, new WildDigimonUpdatePacket(fresh));
                     }
                     continue;
                 case WildState.Gone:
                     continue;
             }
-            Broadcast(new WildDigimonUpdatePacket(wild));
+            BroadcastNear(wild.X, wild.Y, new WildDigimonUpdatePacket(wild));
         }
     }
 
@@ -215,7 +239,7 @@ public sealed class Zone
     {
         wild.State = WildState.Dead;
         wild.DiedAt = _world.Now;
-        Broadcast(new WildDigimonUpdatePacket(wild));
+        BroadcastNear(wild.X, wild.Y, new WildDigimonUpdatePacket(wild));
     }
 
     public void ReloadSpawns()
@@ -228,7 +252,7 @@ public sealed class Zone
         _wild.Clear();
         SpawnAll();
         foreach (var wild in _wild.Values)
-            Broadcast(new WildDigimonUpdatePacket(wild));
+            BroadcastNear(wild.X, wild.Y, new WildDigimonUpdatePacket(wild));
     }
 
     // ---------- itens no chão ----------

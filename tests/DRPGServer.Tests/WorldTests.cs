@@ -244,7 +244,10 @@ public class WildRoamingTests
         var world = TestSupport.NewWorld();
         var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
         var session = TestSupport.NewSession();
-        zone.Enter(new Player(session, new AuthenticatedAccount(1, "u", Authority.None), Entities.Character()));
+        var character = Entities.Character();
+        character.X = 29;
+        character.Y = 66;
+        zone.Enter(new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character));
         session.DrainOutgoing();
         var w = zone.WildDigimons.First();
 
@@ -254,6 +257,40 @@ public class WildRoamingTests
         zone.Update(TimeSpan.Zero, Zone.WildTickInterval);   // para
         Assert.Equal(WildState.Idle, w.State);
         Assert.Equal(2 * zone.WildDigimons.Count(), session.SentOpcodes().Count(op => op == 0x11));
+    }
+
+    [Fact]
+    public void Wild_updates_are_filtered_by_player_view_range()
+    {
+        var world = TestSupport.NewWorld();
+        var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+
+        // Jogador longe dos Yuramon em (27..31, 65..67): não recebe 0x11 na entrada nem no tick
+        var farSession = TestSupport.NewSession();
+        var farChar = Entities.Character();
+        farChar.X = 56;
+        farChar.Y = 56;
+        var farPlayer = new Player(farSession, new AuthenticatedAccount(1, "far", Authority.None), farChar);
+        zone.Enter(farPlayer);
+        Assert.DoesNotContain((ushort)0x11, farSession.SentOpcodes());
+
+        // Jogador perto dos Yuramon: recebe todos os 3 na entrada e a cada tick
+        var nearSession = TestSupport.NewSession();
+        var nearChar = Entities.Character();
+        nearChar.X = 29;
+        nearChar.Y = 66;
+        zone.Enter(new Player(nearSession, new AuthenticatedAccount(2, "near", Authority.None), nearChar));
+        Assert.Equal(3, nearSession.SentOpcodes().Count(op => op == 0x11));
+
+        zone.Update(TimeSpan.Zero, Zone.WildTickInterval);
+        Assert.DoesNotContain((ushort)0x11, farSession.SentOpcodes());
+        Assert.Equal(3, nearSession.SentOpcodes().Count(op => op == 0x11));
+
+        // Jogador distante se aproxima para dentro da janela (±12 em X, ±24 em Y): passa a receber no próximo tick
+        farChar.X = 35;
+        farChar.Y = 66;
+        zone.Update(TimeSpan.Zero, Zone.WildTickInterval);
+        Assert.Equal(3, farSession.SentOpcodes().Count(op => op == 0x11));
     }
 
     [Fact]

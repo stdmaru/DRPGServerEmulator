@@ -25,10 +25,17 @@ public sealed record ItemInfo(uint Id, string Name)
     public byte Flag33 { get; init; }
 }
 
-/// <summary>Skill de <c>digimon_skill_us</c>. ✅ Custo em VP = 20 + nível exigido.</summary>
-public sealed record SkillInfo(ushort Id, string Name, ushort RequiredLevel, byte Type)
+/// <summary>
+/// Skill de <c>digimon_skill_us</c>. ✅ Custo em VP = 20 + nível exigido.
+/// <paramref name="Type"/>: ✅ 1 = corpo-a-corpo, 2 = à distância (offset 36 do 0x67).
+/// <paramref name="TargetCount"/>: ✅ coluna 5 da tabela (1 = alvo único, 2 = 2 alvos, 5 = área / todos).
+/// </summary>
+public sealed record SkillInfo(ushort Id, string Name, ushort RequiredLevel, byte Type, byte TargetCount = 1)
 {
     public const int MaxLevel = 10;
+    public const byte TypeMelee = 1;
+    public const byte TypeRanged = 2;
+
     public int VpCost => 20 + RequiredLevel;
 }
 
@@ -67,10 +74,12 @@ public sealed record SpawnOption(
 /// uma célula andável sorteada no retângulo. O grupo anda só em volta da casa (<c>WildDigimon.RoamRadius</c>).
 /// <paramref name="Exclusive"/>: ✅ grupo que entra em batalha (11) e morre (8 → 12), como os Otamamon da sessão 56.
 /// Sem ele o grupo é compartilhado: continua andando no mapa e a batalha usa cópias (docs/mecanicas/batalha.md).
+/// <paramref name="Grade"/>: ✅ grau do grupo (2 = Beginner, 3 = Veteran — byte 44 do 0x11 e byte 300 do 0x63).
 /// </summary>
 public sealed record SpawnArea(
     byte MapId, short XMin, short XMax, short YMin, short YMax, int MaxCount, TimeSpan RespawnTime,
-    IReadOnlyList<SpawnOption> Options, IReadOnlyList<(short X, short Y)> Points, bool Exclusive = false);
+    IReadOnlyList<SpawnOption> Options, IReadOnlyList<(short X, short Y)> Points, bool Exclusive = false,
+    byte Grade = Game.Stats.WildFormulas.GradeBeginner);
 
 /// <summary>Tabelas estáticas do jogo, carregadas uma vez na partida. Imutáveis.</summary>
 public sealed class GameData
