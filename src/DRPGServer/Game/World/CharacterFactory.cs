@@ -34,7 +34,7 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
                 ? (data.Cards.Count > 0 ? data.FindCard(i.ItemId) is not null : data.FindItem(i.ItemId) is not null)
                 : data.FindItem(i.ItemId) is not null;
             if (!valid) continue;
-            var created = inventory.Create(i.ItemId, i.Slot, i.Amount, i.Uid, isCard, i.ExpiresAt, i.DurationSeconds);
+            var created = inventory.Create(i.ItemId, i.Slot, i.Amount, i.Uid, isCard, i.ExpiresAt);
             if (bagKind == BagKind.Equipment && !EquipmentSlots.CanEquip((ItemPlace)i.Slot, created, row.Level))
                 continue;
             inventory.BagOf(bagKind).Place(created);

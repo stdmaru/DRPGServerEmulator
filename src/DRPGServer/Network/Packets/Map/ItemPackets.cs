@@ -24,16 +24,15 @@ public static class ItemRecord
     };
 
     public static void Write(PacketWriter w, InventoryItem item) =>
-        Write(w, item.Uid, item.ItemId, item.Info, item.Amount, item.ExpiresAt, item.DurationSeconds);
+        Write(w, item.Uid, item.ItemId, item.Info, item.Amount, item.ExpiresAt);
 
-    public static void Write(PacketWriter w, uint uid, uint itemId, ItemInfo? info, uint amount,
-        uint expiresAt = 0, uint durationSeconds = 0)
+    public static void Write(PacketWriter w, uint uid, uint itemId, ItemInfo? info, uint amount, uint expiresAt = 0)
     {
         info ??= new ItemInfo(itemId, "");
         bool isTimed = expiresAt > 0;
         uint wireAmount = isTimed ? expiresAt : amount;
         uint wireStack = isTimed
-            ? Math.Max(Inventory.MinClientDurationSeconds, durationSeconds > 0 ? durationSeconds : info.DurationSeconds)
+            ? Math.Max(Inventory.MinClientDurationSeconds, info.DurationSeconds)
             : info.MaxStack;
 
         w.WriteU32(uid);                         // 0

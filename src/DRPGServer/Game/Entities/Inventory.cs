@@ -73,8 +73,6 @@ public sealed class InventoryItem
     public uint Amount { get; set; }
     /// <summary>✅ Unix timestamp UTC de expiração (0 = permanente; gravado em +12 do ItemRecord quando &gt; 0).</summary>
     public uint ExpiresAt { get; set; }
-    /// <summary>✅ Duração original em segundos (0 = permanente; gravado em +16 do ItemRecord quando &gt; 999).</summary>
-    public uint DurationSeconds { get; set; }
 
     public bool IsTimed => ExpiresAt > 0;
     public bool IsExpired(long unixNow) => ExpiresAt > 0 && unixNow >= ExpiresAt;
@@ -139,12 +137,12 @@ public sealed class Bag
                 if (amount == 0) return changed;
             }
         }
-        var (expiresAt, duration) = ResolvePeriod(itemId, max, durationSeconds);
+        uint expiresAt = ResolveExpiresAt(itemId, max, durationSeconds);
         while (amount > 0)
         {
             int slot = Array.IndexOf(_slots, null);
             uint put = Math.Min(amount, max);
-            var item = _owner.Create(itemId, slot, put, isCard: IsCardBag, expiresAt: expiresAt, durationSeconds: duration);
+            var item = _owner.Create(itemId, slot, put, isCard: IsCardBag, expiresAt: expiresAt);
             _slots[slot] = item;
             amount -= put;
             changed.Add(item);
@@ -152,10 +150,10 @@ public sealed class Bag
         return changed;
     }
 
-    private (uint ExpiresAt, uint DurationSeconds) ResolvePeriod(uint itemId, uint maxStack, long? durationSeconds)
+    private uint ResolveExpiresAt(uint itemId, uint maxStack, long? durationSeconds)
     {
-        if (IsCardBag || maxStack > 1) return (0, 0);
-        if (durationSeconds == Inventory.PermanentDuration) return (0, 0);
+        if (IsCardBag || maxStack > 1) return 0;
+        if (durationSeconds == Inventory.PermanentDuration) return 0;
 
         uint effectiveDuration;
         if (durationSeconds is > 0)
@@ -163,10 +161,9 @@ public sealed class Bag
         else
             effectiveDuration = _owner.FindInfo(itemId)?.DurationSeconds ?? 0u;
 
-        if (effectiveDuration == 0) return (0, 0);
+        if (effectiveDuration == 0) return 0;
         long expires = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + effectiveDuration;
-        uint wireDuration = Math.Max(Inventory.MinClientDurationSeconds, effectiveDuration);
-        return ((uint)Math.Clamp(expires, 1, uint.MaxValue), wireDuration);
+        return (uint)Math.Clamp(expires, 1, uint.MaxValue);
     }
 
     /// <summary>Remove todos os itens cujo <see cref="InventoryItem.ExpiresAt"/> já venceu em <paramref name="unixNow"/>.</summary>
@@ -394,8 +391,7 @@ public sealed class Inventory
     public ItemInfo? FindInfo(uint itemId) => _lookup(itemId);
 
     /// <summary>Item ou card novo com uid novo (ou o salvo, na carga).</summary>
-    public InventoryItem Create(uint itemId, int slot, uint amount, uint uid = 0, bool isCard = false,
-        uint expiresAt = 0, uint durationSeconds = 0)
+    public InventoryItem Create(uint itemId, int slot, uint amount, uint uid = 0, bool isCard = false, uint expiresAt = 0)
     {
         if (uid == 0) uid = _nextUid++;
         else SeenUid(uid);
@@ -410,7 +406,6 @@ public sealed class Inventory
             Slot = slot,
             Amount = amount,
             ExpiresAt = expiresAt,
-            DurationSeconds = durationSeconds,
         };
     }
 
