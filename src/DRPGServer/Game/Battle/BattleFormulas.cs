@@ -14,8 +14,32 @@ public static class BattleFormulas
     /// <summary>✅ Barra de ação cheia (500 em todas as amostras, igual ao MaxActionGauge do bloco de status).</summary>
     public const int MaxGauge = 500;
 
-    /// <summary>❓ Chance de acerto: 313 golpes do jogador com 32 erros (10 %); dos selvagens, 22/25 sem o Otamamon L50.</summary>
-    public const double HitChance = 0.90;
+    /// <summary>
+    /// ❓ [PRECISA DE REVISÃO] Parâmetros empíricos de acerto/esquiva ajustados sobre 661 golpes limpos v322
+    /// em <c>captures.db</c> (sessões 13–64): <c>clamp(0,66 + 0,13 · BR_atacante / BR_defensor, 0,05, 1,00)</c>.
+    /// - Em 120/120 golpes com <c>BR_a / BR_d ≥ 2,5</c> não houve erros (0,0 %).
+    /// - Em BR igual (<c>1,0</c>): ~79 % acerto (21 % erro); em BR 2×: ~92 % acerto.
+    /// - ATENÇÃO: ainda faltam capturas em extremos de <c>BR_a ≪ BR_d</c> (&lt; 0,35) para validar o piso real.
+    /// </summary>
+    public const double HitChanceBase = 0.66;
+    public const double HitChanceBrWeight = 0.13;
+    public const double MinHitChance = 0.05;
+    public const double MaxHitChance = 1.00;
+
+    /// <summary>
+    /// ❓ [PRECISA DE REVISÃO] Calcula a chance de acerto (<c>0,05..1,00</c>) a partir do BR de atacante e alvo.
+    /// </summary>
+    public static double CalculateHitChance(
+        int attackerBr, int targetBr,
+        double attackerBrMultiplier = 1.0, double targetBrMultiplier = 1.0,
+        bool guaranteedHit = false)
+    {
+        if (guaranteedHit) return MaxHitChance;
+        double effectiveAttackerBr = Math.Max(1.0, attackerBr * Math.Max(0.1, attackerBrMultiplier));
+        double effectiveTargetBr = Math.Max(1.0, targetBr * Math.Max(0.1, targetBrMultiplier));
+        double ratio = effectiveAttackerBr / effectiveTargetBr;
+        return Math.Clamp(HitChanceBase + HitChanceBrWeight * ratio, MinHitChance, MaxHitChance);
+    }
 
     /// <summary>
     /// ✅ Ataque básico (skill 0 no fim do 0x67): ⌊ATK² / (10·DEF) · mult⌋, ATK de quem ataca e DEF de quem apanha,
@@ -24,9 +48,13 @@ public static class BattleFormulas
     public static Hit Attack(
         Digimon attacker, Digimon target, Random random,
         double damageMultiplier = 1.0, double defenseMultiplier = 1.0,
-        byte? attackerAttrOverride = null, byte? targetAttrOverride = null)
+        byte? attackerAttrOverride = null, byte? targetAttrOverride = null,
+        double attackerBrMultiplier = 1.0, double targetBrMultiplier = 1.0,
+        bool guaranteedHit = false)
     {
-        if (random.NextDouble() >= HitChance) return new Hit(false, 0);
+        double hitChance = CalculateHitChance(
+            attacker.Stats.Br, target.Stats.Br, attackerBrMultiplier, targetBrMultiplier, guaranteedHit);
+        if (random.NextDouble() >= hitChance) return new Hit(false, 0);
         byte atkAttr = attackerAttrOverride ?? attacker.Species.Attribute;
         byte tgtAttr = targetAttrOverride ?? target.Species.Attribute;
         double mult = AffinityMultiplier(atkAttr, attacker.Species.Element, tgtAttr, target.Species.Element);
@@ -43,9 +71,13 @@ public static class BattleFormulas
     public static Hit Skill(
         Digimon attacker, Digimon target, Data.GameData.SkillInfo skill, int skillLevel, Random random,
         double damageMultiplier = 1.0, double defenseMultiplier = 1.0,
-        byte? attackerAttrOverride = null, byte? targetAttrOverride = null)
+        byte? attackerAttrOverride = null, byte? targetAttrOverride = null,
+        double attackerBrMultiplier = 1.0, double targetBrMultiplier = 1.0,
+        bool guaranteedHit = false)
     {
-        if (random.NextDouble() >= HitChance) return new Hit(false, 0);
+        double hitChance = CalculateHitChance(
+            attacker.Stats.Br, target.Stats.Br, attackerBrMultiplier, targetBrMultiplier, guaranteedHit);
+        if (random.NextDouble() >= hitChance) return new Hit(false, 0);
         byte atkAttr = attackerAttrOverride ?? attacker.Species.Attribute;
         byte tgtAttr = targetAttrOverride ?? target.Species.Attribute;
         double mult = SkillMultiplier(skill, skillLevel) * AffinityMultiplier(atkAttr, attacker.Species.Element, tgtAttr, target.Species.Element);

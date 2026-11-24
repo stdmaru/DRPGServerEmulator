@@ -6,6 +6,7 @@ public sealed class CardAttackContext
     public double DamageBonusPercent { get; set; }
     public double BrBonusPercent { get; set; }
     public bool ForceAllTargets { get; set; }
+    public bool GuaranteedHit { get; set; }
     public byte? OverrideAttackerAttribute { get; set; }
     public byte? OverrideTargetAttribute { get; set; }
     public int HealHpFlat { get; set; }
@@ -27,6 +28,7 @@ public sealed class CardAttackContext
     public bool EvolveMax { get; set; }
 
     public double DamageMultiplier => Math.Max(0.0, 1.0 + DamageBonusPercent / 100.0);
+    public double BrMultiplier => Math.Max(0.1, 1.0 + BrBonusPercent / 100.0);
 }
 
 /// <summary>Modificadores acumulados pelos cards de Defesa (col 23 = 2) ativados quando o jogador é atacado.</summary>
@@ -39,6 +41,7 @@ public sealed class CardDefenseContext
 
     public double DefenseMultiplier => Math.Max(0.1, 1.0 + DefenseBonusPercent / 100.0);
     public double IncomingDamageMultiplier => Math.Max(0.0, 1.0 - Math.Min(100.0, DamageReductionPercent) / 100.0);
+    public double BrMultiplier => Math.Max(0.1, 1.0 + BrBonusPercent / 100.0);
 }
 
 /// <summary>
@@ -115,16 +118,22 @@ public static class CardEffectRegistry
                 break;
 
             // ---- AoE (ataca todos os inimigos com 100% de dano) ----
-            case 42 or 58 or 59 or 64 or 73 or 74 or 82 or 83 or 129:
-                // The Wicked God's Advent, Obelisk, Vajra, Golden Drill, Steel Drill, Golden Drill X, Golden Drill D, Fenrir Sword / (E)
+            case 42 or 58 or 59:                        // The Wicked God's Advent, Obelisk, Vajra
                 ctx.ForceAllTargets = true;
                 break;
-            case 124:                                   // Fenrir Sword S (AoE + 30% dano)
+            case 64 or 73 or 74 or 82 or 83 or 129:
+                // Golden Drill, Steel Drill, Golden Drill X (✅ 77/77 acertos em captures.db), Golden Drill D, Fenrir Sword / (E)
                 ctx.ForceAllTargets = true;
+                ctx.GuaranteedHit = true;
+                break;
+            case 124:                                   // Fenrir Sword S (AoE + 30% dano + acerto garantido)
+                ctx.ForceAllTargets = true;
+                ctx.GuaranteedHit = true;
                 ctx.DamageBonusPercent += 30;
                 break;
-            case 125:                                   // Fenrir Sword SS (AoE + 50% dano)
+            case 125:                                   // Fenrir Sword SS (AoE + 50% dano + acerto garantido)
                 ctx.ForceAllTargets = true;
+                ctx.GuaranteedHit = true;
                 ctx.DamageBonusPercent += 50;
                 break;
 

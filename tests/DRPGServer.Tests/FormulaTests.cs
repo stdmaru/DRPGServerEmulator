@@ -121,4 +121,30 @@ public class CombatFormulaTests
         var statusPayload = new Network.Packets.Map.BattleDigimonStatusPacket(wild.Leader).EncodePayload();
         Assert.Equal(WildFormulas.GradeVeteran, statusPayload[300]);
     }
+
+    // ❓ [PRECISA DE REVISÃO] Fórmula provisória de acerto/esquiva ajustada sobre 661 golpes limpos v322
+    [Theory]
+    [InlineData(100, 100, 0.79)]  // BR igual -> 0.66 + 0.13 * 1.0 = 0.79
+    [InlineData(200, 100, 0.92)]  // BR 2x -> 0.66 + 0.13 * 2.0 = 0.92
+    [InlineData(300, 100, 1.00)]  // BR >= 2.62x -> teto 1.00 (120/120 acertos nas capturas)
+    [InlineData(50,  100, 0.725)] // BR 0.5x -> 0.66 + 0.13 * 0.5 = 0.725
+    public void Hit_chance_scales_with_br_ratio(int attackerBr, int targetBr, double expected)
+    {
+        double hitChance = BattleFormulas.CalculateHitChance(attackerBr, targetBr);
+        Assert.Equal(expected, hitChance, precision: 3);
+    }
+
+    [Fact]
+    public void Hit_chance_respects_br_card_multipliers_and_guaranteed_hit()
+    {
+        // Card de ataque +100% BR dobra BR_a (100*2 / 100 = 2.0 -> 0.92)
+        Assert.Equal(0.92, BattleFormulas.CalculateHitChance(100, 100, attackerBrMultiplier: 2.0), precision: 3);
+        // Card de defesa +100% BR dobra BR_d (100 / 100*2 = 0.5 -> 0.725)
+        Assert.Equal(0.725, BattleFormulas.CalculateHitChance(100, 100, targetBrMultiplier: 2.0), precision: 3);
+        // Acerto garantido (ex.: Golden Drill X) ignora desvantagem de BR
+        Assert.Equal(1.0, BattleFormulas.CalculateHitChance(1, 10_000, guaranteedHit: true), precision: 3);
+        // Valores inválidos/zerados de BR não causam divisão por zero
+        double safe = BattleFormulas.CalculateHitChance(0, 0);
+        Assert.InRange(safe, BattleFormulas.MinHitChance, BattleFormulas.MaxHitChance);
+    }
 }

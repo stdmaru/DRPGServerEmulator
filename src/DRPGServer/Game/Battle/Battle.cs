@@ -262,15 +262,20 @@ public sealed class Battle
 
         double damageMult = (atkCtx?.DamageMultiplier ?? 1.0) * (defCtx?.IncomingDamageMultiplier ?? 1.0);
         double defenseMult = defCtx?.DefenseMultiplier ?? 1.0;
+        double attackerBrMult = atkCtx?.BrMultiplier ?? 1.0;
+        double targetBrMult = defCtx?.BrMultiplier ?? 1.0;
+        bool guaranteedHit = atkCtx?.GuaranteedHit == true;
         var hits = new Dictionary<Combatant, bool>(targets.Count);
 
         foreach (var victim in targets)
         {
             Hit hit = skill is not null
                 ? BattleFormulas.Skill(digimon, victim.Digimon, skill, skillLevel, _system.Random,
-                    damageMult, defenseMult, atkCtx?.OverrideAttackerAttribute, atkCtx?.OverrideTargetAttribute)
+                    damageMult, defenseMult, atkCtx?.OverrideAttackerAttribute, atkCtx?.OverrideTargetAttribute,
+                    attackerBrMult, targetBrMult, guaranteedHit)
                 : BattleFormulas.Attack(digimon, victim.Digimon, _system.Random,
-                    damageMult, defenseMult, atkCtx?.OverrideAttackerAttribute, atkCtx?.OverrideTargetAttribute);
+                    damageMult, defenseMult, atkCtx?.OverrideAttackerAttribute, atkCtx?.OverrideTargetAttribute,
+                    attackerBrMult, targetBrMult, guaranteedHit);
             hits[victim] = hit.Landed;
             if (!hit.Landed) continue;
 
