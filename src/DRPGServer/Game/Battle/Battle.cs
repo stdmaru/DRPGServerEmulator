@@ -423,6 +423,7 @@ public sealed class Battle
                 if (icon - BattleIcon.Evolve1 >= actor.Digimon.EvolutionOptions().Count) return;
                 break;
             default:
+                player.SendDebug($"Unhandled BattleIcon 0x{(ushort)icon:X}");
                 return;                             // ❓ itens ainda não
         }
 

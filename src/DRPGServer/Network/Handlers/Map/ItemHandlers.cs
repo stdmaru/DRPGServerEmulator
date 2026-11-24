@@ -125,6 +125,9 @@ public sealed class ItemUseHandler(Taming taming, GameWorld world) : PlayerHandl
             return;
         }
         if (!taming.UseNet(player, item, player.Zone?.FindWild(target), world.Random))
+        {
+            player.SendDebug($"Item {item.ItemId} (uid={item.Uid}) has no use handler");
             player.Send(new ItemUseFailedPacket());     // ❓ outros itens (consumíveis, tickets) ainda não
+        }
     }
 }

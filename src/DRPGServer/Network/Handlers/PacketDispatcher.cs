@@ -37,7 +37,10 @@ public sealed class PacketDispatcher
         if (!_handlers.TryGetValue((session.Role, frame.Opcode), out var handler))
         {
             var level = _reportedUnknown.TryAdd((session.Role, frame.Opcode), true) ? LogLevel.Information : LogLevel.Debug;
-            _log.Log(level, "Sem handler para {Opcode} em {Role} ({Size}B)", OpcodeNames.Of(session.Role, frame.Opcode), session.Role, frame.Header.Size);
+            var name = OpcodeNames.Of(session.Role, frame.Opcode);
+            _log.Log(level, "Sem handler para {Opcode} em {Role} ({Size}B)", name, session.Role, frame.Header.Size);
+            if (session.Role == ServerRole.Map && session.Player is { IsAdmin: true } admin)
+                admin.SendDebug($"Unhandled {session.Role} opcode {name} ({frame.Header.Size}B)");
             return;
         }
 
