@@ -52,6 +52,8 @@ public sealed class Digimon
     public uint Uid { get; init; }
     /// <summary>Selvagem = tem status fixos. Não usa o uid: ele só é atribuído depois do construtor.</summary>
     public bool IsWild => WildStats is not null;
+    /// <summary>✅ Grau do selvagem (2 = Beginner, 3 = Veteran — byte 300 do bloco de status); 0 no digimon do jogador.</summary>
+    public byte WildGrade { get; init; }
     public Serial Serial { get; } = Serial.New();
     public string Name { get; set; }
     public ushort Level { get; private set; }

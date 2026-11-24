@@ -28,14 +28,14 @@ public sealed class WildDigimon
     public WildDigimon(GameData data, SpawnArea spawn, short homeX, short homeY)
     {
         Spawn = spawn;
-        Members = spawn.Options.Select(o => new WildMember(CreateMember(data, o), o)).ToList();
+        Members = spawn.Options.Select(o => new WildMember(CreateMember(data, o, spawn.Grade), o)).ToList();
         HomeX = X = DestX = homeX;
         HomeY = Y = DestY = homeY;
     }
 
     /// <summary>Digimon novo com os dados de uma opção de spawn (membro do grupo ou cópia para uma batalha).</summary>
-    public static Digimon CreateMember(GameData data, SpawnOption o) =>
-        new(data, data.Species[o.SpeciesId], o.Level, o.Stats ?? WildFormulas.Combat(o.Level));
+    public static Digimon CreateMember(GameData data, SpawnOption o, byte grade = WildFormulas.GradeBeginner) =>
+        new(data, data.Species[o.SpeciesId], o.Level, o.Stats ?? WildFormulas.Combat(o.Level, grade)) { WildGrade = grade };
 
     public Serial Serial { get; } = Serial.New();
     public SpawnArea Spawn { get; }

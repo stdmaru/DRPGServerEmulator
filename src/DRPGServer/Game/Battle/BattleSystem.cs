@@ -48,7 +48,7 @@ public sealed class BattleSystem : IWorldSystem
         bool exclusive = wild.Spawn.Exclusive;
         Func<WildMember, Digimon> enemyOf = exclusive
             ? m => { m.Digimon.RestoreAll(); return m.Digimon; }
-            : m => WildDigimon.CreateMember(_data, m.Option);
+            : m => WildDigimon.CreateMember(_data, m.Option, wild.Spawn.Grade);
         var battle = new Battle(this, player, wild, enemyOf, _world.Random);
         _battles.Add(battle);
         battle.Start();
