@@ -1,6 +1,5 @@
 <!--
-  Point: casa fixa de cada grupo (✅ capturada: centro da caixa de 7 × 7 onde ele anda). Com pontos, MaxCount
-  é o número de pontos; sem pontos, cada grupo sorteia uma célula andável no retângulo PosX/PosY.
+  Point: casa fixa de cada grupo (✅ capturada: centro da caixa de 7 × 7 onde ele anda). Cada <Point> gera um grupo naquela casa fixa (sem <Point>, usa-se MaxCount + PosXMin/Max/PosYMin/Max).
   Status: pelo nível (WildFormulas); HP, VP, ATK, DEF e BR juntos substituem a fórmula.
   BitReward é o máximo (✅ fórmula 2·L + 3 nos Beginner; o oficial sorteia de ¾ dele até ele).
   ExpReward: base sem evento (✅ capturas v322 ÷ 13 por causa do evento +1200%). Ver docs/mecanicas/selvagens.md.
@@ -8,7 +7,7 @@
 <DigimonSpawns>
     <!-- ===== Mapa 79 — Village of Beginning (tutorial, 3 grupos) ===== -->
     <!-- sessões 53, 54 e 61, mesmas três casas. ✅ Yuramon enfraquecido, EXP 0, bits 5–7 -->
-    <Spawn MapID="79" MaxCount="3" PosXMin="24" PosYMin="62" PosXMax="34" PosYMax="70" RespawnTime="1">
+    <Spawn MapID="79" RespawnTime="1">
         <Point X="27" Y="65"/>
         <Point X="29" Y="66"/>
         <Point X="31" Y="67"/>
@@ -17,7 +16,7 @@
 
     <!-- ===== Mapa 2 (54 grupos) ===== -->
     <!-- Yuramon (ID 14) Lv.1: 11 grupos -->
-    <Spawn MapID="2" MaxCount="11" PosXMin="126" PosYMin="28" PosXMax="156" PosYMax="236" RespawnTime="10">
+    <Spawn MapID="2" RespawnTime="10">
         <Point X="126" Y="236"/>
         <Point X="129" Y="230"/>
         <Point X="130" Y="236"/>
@@ -34,7 +33,7 @@
         <SpawnOption DigimonID="14" Level="1" ExpReward="10" BitReward="5" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Zurumon (ID 17) Lv.2: 6 grupos -->
-    <Spawn MapID="2" MaxCount="6" PosXMin="132" PosYMin="55" PosXMax="144" PosYMax="66" RespawnTime="10">
+    <Spawn MapID="2" RespawnTime="10">
         <Point X="132" Y="65"/>
         <Point X="136" Y="64"/>
         <Point X="138" Y="55"/>
@@ -46,7 +45,7 @@
         <SpawnOption DigimonID="17" Level="2" ExpReward="11" BitReward="7" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Zurumon(Aquatic-type (ID 41) Lv.2: 4 grupos -->
-    <Spawn MapID="2" MaxCount="4" PosXMin="117" PosYMin="158" PosXMax="121" PosYMax="176" RespawnTime="10">
+    <Spawn MapID="2" RespawnTime="10">
         <Point X="117" Y="158"/>
         <Point X="117" Y="162"/>
         <Point X="120" Y="168"/>
@@ -56,7 +55,7 @@
         <SpawnOption DigimonID="41" Level="2" ExpReward="11" BitReward="7" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Tokomon (ID 13) Lv.3: 11 grupos -->
-    <Spawn MapID="2" MaxCount="11" PosXMin="28" PosYMin="177" PosXMax="148" PosYMax="216" RespawnTime="10">
+    <Spawn MapID="2" RespawnTime="10">
         <Point X="28" Y="180"/>
         <Point X="68" Y="177"/>
         <Point X="112" Y="213"/>
@@ -73,7 +72,7 @@
         <SpawnOption DigimonID="13" Level="3" ExpReward="12" BitReward="9" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Puroromon (ID 46) Lv.4: 10 grupos -->
-    <Spawn MapID="2" MaxCount="10" PosXMin="77" PosYMin="89" PosXMax="162" PosYMax="143" RespawnTime="10">
+    <Spawn MapID="2" RespawnTime="10">
         <Point X="77" Y="140"/>
         <Point X="79" Y="133"/>
         <Point X="80" Y="134"/>
@@ -89,7 +88,7 @@
         <SpawnOption DigimonID="46" Level="4" ExpReward="14" BitReward="11" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Choromon (ID 18) Lv.5: 8 grupos -->
-    <Spawn MapID="2" MaxCount="8" PosXMin="25" PosYMin="25" PosXMax="98" PosYMax="209" RespawnTime="10">
+    <Spawn MapID="2" RespawnTime="10">
         <Point X="25" Y="208"/>
         <Point X="33" Y="209"/>
         <Point X="56" Y="36"/>
@@ -103,14 +102,14 @@
         <SpawnOption DigimonID="18" Level="5" ExpReward="16" BitReward="13" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Peti Meramon(Wizard- (ID 33) Lv.6: 1 grupos -->
-    <Spawn MapID="2" MaxCount="1" PosXMin="42" PosYMin="57" PosXMax="42" PosYMax="57" RespawnTime="10">
+    <Spawn MapID="2" RespawnTime="10">
         <Point X="42" Y="57"/>
         <SpawnOption DigimonID="33" Level="6" ExpReward="18" BitReward="15" AppearanceRate="100" DropGroup="0"/>
         <SpawnOption DigimonID="33" Level="6" ExpReward="18" BitReward="15" AppearanceRate="75" DropGroup="0"/>
         <SpawnOption DigimonID="33" Level="6" ExpReward="18" BitReward="15" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Peti Meramon(Meteori (ID 49) Lv.6: 3 grupos -->
-    <Spawn MapID="2" MaxCount="3" PosXMin="59" PosYMin="184" PosXMax="64" PosYMax="190" RespawnTime="10">
+    <Spawn MapID="2" RespawnTime="10">
         <Point X="59" Y="186"/>
         <Point X="61" Y="190"/>
         <Point X="64" Y="184"/>
@@ -120,7 +119,7 @@
     </Spawn>
     <!-- ===== Mapa 4 (93 grupos) ===== -->
     <!-- Pukamon(Beast-type) (ID 23) Lv.7: 15 grupos -->
-    <Spawn MapID="4" MaxCount="15" PosXMin="12" PosYMin="12" PosXMax="89" PosYMax="76" RespawnTime="10">
+    <Spawn MapID="4" RespawnTime="10">
         <Point X="12" Y="49"/>
         <Point X="14" Y="52"/>
         <Point X="14" Y="58"/>
@@ -141,7 +140,7 @@
         <SpawnOption DigimonID="23" Level="7" ExpReward="20" BitReward="17" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Pukamon(Aquatic-type (ID 43) Lv.7: 5 grupos -->
-    <Spawn MapID="4" MaxCount="5" PosXMin="61" PosYMin="95" PosXMax="117" PosYMax="125" RespawnTime="10">
+    <Spawn MapID="4" RespawnTime="10">
         <Point X="61" Y="95"/>
         <Point X="112" Y="114"/>
         <Point X="112" Y="122"/>
@@ -152,7 +151,7 @@
         <SpawnOption DigimonID="43" Level="7" ExpReward="20" BitReward="17" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Tanemon (ID 44) Lv.7: 19 grupos -->
-    <Spawn MapID="4" MaxCount="19" PosXMin="8" PosYMin="11" PosXMax="111" PosYMax="174" RespawnTime="10">
+    <Spawn MapID="4" RespawnTime="10">
         <Point X="8" Y="16"/>
         <Point X="9" Y="17"/>
         <Point X="10" Y="11"/>
@@ -177,7 +176,7 @@
         <SpawnOption DigimonID="44" Level="7" ExpReward="20" BitReward="17" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Babydmon (ID 45) Lv.7: 11 grupos -->
-    <Spawn MapID="4" MaxCount="11" PosXMin="13" PosYMin="29" PosXMax="110" PosYMax="151" RespawnTime="10">
+    <Spawn MapID="4" RespawnTime="10">
         <Point X="13" Y="33"/>
         <Point X="16" Y="32"/>
         <Point X="18" Y="37"/>
@@ -194,7 +193,7 @@
         <SpawnOption DigimonID="45" Level="7" ExpReward="20" BitReward="17" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Koromon (ID 21) Lv.8: 6 grupos -->
-    <Spawn MapID="4" MaxCount="6" PosXMin="30" PosYMin="86" PosXMax="86" PosYMax="118" RespawnTime="10">
+    <Spawn MapID="4" RespawnTime="10">
         <Point X="30" Y="91"/>
         <Point X="32" Y="86"/>
         <Point X="34" Y="93"/>
@@ -206,7 +205,7 @@
         <SpawnOption DigimonID="21" Level="8" ExpReward="22" BitReward="19" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Poromon (ID 25) Lv.8: 11 grupos -->
-    <Spawn MapID="4" MaxCount="11" PosXMin="28" PosYMin="50" PosXMax="104" PosYMax="135" RespawnTime="10">
+    <Spawn MapID="4" RespawnTime="10">
         <Point X="28" Y="55"/>
         <Point X="29" Y="50"/>
         <Point X="29" Y="62"/>
@@ -223,7 +222,7 @@
         <SpawnOption DigimonID="25" Level="8" ExpReward="22" BitReward="19" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Caprimon(Knight-type (ID 32) Lv.9: 8 grupos -->
-    <Spawn MapID="4" MaxCount="8" PosXMin="42" PosYMin="24" PosXMax="70" PosYMax="63" RespawnTime="10">
+    <Spawn MapID="4" RespawnTime="10">
         <Point X="42" Y="36"/>
         <Point X="44" Y="24"/>
         <Point X="46" Y="31"/>
@@ -237,7 +236,7 @@
         <SpawnOption DigimonID="32" Level="9" ExpReward="25" BitReward="21" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Caprimon(Warrior-typ (ID 38) Lv.9: 2 grupos -->
-    <Spawn MapID="4" MaxCount="2" PosXMin="74" PosYMin="62" PosXMax="105" PosYMax="85" RespawnTime="10">
+    <Spawn MapID="4" RespawnTime="10">
         <Point X="74" Y="62"/>
         <Point X="105" Y="85"/>
         <SpawnOption DigimonID="38" Level="9" ExpReward="25" BitReward="21" AppearanceRate="100" DropGroup="0"/>
@@ -245,7 +244,7 @@
         <SpawnOption DigimonID="38" Level="9" ExpReward="25" BitReward="21" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Pagumon(Ore-type) (ID 15) Lv.10: 6 grupos -->
-    <Spawn MapID="4" MaxCount="6" PosXMin="32" PosYMin="70" PosXMax="38" PosYMax="78" RespawnTime="10">
+    <Spawn MapID="4" RespawnTime="10">
         <Point X="32" Y="72"/>
         <Point X="34" Y="77"/>
         <Point X="34" Y="78"/>
@@ -257,7 +256,7 @@
         <SpawnOption DigimonID="15" Level="10" ExpReward="28" BitReward="23" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- Pagumon(Oni-type) (ID 37) Lv.10: 10 grupos -->
-    <Spawn MapID="4" MaxCount="10" PosXMin="44" PosYMin="52" PosXMax="100" PosYMax="102" RespawnTime="10">
+    <Spawn MapID="4" RespawnTime="10">
         <Point X="44" Y="54"/>
         <Point X="44" Y="56"/>
         <Point X="51" Y="58"/>
@@ -274,7 +273,7 @@
     </Spawn>
     <!-- ===== Mapa 46 (8 grupos) ===== -->
     <!-- Goburimon (ID 61) Lv.11: 7 grupos -->
-    <Spawn MapID="46" MaxCount="7" PosXMin="4" PosYMin="9" PosXMax="14" PosYMax="29" RespawnTime="10">
+    <Spawn MapID="46" RespawnTime="10">
         <Point X="4" Y="18"/>
         <Point X="5" Y="29"/>
         <Point X="10" Y="14"/>
@@ -287,7 +286,7 @@
         <SpawnOption DigimonID="61" Level="11" ExpReward="32" BitReward="25" AppearanceRate="60" DropGroup="0"/>
     </Spawn>
     <!-- V-mon(Tamed) (ID 635) Lv.11: 1 grupos -->
-    <Spawn MapID="46" MaxCount="1" PosXMin="24" PosYMin="36" PosXMax="24" PosYMax="36" RespawnTime="10" Exclusive="true">
+    <Spawn MapID="46" RespawnTime="10" Exclusive="true">
         <Point X="24" Y="36"/>
         <SpawnOption DigimonID="635" Level="11" ExpReward="32" BitReward="25" AppearanceRate="100" DropGroup="0"/>
     </Spawn>
