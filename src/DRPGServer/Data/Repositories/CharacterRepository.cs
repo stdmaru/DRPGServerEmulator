@@ -51,6 +51,9 @@ public sealed class DigimonRow
     public bool FreeRename { get; set; }
     public bool InDepository { get; set; }
     public uint TitleId { get; set; }
+    public int? Hp { get; set; }
+    public int? Vp { get; set; }
+    public int? Evp { get; set; }
 }
 
 /// <summary>Uma forma de um digimon (tabela <c>digimon_form</c>).</summary>
@@ -84,7 +87,8 @@ public sealed record CharacterSnapshot(
         {
             if (c.Party[slot] is not { Uid: > 0 } d) continue;
             digimons.Add(new DigimonSnapshot(d.Uid, (byte)slot, slot == 0, false, d.BaseForm.Species.Id, d.Name, d.Level, d.Exp,
-                d.UnlockedStage, d.PointsOf(d.BaseForm), d.SkillPoints, d.TotalWins, d.TotalBattles, d.FreeRename, d.TitleId));
+                d.UnlockedStage, d.PointsOf(d.BaseForm), d.SkillPoints, d.TotalWins, d.TotalBattles, d.FreeRename, d.TitleId,
+                d.Hp, d.Vp, d.Evp));
             forms.AddRange(d.Forms.Select(f => new FormRow(d.Uid, f.Species.Id, f.Allocated.Str, f.Allocated.Agi,
                 f.Allocated.Con, f.Allocated.Int, (byte)f.SkillLevels[0], (byte)f.SkillLevels[1])));
             titles.AddRange(d.Titles.Select(t => new TitleRow(d.Uid, t)));
@@ -93,7 +97,8 @@ public sealed record CharacterSnapshot(
         {
             if (c.DepositoryGrid[slot] is not { Uid: > 0 } d) continue;
             digimons.Add(new DigimonSnapshot(d.Uid, (byte)slot, false, true, d.BaseForm.Species.Id, d.Name, d.Level, d.Exp,
-                d.UnlockedStage, d.PointsOf(d.BaseForm), d.SkillPoints, d.TotalWins, d.TotalBattles, d.FreeRename, d.TitleId));
+                d.UnlockedStage, d.PointsOf(d.BaseForm), d.SkillPoints, d.TotalWins, d.TotalBattles, d.FreeRename, d.TitleId,
+                d.Hp, d.Vp, d.Evp));
             forms.AddRange(d.Forms.Select(f => new FormRow(d.Uid, f.Species.Id, f.Allocated.Str, f.Allocated.Agi,
                 f.Allocated.Con, f.Allocated.Int, (byte)f.SkillLevels[0], (byte)f.SkillLevels[1])));
             titles.AddRange(d.Titles.Select(t => new TitleRow(d.Uid, t)));
@@ -108,7 +113,8 @@ public sealed record CharacterSnapshot(
 
 public sealed record DigimonSnapshot(
     uint Uid, byte Slot, bool IsLeader, bool InDepository, ushort DigimonId, string Name, ushort Level, long Exp, byte UnlockedStage,
-    ushort AbilityPoints, ushort SkillPoints, int TotalWins, int TotalBattles, bool FreeRename, uint TitleId = 0);
+    ushort AbilityPoints, ushort SkillPoints, int TotalWins, int TotalBattles, bool FreeRename, uint TitleId = 0,
+    int? Hp = null, int? Vp = null, int? Evp = null);
 
 public sealed record NewCharacter(
     uint AccountUid, byte Slot, string Name, byte TamerId, ushort DigimonId, string DigimonName, byte MapId, short X, short Y,
@@ -143,7 +149,8 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
         if (row is null) return null;
         var uid = row.Uid;
         var digimons = await db.QueryAsync<DigimonRow>(new CommandDefinition("""
-            SELECT uid, slot, digimon_id, name, level, exp, unlocked_stage, total_wins, total_battles, free_rename, in_depository, title_id
+            SELECT uid, slot, digimon_id, name, level, exp, unlocked_stage, total_wins, total_battles, free_rename, in_depository, title_id,
+                   hp, vp, evp
             FROM digimon WHERE character_uid = @uid ORDER BY in_depository, slot, uid
             """, new { uid }, cancellationToken: ct));
         var forms = await db.QueryAsync<FormRow>(new CommandDefinition("""
@@ -226,20 +233,20 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
         // Digimon capturado no mundo ainda não existe no banco: entra aqui com o uid já reservado (DigimonUids).
         await db.ExecuteAsync(new CommandDefinition("""
             INSERT INTO digimon (uid, character_uid, slot, is_leader, in_depository, digimon_id, name, level, exp, unlocked_stage,
-                                 ability_points, skill_points, total_wins, total_battles, free_rename, title_id)
+                                 ability_points, skill_points, total_wins, total_battles, free_rename, title_id, hp, vp, evp)
             VALUES (@Uid, @CharacterUid, @Slot, @IsLeader, @InDepository, @DigimonId, @Name, @Level, @Exp, @UnlockedStage,
-                    @AbilityPoints, @SkillPoints, @TotalWins, @TotalBattles, @FreeRename, @TitleId)
+                    @AbilityPoints, @SkillPoints, @TotalWins, @TotalBattles, @FreeRename, @TitleId, @Hp, @Vp, @Evp)
             ON DUPLICATE KEY UPDATE
                 slot = VALUES(slot), is_leader = VALUES(is_leader), in_depository = VALUES(in_depository),
                 digimon_id = VALUES(digimon_id), name = VALUES(name),
                 level = VALUES(level), exp = VALUES(exp), unlocked_stage = VALUES(unlocked_stage),
                 ability_points = VALUES(ability_points), skill_points = VALUES(skill_points),
                 total_wins = VALUES(total_wins), total_battles = VALUES(total_battles), free_rename = VALUES(free_rename),
-                title_id = VALUES(title_id)
+                title_id = VALUES(title_id), hp = VALUES(hp), vp = VALUES(vp), evp = VALUES(evp)
             """, s.Digimons.Select(d => new
             {
                 d.Uid, CharacterUid = s.Uid, d.Slot, d.IsLeader, d.InDepository, d.DigimonId, d.Name, d.Level, d.Exp, d.UnlockedStage,
-                d.AbilityPoints, d.SkillPoints, d.TotalWins, d.TotalBattles, d.FreeRename, d.TitleId,
+                d.AbilityPoints, d.SkillPoints, d.TotalWins, d.TotalBattles, d.FreeRename, d.TitleId, d.Hp, d.Vp, d.Evp,
             }), tx, cancellationToken: ct));
 
         var digimonUids = s.Digimons.Select(d => d.Uid).ToList();

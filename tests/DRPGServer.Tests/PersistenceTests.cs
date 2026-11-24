@@ -137,4 +137,61 @@ public class PersistenceTests
         new ItemMoveHandler().Handle(session, new PacketReader(w.Payload.ToArray()));
         Assert.True(player.NeedsImmediateSave);
     }
+
+    [Fact]
+    public void Digimon_vitals_persist_through_snapshot_and_factory_reload()
+    {
+        var leader = Entities.Digimon(level: 10);
+        var ally = Entities.Digimon(level: 10);
+        leader.TakeDamage(50);
+        leader.SpendVp(30);
+        ally.TakeDamage(ally.Stats.MaxHp); // nocauteado (HP = 0)
+
+        var character = new Character(leader, new Inventory(TestSupport.Data.FindItem, 999))
+        {
+            Uid = 42, AccountUid = 1, Slot = 0, Name = "Hero", TamerId = 1, Level = 10, MapId = 79, X = 50, Y = 50,
+        };
+        character.Place(1, ally);
+
+        var snap = CharacterSnapshot.Of(character);
+        Assert.Equal(2, snap.Digimons.Count);
+        Assert.Equal((leader.Hp, leader.Vp, leader.Evp), (snap.Digimons[0].Hp, snap.Digimons[0].Vp, snap.Digimons[0].Evp));
+        Assert.Equal(0, snap.Digimons[1].Hp);
+
+        var factory = new CharacterFactory(TestSupport.Data, TestSupport.GameOptions());
+        var record = new CharacterRecord(
+            new CharacterRow { Uid = 42, AccountUid = 1, Slot = 0, Name = "Hero", TamerId = 1, Level = 10, MapId = 79, PosX = 50, PosY = 50 },
+            [
+                new DigimonRow { Uid = 7, Slot = 0, DigimonId = 10, Name = "Guilmon", Level = 10, Hp = snap.Digimons[0].Hp, Vp = snap.Digimons[0].Vp, Evp = snap.Digimons[0].Evp },
+                new DigimonRow { Uid = 8, Slot = 1, DigimonId = 10, Name = "Guilmon2", Level = 10, Hp = 0, Vp = 15, Evp = 20 },
+            ],
+            [new FormRow(7, 10, 0, 0, 0, 0, 0, 0), new FormRow(8, 10, 0, 0, 0, 0, 0, 0)],
+            [],
+            []);
+        var reloaded = factory.Build(record)!;
+
+        // Não recupera HP/VP/EVP ao relogar
+        Assert.Equal(leader.Hp, reloaded.Leader.Hp);
+        Assert.Equal(leader.Vp, reloaded.Leader.Vp);
+        Assert.Equal(leader.Evp, reloaded.Leader.Evp);
+        Assert.Equal(0, reloaded.Party[1]!.Hp);
+        Assert.Equal(15, reloaded.Party[1]!.Vp);
+        Assert.Equal(20, reloaded.Party[1]!.Evp);
+    }
+
+    [Fact]
+    public void Digimon_vitals_null_loads_full_and_out_of_range_clamps()
+    {
+        var d = Entities.Digimon(level: 10);
+        // Registros antigos/novos (NULL) carregam cheios
+        d.TakeDamage(40);
+        d.LoadVitals(null, null, null);
+        Assert.Equal((d.Stats.MaxHp, d.Stats.MaxVp, d.Stats.MaxEvp), (d.Hp, d.Vp, d.Evp));
+
+        // Valores fora da faixa são limitados a 0..Max
+        d.LoadVitals(-50, 999_999, -1);
+        Assert.Equal(0, d.Hp);
+        Assert.Equal(d.Stats.MaxVp, d.Vp);
+        Assert.Equal(0, d.Evp);
+    }
 }
