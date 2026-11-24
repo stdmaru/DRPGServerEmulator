@@ -5,8 +5,9 @@ using DRPGServer.Network.Packets.Map;
 namespace DRPGServer.Game.Npcs;
 
 /// <summary>
-/// Mapa 79 — <c>Village of Beginning</c> (área inicial / tutorial, sessões 53 e 61).
-/// ✅ Escolhas 1–4 (manuais), 5 (Tunomon: 5 Yuramon's Seeds → Carta de Apresentação) e 8 (fim do tutorial → Mapa 1).
+/// Mapa 79 — <c>Village of Beginning</c> (área inicial / tutorial, sessões 53, 61 e 64).
+/// ✅ Escolhas 1–4 (manuais), 5 (Tunomon: 5 Yuramon's Seeds → Carta de Apresentação),
+/// 7 (quiz perfeito: 100× Golden Drill X → Mapa 1, conn=480) e 8 (quiz médio: 50× Golden Drill X → Mapa 1, conn=92/205).
 /// </summary>
 public sealed class VillageOfBeginningNpcs : NpcScriptBase
 {
@@ -16,19 +17,21 @@ public sealed class VillageOfBeginningNpcs : NpcScriptBase
     public const uint YuramonSeed = 41;
     public const uint SeedsForTunomon = 5;
 
-    /// <summary>Woodmon's Leaf, na bolsa de batalha: 50 no fim do tutorial.</summary>
-    public const uint WoodmonLeaf = 74;
-    public const uint LeavesAtEnd = 50;
+    /// <summary>✅ Card #74 Golden Drill X (card_info_us.dat): 100 no quiz perfeito (escolha 7) ou 50 no médio (escolha 8).</summary>
+    public const uint GoldenDrillX = 74;
+    public const uint GoldenDrillAtEndNormal = 50;
+    public const uint GoldenDrillAtEndPerfect = 100;
 
     /// <summary>✅ Escolha 5 (Tunomon): carta 22008 em troca das sementes.</summary>
     public const uint TunomonCard = 22008;
 
-    /// <summary>✅ Escolha 8 (fim do tutorial): 24171 e 24172 na aba Items + teleporte para o Mapa 1 (58, 82).</summary>
+    /// <summary>✅ Escolhas 7/8 (fim do tutorial): 24171 e 24172 na aba Items + teleporte para o Mapa 1 (58, 82).</summary>
     private static readonly (uint ItemId, uint Amount)[] FinalItems = [(24171, 1), (24172, 1)];
     public const byte FinalMap = 1;
     public const short FinalX = 58, FinalY = 82;
 
     public const uint TunomonChoice = 5;
+    public const uint FinalChoicePerfect = 7;
     public const uint FinalChoice = 8;
 
     private readonly ZoneSystem _zones;
@@ -46,22 +49,23 @@ public sealed class VillageOfBeginningNpcs : NpcScriptBase
         RegisterChoice(4, p => GiveItemOnce(p, 4, 22007));
 
         RegisterChoice(TunomonChoice, p => ExchangeItemsOnce(p, TunomonChoice, YuramonSeed, SeedsForTunomon, (TunomonCard, 1)));
-        RegisterChoice(FinalChoice, FinishTutorial);
+        RegisterChoice(FinalChoicePerfect, p => FinishTutorial(p, FinalChoicePerfect, GoldenDrillAtEndPerfect));
+        RegisterChoice(FinalChoice, p => FinishTutorial(p, FinalChoice, GoldenDrillAtEndNormal));
     }
 
-    private bool FinishTutorial(Player player)
+    private bool FinishTutorial(Player player, uint choiceId, uint drillAmount)
     {
-        if (HasDone(player, FinalChoice) || !HasDone(player, TunomonChoice))
+        if (HasDone(player, FinalChoice) || HasDone(player, FinalChoicePerfect) || !HasDone(player, TunomonChoice))
             return false;
 
         var inventory = player.Character.Inventory;
-        if (FinalItems.Any(i => inventory.Main.Room(i.ItemId) < i.Amount) || inventory.Battle.Room(WoodmonLeaf) < LeavesAtEnd)
+        if (FinalItems.Any(i => inventory.Main.Room(i.ItemId) < i.Amount) || inventory.Battle.Room(GoldenDrillX) < drillAmount)
             return false;
 
         _zones.Teleport(player, FinalMap, FinalX, FinalY);
-        player.Send(new NpcChoicePacket(FinalChoice));
+        player.Send(new NpcChoicePacket(choiceId));
         MarkDone(player, FinalChoice);
-        player.GiveCard(WoodmonLeaf, LeavesAtEnd, refresh: false);
+        player.GiveCard(GoldenDrillX, drillAmount, refresh: false);
         player.GiveItems(FinalItems, refresh: true);
 
         // ✅ o oficial repete aqui os 0x7E e 0x7F da entrada

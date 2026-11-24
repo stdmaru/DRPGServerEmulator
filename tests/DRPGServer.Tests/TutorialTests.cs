@@ -338,7 +338,24 @@ public class TutorialTests
         Assert.Equal(7, sent.Count(o => o == 0x7E));
         Assert.Equal(7, sent.Count(o => o == 0x7F));
         Assert.Equal(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalMap, c.MapId);
-        Assert.Equal(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.LeavesAtEnd, c.Inventory.Battle.Count(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.WoodmonLeaf));
+        Assert.Equal(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.GoldenDrillAtEndNormal, c.Inventory.Battle.Count(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.GoldenDrillX));
+    }
+
+    [Fact]
+    public void Tutorial_quiz_perfect_choice_7_gives_100_golden_drills_and_blocks_choice_8()
+    {
+        var c = _player.Character;
+        c.Inventory.Main.Add(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.YuramonSeed, 5);
+        Assert.True(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice));
+        _session.DrainOutgoing();
+
+        Assert.True(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoicePerfect));
+        Assert.Equal(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalMap, c.MapId);
+        Assert.Equal(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.GoldenDrillAtEndPerfect,
+            c.Inventory.Battle.Count(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.GoldenDrillX));
+
+        // Não pode reivindicar a escolha 8 após já ter concluído pela escolha 7
+        Assert.False(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice));
     }
 
     // ---------- recompensas ----------
