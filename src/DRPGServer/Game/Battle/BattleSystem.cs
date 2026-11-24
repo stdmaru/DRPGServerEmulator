@@ -104,7 +104,7 @@ public sealed class BattleSystem : IWorldSystem
     /// digimon, quem derrubou primeiro); os bits vão uma vez só, no 0x6E de quem derrubou, sorteados entre ¾ do
     /// máximo e o máximo. Cada item do grupo de drop é sorteado à parte.
     /// </summary>
-    internal void GrantRewards(Player owner, Combatant killer, IReadOnlyList<Combatant> participants, WildMember defeated)
+    internal void GrantRewards(Player owner, Combatant killer, IReadOnlyList<Combatant> participants, WildMember defeated, int enemyCount = 1)
     {
         double eventMultiplier = _expEvents?.ExpMultiplier ?? 1.0;
         double bits = RollBits(defeated.Option.BitReward) * _options.BitRate;
@@ -114,7 +114,8 @@ public sealed class BattleSystem : IWorldSystem
         bool first = true;
         foreach (var digimon in order)
         {
-            long baseExp = Stats.ExpFormulas.ApplyLevelDifference(defeated.Option.ExpReward, defeated.Digimon.Level, digimon.Level);
+            long withBonus = Stats.ExpFormulas.ApplyEnemyCountBonus(defeated.Option.ExpReward, enemyCount);
+            long baseExp = Stats.ExpFormulas.ApplyLevelDifference(withBonus, defeated.Digimon.Level, digimon.Level);
             long exp = (long)(baseExp * _options.ExpRate * eventMultiplier);
             Progression.GainExp(owner, digimon, exp, first ? bits : 0, _options.DigimonMaxLevel, inBattle: true, _options.AllowMultiLevelUp);
             first = false;

@@ -41,6 +41,20 @@ public class ExpFormulaTests
     [InlineData(0,  2,  2,  0)]   // override 0 (tutorial) continua 0
     public void Exp_level_difference_penalty_matches_captures(long baseExp, int enemyLevel, int digimonLevel, long expected) =>
         Assert.Equal(expected, ExpFormulas.ApplyLevelDifference(baseExp, enemyLevel, digimonLevel));
+
+    // ✅ 7 de 7 amostras Veteran v322 (base = 2× Beginner) + Beginner (1–3 inimigos = 100%)
+    [Theory]
+    [InlineData(50,  1, 50)]   // Beginner L15, 1 inimigo -> 100%
+    [InlineData(50,  3, 50)]   // Beginner L15, 3 inimigos -> 100%
+    [InlineData(64,  4, 67)]   // Veteran L11 (2×32=64), 4 inimigos -> 105% = 67
+    [InlineData(72,  4, 75)]   // Veteran L12 (2×36=72), 4 inimigos -> 105% = 75
+    [InlineData(80,  4, 84)]   // Veteran L13 (2×40=80), 4 inimigos -> 105% = 84
+    [InlineData(90,  3, 90)]   // Veteran L14 (2×45=90), 3 inimigos -> 100% = 90
+    [InlineData(100, 3, 100)]  // Veteran L15 (2×50=100), 3 inimigos -> 100% = 100
+    [InlineData(154, 3, 154)]  // Veteran L19 (2×77=154), 3 inimigos -> 100% = 154
+    [InlineData(172, 5, 189)]  // Veteran L20 (2×86=172), 5 inimigos -> 110% = 189
+    public void Exp_enemy_count_bonus_matches_captures(long baseExp, int enemyCount, long expected) =>
+        Assert.Equal(expected, ExpFormulas.ApplyEnemyCountBonus(baseExp, enemyCount));
 }
 
 public class CombatFormulaTests
