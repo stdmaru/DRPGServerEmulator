@@ -19,23 +19,41 @@ public static class BattleFormulas
 
     /// <summary>
     /// ✅ Ataque básico (skill 0 no fim do 0x67): ⌊ATK² / (10·DEF) · mult⌋, ATK de quem ataca e DEF de quem apanha,
-    /// com multiplicador de afinidade/atributo (0,90…1,05).
+    /// com multiplicador de afinidade/atributo (0,90…1,05) e modificadores opcionais de Card Slash.
     /// </summary>
-    public static Hit Attack(Digimon attacker, Digimon target, Random random)
+    public static Hit Attack(
+        Digimon attacker, Digimon target, Random random,
+        double damageMultiplier = 1.0, double defenseMultiplier = 1.0,
+        byte? attackerAttrOverride = null, byte? targetAttrOverride = null)
     {
         if (random.NextDouble() >= HitChance) return new Hit(false, 0);
-        double mult = AffinityMultiplier(attacker.Species.Attribute, attacker.Species.Element, target.Species.Attribute, target.Species.Element);
-        return new Hit(true, Math.Max(1, (int)Math.Floor(BaseDamage(attacker.Stats.Atk, target.Stats.Def) * mult)));
+        byte atkAttr = attackerAttrOverride ?? attacker.Species.Attribute;
+        byte tgtAttr = targetAttrOverride ?? target.Species.Attribute;
+        double mult = AffinityMultiplier(atkAttr, attacker.Species.Element, tgtAttr, target.Species.Element);
+        int effectiveDef = Math.Max(1, (int)Math.Floor(target.Stats.Def * defenseMultiplier));
+        int damage = damageMultiplier <= 0.0
+            ? 0
+            : Math.Max(1, (int)Math.Floor(BaseDamage(attacker.Stats.Atk, effectiveDef) * mult * damageMultiplier));
+        return new Hit(true, damage);
     }
 
     /// <summary>
-    /// Skill: o mesmo ataque com multiplicador de skill e afinidade.
+    /// Skill: o mesmo ataque com multiplicador de skill, afinidade e modificadores opcionais de Card Slash.
     /// </summary>
-    public static Hit Skill(Digimon attacker, Digimon target, Data.GameData.SkillInfo skill, int skillLevel, Random random)
+    public static Hit Skill(
+        Digimon attacker, Digimon target, Data.GameData.SkillInfo skill, int skillLevel, Random random,
+        double damageMultiplier = 1.0, double defenseMultiplier = 1.0,
+        byte? attackerAttrOverride = null, byte? targetAttrOverride = null)
     {
         if (random.NextDouble() >= HitChance) return new Hit(false, 0);
-        double mult = SkillMultiplier(skill, skillLevel) * AffinityMultiplier(attacker.Species.Attribute, attacker.Species.Element, target.Species.Attribute, target.Species.Element);
-        return new Hit(true, Math.Max(1, (int)Math.Floor(BaseDamage(attacker.Stats.Atk, target.Stats.Def) * mult)));
+        byte atkAttr = attackerAttrOverride ?? attacker.Species.Attribute;
+        byte tgtAttr = targetAttrOverride ?? target.Species.Attribute;
+        double mult = SkillMultiplier(skill, skillLevel) * AffinityMultiplier(atkAttr, attacker.Species.Element, tgtAttr, target.Species.Element);
+        int effectiveDef = Math.Max(1, (int)Math.Floor(target.Stats.Def * defenseMultiplier));
+        int damage = damageMultiplier <= 0.0
+            ? 0
+            : Math.Max(1, (int)Math.Floor(BaseDamage(attacker.Stats.Atk, effectiveDef) * mult * damageMultiplier));
+        return new Hit(true, damage);
     }
 
     /// <summary>

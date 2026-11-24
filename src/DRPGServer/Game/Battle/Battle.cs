@@ -1,3 +1,5 @@
+using DRPGServer.Data.GameData;
+using DRPGServer.Game.Battle.Cards;
 using DRPGServer.Game.Entities;
 using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
@@ -70,6 +72,7 @@ public sealed class Battle
     private readonly List<Combatant> _teamA = [];
     private readonly List<Combatant> _teamB = [];
     private readonly Dictionary<Player, int> _captureAttempts = [];
+    private readonly Dictionary<Player, CardBattleState> _cardStates = [];
     private Phase _phase = Phase.Opening;
     private TimeSpan _timer;
 
@@ -233,20 +236,72 @@ public sealed class Battle
         }
 
         var (acting, other) = actor.Side == BattleSide.A ? (_teamA, _teamB) : (_teamB, _teamA);
-        var targets = SelectTargets(target, other, skill?.TargetCount ?? 1);
+        var activatedCards = new Dictionary<Combatant, ActivatedCards>();
+        CardAttackContext? atkCtx = null;
+        CardDefenseContext? defCtx = null;
+
+        // ✅ Card Slash de Ataque (col 23 == 1): ativa quando o jogador ataca
+        if (actor.Owner is { } attackerOwner
+            && CardStateOf(attackerOwner).TryActivate(attackerOwner, CardTrigger.Attack, out var atkActivated))
+        {
+            activatedCards[actor] = atkActivated;
+            atkCtx = CardEffectRegistry.EvaluateAttack(atkActivated);
+            ApplyPreAttackCardEffects(actor, acting, atkCtx);
+        }
+
+        int maxTargets = atkCtx?.ForceAllTargets == true ? MaxPerSide : (skill?.TargetCount ?? 1);
+        var targets = SelectTargets(target, other, maxTargets);
+
+        // ✅ Card Slash de Defesa (col 23 == 2, conn=446): ativa quando o selvagem ataca o jogador
+        if (actor.IsWild && target.Owner is { } defenderOwner
+            && CardStateOf(defenderOwner).TryActivate(defenderOwner, CardTrigger.Defense, out var defActivated))
+        {
+            activatedCards[target] = defActivated;
+            defCtx = CardEffectRegistry.EvaluateDefense(defActivated);
+        }
+
+        double damageMult = (atkCtx?.DamageMultiplier ?? 1.0) * (defCtx?.IncomingDamageMultiplier ?? 1.0);
+        double defenseMult = defCtx?.DefenseMultiplier ?? 1.0;
         var hits = new Dictionary<Combatant, bool>(targets.Count);
 
         foreach (var victim in targets)
         {
             Hit hit = skill is not null
-                ? BattleFormulas.Skill(digimon, victim.Digimon, skill, skillLevel, _system.Random)
-                : BattleFormulas.Attack(digimon, victim.Digimon, _system.Random);
+                ? BattleFormulas.Skill(digimon, victim.Digimon, skill, skillLevel, _system.Random,
+                    damageMult, defenseMult, atkCtx?.OverrideAttackerAttribute, atkCtx?.OverrideTargetAttribute)
+                : BattleFormulas.Attack(digimon, victim.Digimon, _system.Random,
+                    damageMult, defenseMult, atkCtx?.OverrideAttackerAttribute, atkCtx?.OverrideTargetAttribute);
             hits[victim] = hit.Landed;
-            victim.Digimon.TakeDamage(hit.Damage);
+            if (!hit.Landed) continue;
+
+            int damage = hit.Damage;
+            if (atkCtx is not null)
+            {
+                if (atkCtx.BonusCurrentHpDamageFraction > 0)
+                    damage += (int)Math.Floor(victim.Digimon.Hp * atkCtx.BonusCurrentHpDamageFraction);
+                if (atkCtx.HalveEnemyHpChance && _system.Random.NextDouble() < 0.20)
+                    damage = Math.Max(damage, victim.Digimon.Hp / 2);
+            }
+
+            if (defCtx?.ReflectAttack == true)
+            {
+                digimon.TakeDamage(damage);
+                continue;
+            }
+
+            if (atkCtx?.LeaveOneHp == true && damage >= victim.Digimon.Hp)
+                damage = Math.Max(0, victim.Digimon.Hp - 1);
+
+            victim.Digimon.TakeDamage(damage);
+
+            if (atkCtx?.LifestealFraction > 0 && damage > 0)
+                digimon.Heal((int)Math.Floor(damage * atkCtx.LifestealFraction), 0, 0);
         }
 
         actor.Actions++;
-        actor.Gauge = 0;
+        actor.Gauge = atkCtx?.KeepGaugeFraction > 0
+            ? Math.Clamp((int)Math.Round(BattleFormulas.MaxGauge * atkCtx.KeepGaugeFraction), 0, BattleFormulas.MaxGauge)
+            : 0;
 
         // ✅ AoE pode derrubar vários combatentes no mesmo golpe: envia um 0x6E por alvo derrotado antes do 0x67
         if (actor.Owner is { } owner)
@@ -258,6 +313,13 @@ public sealed class Battle
         }
         else
         {
+            // Se Reverse Sevens refletiu o ataque e derrubou o selvagem, concede as recompensas ao defensor
+            if (defCtx?.ReflectAttack == true && actor.Digimon.IsKnockedOut && actor.Wild is { } reflectedWild
+                && target.Owner is { } defOwner)
+            {
+                var standing = _teamA.Where(c => c.Owner == defOwner && !c.Digimon.IsKnockedOut).ToList();
+                _system.GrantRewards(defOwner, target, standing, reflectedWild, _teamB.Count);
+            }
             // ✅ captura v322 (conn=408): ao ser nocauteado em batalha, perde 1 % de ExpToNextLevel e recebe 0x6E negativo antes do 0x67
             foreach (var victim in targets)
                 if (victim.Digimon.IsKnockedOut && victim.Owner is { } victimOwner)
@@ -270,12 +332,64 @@ public sealed class Battle
 
         byte attackType = skill?.Type ?? Data.GameData.SkillInfo.TypeMelee;
         ushort skillId = skill?.Id ?? 0;
-        Broadcast(new ActionResultsPacket(acting, other, actor, hits, attackType, skillId));
+        Broadcast(new ActionResultsPacket(acting, other, actor, hits, attackType, skillId,
+            activatedCards.Count > 0 ? activatedCards : null));
 
         if (_teamB.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Win);
         else if (_teamA.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Lose);
         else _phase = Phase.Animating;
     }
+
+    private static void ApplyPreAttackCardEffects(Combatant actor, IReadOnlyList<Combatant> allies, CardAttackContext ctx)
+    {
+        var d = actor.Digimon;
+
+        if (ctx.SelfHpCostPercent > 0 && d.Hp > 1)
+        {
+            int cost = Math.Min(d.Hp - 1, (int)Math.Floor(d.Hp * ctx.SelfHpCostPercent / 100.0));
+            if (cost > 0) d.TakeDamage(cost);
+        }
+
+        int healHp = ctx.HealHpFlat + (int)Math.Floor(d.Stats.MaxHp * ctx.HealHpPercent / 100.0);
+        int healVp = ctx.HealVpFlat + (int)Math.Floor(d.Stats.MaxVp * ctx.HealVpPercent / 100.0);
+        int healEvp = (int)Math.Floor(d.Stats.MaxEvp * ctx.HealEvpPercent / 100.0);
+        if (healHp > 0 || healVp > 0 || healEvp > 0)
+            d.Heal(healHp, healVp, healEvp);
+
+        if (ctx.PartyHealHpFlat > 0 || ctx.PartyHealHpPercent > 0 || ctx.PartyHealVpPercent > 0 || ctx.PartyHealEvpPercent > 0)
+        {
+            foreach (var ally in allies)
+            {
+                if (ally.Owner != actor.Owner || ally.Digimon.IsKnockedOut) continue;
+                int pHp = ctx.PartyHealHpFlat + (int)Math.Floor(ally.Digimon.Stats.MaxHp * ctx.PartyHealHpPercent / 100.0);
+                int pVp = (int)Math.Floor(ally.Digimon.Stats.MaxVp * ctx.PartyHealVpPercent / 100.0);
+                int pEvp = (int)Math.Floor(ally.Digimon.Stats.MaxEvp * ctx.PartyHealEvpPercent / 100.0);
+                if (pHp > 0 || pVp > 0 || pEvp > 0)
+                    ally.Digimon.Heal(pHp, pVp, pEvp);
+            }
+        }
+
+        if (ctx.EvolveMax || ctx.EvolveNext)
+        {
+            var options = d.EvolutionOptions();
+            if (options.Count > 0)
+                d.EvolveTo(ctx.EvolveMax ? options[^1] : options[0]);
+        }
+    }
+
+    private CardBattleState CardStateOf(Player player) =>
+        _cardStates.TryGetValue(player, out var state) ? state : _cardStates[player] = new CardBattleState();
+
+    /// <summary>✅ C2S 0xA0: equipa um card dos 6 CardSlots do inventário no slot de batalha 0..2.</summary>
+    public bool EquipCard(Player player, int slot, uint uid, uint cardId) =>
+        _phase is not Phase.Over && _participants.Contains(player) && CardStateOf(player).Equip(player, slot, uid, cardId);
+
+    /// <summary>✅ C2S 0xA1: desequipa o card do slot de batalha 0..2.</summary>
+    public bool UnequipCard(Player player, int slot) =>
+        _phase is not Phase.Over && _participants.Contains(player) && CardStateOf(player).Unequip(slot);
+
+    public int CardSlashesRemaining(Player player) =>
+        _cardStates.TryGetValue(player, out var state) ? state.SlashesRemaining : CardBattleState.MaxCardSlashesPerBattle;
 
     /// <summary>
     /// Seleciona os alvos vivos de um golpe até <paramref name="maxTargets"/>: o alvo principal sempre entra primeiro
@@ -500,6 +614,8 @@ public sealed class Battle
                 }
                 foreach (var _ in mine)
                     player.Send(new BattleEndPacket(result));
+                if (_cardStates.TryGetValue(player, out var cardState) && cardState.AnyConsumed)
+                    player.RequestImmediateSave();
             }
         }
 

@@ -2,12 +2,15 @@ using System.Collections.Frozen;
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game;
+using DRPGServer.Game.Battle;
+using DRPGServer.Game.Battle.Cards;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
 using DRPGServer.Network.Handlers;
 using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DRPGServer.Tests;
 
@@ -194,5 +197,221 @@ public class CardSlashTests
         Assert.Equal(CardTrigger.Attack, loaded.Inventory.CardSlots[0]!.CardInfo!.Trigger);
         Assert.Equal((5u, 12u, def.Uid), (loaded.Inventory.Battle[0]!.ItemId, loaded.Inventory.Battle[0]!.Amount, loaded.Inventory.Battle[0]!.Uid));
         Assert.Equal(CardTrigger.Defense, loaded.Inventory.Battle[0]!.CardInfo!.Trigger);
+    }
+
+    private static byte[] BattleCardPayload(uint slot, uint uid, uint cardId)
+    {
+        var w = new PacketWriter();
+        w.WriteU32(slot);
+        w.WriteU32(uid);
+        w.WriteU32(cardId);
+        w.WriteZeros(98 - 12);
+        return w.Payload.ToArray();
+    }
+
+    private static (Battle Battle, Player Player, Session Session, GameWorld World) StartBattleWithCards(
+        Func<Inventory, Action>? setupInventory = null)
+    {
+        var world = TestSupport.NewWorld();
+        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
+        var battles = new BattleSystem(world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+
+        var inv = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id));
+        setupInventory?.Invoke(inv)();
+        var leader = new Digimon(TestSupport.Data, TestSupport.Data.Species[10], 1) { Uid = 10, Name = "Guilmon" };
+        var character = new Character(leader, inv)
+        {
+            Uid = 1, AccountUid = 1, Slot = 0, Name = "CardSlasher", TamerId = 1, MapId = 79, X = 56, Y = 56,
+        };
+        var session = TestSupport.NewSession();
+        var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
+        session.Player = player;
+        zones.Find(79)!.Enter(player);
+
+        var wild = zones.Find(79)!.WildDigimons.First();
+        var battle = battles.StartPve(player, wild.Serial)!;
+        battle.SendTeams(player);
+        battle.ClientReady(player);
+        session.DrainOutgoing();
+        return (battle, player, session, world);
+    }
+
+    [Fact]
+    public void BattleCardHandlers_equip_and_unequip_slots_and_reject_unequipped_bag_cards()
+    {
+        InventoryItem? equippedDrill = null;
+        InventoryItem? bagOnlyDefense = null;
+        var (battle, player, session, _) = StartBattleWithCards(inv => () =>
+        {
+            equippedDrill = inv.CardSlots.Add(74, 50)[0];
+            bagOnlyDefense = inv.Battle.Add(5, 10)[0];
+        });
+
+        var equip = new BattleCardEquipHandler();
+        var unequip = new BattleCardUnequipHandler();
+
+        // Card nos 6 CardSlots equipa normalmente no slot 1 (sem resposta S2C)
+        equip.Handle(session, new PacketReader(BattleCardPayload(1, equippedDrill!.Uid, 74)));
+        Assert.Empty(session.DrainOutgoing());
+
+        // Card apenas na mochila (não nos 6 CardSlots) é rejeitado
+        Assert.False(battle.EquipCard(player, 0, bagOnlyDefense!.Uid, 5));
+
+        // Desequipar slot 1 via 0xA1 (sem resposta S2C)
+        unequip.Handle(session, new PacketReader(BattleCardPayload(1, equippedDrill.Uid, 74)));
+        Assert.Empty(session.DrainOutgoing());
+        Assert.Equal(CardBattleState.MaxCardSlashesPerBattle, battle.CardSlashesRemaining(player));
+    }
+
+    [Fact]
+    public void Attack_and_defense_cards_trigger_separately_and_write_0x67_offsets_40_to_63()
+    {
+        InventoryItem? defCard = null;
+        InventoryItem? drillCard = null;
+        InventoryItem? healCard = null;
+        var (battle, player, session, _) = StartBattleWithCards(inv => () =>
+        {
+            defCard = inv.CardSlots.Add(5, 3)[0];       // Defense Plug-In C (Trigger = Defense)
+            drillCard = inv.CardSlots.Add(74, 50)[0];   // Golden Drill X (Trigger = Attack, AoE)
+            healCard = inv.CardSlots.Add(19, 1)[0];     // Recovery Floppy L (Trigger = Attack, +50 HP, última unidade)
+        });
+
+        // Equipar nos 3 slots de batalha: slot 0 = Defesa, slot 1 = AoE, slot 2 = Cura (1 unidade)
+        Assert.True(battle.EquipCard(player, 0, defCard!.Uid, 5));
+        Assert.True(battle.EquipCard(player, 1, drillCard!.Uid, 74));
+        Assert.True(battle.EquipCard(player, 2, healCard!.Uid, 19));
+
+        // Dano prévio no líder para comprovar a cura de +50 HP do Recovery Floppy L
+        var leader = player.Leader;
+        leader.TakeDamage(80);
+        int hpBeforeAttack = leader.Hp;
+
+        // 1) Turno de ataque do jogador: apenas slots 1 e 2 (Ataque) ativam; slot 0 (Defesa) fica intacto
+        var enemy = battle.TeamB[0];
+        battle.TeamA[0].Gauge = BattleFormulas.MaxGauge;
+        battle.RequestAction(player, BattleIcon.Attack, leader.Serial, enemy.Digimon.Serial);
+        session.DrainOutgoing();
+
+        // Avança o tempo até o tick disparar o ataque do jogador
+        for (int i = 0; i < 10 && battle.IsRunning; i++)
+            battle.Update(Battle.TickInterval);
+
+        Assert.Equal(19, battle.CardSlashesRemaining(player));
+        Assert.Equal(3u, defCard.Amount);               // defesa NÃO foi consumida no ataque
+        Assert.Equal(49u, drillCard.Amount);            // 50 → 49
+        Assert.Equal(0u, healCard.Amount);              // 1 → 0 (esvaziado)
+        Assert.Null(player.Character.Inventory.CardSlots[2]);
+        Assert.Equal(hpBeforeAttack + 50, leader.Hp);   // Recovery Floppy L curou +50 HP
+
+        var atk0x67 = session.DrainOutgoing()
+            .First(f => PacketHeader.Read(f).Opcode == (ushort)MapOpcode.BattleActionResults);
+        var atkEntry = atk0x67.AsSpan(PacketHeader.Length, ActionResultsPacket.EntryLength);
+        // Preserva índices dos slots 0..2: [0, 74, 19] e quantidades restantes [0, 49, 0]
+        Assert.Equal(0u, BitConverter.ToUInt32(atkEntry[40..]));
+        Assert.Equal(74u, BitConverter.ToUInt32(atkEntry[44..]));
+        Assert.Equal(19u, BitConverter.ToUInt32(atkEntry[48..]));
+        Assert.Equal(0u, BitConverter.ToUInt32(atkEntry[52..]));
+        Assert.Equal(49u, BitConverter.ToUInt32(atkEntry[56..]));
+        Assert.Equal(0u, BitConverter.ToUInt32(atkEntry[60..]));
+
+        // 2) Turno de ataque inimigo: apenas slot 0 (Defesa) ativa e grava na entrada do defensor (posição 5 do 0x67)
+        Assert.False(battle.IsOver);
+        battle.ClientReady(player);
+        session.DrainOutgoing();
+        battle.TeamA[0].Gauge = 0;
+        battle.TeamB.First(c => !c.Digimon.IsKnockedOut).Gauge = BattleFormulas.MaxGauge;
+        for (int i = 0; i < 10 && battle.IsRunning; i++)
+            battle.Update(Battle.TickInterval);
+
+        Assert.Equal(18, battle.CardSlashesRemaining(player));
+        Assert.Equal(2u, defCard.Amount);           // 3 → 2
+        Assert.Equal(49u, drillCard.Amount);        // ataque NÃO foi consumido na defesa
+
+        var def0x67 = session.DrainOutgoing()
+            .First(f => PacketHeader.Read(f).Opcode == (ushort)MapOpcode.BattleActionResults);
+        // Na entrada do defensor (posição 5 do 0x67 = 5 × 136 = 680)
+        var defEntry = def0x67.AsSpan(PacketHeader.Length + 5 * ActionResultsPacket.EntryLength, ActionResultsPacket.EntryLength);
+        Assert.Equal(5u, BitConverter.ToUInt32(defEntry[40..]));
+        Assert.Equal(0u, BitConverter.ToUInt32(defEntry[44..]));
+        Assert.Equal(0u, BitConverter.ToUInt32(defEntry[48..]));
+        Assert.Equal(2u, BitConverter.ToUInt32(defEntry[52..]));
+        Assert.Equal(0u, BitConverter.ToUInt32(defEntry[56..]));
+        Assert.Equal(0u, BitConverter.ToUInt32(defEntry[60..]));
+    }
+
+    [Fact]
+    public void Card_slash_limit_stops_activating_after_20_turns()
+    {
+        var (player, _) = NewPlayerWithCards();
+        var stack = player.Character.Inventory.CardSlots.Add(74, 25)[0];
+        var state = new CardBattleState();
+        Assert.True(state.Equip(player, 0, stack.Uid, 74));
+
+        for (int turn = 1; turn <= 20; turn++)
+        {
+            Assert.True(state.TryActivate(player, CardTrigger.Attack, out var activated));
+            Assert.Equal(74u, activated[0]!.Value.CardId);
+            Assert.Equal((uint)(25 - turn), activated[0]!.Value.RemainingAmount);
+            Assert.Equal(20 - turn, state.SlashesRemaining);
+        }
+
+        // 21º turno: contador em 0, não ativa nem consome mais
+        Assert.False(state.TryActivate(player, CardTrigger.Attack, out var blocked));
+        Assert.False(blocked.Any);
+        Assert.Equal(0, state.SlashesRemaining);
+        Assert.Equal(5u, stack.Amount);
+    }
+
+    [Fact]
+    public void CardEffectRegistry_evaluates_attack_defense_slot_return_and_haste()
+    {
+        // Ataque combinado: Offense Plug-In A (+20%) + Boost Chip (+50%) + Golden Drill X (AoE)
+        var atk = new ActivatedCards();
+        atk[0] = new ActivatedCard(3, 9);
+        atk[1] = new ActivatedCard(7, 4);
+        atk[2] = new ActivatedCard(74, 49);
+        var atkCtx = CardEffectRegistry.EvaluateAttack(atk);
+        Assert.Equal(1.70, atkCtx.DamageMultiplier, 6);
+        Assert.True(atkCtx.ForceAllTargets);
+
+        // Defesa: Defense Plug-In C (+20% DEF) + Holy Orb (-50% dano)
+        var def = new ActivatedCards();
+        def[0] = new ActivatedCard(5, 2);
+        def[1] = new ActivatedCard(15, 1);
+        var defCtx = CardEffectRegistry.EvaluateDefense(def);
+        Assert.Equal(1.20, defCtx.DefenseMultiplier, 6);
+        Assert.Equal(0.50, defCtx.IncomingDamageMultiplier, 6);
+
+        // White Wings (-100% dano) reduz dano final para 0 mesmo em acerto
+        var wings = new ActivatedCards();
+        wings[0] = new ActivatedCard(63, 1);
+        var wingsCtx = CardEffectRegistry.EvaluateDefense(wings);
+        var hit = BattleFormulas.Attack(Entities.Digimon(50, 20), Entities.Digimon(10, 1), new Random(1),
+            damageMultiplier: wingsCtx.IncomingDamageMultiplier);
+        Assert.True(hit.Landed);
+        Assert.Equal(0, hit.Damage);
+
+        // Slot Return (#41) impede consumo dos cards nos slots seguintes
+        var (player, _) = NewPlayerWithCards();
+        var slotReturn = player.Character.Inventory.CardSlots.Add(41, 2)[0];
+        var drill = player.Character.Inventory.CardSlots.Add(74, 10)[0];
+        var state = new CardBattleState();
+        Assert.True(state.Equip(player, 0, slotReturn.Uid, 41));
+        Assert.True(state.Equip(player, 1, drill.Uid, 74));
+        Assert.True(state.TryActivate(player, CardTrigger.Attack, out var retAct));
+        Assert.Equal(1u, slotReturn.Amount);            // Slot Return consumiu 1
+        Assert.Equal(10u, drill.Amount);                // Golden Drill X atrás NÃO foi consumido
+        Assert.Equal(10u, retAct[1]!.Value.RemainingAmount);
+
+        // Haste (#81) não ativa em dois turnos consecutivos
+        var haste = player.Character.Inventory.CardSlots.Add(81, 5)[0];
+        var hasteState = new CardBattleState();
+        Assert.True(hasteState.Equip(player, 0, haste.Uid, 81));
+        Assert.True(hasteState.TryActivate(player, CardTrigger.Attack, out _));
+        Assert.Equal(4u, haste.Amount);
+        Assert.False(hasteState.TryActivate(player, CardTrigger.Attack, out _));
+        Assert.Equal(4u, haste.Amount);
+        Assert.True(hasteState.TryActivate(player, CardTrigger.Attack, out _));
+        Assert.Equal(3u, haste.Amount);
     }
 }

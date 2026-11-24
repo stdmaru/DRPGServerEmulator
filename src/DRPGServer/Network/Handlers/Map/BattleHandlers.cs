@@ -51,3 +51,27 @@ public sealed class BattleActionHandler : PlayerHandler
         player.Battle?.RequestAction(player, icon, requester, target);
     }
 }
+
+/// <summary>0xA0 (C2S 98 B): ✅ equipa um card dos 6 CardSlots no slot de batalha 0..2 (sem resposta S2C).</summary>
+[PacketHandler(MapOpcode.BattleCardEquip)]
+public sealed class BattleCardEquipHandler : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        uint slot = packet.ReadU32();
+        uint uid = packet.ReadU32();
+        uint cardId = packet.ReadU32();
+        player.Battle?.EquipCard(player, (int)slot, uid, cardId);
+    }
+}
+
+/// <summary>0xA1 (C2S 98 B): ✅ desequipa o card do slot de batalha 0..2 (sem resposta S2C).</summary>
+[PacketHandler(MapOpcode.BattleCardUnequip)]
+public sealed class BattleCardUnequipHandler : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        uint slot = packet.ReadU32();
+        player.Battle?.UnequipCard(player, (int)slot);
+    }
+}

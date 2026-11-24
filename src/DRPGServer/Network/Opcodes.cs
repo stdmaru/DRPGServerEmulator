@@ -76,6 +76,8 @@ public enum MapOpcode : ushort
     ItemDropGet = 0x91,            // ✅ mover item: do chão para o inventário ou dentro do inventário
     DepositoryExpand = 0x94,       // ✅ Digimon Depository: expansão de slot por item 901/929 (S2C 1 B)
     EvolutionList = 0x9E,          // ✅ C2S uid; S2C u8 1, u8 0, u16 × 3 formas liberadas
+    BattleCardEquip = 0xA0,        // ✅ C2S (98 B): equipar card no slot 0..2 de batalha (sem resposta S2C)
+    BattleCardUnequip = 0xA1,      // ✅ C2S (98 B): desequipar card do slot 0..2 de batalha (sem resposta S2C)
     TeleportCharacter = 0xB0,
     TamerExp = 0xB1,               // S2C ✅ nível e EXP do tamer no fim da batalha
     RefreshDigimonStatus = 0xB2,

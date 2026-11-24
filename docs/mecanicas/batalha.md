@@ -103,6 +103,16 @@ Dados: 67 batalhas v322 em `captures.db` (sessões 53, 54, 56 e 58; 362 golpes, 
 - Inimigo derrubado: cada digimon do jogador que está de pé ganha a **EXP inteira** (um `0x6E` por digimon, quem derrubou primeiro); os **bits vêm uma vez**, no `0x6E` de quem derrubou.
 - Fim com vários: `0xB1`, `0x84` e `0x6D` um por digimon; o `0xB4` de cada um na saída do resultado.
 
+## ✅ Card Slash (`0xA0` / `0xA1` / `0x67`, sessões 64+)
+- Os cards precisam estar equipados em um dos **6 Card Slots** do inventário (`0x02` offsets `784..1239`, movidos via `0x90`).
+- Em batalha, o jogador equipa até **3 cards** (`slot = 0, 1, 2`) via **`C2S 0xA0`** (98 B: `u32 slot` + `76 B CardRecord` + `18 zeros`) e desequipa via **`C2S 0xA1`** (98 B), ambos sem resposta S2C.
+- **Limite de 20 Card Slash por batalha:** cada turno com ao menos 1 card ativado decrementa o contador (`20 → 0`).
+- **Momento de ativação (`card_info_us.dat` col. 23):**
+  - `1` (**Ataque**): ativa no turno de ataque do jogador (`side = 2`), gravando `+40/+44/+48` (`CardId` dos slots `0..2`) e `+52/+56/+60` (quantidade restante após consumir 1) na entrada do **atacante** (`0x67`, `s0..s4`).
+  - `2` (**Defesa**, `conn=446`): ativa quando o inimigo ataca (`side = 1`), gravando nos mesmos offsets `+40..63` na entrada do **defensor** (`0x67`, `s5..s9`), mesmo se o golpe inimigo errar.
+- **Sincronização:** o cliente toca a animação do Card Slash (+0,5–1,0 s) antes de enviar `C2S 0x69`, logo o servidor não precisa de delay artificial extra.
+- **Efeitos (`Game/Battle/Cards/CardEffects.cs`):** cobre os cards padrão de PvE/loja (`+X%` dano, recuperação de HP/VP/EVP individual e em grupo, AoE 100%, mudança de atributo, sacrifício, roubo de vida, `Slot Return`, `Haste`, `+X%` DEF, `−X%` dano recebido e reflexão `Reverse Sevens`).
+
 ## ❓ Em aberto
 - Fator de atributo no dano, itens em batalha, precisão do multiplicador de skill.
 - Chance de acerto real e a chance de fuga (as 2 fugas capturadas deram certo).
