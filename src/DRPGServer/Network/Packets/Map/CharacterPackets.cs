@@ -71,10 +71,11 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
         DigimonStatusBlock.WriteCombat(w, d);
         DigimonStatusBlock.WriteProgress(w, d);
         DigimonStatusBlock.WriteSkills(w, d);
-        w.WriteI32(0);                          // 328 bônus de STR
-        w.WriteI32(0);                          // bônus de AGI
-        w.WriteI32(0);                          // bônus de CON
-        w.WriteI32(0);                          // bônus de INT
+        var bonus = d.TitleAttributeBonus;
+        w.WriteI32(bonus.Str);                  // 328 ✅ bônus de STR (título)
+        w.WriteI32(bonus.Agi);                  // 332 ✅ bônus de AGI
+        w.WriteI32(bonus.Con);                  // 336 ✅ bônus de CON
+        w.WriteI32(bonus.Int);                  // 340 ✅ bônus de INT
         w.WriteZeros(DigimonStatusBlock.Length - (w.Position - block));
     }
 }
@@ -109,7 +110,7 @@ public sealed class RefreshCharacterInfoPacket(Character character, TamerState s
         w.WriteFixedString(c.Leader.Name, 21);  // 74
         w.WriteU8(c.Leader.Species.Stage);      // 95 estágio do líder ✅ (1 in-training, 2 rookie, 3 champion, 5 mega)
         w.WriteI32(c.Leader.Level);             // 96 nível do líder ✅
-        w.WriteU32(0);                          // 100 ? (20030 em megas; o mesmo valor do bloco de status em 320)
+        w.WriteU32(c.Leader.TitleId);           // 100 ✅ título equipado do líder (conn=36/76/141)
         w.WriteZeros(100);                      // até 204
     }
 }
@@ -158,6 +159,23 @@ public sealed class ChatNoticePacket(string sender, string message) : ServerPack
     {
         w.WriteFixedString(sender, ChatNormalPacket.NicknameLength);
         w.WriteFixedString(message, ChatNormalPacket.MessageLength);
+    }
+}
+
+/// <summary>
+/// 0x4F (257 bytes): ✅ mensagem de sistema no chat (u8 tipo [1 = aviso cinza] + char[256] texto).
+/// Confirmado em 18 capturas v322 (conn=92/100/137/145/205/408/480): <c>You gained the Title of [First Win].</c>.
+/// </summary>
+public sealed class SystemMessagePacket(string message, byte type = 1) : ServerPacket
+{
+    public const int MessageLength = 256;
+
+    public override ushort Opcode => (ushort)MapOpcode.SystemMessage;
+
+    protected override void Write(PacketWriter w)
+    {
+        w.WriteU8(type);
+        w.WriteFixedString(message, MessageLength);
     }
 }
 

@@ -66,6 +66,51 @@ public sealed class DigimonFormInfoHandler : PlayerHandler
     }
 }
 
+/// <summary>0x97 (C2S 1622): ✅ abrir janela de títulos do digimon: u32 2, u32 digimonUid.</summary>
+[PacketHandler(MapOpcode.DigimonTitleList)]
+public sealed class DigimonTitleListHandler : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        uint action = packet.ReadU32();
+        uint digimonUid = packet.ReadU32();
+        if (action != 2) return;
+
+        if (player.Character.FindDigimon(digimonUid) is not { } digimon)
+        {
+            player.Send(new DigimonTitleListPacket(digimonUid, [], success: false));
+            return;
+        }
+        player.Send(new DigimonTitleListPacket(digimon.Uid, digimon.Titles));
+    }
+}
+
+/// <summary>0x99 (C2S 26): ✅ equipar/desequipar título do digimon: u32 2, u32 digimonUid, u32 titleId (0 = remover).</summary>
+[PacketHandler(MapOpcode.DigimonTitleEquip)]
+public sealed class DigimonTitleEquipHandler : PlayerHandler
+{
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        uint action = packet.ReadU32();
+        uint digimonUid = packet.ReadU32();
+        uint titleId = packet.ReadU32();
+        if (player.InBattle || action != 2) return;
+
+        if (player.Character.FindDigimon(digimonUid) is not { } digimon || !digimon.EquipTitle(titleId))
+        {
+            player.Send(new DigimonTitleEquipPacket(digimonUid, titleId, success: false));
+            return;
+        }
+
+        player.RequestImmediateSave();
+        // ✅ Ordem confirmada em conn=76/141: 0xB4 → 0x10 (se líder) → 0x99
+        player.Send(new SingleDigimonInfoPacket(digimon));
+        if (digimon == player.Leader)
+            player.Zone?.Broadcast(new RefreshCharacterInfoPacket(player.Character));
+        player.Send(new DigimonTitleEquipPacket(digimon.Uid, titleId));
+    }
+}
+
 /// <summary>0x9E (C2S 18): ✅ u32 uid do digimon; o servidor responde as formas para evoluir agora (só em batalha).</summary>
 [PacketHandler(MapOpcode.EvolutionList)]
 public sealed class EvolutionListHandler : PlayerHandler

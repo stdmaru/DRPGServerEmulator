@@ -74,11 +74,6 @@ public sealed class BattleSystem : IWorldSystem
     {
         if (result != BattleResult.Cancel)
         {
-            foreach (var c in battle.TeamA)
-            {
-                c.Digimon.TotalBattles++;
-                if (result == BattleResult.Win) c.Digimon.TotalWins++;
-            }
             foreach (var player in battle.Participants)
             {
                 player.Character.TotalBattles++;

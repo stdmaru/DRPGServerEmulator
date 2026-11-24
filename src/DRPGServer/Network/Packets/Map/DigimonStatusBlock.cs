@@ -59,6 +59,11 @@ public static class DigimonStatusBlock
         WriteCombat(w, d);
         WriteProgress(w, d);
         WriteSkills(w, d);
+        var bonus = d.IsWild ? default : d.TitleAttributeBonus;
+        w.WriteI32(bonus.Str);                  // 328 ✅ bônus STR do título equipado
+        w.WriteI32(bonus.Agi);                  // 332 ✅ bônus AGI
+        w.WriteI32(bonus.Con);                  // 336 ✅ bônus CON
+        w.WriteI32(bonus.Int);                  // 340 ✅ bônus INT
     }
 
     /// <summary>192..215: HP/VP/EVP atuais, ATK/DEF/BR.</summary>
@@ -111,6 +116,8 @@ public static class DigimonStatusBlock
         w.WriteU8(d.IsWild ? (d.WildGrade > 0 ? d.WildGrade : Game.Stats.WildFormulas.GradeBeginner) : (byte)0); // 300 ✅ 0 jogador, 2 Beginner, 3 Veteran
         w.WriteZeros(11);
         w.WriteU8(8);                           // 312 ? (7 ou 8 nas capturas)
-        w.WriteZeros(15);                       // até 327
+        w.WriteZeros(7);                        // 313..319
+        w.WriteU32(d.IsWild ? 0u : d.TitleId);  // 320 ✅ título equipado do digimon (conn=76/112/141)
+        w.WriteU32(!d.IsWild && d.TitleId != 0 ? 1u : 0u); // 324 ✅ 1 quando há título equipado
     }
 }

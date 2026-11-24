@@ -46,6 +46,7 @@ public enum MapOpcode : ushort
     JoinHandshakeRes = 0x33,
     BattleActionReq = 0x35,
     JoinHandshakeReq = 0x49,
+    SystemMessage = 0x4F,          // ✅ S2C (257 B): aviso de sistema cinza no chat (u8 tipo + char[256]; ex.: "You gained the Title of [First Win].")
     NpcDialogChoice = 0x56,
     BattleStartReq = 0x61,
     BattleStartRes = 0x62,
@@ -75,6 +76,8 @@ public enum MapOpcode : ushort
     CardMove = 0x90,               // ✅ mover/equipar/desequipar/coletar card (76 B)
     ItemDropGet = 0x91,            // ✅ mover item: do chão para o inventário ou dentro do inventário
     DepositoryExpand = 0x94,       // ✅ Digimon Depository: expansão de slot por item 901/929 (S2C 1 B)
+    DigimonTitleList = 0x97,       // ✅ C2S 1622 B → S2C 1608 B: janela de títulos do digimon (até 200 títulos)
+    DigimonTitleEquip = 0x99,      // ✅ C2S 26 B → S2C 12 B: equipar/desequipar título do digimon
     EvolutionList = 0x9E,          // ✅ C2S uid; S2C u8 1, u8 0, u16 × 3 formas liberadas
     BattleCardEquip = 0xA0,        // ✅ C2S (98 B): equipar card no slot 0..2 de batalha (sem resposta S2C)
     BattleCardUnequip = 0xA1,      // ✅ C2S (98 B): desequipar card do slot 0..2 de batalha (sem resposta S2C)

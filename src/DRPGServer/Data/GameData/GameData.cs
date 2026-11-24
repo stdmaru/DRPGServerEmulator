@@ -51,6 +51,20 @@ public sealed record CardInfo(uint Id, string Name)
     public string Description { get; init; } = "";
 }
 
+/// <summary>Título de Digimon de <c>digimon_title_us.dat</c> (236 entradas; ver <see cref="ClientTables.DigimonTitles"/>).</summary>
+public sealed record DigimonTitleInfo(uint Id, string Name)
+{
+    public Game.Stats.Attributes AttributeBonus { get; init; }
+    public int BonusHp { get; init; }
+    public int BonusVp { get; init; }
+    public int BonusAtk { get; init; }
+    public int BonusDef { get; init; }
+    public int BonusBr { get; init; }
+    public int BonusAtkPercent { get; init; }
+    public int BonusDefPercent { get; init; }
+    public int BonusBrPercent { get; init; }
+}
+
 /// <summary>
 /// Skill de <c>digimon_skill_us</c>. ✅ Custo em VP = 20 + nível exigido.
 /// <paramref name="Type"/>: ✅ 1 = corpo-a-corpo, 2 = à distância (offset 36 do 0x67).
@@ -113,6 +127,7 @@ public sealed class GameData
     public required FrozenDictionary<ushort, DigimonSpecies> Species { get; init; }
     public required FrozenDictionary<uint, ItemInfo> Items { get; init; }
     public FrozenDictionary<uint, CardInfo> Cards { get; init; } = FrozenDictionary<uint, CardInfo>.Empty;
+    public FrozenDictionary<uint, DigimonTitleInfo> DigimonTitles { get; init; } = FrozenDictionary<uint, DigimonTitleInfo>.Empty;
     public FrozenDictionary<ushort, SkillInfo> Skills { get; init; } = FrozenDictionary<ushort, SkillInfo>.Empty;
     /// <summary>Espécie → próxima forma da linha evolutiva (<c>tree_us</c>).</summary>
     public FrozenDictionary<ushort, ushort> Evolutions { get; init; } = FrozenDictionary<ushort, ushort>.Empty;
@@ -129,6 +144,7 @@ public sealed class GameData
     public SkillInfo? FindSkill(ushort id) => id == 0 ? null : Skills.GetValueOrDefault(id);
     public ItemInfo? FindItem(uint id) => Items.GetValueOrDefault(id);
     public CardInfo? FindCard(uint id) => Cards.GetValueOrDefault(id);
+    public DigimonTitleInfo? FindDigimonTitle(uint id) => id == 0 ? null : DigimonTitles.GetValueOrDefault(id);
 
     /// <summary>Próxima forma da linha (null no fim da linha ou se a espécie não está na árvore).</summary>
     public DigimonSpecies? NextForm(DigimonSpecies species) =>

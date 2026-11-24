@@ -80,6 +80,44 @@ public sealed class SkillUpgradePacket(Digimon digimon, DigimonForm form, byte s
     }
 }
 
+/// <summary>
+/// 0x97 (1608 bytes): ✅ lista de títulos desbloqueados do digimon (conn=76/141/162, DigimonRPG.bin @ 0x00AC47DA).
+/// u32 resultado (1 ok, 0 erro), u32 digimonUid, 200 × (u32 titleId, u32 1).
+/// </summary>
+public sealed class DigimonTitleListPacket(uint digimonUid, IReadOnlyList<uint> titles, bool success = true) : ServerPacket
+{
+    public override ushort Opcode => (ushort)MapOpcode.DigimonTitleList;
+
+    protected override void Write(PacketWriter w)
+    {
+        w.WriteU32(success ? 1u : 0u);
+        w.WriteU32(digimonUid);
+        int count = Math.Min(titles.Count, Digimon.MaxTitles);
+        for (int i = 0; i < count; i++)
+        {
+            w.WriteU32(titles[i]);
+            w.WriteU32(1);
+        }
+        w.WriteZeros((Digimon.MaxTitles - count) * 8);
+    }
+}
+
+/// <summary>
+/// 0x99 (12 bytes): ✅ resultado de equipar/desequipar título do digimon (conn=76/141, DigimonRPG.bin @ 0x00AC48C4).
+/// u32 resultado (1 ok, 0 erro), u32 digimonUid, u32 titleId (0 = desequipado).
+/// </summary>
+public sealed class DigimonTitleEquipPacket(uint digimonUid, uint titleId, bool success = true) : ServerPacket
+{
+    public override ushort Opcode => (ushort)MapOpcode.DigimonTitleEquip;
+
+    protected override void Write(PacketWriter w)
+    {
+        w.WriteU32(success ? 1u : 0u);
+        w.WriteU32(digimonUid);
+        w.WriteU32(titleId);
+    }
+}
+
 /// <summary>0x9E (8 bytes): ✅ formas liberadas para evoluir agora: u8 1, u8 0, u16 × 3 (champion, ultimate, mega; 0 = nenhuma).</summary>
 public sealed class EvolutionListPacket(IReadOnlyList<DigimonSpecies> options) : ServerPacket
 {

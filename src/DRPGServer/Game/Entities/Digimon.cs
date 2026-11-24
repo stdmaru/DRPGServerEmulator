@@ -28,6 +28,10 @@ public sealed class Digimon
 {
     private readonly GameData _data;
     private readonly Dictionary<ushort, DigimonForm> _forms = [];
+    private readonly List<uint> _titles = [];
+
+    /// <summary>✅ Limite de títulos na lista do pacote 0x97 (200 entradas × 8 bytes = 1600 B).</summary>
+    public const int MaxTitles = 200;
 
     /// <param name="species">Forma-base: in-training até o nível 11, depois o rookie (✅ não volta).</param>
     public Digimon(GameData data, DigimonSpecies species, ushort level, CombatStats? wildStats = null)
@@ -77,6 +81,14 @@ public sealed class Digimon
     public int TotalWins { get; set; }
     public int TotalBattles { get; set; }
 
+    /// <summary>✅ Título equipado do Digimon (offset 320 do bloco de status; offset 100 do 0x10; 0 = nenhum).</summary>
+    public uint TitleId { get; private set; }
+    /// <summary>✅ Títulos desbloqueados deste Digimon (enviados no 0x97, até <see cref="MaxTitles"/>).</summary>
+    public IReadOnlyList<uint> Titles => _titles;
+    public DigimonTitleInfo? EquippedTitle => TitleId == 0 ? null : _data.FindDigimonTitle(TitleId);
+    public string? FindTitleName(uint titleId) => _data.FindDigimonTitle(titleId)?.Name;
+    public Attributes TitleAttributeBonus => EquippedTitle?.AttributeBonus ?? default;
+
     public int Hp { get; private set; }
     public int Vp { get; private set; }
     public int Evp { get; private set; }
@@ -84,9 +96,55 @@ public sealed class Digimon
     public Attributes Allocated => Current.Allocated;
     public Attributes Attributes => StatFormulas.BaseAttributes(Species, Level) + Current.Allocated;
 
-    public CombatStats Stats => WildStats ?? StatFormulas.Combat(Attributes, Level);
+    public CombatStats Stats => WildStats ?? ComputePlayerStats();
     public long ExpToNextLevel => _data.DigimonExpToNext(Level);
     public bool IsKnockedOut => Hp <= 0;
+
+    public bool HasTitle(uint titleId) => titleId != 0 && _titles.Contains(titleId);
+
+    /// <summary>Desbloqueia um título novo para este Digimon. False se já possuía, inválido ou lista cheia.</summary>
+    public bool UnlockTitle(uint titleId)
+    {
+        if (titleId == 0 || _titles.Count >= MaxTitles || _titles.Contains(titleId)) return false;
+        _titles.Add(titleId);
+        return true;
+    }
+
+    /// <summary>✅ 0x99: equipa um título desbloqueado (ou 0 para desequipar). Ajusta HP/VP/EVP se o máximo diminuir.</summary>
+    public bool EquipTitle(uint titleId)
+    {
+        if (titleId != 0 && !HasTitle(titleId)) return false;
+        TitleId = titleId;
+        var s = Stats;
+        Hp = Math.Min(Hp, s.MaxHp);
+        Vp = Math.Min(Vp, s.MaxVp);
+        Evp = Math.Min(Evp, s.MaxEvp);
+        return true;
+    }
+
+    /// <summary>Carga do banco: restaura lista de títulos desbloqueados e o título equipado.</summary>
+    public void LoadTitles(uint equippedTitleId, IEnumerable<uint> unlockedTitles)
+    {
+        _titles.Clear();
+        foreach (uint tid in unlockedTitles)
+            UnlockTitle(tid);
+        TitleId = equippedTitleId != 0 && HasTitle(equippedTitleId) ? equippedTitleId : 0;
+    }
+
+    private CombatStats ComputePlayerStats()
+    {
+        var title = EquippedTitle;
+        var effectiveAttrs = title is null ? Attributes : Attributes + title.AttributeBonus;
+        var baseStats = StatFormulas.Combat(effectiveAttrs, Level);
+        if (title is null) return baseStats;
+
+        int maxHp = baseStats.MaxHp + title.BonusHp;
+        int maxVp = baseStats.MaxVp + title.BonusVp;
+        int atk = (int)Math.Floor((baseStats.Atk + title.BonusAtk) * (1.0 + title.BonusAtkPercent / 100.0));
+        int def = (int)Math.Floor((baseStats.Def + title.BonusDef) * (1.0 + title.BonusDefPercent / 100.0));
+        int br = (int)Math.Floor((baseStats.Br + title.BonusBr) * (1.0 + title.BonusBrPercent / 100.0));
+        return new CombatStats(maxHp, maxVp, baseStats.MaxEvp, atk, def, br, baseStats.MaxActionGauge);
+    }
 
     /// <summary>✅ Pontos de atributo livres da forma atual: os ganhos na janela do estágio menos os distribuídos.</summary>
     public ushort AbilityPoints => PointsOf(Current);
