@@ -92,7 +92,7 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
                 digimon.LoadForm(formSpecies, new Attributes(f.AllocStr, f.AllocAgi, f.AllocCon, f.AllocInt),
                     f.Skill1Level, f.Skill2Level);
         digimon.LoadTitles(r.TitleId, titles);
-        digimon.RestoreAll();
+        digimon.LoadVitals(r.Hp, r.Vp, r.Evp);
         return digimon;
     }
 
