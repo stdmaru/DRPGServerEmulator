@@ -33,9 +33,20 @@ public class DigimonTests
     {
         var d = Entities.Digimon();
         long needed = TestSupport.Data.DigimonExpToNext(1) + TestSupport.Data.DigimonExpToNext(2);
-        Assert.Equal(2, d.GainExp(needed + 3, maxLevel: 100));
+        Assert.Equal(2, d.GainExp(needed + 3, maxLevel: 100, allowMultiLevelUp: true));
         Assert.Equal(3, d.Level);
         Assert.Equal(3, d.Exp);
+        Assert.Equal(d.Stats.MaxHp, d.Hp);
+    }
+
+    [Fact]
+    public void Single_level_up_discards_overflow_exp_when_multi_level_disabled()
+    {
+        var d = Entities.Digimon();
+        long huge = TestSupport.Data.DigimonExpToNext(1) + TestSupport.Data.DigimonExpToNext(2) + 500;
+        Assert.Equal(1, d.GainExp(huge, maxLevel: 100, allowMultiLevelUp: false));
+        Assert.Equal(2, d.Level);
+        Assert.Equal(0, d.Exp);
         Assert.Equal(d.Stats.MaxHp, d.Hp);
     }
 

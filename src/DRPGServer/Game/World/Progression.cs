@@ -12,10 +12,14 @@ namespace DRPGServer.Game.World;
 public static class Progression
 {
     /// <summary>Soma EXP e manda o 0x6E do digimon e, se subiu, o 0x70 e o 0x80.</summary>
-    public static int GainExp(Player owner, Digimon digimon, long exp, double bits, int maxLevel, bool inBattle)
+    public static int GainExp(Player owner, Digimon digimon, long exp, double bits, int maxLevel, bool inBattle, bool allowMultiLevelUp = true)
     {
-        int levels = digimon.GainExp(exp, maxLevel);
-        owner.Send(new RewardBitExpPacket(digimon.Serial, exp, bits));
+        long appliedExp = exp;
+        if (!allowMultiLevelUp && digimon.Level < maxLevel && exp > 0)
+            appliedExp = Math.Min(exp, Math.Max(0, digimon.ExpToNextLevel - digimon.Exp));
+
+        int levels = digimon.GainExp(exp, maxLevel, allowMultiLevelUp);
+        owner.Send(new RewardBitExpPacket(digimon.Serial, appliedExp, bits));
         if (levels > 0) AfterLevelUp(owner, digimon, inBattle);
         return levels;
     }

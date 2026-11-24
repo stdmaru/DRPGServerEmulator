@@ -38,7 +38,7 @@ Evidência: `DigimonRPG.bin` (S2C `0x00AC2498`, C2S `0x00AD9D80` abrir / `0x00AD
 | **Bits** | 1 000 | 5 000 | 10 000 | 20 000 | 30 000 | 40 000 | 50 000 | 60 000 | 70 000 |
 
 - Na troca (`action=4`), a taxa é a **soma** dos dois Digimons envolvidos.
-- Configurável em `GameOptions`: `ChargeDepositoryFee` (`true` por padrão) e `DefaultDepositorySlots` (`10` por padrão na criação do personagem; personagens já existentes respeitam o valor de `character.depository_slots` no banco).
+- Configurável em `GameOptions`: `DigimonDepositoryFee` (`1000` por padrão; `0` = gratuito, `> 0` = valor fixo em Bits, `< 0` = tabela oficial por nível `1k..70k`) e `DefaultDepositorySlots` (`10` por padrão na criação do personagem; personagens já existentes respeitam o valor de `character.depository_slots` no banco).
 
 ---
 

@@ -189,12 +189,28 @@ public sealed class Digimon
         return true;
     }
 
-    /// <summary>Soma EXP e sobe quantos níveis couberem. Devolve quantos níveis subiu.</summary>
-    public int GainExp(long amount, int maxLevel)
+    /// <summary>
+    /// Soma EXP e sobe de nível. Com <paramref name="allowMultiLevelUp"/> = <c>true</c>, sobe quantos níveis
+    /// couberem preservando o excedente; com <c>false</c> (oficial), sobe no máximo 1 nível e zera o excedente.
+    /// </summary>
+    public int GainExp(long amount, int maxLevel, bool allowMultiLevelUp = true)
     {
         if (amount <= 0) return 0;
         Exp += amount;
         int gained = 0;
+
+        if (!allowMultiLevelUp)
+        {
+            if (Level < maxLevel && Exp >= ExpToNextLevel)
+            {
+                LevelUp();
+                Exp = 0;
+                return 1;
+            }
+            if (Level >= maxLevel) Exp = Math.Min(Exp, ExpToNextLevel);
+            return 0;
+        }
+
         while (Level < maxLevel && Exp >= ExpToNextLevel)
         {
             Exp -= ExpToNextLevel;

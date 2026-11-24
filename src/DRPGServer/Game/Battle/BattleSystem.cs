@@ -112,7 +112,7 @@ public sealed class BattleSystem : IWorldSystem
         bool first = true;
         foreach (var digimon in order)
         {
-            Progression.GainExp(owner, digimon, exp, first ? bits : 0, _options.DigimonMaxLevel, inBattle: true);
+            Progression.GainExp(owner, digimon, exp, first ? bits : 0, _options.DigimonMaxLevel, inBattle: true, _options.AllowMultiLevelUp);
             first = false;
         }
 

@@ -65,7 +65,7 @@ public class DepositoryTests
         var session = TestSupport.NewSession(ServerRole.Map);
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
         session.Player = player;
-        var handler = new DepositoryActionHandler(TestSupport.GameOptions(o => o.ChargeDepositoryFee = true));
+        var handler = new DepositoryActionHandler(TestSupport.GameOptions(o => o.DigimonDepositoryFee = 1000));
 
         // Sem Bits suficientes (lv 5 custa 1000 Bits) -> DepositNotEnoughBits (5)
         handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: 42)));
@@ -144,6 +144,16 @@ public class DepositoryTests
         var fullPartyFail = Assert.Single(session.DrainOutgoing());
         Assert.Equal((byte)DepositoryResult.WithdrawFailed, fullPartyFail[14 + 32]);
         Assert.Equal(1_000, character.Bits);
+    }
+
+    [Fact]
+    public void Depository_fee_supports_free_custom_and_official_level_table()
+    {
+        Assert.Equal(0, Character.ResolveDepositoryFee(50, configuredFee: 0));
+        Assert.Equal(250, Character.ResolveDepositoryFee(50, configuredFee: 250));
+        Assert.Equal(1_000, Character.ResolveDepositoryFee(5, configuredFee: -1));
+        Assert.Equal(5_000, Character.ResolveDepositoryFee(15, configuredFee: -1));
+        Assert.Equal(70_000, Character.ResolveDepositoryFee(99, configuredFee: -1));
     }
 
     [Fact]
