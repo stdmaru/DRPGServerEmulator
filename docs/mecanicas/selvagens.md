@@ -46,8 +46,8 @@ Dados: 592 grupos e 72 mil pacotes `0x11` nas sessões 53–58 (v322).
 - **Dano (`0x67`):** ✅ Beginner e Veteran usam exatamente a mesma fórmula `⌊ATK² / (10·DEF) · mult⌋`.
 - **Bits (`0x6E`):** ✅ Beginner e Veteran usam a mesma fórmula: inteiro sorteado de `⌊¾·máx⌋` até `máx`, onde `máx = 2·L + 3` (verificado de L1 a L26 em Beginner e em L11, L13, L15, L50 em Veteran).
 - **EXP (`0x6E`):**
-  - ✅ **Beginner:** amostras v322 revelam a EXP base oficial por nível (L1 = 10, L3 = 12, L4 = 14, L6 = 18, L7 = 20, L10 = 28, L11 = 32, L12 = 36, L13 = 40, L14 = 45, L15 = 50, L16 = 56, L17 = 62, L26 = 159), com redução por diferença de nível. EXP do Yuramon do tutorial: 0.
-  - ❓ **Veteran:** 3 níveis capturados na sessão 63 (evento +500% = `6×`): L11 = `67` (2,09× Beginner), L13 = `84` (2,10×), L15 = `100` (2,00×) — curva exata ainda pendente de mais níveis.
+  - ✅ **Beginner:** amostras v322 revelam a EXP base oficial por nível (L1 = 10, L3 = 12, L4 = 14, L6 = 18, L7 = 20, L10 = 28, L11 = 32, L12 = 36, L13 = 40, L14 = 45, L15 = 50, L16 = 56, L17 = 62, L18 = 69, L19 = 77, L20 = 86, L26 = 159), com redução por diferença de nível. EXP do Yuramon do tutorial: 0.
+  - ✅ **Veteran:** exatamente **`2×` a EXP base do Beginner** (`ExpFormulas.ApplyEnemyCountBonus` aplica automaticamente `+5 %` em batalhas com 4 inimigos e `+10 %` com 5 inimigos — 7/7 amostras L11–L15, L19, L20 exatas com 0 erro).
 - Drop: cada item do grupo é sorteado à parte (o Yuramon do tutorial dá duas Yuramon's Seeds).
 
 ## Mapas populados (`Resources/Map/DigimonSpawns.xml`)
@@ -58,7 +58,7 @@ Dados: 592 grupos e 72 mil pacotes `0x11` nas sessões 53–58 (v322).
 
 ## ❓ Em aberto
 - Demais mapas (ex.: Mapas 3, 6, 7, 8, 9, 10–12, 40, 44 e regiões avançadas): faltam travessias completas em `captures.db`.
-- Curva exata de EXP base e composição de grupo (`AppearanceRate`) dos monstros **Veteran** (`Grade = 3`) — só 3 níveis de EXP e 6 batalhas capturadas até agora.
+- Composição exata de grupo (`AppearanceRate`, 3–5 inimigos) e tempo de respawn dos monstros **Veteran** (`Grade = 3`).
 - Graus superiores (**Elite / Legend**, `byte 44 ≥ 4`): ainda sem capturas.
 - Taxas reais de drop dos monstros fora do tutorial.
 - Respawn: tempo e se a casa é sempre a mesma.

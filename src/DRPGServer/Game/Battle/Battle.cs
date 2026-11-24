@@ -254,7 +254,7 @@ public sealed class Battle
             var standing = _teamA.Where(c => c.Owner == owner && !c.Digimon.IsKnockedOut).ToList();
             foreach (var victim in targets)
                 if (victim.Digimon.IsKnockedOut && victim.Wild is { } member)
-                    _system.GrantRewards(owner, actor, standing, member);
+                    _system.GrantRewards(owner, actor, standing, member, _teamB.Count);
         }
         else
         {
@@ -455,7 +455,7 @@ public sealed class Battle
             if (c.Digimon.IsKnockedOut) continue;
             c.Digimon.TakeDamage(c.Digimon.Hp);
             if (owner is not null && c.Wild is { } member && _teamA.FirstOrDefault(a => !a.Digimon.IsKnockedOut) is { } killer)
-                _system.GrantRewards(owner, killer, _teamA.Where(a => a.Owner == owner && !a.Digimon.IsKnockedOut).ToList(), member);
+                _system.GrantRewards(owner, killer, _teamA.Where(a => a.Owner == owner && !a.Digimon.IsKnockedOut).ToList(), member, _teamB.Count);
         }
         End(side == BattleSide.B ? BattleResult.Win : BattleResult.Lose);
     }
