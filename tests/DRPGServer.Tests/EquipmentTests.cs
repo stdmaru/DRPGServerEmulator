@@ -1,0 +1,312 @@
+using System.Buffers.Binary;
+using System.Collections.Frozen;
+using DRPGServer.Configuration;
+using DRPGServer.Data.GameData;
+using DRPGServer.Data.Repositories;
+using DRPGServer.Game.Battle.Cards;
+using DRPGServer.Game.Entities;
+using DRPGServer.Game.Stats;
+using DRPGServer.Game.World;
+using DRPGServer.Network;
+using DRPGServer.Network.Handlers;
+using DRPGServer.Network.Packets.Map;
+using DRPGServer.Network.Protocol;
+using Microsoft.Extensions.Options;
+
+namespace DRPGServer.Tests;
+
+public class EquipmentTests
+{
+    private static readonly ItemInfo Crest107 = new(107, "Crest of Courage +5 (for Beginners)")
+    {
+        Type = 1, SubType = 1, Level = 1, MaxStack = 1,
+        Description = "ATK +75 / DEF +40 / Battle Rating +350",
+        EquipmentBonus = ClientTables.ParseEquipmentBonus("ATK +75 / DEF +40 / Battle Rating +350"),
+    };
+
+    private static readonly ItemInfo Digimental215 = new(215, "Digimental of Miracles +5 (for Beginners)")
+    {
+        Type = 2, SubType = 1, Level = 1, MaxStack = 1,
+        Description = "STR +6 / AGI +6 / CON +6",
+        EquipmentBonus = ClientTables.ParseEquipmentBonus("STR +6 / AGI +6 / CON +6"),
+    };
+
+    private static readonly ItemInfo Dark442 = new(442, "Rookie's D-ark")
+    {
+        Type = 9, SubType = 1, Level = 1, MaxStack = 1,
+        Description = "Card Slash 23 times",
+        EquipmentBonus = ClientTables.ParseEquipmentBonus("Card Slash 23 times"),
+    };
+
+    private static readonly ItemInfo HighLevelRing = new(668, "Ring of Hope +1")
+    {
+        Type = 25, SubType = 1, Level = 30, MaxStack = 1,
+        Description = "STR +5",
+        EquipmentBonus = ClientTables.ParseEquipmentBonus("STR +5"),
+    };
+
+    private static readonly ItemInfo Bread25 = new(25, "Bread")
+    {
+        Type = 4, SubType = 1, Level = 1, MaxStack = 99,
+    };
+
+    private static readonly ItemInfo Watch23552 = new(23552, "Smart Watch [30 Days]")
+    {
+        Type = 45, SubType = 6, Level = 1, MaxStack = 1,
+        Description = "ATK +25 / VP +200 / Battle Rating +100 / DEF +3%",
+        EquipmentBonus = ClientTables.ParseEquipmentBonus("ATK +25 / VP +200 / Battle Rating +100 / DEF +3%"),
+    };
+
+    private static readonly Dictionary<uint, ItemInfo> TestItems = new()
+    {
+        [107] = Crest107,
+        [215] = Digimental215,
+        [442] = Dark442,
+        [668] = HighLevelRing,
+        [25] = Bread25,
+        [23552] = Watch23552,
+    };
+
+    private static DigimonSpecies InTrainingSpecies =>
+        TestSupport.Data.Species.Values.First(s => s.Stage == StatFormulas.InTraining);
+
+    private static (Player Player, Session Session) MakePlayer(ushort tamerLevel = 1)
+    {
+        var inv = new Inventory(id => TestItems.GetValueOrDefault(id), 99);
+        var species = InTrainingSpecies;
+        var leader = new Digimon(TestSupport.Data, species, 1); // L1 In-Training (10/10/10/10)
+        var second = new Digimon(TestSupport.Data, species, 1);
+        var character = new Character(leader, inv)
+        {
+            Uid = 10, AccountUid = 1, Slot = 0, Name = "Tamer", TamerId = 1, Level = tamerLevel, MapId = 79, X = 30, Y = 30,
+        };
+        character.Place(1, second);
+        var session = TestSupport.NewSession();
+        var player = new Player(session, new AuthenticatedAccount(1, "user", Authority.None), character);
+        session.Player = player;
+        return (player, session);
+    }
+
+    private static PacketReader MovePacket(ItemPlace from, ItemPlace to, int fa, int fb, int ta, int tb, uint uid, uint itemId)
+    {
+        var w = new PacketWriter();
+        new ItemMoveHeader(from, to, fa, fb, ta, tb).Write(w);
+        w.WriteU32(uid);
+        w.WriteU32(itemId);
+        w.WriteZeros(250 - 28);
+        return new PacketReader(w.ToFrame((ushort)MapOpcode.ItemDropGet).AsSpan(PacketHeader.Length).ToArray());
+    }
+
+    [Fact]
+    public void ParseEquipmentBonus_extracts_all_bonus_types()
+    {
+        var crest = ClientTables.ParseEquipmentBonus("ATK +75 / DEF +40 / Battle Rating +350");
+        Assert.Equal(75, crest.BonusAtk);
+        Assert.Equal(40, crest.BonusDef);
+        Assert.Equal(350, crest.BonusBr);
+
+        var egg = ClientTables.ParseEquipmentBonus("STR +6 / AGI +6 / CON +6");
+        Assert.Equal(new Attributes(6, 6, 6, 0), egg.Attributes);
+
+        var watch = ClientTables.ParseEquipmentBonus("ATK +25 / VP +200 / Battle Rating +100 / DEF +3%");
+        Assert.Equal(25, watch.BonusAtk);
+        Assert.Equal(200, watch.BonusVp);
+        Assert.Equal(100, watch.BonusBr);
+        Assert.Equal(3, watch.BonusDefPercent);
+
+        var dark = ClientTables.ParseEquipmentBonus("Card Slash 23 times");
+        Assert.Equal(23, dark.CardSlashLimit);
+
+        var socks = ClientTables.ParseEquipmentBonus("Digimon EXP +100% / Tamer EXP +5");
+        Assert.Equal(100, socks.DigimonExpPercent);
+        Assert.Equal(5, socks.TamerExpFlat);
+
+        var aura = ClientTables.ParseEquipmentBonus("HP Recovery Amount 10 / VP Recovery Amount 8 / EVP Recovery Amount 15");
+        Assert.Equal(10, aura.HpRecovery);
+        Assert.Equal(8, aura.VpRecovery);
+        Assert.Equal(15, aura.EvpRecovery);
+    }
+
+    /// <summary>
+    /// ✅ Confirmação exata contra captures.db (conn=234, InputName L1 10/10/10/10):
+    /// - Sem equipamento: ATK 145, DEF 87, BR 131, HP 115, VP 115
+    /// - +1× Crest 107: ATK 220, DEF 127, BR 481, HP 115, VP 115
+    /// - +1× Digimental 215: ATK 258, DEF 145, BR 489, HP 146, VP 125
+    /// - +2ª Crest 107: ATK 333, DEF 185, BR 839, HP 146, VP 125
+    /// </summary>
+    [Fact]
+    public void Equipping_crests_and_digimental_matches_official_conn234_stats_and_packet_sequence()
+    {
+        var (player, session) = MakePlayer();
+        var inv = player.Character.Inventory;
+        var crest1 = inv.Add(107, 1)!;
+        var egg1 = inv.Add(215, 1)!;
+        var crest2 = inv.Add(107, 1)!;
+
+        // Baseline sem equipamento
+        var s0 = player.Leader.Stats;
+        Assert.Equal((145, 87, 131, 115, 115), (s0.Atk, s0.Def, s0.Br, s0.MaxHp, s0.MaxVp));
+
+        var handler = new ItemMoveHandler();
+
+        // 1. Equipar Crest 107 no slot Crest1 (4)
+        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest1.Row, crest1.Column, 0, 0, crest1.Uid, 107));
+        var s1 = player.Leader.Stats;
+        Assert.Equal((220, 127, 481, 115, 115), (s1.Atk, s1.Def, s1.Br, s1.MaxHp, s1.MaxVp));
+        // Também aplica ao 2º Digimon da party
+        Assert.Equal(s1, player.Character.Party[1]!.Stats);
+        // Sequência oficial de pacotes: 0xB1 → 0xB4 × 2 → 0x10 → 0x91
+        Assert.Equal(
+            [(ushort)MapOpcode.TamerExp, (ushort)MapOpcode.BattleDigimonStatus, (ushort)MapOpcode.BattleDigimonStatus,
+             (ushort)MapOpcode.RefreshCharacterInfo, (ushort)MapOpcode.ItemDropGet],
+            session.SentOpcodes());
+
+        // 2. Equipar Digimental 215 no slot Digimental1 (7)
+        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Digimental1, egg1.Row, egg1.Column, 0, 0, egg1.Uid, 215));
+        var s2 = player.Leader.Stats;
+        Assert.Equal((258, 145, 489, 146, 125), (s2.Atk, s2.Def, s2.Br, s2.MaxHp, s2.MaxVp));
+
+        // 3. Equipar 2ª Crest 107 no slot Crest2 (5)
+        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest2, crest2.Row, crest2.Column, 0, 0, crest2.Uid, 107));
+        var s3 = player.Leader.Stats;
+        Assert.Equal((333, 185, 839, 146, 125), (s3.Atk, s3.Def, s3.Br, s3.MaxHp, s3.MaxVp));
+
+        // 4. Desequipar Crest1 volta para s2
+        handler.Handle(session, MovePacket(ItemPlace.Crest1, ItemPlace.Inventory, 0, 0, 0, 0, crest1.Uid, 107));
+        Assert.Null(inv.EquippedAt(ItemPlace.Crest1));
+        Assert.Equal(crest1, inv.Main[0]);
+        Assert.Equal(s2, player.Leader.Stats);
+    }
+
+    [Fact]
+    public void CharacterData_0x02_and_TamerExp_0xB1_write_equipment_at_official_offsets()
+    {
+        var (player, _) = MakePlayer();
+        var inv = player.Character.Inventory;
+        var c1 = inv.Create(107, (int)ItemPlace.Crest1, 1);
+        var e1 = inv.Create(215, (int)ItemPlace.Digimental1, 1);
+        var dark = inv.Create(442, (int)ItemPlace.Digivice, 1);
+        var watch = inv.Create(23552, (int)ItemPlace.Watch, 1);
+        inv.Equipment.Place(c1);
+        inv.Equipment.Place(e1);
+        inv.Equipment.Place(dark);
+        inv.Equipment.Place(watch);
+
+        // S2C 0x02 (7600 B)
+        var p02 = new CharacterDataPacket(player.Character).EncodePayload();
+        Assert.Equal(7600, p02.Length);
+        Assert.Equal(c1.Uid, BinaryPrimitives.ReadUInt32LittleEndian(p02.AsSpan(100)));
+        Assert.Equal(107u, BinaryPrimitives.ReadUInt32LittleEndian(p02.AsSpan(104)));
+        Assert.Equal(e1.Uid, BinaryPrimitives.ReadUInt32LittleEndian(p02.AsSpan(424)));
+        Assert.Equal(215u, BinaryPrimitives.ReadUInt32LittleEndian(p02.AsSpan(428)));
+        Assert.Equal(dark.Uid, BinaryPrimitives.ReadUInt32LittleEndian(p02.AsSpan(0x12E0)));
+        Assert.Equal(442u, BinaryPrimitives.ReadUInt32LittleEndian(p02.AsSpan(0x12E4)));
+        Assert.Equal(watch.Uid, BinaryPrimitives.ReadUInt32LittleEndian(p02.AsSpan(0x1CF0)));
+        Assert.Equal(23552u, BinaryPrimitives.ReadUInt32LittleEndian(p02.AsSpan(0x1CF4)));
+
+        // S2C 0xB1 (1252 B)
+        var pb1 = new TamerExpPacket(player.Character).EncodePayload();
+        Assert.Equal(1252, pb1.Length);
+        Assert.Equal(c1.Uid, BinaryPrimitives.ReadUInt32LittleEndian(pb1.AsSpan(0x018)));
+        Assert.Equal(e1.Uid, BinaryPrimitives.ReadUInt32LittleEndian(pb1.AsSpan(0x15C)));
+        Assert.Equal(dark.Uid, BinaryPrimitives.ReadUInt32LittleEndian(pb1.AsSpan(0x2A0)));
+    }
+
+    [Fact]
+    public void Security_guards_reject_invalid_equip_unequip_and_swaps()
+    {
+        var (player, session) = MakePlayer(tamerLevel: 5);
+        var inv = player.Character.Inventory;
+        var crest = inv.Add(107, 1)!;          // slot 0 (Type 1)
+        var egg = inv.Add(215, 1)!;            // slot 1 (Type 2)
+        var bread = inv.Add(25, 1)!;           // slot 2 (Type 4, consumível)
+        var ring = inv.Add(668, 1)!;           // slot 3 (Type 25, nível 30)
+        var handler = new ItemMoveHandler();
+
+        // Tipo incompatível: Digimental (Type 2) em Crest1 (aceita só Type 1)
+        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, egg.Row, egg.Column, 0, 0, egg.Uid, 215));
+        Assert.Null(inv.EquippedAt(ItemPlace.Crest1));
+        Assert.Empty(session.SentOpcodes());
+
+        // Consumível em slot de equipamento
+        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Ring, bread.Row, bread.Column, 0, 0, bread.Uid, 25));
+        Assert.Null(inv.EquippedAt(ItemPlace.Ring));
+
+        // Nível insuficiente (Tamer L5 vs Ring L30)
+        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Ring, ring.Row, ring.Column, 0, 0, ring.Uid, 668));
+        Assert.Null(inv.EquippedAt(ItemPlace.Ring));
+
+        // UID forjado / ItemId trocado
+        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest.Row, crest.Column, 0, 0, crest.Uid + 999, 107));
+        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest.Row, crest.Column, 0, 0, crest.Uid, 215));
+        Assert.Null(inv.EquippedAt(ItemPlace.Crest1));
+
+        // Coordenadas não-zero no slot de equipamento
+        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest.Row, crest.Column, 1, 0, crest.Uid, 107));
+        Assert.Null(inv.EquippedAt(ItemPlace.Crest1));
+
+        // Equipar válido e tentar desequipar em cima do pão (troca inválida: pão não pode ir para Crest1)
+        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest.Row, crest.Column, 0, 0, crest.Uid, 107));
+        Assert.Equal(crest, inv.EquippedAt(ItemPlace.Crest1));
+        session.SentOpcodes();
+
+        handler.Handle(session, MovePacket(ItemPlace.Crest1, ItemPlace.Inventory, 0, 0, bread.Row, bread.Column, crest.Uid, 107));
+        Assert.Equal(crest, inv.EquippedAt(ItemPlace.Crest1));
+        Assert.Equal(bread, inv.Main[bread.Slot]);
+        Assert.Empty(session.SentOpcodes());
+    }
+
+    [Fact]
+    public void Equipment_persists_through_snapshot_and_factory_reload()
+    {
+        var (player, _) = MakePlayer();
+        var inv = player.Character.Inventory;
+        var c1 = inv.Create(107, (int)ItemPlace.Crest1, 1);
+        var dark = inv.Create(442, (int)ItemPlace.Digivice, 1);
+        inv.Equipment.Place(c1);
+        inv.Equipment.Place(dark);
+        player.Character.SyncEquipmentBonuses();
+
+        var snap = CharacterSnapshot.Of(player.Character);
+        Assert.Contains(snap.Items, i => i.Bag == (byte)BagKind.Equipment && i.Slot == (byte)ItemPlace.Crest1 && i.ItemId == 107);
+        Assert.Contains(snap.Items, i => i.Bag == (byte)BagKind.Equipment && i.Slot == (byte)ItemPlace.Digivice && i.ItemId == 442);
+
+        // Recarrega via CharacterFactory com GameData contendo os itens de teste
+        var data = new GameData
+        {
+            Species = TestSupport.Data.Species,
+            Items = TestItems.ToFrozenDictionary(),
+            Cards = TestSupport.Data.Cards,
+            DigimonTitles = TestSupport.Data.DigimonTitles,
+            Skills = TestSupport.Data.Skills,
+            Evolutions = TestSupport.Data.Evolutions,
+            Maps = TestSupport.Data.Maps,
+            Grids = TestSupport.Data.Grids,
+            DropGroups = TestSupport.Data.DropGroups,
+            TamingNets = TestSupport.Data.TamingNets,
+            Portals = TestSupport.Data.Portals,
+            Spawns = TestSupport.Data.Spawns,
+            ZoneIds = TestSupport.Data.ZoneIds,
+        };
+        var factory = new CharacterFactory(data, Options.Create(new GameOptions()));
+        var species = InTrainingSpecies;
+        var record = new CharacterRecord(
+            new CharacterRow
+            {
+                Uid = 10, AccountUid = 1, Slot = 0, Name = "Tamer", TamerId = 1, Level = 1,
+                MapId = 79, PosX = 30, PosY = 30, DepositorySlots = 10,
+            },
+            [new DigimonRow { Uid = 100, Slot = 0, DigimonId = species.Id, Name = species.Name, Level = 1 }],
+            [new FormRow(100, species.Id, 0, 0, 0, 0, 0, 0)],
+            snap.Items,
+            [],
+            []);
+        var reloaded = factory.Build(record)!;
+
+        Assert.Equal(107u, reloaded.Inventory.EquippedAt(ItemPlace.Crest1)?.ItemId);
+        Assert.Equal(442u, reloaded.Inventory.EquippedAt(ItemPlace.Digivice)?.ItemId);
+        Assert.Equal(220, reloaded.Leader.Stats.Atk); // 145 base + 75 Crest
+        Assert.Equal(23, reloaded.TotalEquipmentBonus.CardSlashLimit);
+        Assert.Equal(23, new CardBattleState(reloaded.TotalEquipmentBonus.CardSlashLimit).SlashesRemaining);
+    }
+}

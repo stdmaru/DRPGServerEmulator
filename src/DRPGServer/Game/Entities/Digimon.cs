@@ -89,6 +89,18 @@ public sealed class Digimon
     public string? FindTitleName(uint titleId) => _data.FindDigimonTitle(titleId)?.Name;
     public Attributes TitleAttributeBonus => EquippedTitle?.AttributeBonus ?? default;
 
+    /// <summary>✅ Bônus acumulado dos equipamentos do Tamer (sincronizado via <see cref="Character.SyncEquipmentBonuses"/>).</summary>
+    public EquipmentBonus EquipmentBonus { get; private set; }
+
+    public void SetEquipmentBonus(EquipmentBonus bonus)
+    {
+        EquipmentBonus = bonus;
+        var s = Stats;
+        Hp = Math.Min(Hp, s.MaxHp);
+        Vp = Math.Min(Vp, s.MaxVp);
+        Evp = Math.Min(Evp, s.MaxEvp);
+    }
+
     public int Hp { get; private set; }
     public int Vp { get; private set; }
     public int Evp { get; private set; }
@@ -134,15 +146,25 @@ public sealed class Digimon
     private CombatStats ComputePlayerStats()
     {
         var title = EquippedTitle;
-        var effectiveAttrs = title is null ? Attributes : Attributes + title.AttributeBonus;
+        var equip = EquipmentBonus;
+        var effectiveAttrs = Attributes + (title?.AttributeBonus ?? default) + equip.Attributes;
         var baseStats = StatFormulas.Combat(effectiveAttrs, Level);
-        if (title is null) return baseStats;
+        if (title is null && equip.IsEmpty) return baseStats;
 
-        int maxHp = baseStats.MaxHp + title.BonusHp;
-        int maxVp = baseStats.MaxVp + title.BonusVp;
-        int atk = (int)Math.Floor((baseStats.Atk + title.BonusAtk) * (1.0 + title.BonusAtkPercent / 100.0));
-        int def = (int)Math.Floor((baseStats.Def + title.BonusDef) * (1.0 + title.BonusDefPercent / 100.0));
-        int br = (int)Math.Floor((baseStats.Br + title.BonusBr) * (1.0 + title.BonusBrPercent / 100.0));
+        int bonusHp = (title?.BonusHp ?? 0) + equip.BonusHp;
+        int bonusVp = (title?.BonusVp ?? 0) + equip.BonusVp;
+        int bonusAtk = (title?.BonusAtk ?? 0) + equip.BonusAtk;
+        int bonusDef = (title?.BonusDef ?? 0) + equip.BonusDef;
+        int bonusBr = (title?.BonusBr ?? 0) + equip.BonusBr;
+        int atkPct = (title?.BonusAtkPercent ?? 0) + equip.BonusAtkPercent;
+        int defPct = (title?.BonusDefPercent ?? 0) + equip.BonusDefPercent;
+        int brPct = (title?.BonusBrPercent ?? 0) + equip.BonusBrPercent;
+
+        int maxHp = baseStats.MaxHp + bonusHp;
+        int maxVp = baseStats.MaxVp + bonusVp;
+        int atk = (int)Math.Floor((baseStats.Atk + bonusAtk) * (1.0 + atkPct / 100.0));
+        int def = (int)Math.Floor((baseStats.Def + bonusDef) * (1.0 + defPct / 100.0));
+        int br = (int)Math.Floor((baseStats.Br + bonusBr) * (1.0 + brPct / 100.0));
         return new CombatStats(maxHp, maxVp, baseStats.MaxEvp, atk, def, br, baseStats.MaxActionGauge);
     }
 

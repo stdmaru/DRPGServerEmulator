@@ -263,11 +263,15 @@ public sealed class BattleDigimonStatusPacket(Digimon digimon) : ServerPacket
 }
 
 /// <summary>
-/// 0xB1 (1252 bytes): nível e EXP do tamer no fim da batalha. ✅ u16 ? (o mesmo valor do offset 38 do 0x10),
-/// u16 nível, u32 0, i32 EXP, i32 EXP para o próximo nível (5·(L + 1)), resto zero.
+/// 0xB1 (1252 bytes): nível, EXP e equipamentos do tamer (fim de batalha e equipar/desequipar).
+/// ✅ Layout confirmado em <c>DigimonRPG.bin @ 0x00B5C170</c> e <c>captures.db (conn=234/428)</c>:
+/// 0..23 cabeçalho (u16 1, u16 nível, u32 0, i32 EXP, i32 EXP próx., 8 zeros), seguido de 11 registros de
+/// equipamento de 108 B (Crests 4..6, Digimentals 7..9, D-ark 12, Spirits 26..28 e D-ark Card 25).
 /// </summary>
 public sealed class TamerExpPacket(Character character) : ServerPacket
 {
+    public const int TotalLength = 1252;
+
     public override ushort Opcode => (ushort)MapOpcode.TamerExp;
 
     protected override void Write(PacketWriter w)
@@ -277,6 +281,20 @@ public sealed class TamerExpPacket(Character character) : ServerPacket
         w.WriteU32(0);
         w.WriteI32(0);                          // EXP do tamer ❓ não persistido (igual ao 0x02)
         w.WriteI32((int)Game.Stats.ExpFormulas.TamerExpToNext(character.Level));
-        w.WriteZeros(1252 - 16);
+        w.WriteZeros(8);                        // 16..23
+
+        int cursor = 24;
+        foreach (var (place, offset) in EquipmentSlots.TamerRefreshSlots)
+        {
+            if (offset > cursor)
+                w.WriteZeros(offset - cursor);
+            if (character.Inventory.EquippedAt(place) is { } eq)
+                ItemRecord.Write(w, eq);
+            else
+                w.WriteZeros(ItemRecord.Length);
+            cursor = offset + ItemRecord.Length;
+        }
+        if (TotalLength > cursor)
+            w.WriteZeros(TotalLength - cursor);
     }
 }

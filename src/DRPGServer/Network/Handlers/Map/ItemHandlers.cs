@@ -82,31 +82,91 @@ public sealed class ItemMoveHandler : PlayerHandler
         uint itemId = packet.ReadU32();
         if (player.InBattle) return;
         var bag = player.Character.Inventory.Main;
+        var equipment = player.Character.Inventory.Equipment;
 
-        switch (header.From, header.To)
+        if (header.From == ItemPlace.Ground && header.To == ItemPlace.Inventory)
         {
-            case (ItemPlace.Ground, ItemPlace.Inventory):
-            {
-                if (player.Zone is not { } zone || zone.FindDrop(uid) is not { IsCard: false } drop || drop.ItemId != itemId) return;
-                if (bag.Add(drop.ItemId, 1) is not [.., var item]) return;   // inventário cheio: fica no chão
-                zone.RemoveDrop(drop);
-                player.RequestImmediateSave();
-                player.Send(new ItemMovePacket(header with { ToA = item.Row, ToB = item.Column }, item));
-                break;
-            }
-            case (ItemPlace.Inventory, ItemPlace.Inventory):
-            {
-                int from = SlotOf(header.FromA, header.FromB), to = SlotOf(header.ToA, header.ToB);
-                if (bag[from] is not { } item || item.Uid != uid) return;
-                if (bag.Move(from, to, out var displaced))
-                {
-                    player.MarkDirty();
-                    player.Send(new ItemMovePacket(header, item, displaced));
-                }
-                break;
-            }
-            // ❓ bolsas extras (0x33, 0x3D) ainda não
+            if (player.Zone is not { } zone || zone.FindDrop(uid) is not { IsCard: false } drop || drop.ItemId != itemId) return;
+            if (bag.Add(drop.ItemId, 1) is not [.., var item]) return;   // inventário cheio: fica no chão
+            zone.RemoveDrop(drop);
+            player.RequestImmediateSave();
+            player.Send(new ItemMovePacket(header with { ToA = item.Row, ToB = item.Column }, item));
+            return;
         }
+
+        if (header.From == ItemPlace.Inventory && header.To == ItemPlace.Inventory)
+        {
+            int from = SlotOf(header.FromA, header.FromB), to = SlotOf(header.ToA, header.ToB);
+            if (bag[from] is not { } item || item.Uid != uid || item.ItemId != itemId) return;
+            if (bag.Move(from, to, out var displaced))
+            {
+                player.MarkDirty();
+                player.Send(new ItemMovePacket(header, item, displaced));
+            }
+            return;
+        }
+
+        // ✅ Equipar item: Inventário (3) → Slot de equipamento (4..9, 11, 12, 14..28, 81..86)
+        if (header.From == ItemPlace.Inventory && EquipmentSlots.IsEquipmentPlace(header.To))
+        {
+            if (header.ToA != 0 || header.ToB != 0) return;
+            int fromSlot = SlotOf(header.FromA, header.FromB);
+            if (bag[fromSlot] is not { } item || item.Uid != uid || item.ItemId != itemId) return;
+            if (!EquipmentSlots.CanEquip(header.To, item, player.Character.Level)) return;
+
+            if (!bag.MoveTo(fromSlot, equipment, (int)header.To, out var displaced)) return;
+            ApplyEquipmentChange(player, header, item, displaced);
+            return;
+        }
+
+        // ✅ Desequipar item: Slot de equipamento → Inventário (3)
+        if (EquipmentSlots.IsEquipmentPlace(header.From) && header.To == ItemPlace.Inventory)
+        {
+            if (header.FromA != 0 || header.FromB != 0) return;
+            int toSlot = SlotOf(header.ToA, header.ToB);
+            if (toSlot < 0) return;
+            if (equipment[(int)header.From] is not { } item || item.Uid != uid || item.ItemId != itemId) return;
+
+            // Se o slot de destino no inventário já está ocupado, só permite troca se o item deslocado puder ir para o slot de equipamento
+            if (bag[toSlot] is { } existing && !EquipmentSlots.CanEquip(header.From, existing, player.Character.Level))
+                return;
+
+            if (!equipment.MoveTo((int)header.From, bag, toSlot, out var displaced)) return;
+            ApplyEquipmentChange(player, header, item, displaced);
+            return;
+        }
+
+        // ✅ Mover/trocar entre dois slots de equipamento compatíveis (ex.: Crest 1 ↔ Crest 2, Digimental 1 ↔ 3)
+        if (EquipmentSlots.IsEquipmentPlace(header.From) && EquipmentSlots.IsEquipmentPlace(header.To))
+        {
+            if (header.From == header.To || header.FromA != 0 || header.FromB != 0 || header.ToA != 0 || header.ToB != 0) return;
+            if (equipment[(int)header.From] is not { } item || item.Uid != uid || item.ItemId != itemId) return;
+            if (!EquipmentSlots.CanEquip(header.To, item, player.Character.Level)) return;
+            if (equipment[(int)header.To] is { } existing && !EquipmentSlots.CanEquip(header.From, existing, player.Character.Level))
+                return;
+
+            if (!equipment.Move((int)header.From, (int)header.To, out var displaced)) return;
+            ApplyEquipmentChange(player, header, item, displaced);
+        }
+    }
+
+    /// <summary>
+    /// ✅ Sequência oficial ao equipar/desequipar (captures.db conn=234 pid=115773..115778):
+    /// 0xB1 (Tamer + equipamentos) → 0xB4 (um por Digimon do time com status recalculados) → 0x10 → 0x91.
+    /// </summary>
+    private static void ApplyEquipmentChange(Player player, ItemMoveHeader header, InventoryItem moved, InventoryItem? displaced)
+    {
+        var c = player.Character;
+        c.SyncEquipmentBonuses();
+        player.RequestImmediateSave();
+        player.Send(new TamerExpPacket(c));
+        foreach (var digimon in c.Digimons)
+            player.Send(new BattleDigimonStatusPacket(digimon));
+        if (player.Zone is { } zone)
+            zone.Broadcast(new RefreshCharacterInfoPacket(c));
+        else
+            player.Send(new RefreshCharacterInfoPacket(c));
+        player.Send(new ItemMovePacket(header, moved, displaced));
     }
 
     internal static int SlotOf(int row, int column) =>

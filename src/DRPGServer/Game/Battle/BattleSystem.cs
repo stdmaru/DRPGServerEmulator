@@ -103,6 +103,7 @@ public sealed class BattleSystem : IWorldSystem
     internal void GrantRewards(Player owner, Combatant killer, IReadOnlyList<Combatant> participants, WildMember defeated, int enemyCount = 1)
     {
         double eventMultiplier = _expEvents?.ExpMultiplier ?? 1.0;
+        double equipExpMultiplier = 1.0 + Math.Max(0, owner.Character.TotalEquipmentBonus.DigimonExpPercent) / 100.0;
         double bits = RollBits(defeated.Option.BitReward) * _options.BitRate;
         owner.Character.AddBits(bits);
 
@@ -112,7 +113,7 @@ public sealed class BattleSystem : IWorldSystem
         {
             long withBonus = Stats.ExpFormulas.ApplyEnemyCountBonus(defeated.Option.ExpReward, enemyCount);
             long baseExp = Stats.ExpFormulas.ApplyLevelDifference(withBonus, defeated.Digimon.Level, digimon.Level);
-            long exp = (long)(baseExp * _options.ExpRate * eventMultiplier);
+            long exp = (long)(baseExp * _options.ExpRate * eventMultiplier * equipExpMultiplier);
             Progression.GainExp(owner, digimon, exp, first ? bits : 0, _options.DigimonMaxLevel, inBattle: true, _options.AllowMultiLevelUp);
             first = false;
         }

@@ -4,23 +4,61 @@ namespace DRPGServer.Game.Entities;
 
 /// <summary>
 /// Onde fica um item ou card, pelo código que o 0x90/0x91/0xBD usam como origem e destino.
-/// ✅ 1 chão, 2 os 6 Card Slots equipados (0x90), 3 inventário / mochila de cards (sessões 53, 56, 64);
-/// 0x33 é a bolsa extra equipada (❓ não implementada).
+/// ✅ 1 chão, 2 os 6 Card Slots equipados (0x90), 3 inventário / mochila de cards,
+/// 4..9 Crests/Digimentals, 11..12 Aura/D-ark, 14..28 Roupas/Acessórios/Spirits, 81..86 Asas/Efeitos/Gem/Watch
+/// (confirmado em <c>DigimonRPG.bin @ 0x00AF030C / 0x00B0E740..0x00B0FEFD</c> e capturas v322 <c>conn=234/428</c>).
 /// </summary>
 public enum ItemPlace : byte
 {
     Ground = 1,
     CardSlots = 2,
     Inventory = 3,
+
+    // Equipamentos primários (0x02 offsets 100..747, 0xB1 offsets 24..671)
+    Crest1 = 4,
+    Crest2 = 5,
+    Crest3 = 6,
+    Digimental1 = 7,
+    Digimental2 = 8,
+    Digimental3 = 9,
+
+    // Equipamentos do Tamer (0x02 cauda 4724..7599)
+    Aura = 11,
+    Digivice = 12,
+    Socks = 14,
+    Shoes = 15,
+    Pants = 16,
+    Gloves = 17,
+    Shirt = 18,
+    Jacket = 19,
+    Hat = 20,
+    CostumeSet = 21,
+    Earring = 22,
+    Necklace = 23,
+    Ring = 24,
+    DarkCard = 25,
+    Spirit1 = 26,
+    Spirit2 = 27,
+    Spirit3 = 28,
+
     ExtraBag = 0x33,
+
+    // Cosméticos e acessórios adicionais (0x02 offsets 6868..7515)
+    Wings = 81,
+    FloatingEffect = 82,
+    Emblem = 83,
+    Font = 84,
+    Gem = 85,
+    Watch = 86,
 }
 
-/// <summary>Bolsa: o inventário (108 B), a mochila de cards (76 B no 0x03) e os 6 Card Slots equipados (76 B no 0x02).</summary>
+/// <summary>Bolsa: o inventário (108 B), a mochila de cards (76 B no 0x03), os 6 Card Slots (76 B no 0x02) e os equipamentos (108 B no 0x02/0xB1).</summary>
 public enum BagKind : byte
 {
     Battle = 2,
     Inventory = 3,
     EquippedCards = 4,
+    Equipment = 5,
 }
 
 public sealed class InventoryItem
@@ -256,6 +294,7 @@ public sealed class Inventory
         Main = new Bag(this, BagKind.Inventory, Size);
         Battle = new Bag(this, BagKind.Battle, Size);
         CardSlots = new Bag(this, BagKind.EquippedCards, CardSlotCount);
+        Equipment = new Bag(this, BagKind.Equipment, EquipmentSlots.BagCapacity);
     }
 
     /// <summary>Sem tabela de itens: toda pilha vai até <paramref name="maxStack"/>.</summary>
@@ -266,14 +305,33 @@ public sealed class Inventory
     public Bag Battle { get; }
     /// <summary>✅ 6 Card Slots equipados no inventário (0x02 offsets 784..1239; 0x90 place = 2).</summary>
     public Bag CardSlots { get; }
+    /// <summary>✅ 29 slots de equipamento do Tamer (indexados por <see cref="ItemPlace"/>; 0x02 / 0xB1 / 0x91).</summary>
+    public Bag Equipment { get; }
     public IEnumerable<InventoryItem> Items => Main.Items;
 
     public Bag BagOf(BagKind kind) => kind switch
     {
         BagKind.Battle => Battle,
         BagKind.EquippedCards => CardSlots,
+        BagKind.Equipment => Equipment,
         _ => Main,
     };
+
+    /// <summary>Item equipado no slot <paramref name="place"/> (null se vazio ou inválido).</summary>
+    public InventoryItem? EquippedAt(ItemPlace place) =>
+        EquipmentSlots.IsEquipmentPlace(place) ? Equipment[(int)place] : null;
+
+    /// <summary>Soma dos bônus de todos os equipamentos atualmente equipados pelo Tamer.</summary>
+    public EquipmentBonus TotalEquipmentBonus()
+    {
+        var total = EquipmentBonus.Empty;
+        foreach (var place in EquipmentSlots.All)
+        {
+            if (Equipment[(int)place]?.Info is { } info && !info.EquipmentBonus.IsEmpty)
+                total += info.EquipmentBonus;
+        }
+        return total;
+    }
 
     internal uint MaxStackOf(uint itemId, bool isCard = false)
     {

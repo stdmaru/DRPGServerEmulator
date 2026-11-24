@@ -39,14 +39,14 @@ public sealed class ActivatedCards
 /// <summary>
 /// Estado dos 3 slots de batalha (0xA0/0xA1) e do contador de 20 Card Slash por jogador dentro de uma batalha.
 /// </summary>
-public sealed class CardBattleState
+public sealed class CardBattleState(int maxCardSlashes = CardBattleState.MaxCardSlashesPerBattle)
 {
     public const int SlotCount = ActivatedCards.SlotCount;
     public const int MaxCardSlashesPerBattle = 20;
 
     private readonly InventoryItem?[] _slots = new InventoryItem?[SlotCount];
 
-    public int SlashesRemaining { get; private set; } = MaxCardSlashesPerBattle;
+    public int SlashesRemaining { get; private set; } = Math.Max(MaxCardSlashesPerBattle, maxCardSlashes);
     public bool AnyConsumed { get; private set; }
     public bool UsedHasteLastAttack { get; private set; }
 
