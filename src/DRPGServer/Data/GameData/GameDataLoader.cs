@@ -66,8 +66,14 @@ public static class GameDataLoader
                 U16(o, "DigimonID"), U16(o, "Level"), I64(o, "ExpReward"), F64(o, "BitReward"), U16(o, "AppearanceRate"),
                 U32(o, "DropGroup")) { Stats = FixedStats(o, U16(o, "Level")) }).ToList();
             var points = e.Elements("Point").Select(p => (I16(p, "X"), I16(p, "Y"))).ToList();
-            var area = new SpawnArea(U8(e, "MapID"), I16(e, "PosXMin"), I16(e, "PosXMax"), I16(e, "PosYMin"), I16(e, "PosYMax"),
-                points.Count > 0 ? points.Count : I32(e, "MaxCount"), TimeSpan.FromSeconds(F64(e, "RespawnTime")), options, points,
+            bool hasPoints = points.Count > 0;
+            short xMin = hasPoints ? (short)0 : I16(e, "PosXMin");
+            short xMax = hasPoints ? (short)0 : I16(e, "PosXMax");
+            short yMin = hasPoints ? (short)0 : I16(e, "PosYMin");
+            short yMax = hasPoints ? (short)0 : I16(e, "PosYMax");
+            int maxCount = hasPoints ? points.Count : I32(e, "MaxCount");
+            var area = new SpawnArea(U8(e, "MapID"), xMin, xMax, yMin, yMax,
+                maxCount, TimeSpan.FromSeconds(F64(e, "RespawnTime")), options, points,
                 (bool?)e.Attribute("Exclusive") ?? false);
             if (grids.GetValueOrDefault(area.MapId) is { } grid)
                 foreach (var (x, y) in points)
