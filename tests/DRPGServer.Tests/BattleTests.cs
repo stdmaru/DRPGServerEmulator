@@ -218,7 +218,8 @@ public class BattleTests
         }
 
         Assert.True(battle.IsOver);
-        Assert.Equal(0, me.Digimon.Hp);
+        // ✅ 0x84 sai com HP = 0, mas o líder revive com 10 HP no mapa (conn=408 S2C 0xB4) para regenerar via 0xB2
+        Assert.Equal(10, me.Digimon.Hp);
         Assert.Equal(1000 - 46, me.Digimon.Exp);
 
         var opcodes = frames.Select(f => PacketHeader.Read(f).Opcode).ToList();

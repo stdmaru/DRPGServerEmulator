@@ -33,7 +33,8 @@ Dados: 67 batalhas v322 em `captures.db` (sessões 53, 54, 56 e 58; 362 golpes, 
    - logo depois, `0xB1` (EXP do tamer), `0x10` (estado 1), `0x84` (bloco do digimon) e `0x6D` 1.
 8. **Derrota por nocaute** (✅ sessão 64, `conn=408`):
    - Quando um digimon do jogador é nocauteado, perde **1 % de `ExpToNext(L)`** via `0x6E` negativo (`EXP = −⌊ExpToNext/100⌋`, `bits = 0`) antes do `0x67`.
-   - Ao cair o último digimon do jogador: `0xB1`, `0x10` (estado 1), `[0x4F se ganhou título]`, `0x84` (**com `HP = 0`**) e `0x6D` **2** (um por digimon), **sem teleporte (`0xB0`)** — o `0xB2` recupera o HP no mapa logo após o `0xB4`.
+   - Ao cair o último digimon do jogador: `0xB1`, `0x10` (estado 1), `[0x4F se ganhou título]`, `0x84` (**com `HP = 0`**) e `0x6D` **2** (um por digimon), **sem teleporte (`0xB0`)**.
+   - Na volta ao mapa (`S2C 0xB4`), **apenas o líder** revive (`HP = 10` em `conn=408`) e volta a regenerar via `0xB2` (`15 → 20 → ...`); os demais digimons nocauteados permanecem com `HP = 0` e **não** regeneram automaticamente.
 9. **Fuga:**
    - `0x35` 3;
    - `0x65` (serial do digimon), `0x6A` (serial do tamer);

@@ -423,9 +423,13 @@ public sealed class Battle
                 player.Zone?.Broadcast(new RefreshCharacterInfoPacket(player.Character, TamerState.Idle));
                 foreach (var c in mine)
                 {
-                    // ✅ evoluído volta para a forma-base no fim (sem Aura); nocauteado mantém HP = 0 e cura via 0xB2 no mapa
+                    // ✅ evoluído volta para a forma-base no fim (sem Aura); 0x84 sai com HP = 0 nos nocauteados
                     c.Digimon.Devolve();
                     if (sendSummary) player.Send(new BattleDigimonStatusPacket(c.Digimon));
+                    // ✅ conn=408 (S2C 0xB4 pid=313462): apenas o líder revive no mapa (HP = 10) para voltar a regenerar;
+                    // os demais digimons nocauteados permanecem com HP = 0 (sem regeneração automática)
+                    if (c.Digimon == player.Leader && c.Digimon.IsKnockedOut)
+                        c.Digimon.Heal(10, 0, 0);
                 }
                 foreach (var _ in mine)
                     player.Send(new BattleEndPacket(result));

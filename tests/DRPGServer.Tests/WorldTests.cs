@@ -73,6 +73,27 @@ public class ZoneTickTests
         Assert.Contains((ushort)0xB2, sent);
         Assert.Equal((hp + 5, vp + 3, evp + 10), (leader.Hp, leader.Vp, leader.Evp));
     }
+
+    [Fact]
+    public void Auto_recovery_skips_knocked_out_party_digimons()
+    {
+        var world = TestSupport.NewWorld();
+        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
+        var session = TestSupport.NewSession();
+        var character = Entities.Character();
+        var fallen = Entities.Digimon(level: 5);
+        fallen.TakeDamage(fallen.Hp);
+        character.Place(1, fallen);
+        var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
+        var zone = zones.Find(79)!;
+        zone.Enter(player);
+        session.DrainOutgoing();
+
+        var due = player.NextRecoveryAt;
+        zone.Update(due, Zone.RecoveryInterval);
+        Assert.Equal(0, fallen.Hp);
+        Assert.DoesNotContain((ushort)0xB2, session.SentOpcodes());
+    }
 }
 
 internal static class Grids
