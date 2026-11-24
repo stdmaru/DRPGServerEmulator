@@ -96,42 +96,9 @@ public sealed class Player(Session session, AuthenticatedAccount account, Charac
     /// </summary>
     public bool GiveItems(IReadOnlyList<(uint ItemId, int AmountOrDuration)> items, bool refresh = true)
     {
-        var inv = Character.Inventory;
-        var bag = inv.Main;
-        var resolved = new List<(uint ItemId, uint Amount, long? DurationSeconds)>(items.Count);
-
-        foreach (var (itemId, value) in items)
-        {
-            var info = inv.FindInfo(itemId);
-            bool nonStackable = info is { MaxStack: <= 1 };
-            if (nonStackable)
-            {
-                if (value < Inventory.PermanentDuration) return false;
-                long? duration = value switch
-                {
-                    Inventory.PermanentDuration => Inventory.PermanentDuration,
-                    0 or 1 => null,
-                    _ => value,
-                };
-                resolved.Add((itemId, 1u, duration));
-            }
-            else
-            {
-                if (value <= 0) return false;
-                resolved.Add((itemId, (uint)value, null));
-            }
-        }
-
-        // Verifica espaço total necessário antes de mutar o inventário
-        int freeSlotsNeeded = 0;
-        foreach (var group in resolved.GroupBy(r => r.ItemId))
-        {
-            uint totalAmt = (uint)group.Sum(x => (long)x.Amount);
-            if (bag.Room(group.Key) < totalAmt) return false;
-            if (inv.FindInfo(group.Key) is { MaxStack: <= 1 })
-                freeSlotsNeeded += (int)totalAmt;
-        }
-        if (freeSlotsNeeded > bag.Capacity - bag.Items.Count()) return false;
+        var bag = Character.Inventory.Main;
+        if (!TryResolveItems(items, out var resolved)) return false;
+        if (!HasRoomForBatch(bag, resolved.Select(r => (r.ItemId, r.Amount)), isCard: false)) return false;
 
         var added = new List<InventoryItem>();
         foreach (var (itemId, amount, duration) in resolved)
@@ -146,12 +113,23 @@ public sealed class Player(Session session, AuthenticatedAccount account, Charac
     /// Entrega um card na aba <b>Cards</b> (uso em batalha), enviando <c>0xC8</c> (e <c>0xFC</c> se <paramref name="refresh"/>).
     /// Devolve <c>false</c> sem alterar o inventário se não houver espaço suficiente.
     /// </summary>
-    public bool GiveCard(uint itemId, uint amount = 1, bool refresh = true)
+    public bool GiveCard(uint cardId, uint amount = 1, bool refresh = true) =>
+        GiveCards([(cardId, amount)], refresh);
+
+    /// <summary>
+    /// Entrega um lote de cards na aba <b>Cards</b> (uso em batalha), enviando um único <c>0xC8</c>
+    /// (e <c>0xFC</c> se <paramref name="refresh"/>). Devolve <c>false</c> sem alterar nada se faltar espaço.
+    /// </summary>
+    public bool GiveCards(IReadOnlyList<(uint CardId, uint Amount)> cards, bool refresh = true)
     {
         var bag = Character.Inventory.Battle;
-        if (bag.Room(itemId) < amount) return false;
+        if (cards.Any(c => c.Amount == 0)) return false;
+        if (!HasRoomForBatch(bag, cards, isCard: true)) return false;
 
-        var added = bag.Add(itemId, amount);
+        var added = new List<InventoryItem>();
+        foreach (var (cardId, amount) in cards)
+            added.AddRange(bag.Add(cardId, amount));
+
         if (added.Count > 0) Send(new BattleItemReceivePacket(added));
         if (refresh) RefreshInventory();
         return true;
@@ -159,33 +137,32 @@ public sealed class Player(Session session, AuthenticatedAccount account, Charac
 
     /// <summary>
     /// Troca atômica na aba <b>Items</b>: remove <paramref name="takeAmount"/> de <paramref name="takeItemId"/> e
-    /// entrega <paramref name="giveItems"/>, fazendo rollback se faltar espaço. Envia <c>0xC9</c> (posições alteradas)
-    /// e <c>0xFC</c>. Opcionalmente executa <paramref name="beforeNotify"/> após a troca ser confirmada em memória
-    /// e antes de enviar <c>0xC9</c>/<c>0xFC</c>.
+    /// entrega <paramref name="giveItems"/> (aceitando o mesmo formato de <see cref="GiveItems"/>, incluindo
+    /// <c>-1</c> para permanente e duração arbitrária em segundos para não empilháveis). Faz rollback se faltar espaço.
+    /// Envia <c>0xC9</c> (posições alteradas) e <c>0xFC</c>. Opcionalmente executa <paramref name="beforeNotify"/>
+    /// após a troca ser confirmada em memória e antes de enviar <c>0xC9</c>/<c>0xFC</c>.
     /// </summary>
     public bool ExchangeItems(
         uint takeItemId,
         uint takeAmount,
-        IReadOnlyList<(uint ItemId, uint Amount)> giveItems,
+        IReadOnlyList<(uint ItemId, int AmountOrDuration)> giveItems,
         bool refresh = true,
         Action? beforeNotify = null)
     {
         var bag = Character.Inventory.Main;
         if (bag.Count(takeItemId) < takeAmount) return false;
+        if (!TryResolveItems(giveItems, out var resolved)) return false;
 
         var removed = bag.Remove(takeItemId, takeAmount);
-        var added = new List<InventoryItem>();
-        foreach (var (itemId, amount) in giveItems)
+        if (!HasRoomForBatch(bag, resolved.Select(r => (r.ItemId, r.Amount)), isCard: false))
         {
-            if (bag.Room(itemId) < amount)
-            {
-                foreach (var item in added)
-                    bag.Remove(item.ItemId, item.Amount);
-                bag.Add(takeItemId, takeAmount);
-                return false;
-            }
-            added.AddRange(bag.Add(itemId, amount));
+            bag.Add(takeItemId, takeAmount);
+            return false;
         }
+
+        var added = new List<InventoryItem>();
+        foreach (var (itemId, amount, duration) in resolved)
+            added.AddRange(bag.Add(itemId, amount, duration));
 
         beforeNotify?.Invoke();
 
@@ -194,6 +171,57 @@ public sealed class Player(Session session, AuthenticatedAccount account, Charac
         if (changed.Count > 0) Send(new ItemReceivePacket(changed));
         if (refresh) RefreshInventory();
         return true;
+    }
+
+    private bool TryResolveItems(
+        IReadOnlyList<(uint ItemId, int AmountOrDuration)> items,
+        out List<(uint ItemId, uint Amount, long? DurationSeconds)> resolved)
+    {
+        var inv = Character.Inventory;
+        resolved = new List<(uint ItemId, uint Amount, long? DurationSeconds)>(items.Count);
+
+        foreach (var (itemId, value) in items)
+        {
+            bool nonStackable = inv.FindInfo(itemId) is { MaxStack: <= 1 };
+            if (nonStackable)
+            {
+                if (value < Inventory.PermanentDuration) return false;
+                long? duration = value is 0 or 1 ? null : value;
+                resolved.Add((itemId, 1u, duration));
+            }
+            else
+            {
+                if (value <= 0) return false;
+                resolved.Add((itemId, (uint)value, null));
+            }
+        }
+        return true;
+    }
+
+    private bool HasRoomForBatch(Bag bag, IEnumerable<(uint Id, uint Amount)> entries, bool isCard)
+    {
+        var inv = Character.Inventory;
+        int freeSlots = bag.Capacity - bag.Items.Count();
+        int newSlotsNeeded = 0;
+
+        foreach (var group in entries.GroupBy(e => e.Id))
+        {
+            uint max = inv.MaxStackOf(group.Key, isCard);
+            long totalAmt = group.Sum(x => (long)x.Amount);
+            if (max <= 1)
+            {
+                newSlotsNeeded += (int)totalAmt;
+                continue;
+            }
+
+            long existingRoom = bag.Items
+                .Where(i => i.ItemId == group.Key)
+                .Sum(i => (long)(max - Math.Min(max, i.Amount)));
+            long overflow = Math.Max(0, totalAmt - existingRoom);
+            newSlotsNeeded += (int)((overflow + max - 1) / max);
+        }
+
+        return newSlotsNeeded <= freeSlots;
     }
 
     public override string ToString() => $"{Character.Name}({Account.Username})";
