@@ -55,6 +55,7 @@ public sealed class BattleSystem : IWorldSystem
         if (exclusive)
         {
             wild.State = WildState.InBattle;
+            wild.FaceBattleDiagonal(player.Character.X, player.Character.Y);
             zone.BroadcastNear(wild.X, wild.Y, new WildDigimonUpdatePacket(wild));
         }
         _log.LogDebug("{Player} começou {Battle} contra {Wild}", player, battle, wild.Leader.Name);

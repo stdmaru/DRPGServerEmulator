@@ -299,8 +299,10 @@ public class WildRoamingTests
         var world = TestSupport.NewWorld();
         var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
         var w = zone.WildDigimons.First();
+        Assert.Equal(Direction.South, w.Facing); // começa em direção cardeal (sem animação Dead no cliente)
         zone.Kill(w);
         Assert.Equal(8, w.StateCode);
+        Assert.True(w.Facing is Direction.NorthWest or Direction.SouthEast);
         var ticks = (int)Math.Ceiling(Zone.DeadDisplayTime / Zone.WildTickInterval);
         for (int i = 0; i < ticks; i++) zone.Update(world.Now + Zone.WildTickInterval * (i + 1), Zone.WildTickInterval);
         Assert.Equal(12, w.StateCode);
@@ -308,5 +310,28 @@ public class WildRoamingTests
         zone.Update(later, Zone.WildTickInterval);
         Assert.DoesNotContain(w, zone.WildDigimons);
         Assert.Contains(zone.WildDigimons, f => (f.HomeX, f.HomeY) == (w.HomeX, w.HomeY));
+    }
+
+    [Fact]
+    public void Wild_battle_facing_snaps_to_diagonal_3_or_7()
+    {
+        var world = TestSupport.NewWorld();
+        var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var w = zone.WildDigimons.First();
+
+        // Jogador à esquerda/noroeste -> NorthWest (3)
+        w.FaceBattleDiagonal((short)(w.X - 2), (short)(w.Y - 1));
+        Assert.Equal(Direction.NorthWest, w.Facing);
+
+        // Jogador à direita/sudeste -> SouthEast (7)
+        w.FaceBattleDiagonal((short)(w.X + 2), (short)(w.Y + 1));
+        Assert.Equal(Direction.SouthEast, w.Facing);
+
+        // Movimento cardeal (East) -> corrigido para diagonal em EnsureBattleDiagonal
+        w.StartMove((short)(w.X + 1), w.Y);
+        w.Arrive();
+        Assert.Equal(Direction.East, w.Facing);
+        w.EnsureBattleDiagonal();
+        Assert.True(w.Facing is Direction.NorthWest or Direction.SouthEast);
     }
 }

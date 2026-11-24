@@ -238,6 +238,7 @@ public sealed class Zone
     public void Kill(WildDigimon wild)
     {
         wild.State = WildState.Dead;
+        wild.EnsureBattleDiagonal();
         wild.DiedAt = _world.Now;
         BroadcastNear(wild.X, wild.Y, new WildDigimonUpdatePacket(wild));
     }

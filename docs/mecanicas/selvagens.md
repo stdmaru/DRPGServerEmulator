@@ -29,7 +29,7 @@ Dados: 592 grupos e 72 mil pacotes `0x11` nas sessões 53–58 (v322).
   3. no próximo, 1.
 - **Direção:** o sinal de (dx, dy): (0,+1)=0, (−,+)=1, (−,0)=2, (−,−)=3, (0,−)=4, (+,−)=5, (+,0)=6, (+,+)=7.
   Ela só muda no pacote de chegada (96 %).
-- **Batalha:** ✅ o grupo comum continua andando (a batalha é instanciada); só o grupo exclusivo fica em 11. Ver [batalha](batalha.md).
+- **Batalha:** ✅ o grupo comum continua andando (a batalha é instanciada); só o grupo exclusivo fica em 11 e vira para uma diagonal de batalha (`3` = `NorthWest` ou `7` = `SouthEast`, 3/3 amostras em `conn=145/179`), mantendo essa direção em `8` (Dead) e `12` (Gone) para exibir a animação correta no cliente. Ver [batalha](batalha.md).
 - **Derrota** (exclusivo): 8 por ~10,4 s, depois 12, e o serial some. Volta como grupo novo (serial novo). ❓ Só 2 amostras.
 - 98 % das posições dos selvagens são andáveis; o resto fica encostado em área andável.
 
