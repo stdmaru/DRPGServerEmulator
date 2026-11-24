@@ -22,29 +22,25 @@ public class EquipmentTests
     private static readonly ItemInfo Crest107 = new(107, "Crest of Courage +5 (for Beginners)")
     {
         Type = 1, SubType = 1, Level = 1, MaxStack = 1,
-        Description = "ATK +75 / DEF +40 / Battle Rating +350",
-        EquipmentBonus = ClientTables.ParseEquipmentBonus("ATK +75 / DEF +40 / Battle Rating +350"),
+        EquipmentBonus = new EquipmentBonus(BonusAtk: 75, BonusDef: 40, BonusBr: 350),
     };
 
     private static readonly ItemInfo Digimental215 = new(215, "Digimental of Miracles +5 (for Beginners)")
     {
         Type = 2, SubType = 1, Level = 1, MaxStack = 1,
-        Description = "STR +6 / AGI +6 / CON +6",
-        EquipmentBonus = ClientTables.ParseEquipmentBonus("STR +6 / AGI +6 / CON +6"),
+        EquipmentBonus = new EquipmentBonus(Attributes: new Attributes(6, 6, 6, 0)),
     };
 
     private static readonly ItemInfo Dark442 = new(442, "Rookie's D-ark")
     {
         Type = 9, SubType = 1, Level = 1, MaxStack = 1,
-        Description = "Card Slash 23 times",
-        EquipmentBonus = ClientTables.ParseEquipmentBonus("Card Slash 23 times"),
+        EquipmentBonus = new EquipmentBonus(CardSlashLimit: 23),
     };
 
     private static readonly ItemInfo HighLevelRing = new(668, "Ring of Hope +1")
     {
         Type = 25, SubType = 1, Level = 30, MaxStack = 1,
-        Description = "STR +5",
-        EquipmentBonus = ClientTables.ParseEquipmentBonus("STR +5"),
+        EquipmentBonus = new EquipmentBonus(Attributes: new Attributes(5, 0, 0, 0)),
     };
 
     private static readonly ItemInfo Bread25 = new(25, "Bread")
@@ -55,8 +51,7 @@ public class EquipmentTests
     private static readonly ItemInfo Watch23552 = new(23552, "Smart Watch [30 Days]")
     {
         Type = 45, SubType = 6, Level = 1, MaxStack = 1,
-        Description = "ATK +25 / VP +200 / Battle Rating +100 / DEF +3%",
-        EquipmentBonus = ClientTables.ParseEquipmentBonus("ATK +25 / VP +200 / Battle Rating +100 / DEF +3%"),
+        EquipmentBonus = new EquipmentBonus(BonusAtk: 25, BonusVp: 200, BonusBr: 100, BonusDefPercent: 3),
     };
 
     private static readonly Dictionary<uint, ItemInfo> TestItems = new()
@@ -100,33 +95,27 @@ public class EquipmentTests
     }
 
     [Fact]
-    public void ParseEquipmentBonus_extracts_all_bonus_types()
+    public void EquipmentEffects_xml_loads_all_structured_bonuses_and_auras()
     {
-        var crest = ClientTables.ParseEquipmentBonus("ATK +75 / DEF +40 / Battle Rating +350");
-        Assert.Equal(75, crest.BonusAtk);
-        Assert.Equal(40, crest.BonusDef);
-        Assert.Equal(350, crest.BonusBr);
+        var path = Path.Combine(AppContext.BaseDirectory, "Resources", "Item", "EquipmentEffects.xml");
+        var effects = GameDataLoader.LoadEquipmentEffects(path);
+        Assert.True(effects.Count > 9000);
 
-        var egg = ClientTables.ParseEquipmentBonus("STR +6 / AGI +6 / CON +6");
-        Assert.Equal(new Attributes(6, 6, 6, 0), egg.Attributes);
-
-        var watch = ClientTables.ParseEquipmentBonus("ATK +25 / VP +200 / Battle Rating +100 / DEF +3%");
-        Assert.Equal(25, watch.BonusAtk);
-        Assert.Equal(200, watch.BonusVp);
-        Assert.Equal(100, watch.BonusBr);
-        Assert.Equal(3, watch.BonusDefPercent);
-
-        var dark = ClientTables.ParseEquipmentBonus("Card Slash 23 times");
-        Assert.Equal(23, dark.CardSlashLimit);
-
-        var socks = ClientTables.ParseEquipmentBonus("Digimon EXP +100% / Tamer EXP +5");
-        Assert.Equal(100, socks.DigimonExpPercent);
-        Assert.Equal(5, socks.TamerExpFlat);
-
-        var aura = ClientTables.ParseEquipmentBonus("HP Recovery Amount 10 / VP Recovery Amount 8 / EVP Recovery Amount 15");
-        Assert.Equal(10, aura.HpRecovery);
-        Assert.Equal(8, aura.VpRecovery);
-        Assert.Equal(15, aura.EvpRecovery);
+        // Crest #107
+        Assert.Equal((75, 40, 350), (effects[107].BonusAtk, effects[107].BonusDef, effects[107].BonusBr));
+        // Digimental #215
+        Assert.Equal(new Attributes(6, 6, 6, 0), effects[215].Attributes);
+        // Rookie's D-ark #442
+        Assert.Equal(23, effects[442].CardSlashLimit);
+        // Aura of High-Velocity #529
+        Assert.Equal((1, 8, 15), (effects[529].AutoSummonPartners, effects[529].VpRecovery, effects[529].EvpRecovery));
+        // Aura of Evolution #555
+        Assert.True(effects[555].MaintainEvolution);
+        // Aura T of Deva #718
+        Assert.True(effects[718].MaintainEvolution);
+        Assert.Equal((8, 13), (effects[718].HpRecovery, effects[718].EvpRecovery));
+        // Smart Watch #23552
+        Assert.Equal((25, 200, 100, 3), (effects[23552].BonusAtk, effects[23552].BonusVp, effects[23552].BonusBr, effects[23552].BonusDefPercent));
     }
 
     /// <summary>
@@ -313,46 +302,12 @@ public class EquipmentTests
     }
 
     [Fact]
-    public void ParseEquipmentBonus_extracts_auras_and_combat_modifiers()
-    {
-        var deva = ClientTables.ParseEquipmentBonus(
-            "An aura that maintains the Digimon's current Evolution Stage. / It is maintained even when entering battle. / HP Recovery Amount 8 / EVP Recovery Amount 13");
-        Assert.True(deva.MaintainEvolution);
-        Assert.Equal(8, deva.HpRecovery);
-        Assert.Equal(13, deva.EvpRecovery);
-
-        // Aura of Evolution (#555) tem col 28 vazia
-        var evo555 = ClientTables.ParseEquipmentBonus("", "", itemId: 555);
-        Assert.True(evo555.MaintainEvolution);
-
-        // Aura of High-Velocity (#529): texto de auto-summon nas colunas 4..12
-        var highVel = ClientTables.ParseEquipmentBonus(
-            "VP Recovery Amount 8 / EVP Recovery Amount 15",
-            "At the start of battle, an aura that summons the leader and Partner Digimon at the same time.",
-            itemId: 529);
-        Assert.Equal(1, highVel.AutoSummonPartners);
-        Assert.Equal(8, highVel.VpRecovery);
-        Assert.Equal(15, highVel.EvpRecovery);
-
-        var combat = ClientTables.ParseEquipmentBonus(
-            "Damage +5% / Single Skill Damage +20% / Multi Skill Damage +15% / Melee Skill Damage +10% / Ranged Skill Damage +12% / Extra Card Slash 3 Times / Recover 30 HP, when attacking. / Recover 15 VP, when attacking.");
-        Assert.Equal(5, combat.BonusDamagePercent);
-        Assert.Equal(20, combat.SingleSkillDamagePercent);
-        Assert.Equal(15, combat.MultiSkillDamagePercent);
-        Assert.Equal(10, combat.MeleeSkillDamagePercent);
-        Assert.Equal(12, combat.RangedSkillDamagePercent);
-        Assert.Equal(3, combat.ExtraCardSlashes);
-        Assert.Equal(30, combat.OnHitHealHp);
-        Assert.Equal(15, combat.OnHitHealVp);
-    }
-
-    [Fact]
     public void Aura_recovery_bonus_applies_to_zone_auto_recovery_tick()
     {
         var auraDeva = new ItemInfo(718, "Aura T of Deva")
         {
             Type = 27, SubType = 2, Level = 1, MaxStack = 1,
-            EquipmentBonus = ClientTables.ParseEquipmentBonus("HP Recovery Amount 8 / VP Recovery Amount 4 / EVP Recovery Amount 13"),
+            EquipmentBonus = new EquipmentBonus(HpRecovery: 8, VpRecovery: 4, EvpRecovery: 13),
         };
         var items = new Dictionary<uint, ItemInfo>(TestItems) { [718] = auraDeva };
         var inv = new Inventory(id => items.GetValueOrDefault(id), 99);
@@ -386,8 +341,7 @@ public class EquipmentTests
         var auraDeva = new ItemInfo(718, "Aura T of Deva")
         {
             Type = 27, SubType = 2, Level = 1, MaxStack = 1,
-            EquipmentBonus = ClientTables.ParseEquipmentBonus(
-                "An aura that maintains the Digimon's current Evolution Stage. / It is maintained even when entering battle."),
+            EquipmentBonus = new EquipmentBonus(MaintainEvolution: true),
         };
         var items = new Dictionary<uint, ItemInfo>(TestItems) { [718] = auraDeva };
         var inv = new Inventory(id => items.GetValueOrDefault(id), 99);
@@ -432,10 +386,7 @@ public class EquipmentTests
         var highVel = new ItemInfo(529, "Aura of High-Velocity")
         {
             Type = 8, SubType = 3, Level = 1, MaxStack = 1,
-            EquipmentBonus = ClientTables.ParseEquipmentBonus(
-                "VP Recovery Amount 8 / EVP Recovery Amount 15",
-                "At the start of battle, an aura that summons the leader and Partner Digimon at the same time.",
-                itemId: 529),
+            EquipmentBonus = new EquipmentBonus(VpRecovery: 8, EvpRecovery: 15, AutoSummonPartners: 1),
         };
         var items = new Dictionary<uint, ItemInfo>(TestItems) { [529] = highVel };
         var inv = new Inventory(id => items.GetValueOrDefault(id), 99);
