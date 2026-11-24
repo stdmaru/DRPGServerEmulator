@@ -276,8 +276,7 @@ public class TutorialTests
         _session.DrainOutgoing();
 
         var payload = new byte[38];
-        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), (ushort)BagKind.Inventory);
-        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(10), 1);
+        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), 1); // bagType 1 = Main Inventory
         new InventorySortHandler().Handle(_session, new PacketReader(payload));
 
         Assert.Equal([(ushort)0xFC], _session.SentOpcodes());
@@ -292,6 +291,18 @@ public class TutorialTests
         Assert.Null(bag[4]);
         Assert.Null(bag[10]);
         Assert.Null(bag[20]);
+
+        // bagType 2 = Battle Bag (não mexe no inventário principal)
+        inv.Battle.Place(inv.Create(74, slot: 8, amount: 3));
+        inv.Battle.Place(inv.Create(74, slot: 15, amount: 4));
+        BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), 2);
+        new InventorySortHandler().Handle(_session, new PacketReader(payload));
+
+        Assert.Equal([(ushort)0xFC], _session.SentOpcodes());
+        Assert.Equal(74u, inv.Battle[0]!.ItemId);
+        Assert.Equal(7u, inv.Battle[0]!.Amount);
+        Assert.Null(inv.Battle[8]);
+        Assert.Null(inv.Battle[15]);
     }
 
     // ---------- NPCs ----------
