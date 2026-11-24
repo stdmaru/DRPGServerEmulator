@@ -29,9 +29,14 @@
   - Offsets **`784..1239`** = exatamente **`6 × 76 = 456 bytes`** (logo antes dos 5 blocos de status do time em `1240`!).
   - Confirmado em `conn=428` (`pid=339542`): `slot 0` em `784` (`Golden Drill X`, `uid=0x1B55`, `qty=50`), `slot 1` em `860` (`Recovery Floppy L`, `uid=0x2286`, `qty=2`).
 - Os 24 slots da mochila de Cards ficam nos primeiros `24 × 76` bytes de `S2C 0x03` (`InventoryDataPacket`) e `S2C 0xFC` (`InventoryRefreshPacket`).
-- **Movimentação / Empilhamento de Cards (`C2S/S2C 0x90`):**
-  - `C2S 0x90` (186 B) → `S2C 0x90` (172 B), paralelo ao `0x91` da aba Items.
-  - ❓ Falta capturar 1 movimento **da mochila de Cards (24 slots) ↔ 6 Card Slots equipados** para confirmar os códigos exatos de `place` (`from`/`to`) no cabeçalho do `0x90`.
+- **Movimentação / Equipar / Desequipar / Coleta de Cards (`C2S/S2C 0x90`) ✅:**
+  - `C2S 0x90` (186 B) → `S2C 0x90` (172 B = `20 B` cabeçalho + `76 B` `rec1` + `76 B` `rec2`), paralelo ao `0x91` da aba Items (`ItemMoveHeader` com registros de 76 bytes):
+    - `+0` (`u8` `fromPlace`), `+1` (`u8` `toPlace`), `+2..3` (`u16` 0):
+      - `1` = Chão (coleta de card dropado; `+4/+8` = `X/Y`)
+      - `2` = **6 Card Slots equipados** (`row = 0`, `col = 0..5`)
+      - `3` = **Mochila de Cards** (24 slots: `row = 0..3`, `col = 0..5`)
+    - `+4` (`i32` `fromRow`), `+8` (`i32` `fromCol`), `+12` (`i32` `toRow`), `+16` (`i32` `toCol`).
+    - Confirmado em `conn=437, 442, 446`: `3→2` (equipar), `2→3` (desequipar), `2→2` (mover entre os 6 slots), `3→3` (mover na mochila) e `1→3` (coletar do chão).
 
 ### 1.3 Equipar / Desequipar nos 3 Slots de Batalha (`0xA0` / `0xA1`) ✅
 - Durante a batalha, o jogador equipa até **3 cards** (`slot = 0, 1, 2`) a partir dos 6 Card Slots equipados.
@@ -48,7 +53,9 @@ Na entrada de 136 bytes de quem ativa cards em `S2C 0x67` (`ActionResultsPacket`
 - `+40`, `+44`, `+48` (`u32 × 3`): **CardId** ativado nos slots `0`, `1`, `2` (`0` se vazio)
 - `+52`, `+56`, `+60` (`u32 × 3`): **quantidade restante** nos slots `0`, `1`, `2` após consumir 1 unidade
 - Quando a quantidade chega a `0`, o card é consumido do slot de batalha e do Card Slot equipado do inventário; no turno seguinte aquele slot volta a `0`.
-- ❓ **Cards de Defesa (`TriggerTiming = 2`):** ainda precisamos de **1 captura** usando um card de defesa (ex.: `Defense Plug-In C` #5) para confirmar se `+40..+63` vão preenchidos na entrada do **defensor** (slots `5..9` do `0x67`) quando o inimigo ataca.
+- **Cards de Defesa (`TriggerTiming = 2`) ✅ (`conn=446`, `pid=371167` / `371258`):**
+  - Quando o inimigo ataca (`side = 1`), apenas os slots equipados com cards de **Defesa (`col 23 == 2`)** são ativados e gravados na entrada do **defensor** (slots `5..9` do `0x67`), preservando exatamente o índice do slot (`+40/+52` para slot 0, `+44/+56` para slot 1, `+48/+60` para slot 2) — mesmo se o ataque inimigo errar (`h = 3`), o card de defesa é consumido.
+  - Quando o jogador ataca (`side = 2`), apenas os slots com cards de **Ataque (`col 23 == 1`)** são ativados e gravados na entrada do **atacante** (`s0..s4`), também preservando o índice do slot (ex.: slot 1 vai em `+44/+56` com `+40/+52` zerados).
 
 ### 1.5 Limite de 20 Card Slash por Batalha
 - Cada batalha começa com **20 Card Slash** disponíveis por jogador.
@@ -115,14 +122,14 @@ Em vez de um `switch` gigante em `Battle.cs`, usar uma estrutura modular dedicad
 
 | Fase | Escopo | Pré-requisito de captura |
 |---|---|---|
-| **Fase 1** | `CardInfo` (`card_info_us.dat`), `CardRecord` (76 B), 6 `CardSlots` no `Inventory` + `0x02` (`784..1239`) + persistência + `0x90` (mover/equipar cards) | 1 captura de equipar/desequipar card entre a aba Cards e os 6 Card Slots (`0x90`) |
-| **Fase 2** | Slots `0..2` em batalha (`0xA0`/`0xA1`), contador de `20` Card Slash por batalha, consumo de quantidade e escrita dos offsets `40..63` no `0x67` | Já 100 % capturado (`conn=428`, `conn=433`) ✅ |
-| **Fase 3** | `CardEffectRegistry`: efeitos de **Ataque** (HP/VP/EVP, AoE, % dano, atributo) e **Defesa** (DEF/redução de dano/reflexão) | 1 captura de card de **Defesa** (`Trigger = 2`, ex.: `Defense Plug-In C` #5) para confirmar offsets do defensor no `0x67` |
+| **Fase 1** | `CardInfo` (`card_info_us.dat`), `CardRecord` (76 B), 6 `CardSlots` no `Inventory` + `0x02` (`784..1239`) + persistência + `0x90` (mover/equipar/desequipar/coletar cards) | 100 % capturado (`conn=437, 442, 446`) ✅ |
+| **Fase 2** | Slots `0..2` em batalha (`0xA0`/`0xA1`), contador de `20` Card Slash por batalha, consumo de quantidade e escrita dos offsets `40..63` no `0x67` (atacante e defensor) | 100 % capturado (`conn=428, 433, 446`) ✅ |
+| **Fase 3** | `CardEffectRegistry`: efeitos de **Ataque** (`col 23 == 1`: HP/VP/EVP, AoE, % dano, atributo) e **Defesa** (`col 23 == 2`: DEF/redução de dano/reflexão) | 100 % capturado (`conn=428, 446`) ✅ |
 | **Fase 4** | Testes unitários completos (`CardSlashTests.cs`) + sincronia da documentação em `docs/mecanicas/batalha.md` e `docs/protocolo/structs/inventario.md` | — |
 
 ---
 
 ## 4. Checklist de Validação antes de começar a Fase 1
-- [ ] Revisar e aprovar este plano.
-- [ ] Capturar 1 movimentação de card da aba Cards ↔ um dos 6 Card Slots (`C2S/S2C 0x90`).
-- [ ] Capturar 1 ativação de card de **Defesa** (`col 23 == 2`, ex.: `Defense Plug-In C` #5) em batalha para validar os offsets do defensor no `0x67`.
+- [x] Capturar movimentação de card da aba Cards ↔ 6 Card Slots (`C2S/S2C 0x90`) — ✅ `conn=437, 442, 446`.
+- [x] Capturar ativação de card de **Defesa** (`col 23 == 2`, `Defense Plug-In C` #5) em batalha — ✅ `conn=446`.
+- [ ] Revisar e aprovar este plano para iniciar a Fase 1.
