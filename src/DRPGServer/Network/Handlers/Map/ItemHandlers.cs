@@ -192,3 +192,43 @@ public sealed class ItemUseHandler(Taming taming, GameWorld world) : PlayerHandl
         }
     }
 }
+
+/// <summary>
+/// 0x85 (C2S 138): ✅ teleporte imediato no mesmo mapa usando item 900 (Teleport) ou 907 (Teleport X).
+/// Layout: i32 X, i32 Y, u32 place (3), ItemRecord (108 B), 18 zeros (conn=125/234/469).
+/// Resposta oficial: 0x10 (broadcast na zona) → 0x85 (124 B) → 0xC9 (604 B com quantidade atualizada).
+/// </summary>
+[PacketHandler(MapOpcode.ItemTeleport)]
+public sealed class ItemTeleportHandler(GameWorld world) : PlayerHandler
+{
+    public const uint TeleportItemId = 900;
+    public const uint TeleportXItemId = 907;
+
+    protected override void Handle(Player player, PacketReader packet)
+    {
+        int targetX = packet.ReadI32();
+        int targetY = packet.ReadI32();
+        uint place = packet.ReadU32();
+        uint uid = packet.ReadU32();
+        uint itemId = packet.ReadU32();
+
+        if (player.InBattle || player.Zone is not { } zone) return;
+        if (place != (uint)ItemPlace.Inventory) return;
+        if (itemId is not (TeleportItemId or TeleportXItemId)) return;
+        if (targetX < short.MinValue || targetX > short.MaxValue || targetY < short.MinValue || targetY > short.MaxValue) return;
+        if (zone.Grid is { } grid && !grid.IsWalkable(targetX, targetY)) return;
+
+        var bag = player.Character.Inventory.Main;
+        if (bag.FindByUid(uid) is not { } item || item.ItemId != itemId || item.Amount == 0) return;
+
+        player.Character.X = (short)targetX;
+        player.Character.Y = (short)targetY;
+        player.LastMoveAt = world.Now;
+
+        zone.Broadcast(new RefreshCharacterInfoPacket(player.Character));
+        player.Send(new ItemTeleportPacket(targetX, targetY, item));
+        bag.Consume(item, 1);
+        player.RequestImmediateSave();
+        player.Send(new ItemReceivePacket(item));
+    }
+}

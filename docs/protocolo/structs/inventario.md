@@ -40,6 +40,7 @@ Cabeçalho comum de 20 bytes: `u8 origem`, `u8 destino` (1 chão, 3 inventário,
 | `0xC9` receber | — | 604 | `u32 n` (≤ 5) + n × (`u32 3`, `u32 linha`, `u32 coluna`, registro 108) com o estado novo da posição (posição esvaziada = registro zerado) |
 | `0xC8` receber na bolsa de 76 | — | 444 | como o `0xC9`, com registros de 76 (Woodmon's Leaf × 50 no fim do tutorial, uid 0) |
 | `0xFC` | — | 4424 | `f64 bits` + as duas bolsas como no `0x03`. ✅ Sempre depois de um `0xC9`/`0xC8` |
+| `0x85` teleporte | 138 | 124 | ✅ teleporte no mesmo mapa via item `900` (*Teleport*) ou `907` (*Teleport X*, `conn=125/234/469`): `i32 X`, `i32 Y`, `u32 3`, registro (108 B). Servidor responde `0x10` (broadcast) → `0x85` (124 B) → `0xC9` (604 B com quantidade atualizada). |
 
 O C2S tem sempre 14 bytes a mais que o S2C correspondente (zeros no fim).
 
