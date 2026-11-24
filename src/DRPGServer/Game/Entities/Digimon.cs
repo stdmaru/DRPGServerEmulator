@@ -54,7 +54,7 @@ public sealed class Digimon
     public bool IsWild => WildStats is not null;
     /// <summary>✅ Grau do selvagem (2 = Beginner, 3 = Veteran — byte 300 do bloco de status); 0 no digimon do jogador.</summary>
     public byte WildGrade { get; init; }
-    public Serial Serial { get; } = Serial.New();
+    public Serial Serial { get; init; } = Serial.New();
     public string Name { get; set; }
     public ushort Level { get; private set; }
     public long Exp { get; private set; }

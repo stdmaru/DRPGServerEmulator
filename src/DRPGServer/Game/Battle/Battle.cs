@@ -59,6 +59,8 @@ public sealed class Battle
     public static readonly TimeSpan OpeningDelay = TimeSpan.FromMilliseconds(540);
     /// <summary>✅ Atraso após S2C 0x69 na retomada pós-animação antes da barra voltar a subir (mediana 196 ms em 272 turnos).</summary>
     public static readonly TimeSpan ResumeDelay = TimeSpan.FromMilliseconds(200);
+    /// <summary>✅ Selvagens usam skills em ~31 % dos turnos nas capturas v322 (22 de 70 ações) quando têm VP.</summary>
+    public const double WildSkillChance = 0.30;
     public const int MaxPerSide = 5;
 
     private enum Phase { Opening, Running, Animating, Over }
@@ -165,7 +167,8 @@ public sealed class Battle
         {
             var targets = _teamA.Where(c => !c.Digimon.IsKnockedOut).ToList();
             if (targets.Count == 0) return;
-            Attack(actor, targets[_system.Random.Next(targets.Count)], null);
+            var primary = targets[_system.Random.Next(targets.Count)];
+            Attack(actor, primary, ChooseWildSkillSlot(actor.Digimon));
             return;
         }
 
@@ -218,30 +221,87 @@ public sealed class Battle
     {
         Broadcast(new LockActionBarPacket());
         var digimon = actor.Digimon;
-        Hit hit;
-        ushort skillId = 0;
-        if (skillSlot is { } slot && digimon.SkillInfoOf(slot) is { } skill && digimon.SpendVp(skill.VpCost))
+        Data.GameData.SkillInfo? skill = null;
+        int skillLevel = 0;
+        if (skillSlot is { } slot
+            && digimon.Current.SkillLevels[slot] >= 1
+            && digimon.SkillInfoOf(slot) is { } candidate
+            && digimon.SpendVp(candidate.VpCost))
         {
-            skillId = skill.Id;
-            hit = BattleFormulas.Skill(digimon, target.Digimon, skill, digimon.Current.SkillLevels[slot], _system.Random);
+            skill = candidate;
+            skillLevel = digimon.Current.SkillLevels[slot];
         }
-        else
+
+        var (acting, other) = actor.Side == BattleSide.A ? (_teamA, _teamB) : (_teamB, _teamA);
+        var targets = SelectTargets(target, other, skill?.TargetCount ?? 1);
+        var hits = new Dictionary<Combatant, bool>(targets.Count);
+
+        foreach (var victim in targets)
         {
-            hit = BattleFormulas.Attack(digimon, target.Digimon, _system.Random);
+            Hit hit = skill is not null
+                ? BattleFormulas.Skill(digimon, victim.Digimon, skill, skillLevel, _system.Random)
+                : BattleFormulas.Attack(digimon, victim.Digimon, _system.Random);
+            hits[victim] = hit.Landed;
+            victim.Digimon.TakeDamage(hit.Damage);
         }
-        target.Digimon.TakeDamage(hit.Damage);
+
         actor.Actions++;
         actor.Gauge = 0;
 
-        if (target.Digimon.IsKnockedOut && actor.Owner is { } owner && target.Wild is { } member)
-            _system.GrantRewards(owner, actor, _teamA.Where(c => c.Owner == owner && !c.Digimon.IsKnockedOut).ToList(), member);
+        // ✅ AoE pode derrubar vários inimigos no mesmo golpe: envia um 0x6E por inimigo derrotado antes do 0x67
+        if (actor.Owner is { } owner)
+        {
+            var standing = _teamA.Where(c => c.Owner == owner && !c.Digimon.IsKnockedOut).ToList();
+            foreach (var victim in targets)
+                if (victim.Digimon.IsKnockedOut && victim.Wild is { } member)
+                    _system.GrantRewards(owner, actor, standing, member);
+        }
 
-        var (acting, other) = actor.Side == BattleSide.A ? (_teamA, _teamB) : (_teamB, _teamA);
-        Broadcast(new ActionResultsPacket(acting, other, actor, target, hit.Landed, skillId));
+        byte attackType = skill?.Type ?? Data.GameData.SkillInfo.TypeMelee;
+        ushort skillId = skill?.Id ?? 0;
+        Broadcast(new ActionResultsPacket(acting, other, actor, hits, attackType, skillId));
 
         if (_teamB.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Win);
         else if (_teamA.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Lose);
         else _phase = Phase.Animating;
+    }
+
+    /// <summary>
+    /// Seleciona os alvos vivos de um golpe até <paramref name="maxTargets"/>: o alvo principal sempre entra primeiro
+    /// e, em skills multi-alvo (2 ou 5), completa com os demais vivos do time adversário.
+    /// </summary>
+    private static List<Combatant> SelectTargets(Combatant primary, IReadOnlyList<Combatant> enemyTeam, int maxTargets)
+    {
+        var list = new List<Combatant>(Math.Min(maxTargets, enemyTeam.Count));
+        if (!primary.Digimon.IsKnockedOut)
+            list.Add(primary);
+        if (list.Count >= maxTargets)
+            return list;
+
+        foreach (var candidate in enemyTeam)
+        {
+            if (candidate == primary || candidate.Digimon.IsKnockedOut) continue;
+            list.Add(candidate);
+            if (list.Count >= maxTargets) break;
+        }
+        return list;
+    }
+
+    private int? ChooseWildSkillSlot(Digimon digimon)
+    {
+        if (_system.Random.NextDouble() >= WildSkillChance) return null;
+        int? first = null;
+        int? second = null;
+        for (int slot = 0; slot < DigimonForm.SkillSlots; slot++)
+        {
+            if (digimon.Current.SkillLevels[slot] < 1) continue;
+            if (digimon.SkillInfoOf(slot) is not { } skill || digimon.Vp < skill.VpCost) continue;
+            if (first is null) first = slot;
+            else second = slot;
+        }
+        if (first is null) return null;
+        if (second is null) return first;
+        return _system.Random.Next(2) == 0 ? first : second;
     }
 
     public int CaptureAttempts(Player player) => _captureAttempts.GetValueOrDefault(player);
@@ -251,8 +311,10 @@ public sealed class Battle
         && CaptureAttempts(owner) < World.Taming.AttemptsPerBattle && World.Taming.CanBattleCapture(owner.Character, target.Digimon);
 
     /// <summary>
-    /// ✅ Captura comum (sessão 56): 0x68 → 0xB3 → 0x35 3, depois a animação (0x69). ❓ No sucesso o selvagem sai da
-    /// batalha sem recompensa, o digimon novo vai para o time (0xEF) e a batalha acaba se não sobrar inimigo.
+    /// ✅ Captura comum (DigimonRPG.bin @ 0x00AF9A30 / 0x00AF9B37): 0x68 → 0xB3 → 0x35 3, depois a animação (0x69).
+    /// No sucesso (result = 1), o bloco de 696 bytes em 0xB3+24 DEVE manter o serial do alvo (target.Digimon.Serial):
+    /// o cliente procura o inimigo na batalha pelo serial em +28 (0x00AF9B7F), toca a animação de sucesso, faz o
+    /// inimigo sumir ([esi+0x210] = 8) e adiciona o digimon ao time via 0xB5A7D0 — sem precisar de 0xEF.
     /// </summary>
     private void Capture(Combatant actor, Combatant target)
     {
@@ -262,13 +324,13 @@ public sealed class Battle
         actor.Actions++;
         Broadcast(new LockActionBarPacket());
         Digimon? captured = _system.Random.NextDouble() < _system.Taming.BattleChance
-            ? _system.Taming.Tame(owner.Character, target.Digimon.Species) : null;
+            ? _system.Taming.Tame(owner.Character, target.Digimon.Species, target.Digimon.Serial) : null;
         Broadcast(new BattleCapturePacket(captured is not null, owner.Character.Serial, actor, target, captured));
         Broadcast(new ActionRequestPacket(BattleAction.Executed, BattleIcon.None, actor.Digimon.Serial, Serial.Empty));
         if (captured is not null)
         {
+            owner.RequestImmediateSave();
             target.Digimon.TakeDamage(target.Digimon.Hp);
-            owner.Send(new DigimonReceivedPacket(captured));
             if (_teamB.All(c => c.Digimon.IsKnockedOut))
             {
                 End(BattleResult.Win);

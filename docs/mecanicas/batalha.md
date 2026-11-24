@@ -46,9 +46,9 @@ Dados: 67 batalhas v322 em `captures.db` (sessões 53, 54, 56 e 58; 362 golpes, 
 | 0 | 16 B | serial |
 | 16 | i32 ×3 | HP, VP, EVP depois do golpe |
 | 28 | i32 | barra de ação |
-| 36 | u8 | 1 = quem age |
-| 37 | u8 | alvo: **1 acertou, 3 errou** (dano 0) |
-| 64, 68, 80 | | ❓ só com skill (1078 do L160, multi-alvo) |
+| 36 | u8 | quem age: **1** ataque básico/skill corpo-a-corpo (`Type = 1`), **2** skill à distância (`Type = 2`, `DigimonRPG.bin @ 0x00AF552B`) |
+| 37 | u8 | alvo: **1 acertou, 3 errou** (dano 0); em skills multi-alvo, preenchido independentemente para cada alvo vivo atingido |
+| 64, 68, 80 | i32 | triggers de efeitos/passivas (`DigimonRPG.bin @ 0x00AF6350`) |
 | 134 | u16 | ações feitas na batalha |
 
 ## ✅ Dano do ataque básico
@@ -89,7 +89,11 @@ Dados: 67 batalhas v322 em `captures.db` (sessões 53, 54, 56 e 58; 362 golpes, 
 - O emulador para a recuperação na batalha e agenda a próxima para 0,2 s depois do fim.
 
 ## ✅ Skills, invocação e recompensas (sessão 56)
-- Skill: ícones `0x0B`/`0x0C` no `0x35`, só aprendida e com VP para o custo (20 + nível exigido); o id vai no fim do `0x67`. ❓ Multiplicador ajustado `1 + 0,0075·(nível exigido + 4) + 0,01·(nível − 1)` em 4 medidas.
+- Skill (`digimon_skill_us.dat`): ícones `0x0B`/`0x0C` no `0x35`, só aprendida e com VP para o custo (`20 + nível exigido`); o id vai no fim do `0x67`.
+  - **Coluna 4 (`Type`):** `1` corpo-a-corpo (offset 36 = `1`), `2` à distância (offset 36 = `2`, ex.: `701` *Lullaby Bubble*, `1078` *Sun of Sorrows*).
+  - **Coluna 5 (`TargetCount`):** `1` alvo único (695 skills), `2` dois alvos (13 skills, ex.: `9` *Double Fire*), `5` área / todos os inimigos vivos (353 skills, ex.: `1078` *Sun of Sorrows*). Em skills multi-alvo, cada alvo vivo rola acerto/dano independentemente e cada inimigo derrubado gera seu próprio `0x6E` antes do `0x67`; inimigos já nocauteados ficam com `offset 37 = 0`.
+  - **Selvagens:** usam skills aprendidas em ~31 % dos turnos (22 de 70 ações capturadas, ex.: Otamamon com `701`/`702`) quando têm VP.
+  - ❓ Multiplicador ajustado `1 + 0,0075·(nível exigido + 4) + 0,01·(nível − 1)` em 4 medidas.
 - Captura comum: `0x35` ícone 1 (alvo = selvagem) → `0x68` → `0xB3` → `0x35` 3, até 3 por batalha. Ver [captura](captura.md).
 - Invocação: `0x35` ícone 2 (alvo = serial do digimon do time) → `0x35` 1; com a barra cheia `0x68` → `0x64` (720: `u8 2`, `u8 posição`, `u16 0`, `u32 0`, bloco, 16 zeros) → `0x35` 3. Entra com a barra zerada.
 - Inimigo derrubado: cada digimon do jogador que está de pé ganha a **EXP inteira** (um `0x6E` por digimon, quem derrubou primeiro); os **bits vêm uma vez**, no `0x6E` de quem derrubou.

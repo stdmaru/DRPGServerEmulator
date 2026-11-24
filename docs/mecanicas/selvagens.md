@@ -18,7 +18,7 @@ Dados: 592 grupos e 72 mil pacotes `0x11` nas sessões 53–58 (v322).
 | 52 | i16, i16 | destino (igual à posição quando parado) |
 
 ## Comportamento oficial
-- **Tick:** o servidor manda o 0x11 de **todos** os selvagens a cada ~**344 ms**, parados ou não.
+- **Tick e visibilidade (AOI):** ✅ o servidor manda o `0x11` a cada ~**344 ms** (parados ou não) apenas para os selvagens dentro da janela de visão do jogador: **`|dx| ≤ 12` e `|dy| ≤ 23`** (~100 mil amostras com jogador parado em `captures.db`, grade isométrica onde X vale o dobro de Y na tela). Quando o jogador se afasta, o servidor simplesmente para de enviar o `0x11` (não envia estado `12`, que só ocorre quando um grupo exclusivo morre).
 - **Casa:** cada grupo tem um ponto fixo e anda só numa caixa de **7 × 7** em volta dele (casa ± 3). As sessões 53 e
   54 mostram as mesmas casas no mapa 79.
 - **Andar:** parado, a cada tick há ~**5 %** de chance de começar (3276 de 65 462 ticks), ou ~6,9 s em média
@@ -34,7 +34,7 @@ Dados: 592 grupos e 72 mil pacotes `0x11` nas sessões 53–58 (v322).
 - 98 % das posições dos selvagens são andáveis; o resto fica encostado em área andável.
 
 ## Emulador (`Game/World/Zone.cs`, `Game/Entities/WildDigimon.cs`)
-- Tick de 344 ms, chance de 5 %, destino sorteado na caixa da casa **e andável** (até 8 tentativas).
+- Tick de 344 ms com filtro de proximidade (`Zone.WildViewRangeX = 12`, `Zone.WildViewRangeY = 24`) via `Zone.BroadcastNear`, chance de 5 %, destino sorteado na caixa da casa **e andável** (até 8 tentativas).
 - Casa: `<Point>` no `DigimonSpawns.xml` (capturado) ou célula andável sorteada no retângulo.
 - Grupo comum não sai do mapa na batalha; `Exclusive="true"` no `<Spawn>`: 11 na batalha e, se derrotado, 8 por 10,4 s, 12, e um grupo novo na mesma casa depois do `RespawnTime`.
 
@@ -61,5 +61,4 @@ Dados: 592 grupos e 72 mil pacotes `0x11` nas sessões 53–58 (v322).
 - Curva exata de EXP base e composição de grupo (`AppearanceRate`) dos monstros **Veteran** (`Grade = 3`) — só 3 níveis de EXP e 6 batalhas capturadas até agora.
 - Graus superiores (**Elite / Legend**, `byte 44 ≥ 4`): ainda sem capturas.
 - Taxas reais de drop dos monstros fora do tutorial.
-- Se o oficial manda o 0x11 apenas para selvagens próximos (ao atravessar um mapa grande, só chegam os grupos ao redor do jogador).
 - Respawn: tempo e se a casa é sempre a mesma.

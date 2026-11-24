@@ -69,6 +69,9 @@ public class RealClientTablesTests
         var data = GameDataLoader.Load(resources, ClientPack.Open(table), File.Exists(grids) ? MapGrid.Load(grids) : null);
         Assert.True(data.Species.Count > 700);
         Assert.True(data.Items.Count > 10_000);
+        Assert.Equal((SkillInfo.TypeMelee, (byte)1), (data.Skills[236].Type, data.Skills[236].TargetCount));   // Hop Hip
+        Assert.Equal((SkillInfo.TypeRanged, (byte)2), (data.Skills[9].Type, data.Skills[9].TargetCount));      // Double Fire
+        Assert.Equal((SkillInfo.TypeRanged, (byte)5), (data.Skills[1078].Type, data.Skills[1078].TargetCount)); // Sun of Sorrows
         Assert.Contains((byte)79, data.ZoneIds);
         Assert.Equal(new PortalInfo(1, 3, 120, 2, 165, 17), data.PortalsOf(1).Single(p => p.X == 3));
         Assert.Equal((byte)1, data.Species[14].Stage);
