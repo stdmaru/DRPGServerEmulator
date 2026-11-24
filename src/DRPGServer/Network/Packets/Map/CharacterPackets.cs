@@ -30,8 +30,15 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
         w.WriteI16(0);                          // vitórias ranqueadas
         w.WriteI16(0);                          // batalhas ranqueadas
         w.WriteI32(1800);                       // pontos ranqueados
-        w.WriteU8((byte)Rank.ChromeDigizoid);
-        w.WriteZeros(695);                      // 89..783
+        w.WriteU8((byte)Rank.ChromeDigizoid);   // 88
+        w.WriteZeros(11);                       // 89..99
+        // 100..747: ✅ 6 equipamentos primários (Crests 4..6 + Digimentals 7..9; 6 × 108 = 648 B, conn=238/428)
+        foreach (var place in EquipmentSlots.PrimarySlots)
+        {
+            if (c.Inventory.EquippedAt(place) is { } eq) ItemRecord.Write(w, eq);
+            else w.WriteZeros(ItemRecord.Length);
+        }
+        w.WriteZeros(36);                       // 748..783
         // 784..1239: ✅ 6 Card Slots equipados (6 × 76 = 456 bytes, conn=428/437/442/446)
         for (int slot = 0; slot < Inventory.CardSlotCount; slot++)
         {
@@ -48,11 +55,34 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
 
         w.WriteI16(c.X);                        // 4720 na v322 (4680 na v242)
         w.WriteI16(c.Y);
-        // ❓ capturado: 0x1852..0x1856 e 0x2052..0x205A parecem ponteiros/handles do servidor oficial
-        w.WriteSparse(2876,
-            (1852, [0xDC, 0xF3, 0x51, 0x68, 0x01]),
-            (2052, [0xFA, 0x11, 0x00, 0x00, 0x50, 0xB8, 0x52, 0x68]),
-            (2792, [0x0A]));
+        // 4724..7599 (2876 B): ✅ 23 slots de equipamento do Tamer (DigimonRPG.bin @ 0x00B5BF21..0x00B5C150)
+        // + bytes esparsos preservados onde não há equipamento
+        WriteEquipmentTail(w, c.Inventory);
+    }
+
+    private static void WriteEquipmentTail(PacketWriter w, Inventory inventory)
+    {
+        const int tailLength = 2876;
+        int tailStart = w.Position;
+        int cursor = 0;
+
+        foreach (var (place, offset) in EquipmentSlots.TailSlots)
+        {
+            if (offset > cursor)
+                w.WriteZeros(offset - cursor);
+            if (inventory.EquippedAt(place) is { } eq)
+                ItemRecord.Write(w, eq);
+            else
+                w.WriteZeros(ItemRecord.Length);
+            cursor = offset + ItemRecord.Length;
+        }
+
+        if (tailLength > cursor)
+            w.WriteZeros(tailLength - cursor);
+
+        // Garante exatamente 2876 bytes na cauda (total 7600 B no S2C 0x02)
+        int written = w.Position - tailStart;
+        if (written < tailLength) w.WriteZeros(tailLength - written);
     }
 
     /// <summary>Bloco do time: o começo do bloco de status, com 64..191 próprio.</summary>

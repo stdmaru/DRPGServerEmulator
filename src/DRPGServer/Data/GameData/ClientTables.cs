@@ -67,16 +67,133 @@ public static class ClientTables
             if (f.Length > 1 && uint.TryParse(f[0], CultureInfo.InvariantCulture, out var id) && id != 0)
             {
                 uint col26 = UInt(f, 26);
+                byte type = Byte(f, 2);
+                string desc = f.Length > 28 ? f[28] : "";
                 items.TryAdd(id, new ItemInfo(id, f[1])
                 {
-                    Type = Byte(f, 2), SubType = Byte(f, 3),
+                    Type = type, SubType = Byte(f, 3),
                     Col16 = UShort(f, 15), Col17 = UInt(f, 16), BuyPrice = UInt(f, 17), SellPrice = UInt(f, 18),
                     Level = UInt(f, 20), Flag24 = Byte(f, 23), Flag25 = Byte(f, 24),
                     MaxStack = col26 is >= 1 and <= 999 ? col26 : 1u, Flag33 = Byte(f, 32),
+                    Description = desc,
+                    EquipmentBonus = IsEquipmentItemType(type) ? ParseEquipmentBonus(desc) : EquipmentBonus.Empty,
                 });
             }
         return items.ToFrozenDictionary();
     }
+
+    private static bool IsEquipmentItemType(byte type) => type switch
+    {
+        1 or 2 or 8 or 9 or 27 => true,
+        >= 15 and <= 21 => true,
+        23 or 24 or 25 or 28 => true,
+        37 or 38 => true,
+        >= 40 and <= 45 => true,
+        _ => false,
+    };
+
+    /// <summary>
+    /// Extrai os bônus de equipamento da coluna 28 de <c>item_info_us.dat</c>
+    /// (ex.: <c>ATK +75 / DEF +40 / Battle Rating +350</c>, <c>STR +6 / AGI +6 / CON +6</c>,
+    /// <c>Card Slash 23 times</c>, <c>Digimon EXP +100% / Tamer EXP +5</c>).
+    /// </summary>
+    public static EquipmentBonus ParseEquipmentBonus(string description)
+    {
+        if (string.IsNullOrWhiteSpace(description)) return EquipmentBonus.Empty;
+
+        int str = 0, agi = 0, con = 0, intl = 0;
+        int hp = 0, vp = 0, atk = 0, def = 0, br = 0;
+        int atkPct = 0, defPct = 0, brPct = 0;
+        int cardSlash = 0, digimonExpPct = 0, tamerExp = 0;
+        int hpRec = 0, vpRec = 0, evpRec = 0;
+
+        foreach (string rawPart in description.Split('/'))
+        {
+            string part = rawPart.Trim();
+            if (part.Length == 0) continue;
+
+            if (CardSlashRegex.Match(part) is { Success: true } cs)
+            {
+                cardSlash = Math.Max(cardSlash, int.Parse(cs.Groups[1].Value, CultureInfo.InvariantCulture));
+                continue;
+            }
+            if (DigimonExpRegex.Match(part) is { Success: true } de)
+            {
+                digimonExpPct += int.Parse(de.Groups[1].Value, CultureInfo.InvariantCulture);
+                continue;
+            }
+            if (TamerExpRegex.Match(part) is { Success: true } te)
+            {
+                tamerExp += int.Parse(te.Groups[1].Value, CultureInfo.InvariantCulture);
+                continue;
+            }
+            if (RecoveryRegex.Match(part) is { Success: true } rec)
+            {
+                int val = int.Parse(rec.Groups[2].Value, CultureInfo.InvariantCulture);
+                switch (rec.Groups[1].Value.ToUpperInvariant())
+                {
+                    case "HP": hpRec += val; break;
+                    case "VP": vpRec += val; break;
+                    case "EVP": evpRec += val; break;
+                }
+                continue;
+            }
+
+            foreach (Match m in TitleStatRegex.Matches(part))
+            {
+                string stat = m.Groups[1].Value.Trim().ToUpperInvariant();
+                int val = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
+                bool isPercent = m.Groups[3].Value == "%";
+                switch (stat)
+                {
+                    case "ALL STATS":
+                        str += val; agi += val; con += val; intl += val;
+                        break;
+                    case "STR": str += val; break;
+                    case "AGI": agi += val; break;
+                    case "CON": con += val; break;
+                    case "INT": intl += val; break;
+                    case "HP" or "MAX HP": hp += val; break;
+                    case "VP" or "MAX VP": vp += val; break;
+                    case "ATK":
+                        if (isPercent) atkPct += val; else atk += val;
+                        break;
+                    case "DEF":
+                        if (isPercent) defPct += val; else def += val;
+                        break;
+                    case "BR" or "BATTLE RATING":
+                        if (isPercent) brPct += val; else br += val;
+                        break;
+                }
+            }
+        }
+
+        return new EquipmentBonus(
+            Attributes: new Attributes(str, agi, con, intl),
+            BonusHp: hp,
+            BonusVp: vp,
+            BonusAtk: atk,
+            BonusDef: def,
+            BonusBr: br,
+            BonusAtkPercent: atkPct,
+            BonusDefPercent: defPct,
+            BonusBrPercent: brPct,
+            CardSlashLimit: cardSlash,
+            DigimonExpPercent: digimonExpPct,
+            TamerExpFlat: tamerExp,
+            HpRecovery: hpRec,
+            VpRecovery: vpRec,
+            EvpRecovery: evpRec);
+    }
+
+    private static readonly Regex CardSlashRegex = new(
+        @"^Card Slash\s+(\d+)\s+times?$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex DigimonExpRegex = new(
+        @"^Digimon EXP\s*\+?\s*(\d+)\s*%$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex TamerExpRegex = new(
+        @"^Tamer EXP\s*\+?\s*(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex RecoveryRegex = new(
+        @"^(HP|VP|EVP)\s+Recovery Amount\s+(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
     /// Cards: <c>card_info_us</c> (31 colunas, índices 0..30). ✅ Colunas mapeadas contra capturas v322 (0x02/0x03/0x90):

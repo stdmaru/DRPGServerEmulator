@@ -383,7 +383,9 @@ public sealed class Battle
     }
 
     private CardBattleState CardStateOf(Player player) =>
-        _cardStates.TryGetValue(player, out var state) ? state : _cardStates[player] = new CardBattleState();
+        _cardStates.TryGetValue(player, out var state)
+            ? state
+            : _cardStates[player] = new CardBattleState(player.Character.TotalEquipmentBonus.CardSlashLimit);
 
     /// <summary>✅ C2S 0xA0: equipa um card dos 6 CardSlots do inventário no slot de batalha 0..2.</summary>
     public bool EquipCard(Player player, int slot, uint uid, uint cardId) =>

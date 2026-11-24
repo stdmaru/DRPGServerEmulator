@@ -33,6 +33,7 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
             {
                 (byte)BagKind.Battle => BagKind.Battle,
                 (byte)BagKind.EquippedCards => BagKind.EquippedCards,
+                (byte)BagKind.Equipment => BagKind.Equipment,
                 _ => BagKind.Inventory,
             };
             bool isCard = bagKind is BagKind.Battle or BagKind.EquippedCards;
@@ -40,7 +41,10 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
                 ? (data.Cards.Count > 0 ? data.FindCard(i.ItemId) is not null : data.FindItem(i.ItemId) is not null)
                 : data.FindItem(i.ItemId) is not null;
             if (!valid) continue;
-            inventory.BagOf(bagKind).Place(inventory.Create(i.ItemId, i.Slot, i.Amount, i.Uid, isCard));
+            var created = inventory.Create(i.ItemId, i.Slot, i.Amount, i.Uid, isCard);
+            if (bagKind == BagKind.Equipment && !EquipmentSlots.CanEquip((ItemPlace)i.Slot, created, row.Level))
+                continue;
+            inventory.BagOf(bagKind).Place(created);
         }
 
         var character = new Character(leader, inventory)
@@ -68,6 +72,9 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
         }
         foreach (var flag in record.Flags) character.SetFlag(flag);
         character.SetBits(row.Bits);
+        character.SyncEquipmentBonuses();
+        foreach (var (r, d) in digimons)
+            d!.LoadVitals(r.Hp, r.Vp, r.Evp);
         return character;
     }
 

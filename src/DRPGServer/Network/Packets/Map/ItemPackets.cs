@@ -39,7 +39,7 @@ public static class ItemRecord
         w.WriteU32(info.SellPrice);              // 24
         w.WriteU32(Unknown28(itemId));           // 28 ❓
         w.WriteU32(info.Level);                  // 32
-        w.WriteZeros(52);                        // 36 ❓ efeitos (HP +150 etc.); zero nos itens do tutorial
+        WriteEffectTriplets(w, info.EquipmentBonus); // 36..87 (52 B): até 4 triplas (id, statCode, value) + 4 zeros
         w.WriteU16(info.Type == 7 ? (ushort)32000 : (ushort)9999); // 88 ❓
         w.WriteU16(info.Col16);                  // 90
         w.WriteU32(info.Col17);                  // 92
@@ -49,6 +49,46 @@ public static class ItemRecord
         w.WriteU8(info.Flag33);
         w.WriteU32(uid + itemId);                // 100 checagem
         w.WriteU32(0);                           // 104
+    }
+
+    /// <summary>
+    /// ✅ Capturas v322 (<c>conn=234/238/428</c>): offsets +36..83 guardam até 4 triplas <c>(effectId, statCode, value)</c>:
+    /// 1=STR, 2=AGI, 3=CON, 4=INT (Digimental #215), 301=ATK, 302=DEF, 303=BR (Crest #107), 304=HP, 305=VP.
+    /// </summary>
+    private static void WriteEffectTriplets(PacketWriter w, EquipmentBonus bonus)
+    {
+        if (bonus.IsEmpty)
+        {
+            w.WriteZeros(52);
+            return;
+        }
+
+        Span<(uint Id, uint Code, int Value)> triplets = stackalloc (uint, uint, int)[4];
+        int count = 0;
+
+        AddTriplet(triplets, ref count, (uint)bonus.Attributes.Str, 1, bonus.Attributes.Str);
+        AddTriplet(triplets, ref count, (uint)bonus.Attributes.Agi, 2, bonus.Attributes.Agi);
+        AddTriplet(triplets, ref count, (uint)bonus.Attributes.Con, 3, bonus.Attributes.Con);
+        AddTriplet(triplets, ref count, (uint)bonus.Attributes.Int, 4, bonus.Attributes.Int);
+        AddTriplet(triplets, ref count, (uint)(10_000 + bonus.BonusAtk), 301, bonus.BonusAtk);
+        AddTriplet(triplets, ref count, (uint)(20_000 + bonus.BonusDef), 302, bonus.BonusDef);
+        AddTriplet(triplets, ref count, (uint)(30_000 + bonus.BonusBr), 303, bonus.BonusBr);
+        AddTriplet(triplets, ref count, (uint)(40_000 + bonus.BonusHp), 304, bonus.BonusHp);
+        AddTriplet(triplets, ref count, (uint)(50_000 + bonus.BonusVp), 305, bonus.BonusVp);
+
+        for (int i = 0; i < count; i++)
+        {
+            w.WriteU32(triplets[i].Id);
+            w.WriteU32(triplets[i].Code);
+            w.WriteI32(triplets[i].Value);
+        }
+        w.WriteZeros(52 - count * 12);
+    }
+
+    private static void AddTriplet(Span<(uint Id, uint Code, int Value)> triplets, ref int count, uint id, uint code, int value)
+    {
+        if (value > 0 && count < triplets.Length)
+            triplets[count++] = (id, code, value);
     }
 }
 

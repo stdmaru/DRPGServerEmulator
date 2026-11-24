@@ -36,6 +36,21 @@ public sealed class Character
     {
         _party[0] = leader;
         Inventory = inventory;
+        SyncEquipmentBonuses();
+    }
+
+    /// <summary>Soma dos bônus de todos os equipamentos atualmente equipados pelo Tamer.</summary>
+    public Data.GameData.EquipmentBonus TotalEquipmentBonus => Inventory.TotalEquipmentBonus();
+
+    /// <summary>
+    /// Recalcula o bônus total de equipamentos do Tamer e propaga para todos os Digimons do time
+    /// (✅ confirmado em <c>captures.db conn=234</c>: Crests e Digimentals aplicam a todos os Digimons da party).
+    /// </summary>
+    public void SyncEquipmentBonuses()
+    {
+        var bonus = Inventory.TotalEquipmentBonus();
+        foreach (var d in Digimons)
+            d.SetEquipmentBonus(bonus);
     }
 
     public required uint Uid { get; init; }
@@ -203,6 +218,7 @@ public sealed class Character
 
         _depository[depSlot] = null;
         _party[freePartySlot] = digimon;
+        digimon.SetEquipmentBonus(TotalEquipmentBonus);
         return (DepositoryResult.WithdrawOk, digimon);
     }
 
@@ -224,6 +240,7 @@ public sealed class Character
 
         _party[partySlot] = storedDigimon;
         _depository[depSlot] = partyDigimon;
+        storedDigimon.SetEquipmentBonus(TotalEquipmentBonus);
         return (DepositoryResult.SwapOk, storedDigimon);
     }
 
@@ -232,6 +249,7 @@ public sealed class Character
     {
         if (slot is < 0 or >= PartySize || (_party[slot] is not null && slot != 0) || _party.Contains(digimon)) return false;
         _party[slot] = digimon;
+        digimon.SetEquipmentBonus(TotalEquipmentBonus);
         return true;
     }
 
