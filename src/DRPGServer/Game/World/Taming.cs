@@ -32,7 +32,7 @@ public sealed class Taming(GameData data, DigimonUids uids, IOptions<GameOptions
         && c.Digimons.Any(d => d.BaseForm.Species.Stage >= StatFormulas.Rookie);
 
     /// <summary>Cria o digimon capturado e põe na primeira posição livre do time. Null sem posição livre.</summary>
-    public Digimon? Tame(Character character, DigimonSpecies species)
+    public Digimon? Tame(Character character, DigimonSpecies species, Serial? serial = null)
     {
         int slot = character.Party.ToList().IndexOf(null);
         if (slot < 0) return null;
@@ -40,6 +40,7 @@ public sealed class Taming(GameData data, DigimonUids uids, IOptions<GameOptions
         var digimon = new Digimon(data, species, level)
         {
             Uid = uids.Next(),
+            Serial = serial ?? Serial.New(),
             Name = Digimon.DefaultName,
             FreeRename = true,
         };

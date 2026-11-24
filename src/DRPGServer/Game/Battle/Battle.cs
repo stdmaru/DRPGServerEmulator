@@ -251,8 +251,10 @@ public sealed class Battle
         && CaptureAttempts(owner) < World.Taming.AttemptsPerBattle && World.Taming.CanBattleCapture(owner.Character, target.Digimon);
 
     /// <summary>
-    /// ✅ Captura comum (sessão 56): 0x68 → 0xB3 → 0x35 3, depois a animação (0x69). ❓ No sucesso o selvagem sai da
-    /// batalha sem recompensa, o digimon novo vai para o time (0xEF) e a batalha acaba se não sobrar inimigo.
+    /// ✅ Captura comum (DigimonRPG.bin @ 0x00AF9A30 / 0x00AF9B37): 0x68 → 0xB3 → 0x35 3, depois a animação (0x69).
+    /// No sucesso (result = 1), o bloco de 696 bytes em 0xB3+24 DEVE manter o serial do alvo (target.Digimon.Serial):
+    /// o cliente procura o inimigo na batalha pelo serial em +28 (0x00AF9B7F), toca a animação de sucesso, faz o
+    /// inimigo sumir ([esi+0x210] = 8) e adiciona o digimon ao time via 0xB5A7D0 — sem precisar de 0xEF.
     /// </summary>
     private void Capture(Combatant actor, Combatant target)
     {
@@ -262,13 +264,13 @@ public sealed class Battle
         actor.Actions++;
         Broadcast(new LockActionBarPacket());
         Digimon? captured = _system.Random.NextDouble() < _system.Taming.BattleChance
-            ? _system.Taming.Tame(owner.Character, target.Digimon.Species) : null;
+            ? _system.Taming.Tame(owner.Character, target.Digimon.Species, target.Digimon.Serial) : null;
         Broadcast(new BattleCapturePacket(captured is not null, owner.Character.Serial, actor, target, captured));
         Broadcast(new ActionRequestPacket(BattleAction.Executed, BattleIcon.None, actor.Digimon.Serial, Serial.Empty));
         if (captured is not null)
         {
+            owner.RequestImmediateSave();
             target.Digimon.TakeDamage(target.Digimon.Hp);
-            owner.Send(new DigimonReceivedPacket(captured));
             if (_teamB.All(c => c.Digimon.IsKnockedOut))
             {
                 End(BattleResult.Win);

@@ -100,9 +100,10 @@ public sealed class ActionRequestPacket(BattleAction action, BattleIcon icon, Se
 }
 
 /// <summary>
-/// 0xB3 (744 bytes): resultado da captura comum. ✅ u32 resultado (2 = falhou, as 21 da sessão 56), serial do tamer,
-/// u32 0, bloco de 696 (na falha só o serial do alvo em +4), u32 0, serial de quem tentou, u32 0.
-/// ❓ Sucesso nunca capturado: 1 e o bloco do digimon novo.
+/// 0xB3 (744 bytes): resultado da captura comum (✅ DigimonRPG.bin @ 0x00AF9A30).
+/// u32 resultado (1 = sucesso, 2 = falhou), serial do tamer, u32 0, bloco de 696 (na falha só o serial do alvo em +4;
+/// no sucesso, bloco do digimon capturado mantendo o MESMO serial do alvo em +4 para o cliente removê-lo da batalha e
+/// adicioná-lo ao time), u32 0, serial de quem tentou, u32 0.
 /// </summary>
 public sealed class BattleCapturePacket(bool success, Serial tamer, Combatant actor, Combatant target, Digimon? captured) : ServerPacket
 {
