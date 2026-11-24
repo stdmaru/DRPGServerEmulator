@@ -78,6 +78,9 @@ public sealed class BattleSystem : IWorldSystem
             {
                 c.Digimon.TotalBattles++;
                 if (result == BattleResult.Win) c.Digimon.TotalWins++;
+                var unlocked = DigimonTitles.CheckUnlocks(c.Digimon);
+                if (unlocked.Count > 0 && c.Owner is { } owner)
+                    owner.SendDebug($"Unlocked title(s) for {c.Digimon.Name}: {string.Join(", ", unlocked)}");
             }
             foreach (var player in battle.Participants)
             {

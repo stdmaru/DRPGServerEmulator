@@ -42,5 +42,12 @@ public static class Progression
             if (inBattle && digimon.LineSpecies(stage) is { } next && digimon.EvolveTo(next))
                 owner.Send(new DigimonEvolvedPacket(digimon));
         }
+
+        var unlocked = DigimonTitles.CheckUnlocks(digimon);
+        if (unlocked.Count > 0)
+        {
+            owner.RequestImmediateSave();
+            owner.SendDebug($"Unlocked title(s) for {digimon.Name}: {string.Join(", ", unlocked)}");
+        }
     }
 }

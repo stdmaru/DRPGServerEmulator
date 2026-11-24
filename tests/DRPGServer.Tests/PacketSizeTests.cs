@@ -68,6 +68,8 @@ public class PacketSizeTests
             (new DepositoryActionPacket(1, DepositoryAction.Open, 0, 0, 0, DepositoryResult.OpenOk), 736), // ✅ v322 (0x89)
             (new DepositoryListPacket(1, character), 808),             // ✅ v322 (0x8A)
             (new DepositoryExpandPacket(DepositoryExpandResult.Ok), 1),// ✅ v322 (0x94)
+            (new DigimonTitleListPacket(7, [20100, 20200]), 1608),     // ✅ v322 (0x97, conn=76/141/162)
+            (new DigimonTitleEquipPacket(7, 20100), 12),               // ✅ v322 (0x99, conn=76/141)
             (new BattleSummonPacket(1, digimon), 720),                 // ✅ v322 (0x64)
             (new EvolutionListPacket([]), 8),                          // ✅ v322 (0x9E)
             (new SetLeaderPacket(1, 7), 12),                           // ✅ v322 (0xF1)

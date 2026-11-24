@@ -15,8 +15,9 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
     {
         var row = record.Character;
         var formsByDigimon = record.Forms.ToLookup(f => f.DigimonUid);
+        var titlesByDigimon = (record.Titles ?? []).ToLookup(t => t.DigimonUid, t => t.TitleId);
         var digimons = record.Digimons
-            .Select(r => (Row: r, Digimon: BuildDigimon(r, formsByDigimon[r.Uid])))
+            .Select(r => (Row: r, Digimon: BuildDigimon(r, formsByDigimon[r.Uid], titlesByDigimon[r.Uid])))
             .Where(d => d.Digimon is not null)
             .ToList();
         var leader = digimons.FirstOrDefault(d => !d.Row.InDepository && d.Row.Slot == 0).Digimon
@@ -70,7 +71,7 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
         return character;
     }
 
-    private Digimon? BuildDigimon(DigimonRow r, IEnumerable<FormRow> forms)
+    private Digimon? BuildDigimon(DigimonRow r, IEnumerable<FormRow> forms, IEnumerable<uint> titles)
     {
         if (data.FindSpecies(r.DigimonId) is not { } species) return null;
         var digimon = new Digimon(data, species, r.Level)
@@ -84,6 +85,7 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
             if (data.FindSpecies(f.SpeciesId) is { } formSpecies)
                 digimon.LoadForm(formSpecies, new Attributes(f.AllocStr, f.AllocAgi, f.AllocCon, f.AllocInt),
                     f.Skill1Level, f.Skill2Level);
+        digimon.LoadTitles(r.TitleId, titles);
         digimon.RestoreAll();
         return digimon;
     }

@@ -63,6 +63,20 @@ public sealed class ChatCommands
             if (args.Length >= 3 && !byte.TryParse(args[2], out map)) return;
             zones.Teleport(p, map, x, y);
         });
+
+        Add("givetitle", "/givetitle <titleId>", Authority.GameMaster, (p, args) =>
+        {
+            if (args.Length < 1 || !uint.TryParse(args[0], out var titleId) || titleId == 0) return;
+            if (p.Leader.UnlockTitle(titleId))
+            {
+                p.RequestImmediateSave();
+                Reply(p, $"Titulo {titleId} desbloqueado para {p.Leader.Name}.");
+            }
+            else
+            {
+                Reply(p, $"Titulo {titleId} ja desbloqueado ou lista cheia.");
+            }
+        });
     }
 
     private async Task ReloadEventsAsync(Player requester, ExpEventService expEvents)
