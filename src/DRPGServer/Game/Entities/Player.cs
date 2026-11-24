@@ -108,5 +108,44 @@ public sealed class Player(Session session, AuthenticatedAccount account, Charac
         return true;
     }
 
+    /// <summary>
+    /// Troca atômica na aba <b>Items</b>: remove <paramref name="takeAmount"/> de <paramref name="takeItemId"/> e
+    /// entrega <paramref name="giveItems"/>, fazendo rollback se faltar espaço. Envia <c>0xC9</c> (posições alteradas)
+    /// e <c>0xFC</c>. Opcionalmente executa <paramref name="beforeNotify"/> após a troca ser confirmada em memória
+    /// e antes de enviar <c>0xC9</c>/<c>0xFC</c>.
+    /// </summary>
+    public bool ExchangeItems(
+        uint takeItemId,
+        uint takeAmount,
+        IReadOnlyList<(uint ItemId, uint Amount)> giveItems,
+        bool refresh = true,
+        Action? beforeNotify = null)
+    {
+        var bag = Character.Inventory.Main;
+        if (bag.Count(takeItemId) < takeAmount) return false;
+
+        var removed = bag.Remove(takeItemId, takeAmount);
+        var added = new List<InventoryItem>();
+        foreach (var (itemId, amount) in giveItems)
+        {
+            if (bag.Room(itemId) < amount)
+            {
+                foreach (var item in added)
+                    bag.Remove(item.ItemId, item.Amount);
+                bag.Add(takeItemId, takeAmount);
+                return false;
+            }
+            added.AddRange(bag.Add(itemId, amount));
+        }
+
+        beforeNotify?.Invoke();
+
+        // posição esvaziada e ocupada de novo na mesma troca: vale o último estado
+        var changed = removed.Concat(added).GroupBy(i => i.Slot).Select(g => g.Last()).ToList();
+        if (changed.Count > 0) Send(new ItemReceivePacket(changed));
+        if (refresh) RefreshInventory();
+        return true;
+    }
+
     public override string ToString() => $"{Character.Name}({Account.Username})";
 }
