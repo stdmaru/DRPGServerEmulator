@@ -17,6 +17,8 @@ public static class DigimonTitles
     public const uint EndlessJourney = 20030;        // Lv. 120
     public const uint AnotherStart = 20040;          // Lv. 130
     public const uint LimitBreak = 20050;            // Lv. 140
+    public const uint BestPartner = 30402;           // Lv. 150 (✅ conn=137 pid=80450)
+    public const uint BeyondEvolution = 30444;       // Lv. 160 (✅ conn=137 pid=80451)
 
     public const uint FirstWin = 20100;              // 1 vitória
     public const uint Win10 = 20110;                 // 10 vitórias
@@ -63,6 +65,8 @@ public static class DigimonTitles
         TryUnlock(digimon.Level >= 120, EndlessJourney);
         TryUnlock(digimon.Level >= 130, AnotherStart);
         TryUnlock(digimon.Level >= 140, LimitBreak);
+        TryUnlock(digimon.Level >= 150, BestPartner);
+        TryUnlock(digimon.Level >= 160, BeyondEvolution);
 
         return unlocked;
     }

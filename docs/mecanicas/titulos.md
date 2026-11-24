@@ -30,6 +30,6 @@ Evidências: `captures.db` (sessão 56, marca 72 — `conn=55, 57, 76, 112, 141,
 - **Marcos automáticos (`Game/World/DigimonTitles.cs`):**
   - **Vitórias (`TotalWins`):** `20100` (1), `20110` (10), `20120` (100), `20130` (1000), `20140` (10000).
   - **Derrotas (`TotalBattles - TotalWins`, incluindo fuga):** `20200` (1), `20210` (100), `20220` (1000), `20230` (10000).
-  - **Nível / Mega:** `20000` (Mega / Lv. 41), `20010` (Lv. 100), `20020` (Lv. 110), `20030` (Lv. 120), `20040` (Lv. 130), `20050` (Lv. 140).
+  - **Nível / Mega:** `20000` (Mega / Lv. 41), `20010` (Lv. 100), `20020` (Lv. 110), `20030` (Lv. 120), `20040` (Lv. 130), `20050` (Lv. 140), `30402` (Lv. 150 — *Best Partner*), `30444` (Lv. 160 — *Beyond Evolution*).
 - **Comando GM:** `/givetitle <titleId>` desbloqueia qualquer título de `digimon_title_us.dat` no líder.
 - **Banco de Dados (`sql/upgrade/0007_digimon_titles.sql`):** coluna `digimon.title_id` + tabela `digimon_title (digimon_uid, title_id)`.
