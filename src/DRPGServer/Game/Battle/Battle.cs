@@ -83,6 +83,20 @@ public sealed class Battle
         Zone = player.Zone;
         _participants.Add(player);
         _teamA.Add(new Combatant(player.Leader, BattleSide.A, player, null));
+
+        // ✅ Aura of High-Velocity / "Summon N more Digimon": invoca parceiros vivos extras já na abertura (0x63)
+        int autoSummon = player.Character.TotalEquipmentBonus.AutoSummonPartners;
+        if (autoSummon > 0)
+        {
+            for (int slot = 1; slot < Character.PartySize && _teamA.Count < MaxPerSide && autoSummon > 0; slot++)
+            {
+                if (player.Character.Party[slot] is { IsKnockedOut: false } partner)
+                {
+                    _teamA.Add(new Combatant(partner, BattleSide.A, player, null));
+                    autoSummon--;
+                }
+            }
+        }
         for (int i = 0; i < wild.Members.Count && _teamB.Count < MaxPerSide; i++)
         {
             var member = wild.Members[i];
@@ -260,7 +274,9 @@ public sealed class Battle
             defCtx = CardEffectRegistry.EvaluateDefense(defActivated);
         }
 
-        double damageMult = (atkCtx?.DamageMultiplier ?? 1.0) * (defCtx?.IncomingDamageMultiplier ?? 1.0);
+        var atkEquip = actor.Owner?.Character.TotalEquipmentBonus ?? Data.GameData.EquipmentBonus.Empty;
+        double equipDamageMult = 1.0 + EquipmentDamageBonusPercent(atkEquip, skill) / 100.0;
+        double damageMult = (atkCtx?.DamageMultiplier ?? 1.0) * (defCtx?.IncomingDamageMultiplier ?? 1.0) * equipDamageMult;
         double defenseMult = defCtx?.DefenseMultiplier ?? 1.0;
         double attackerBrMult = atkCtx?.BrMultiplier ?? 1.0;
         double targetBrMult = defCtx?.BrMultiplier ?? 1.0;
@@ -301,6 +317,8 @@ public sealed class Battle
 
             if (atkCtx?.LifestealFraction > 0 && damage > 0)
                 digimon.Heal((int)Math.Floor(damage * atkCtx.LifestealFraction), 0, 0);
+            if (atkEquip.OnHitHealHp > 0 || atkEquip.OnHitHealVp > 0)
+                digimon.Heal(atkEquip.OnHitHealHp, atkEquip.OnHitHealVp, 0);
         }
 
         actor.Actions++;
@@ -382,10 +400,22 @@ public sealed class Battle
         }
     }
 
-    private CardBattleState CardStateOf(Player player) =>
-        _cardStates.TryGetValue(player, out var state)
-            ? state
-            : _cardStates[player] = new CardBattleState(player.Character.TotalEquipmentBonus.CardSlashLimit);
+    private static int EquipmentDamageBonusPercent(Data.GameData.EquipmentBonus equip, Data.GameData.SkillInfo? skill)
+    {
+        int pct = equip.BonusDamagePercent;
+        if (skill is null) return pct;
+        pct += skill.TargetCount == 1 ? equip.SingleSkillDamagePercent : equip.MultiSkillDamagePercent;
+        pct += skill.Type == Data.GameData.SkillInfo.TypeRanged ? equip.RangedSkillDamagePercent : equip.MeleeSkillDamagePercent;
+        return pct;
+    }
+
+    private CardBattleState CardStateOf(Player player)
+    {
+        if (_cardStates.TryGetValue(player, out var state)) return state;
+        var equip = player.Character.TotalEquipmentBonus;
+        int limit = Math.Max(CardBattleState.MaxCardSlashesPerBattle, equip.CardSlashLimit) + equip.ExtraCardSlashes;
+        return _cardStates[player] = new CardBattleState(limit);
+    }
 
     /// <summary>✅ C2S 0xA0: equipa um card dos 6 CardSlots do inventário no slot de batalha 0..2.</summary>
     public bool EquipCard(Player player, int slot, uint uid, uint cardId) =>
@@ -587,8 +617,10 @@ public sealed class Battle
     {
         _participants.Remove(player);
         player.Battle = null;
+        bool keepEvolution = player.Character.TotalEquipmentBonus.MaintainEvolution;
         foreach (var c in _teamA.Where(c => c.Owner == player))
-            c.Digimon.Devolve();
+            if (!keepEvolution || c.Digimon.IsKnockedOut)
+                c.Digimon.Devolve();
         if (_participants.Count == 0)
             End(BattleResult.Cancel);
     }
@@ -615,11 +647,16 @@ public sealed class Battle
                 if (sendSummary)
                     foreach (var _ in mine)
                         player.Send(new TamerExpPacket(player.Character));
+                bool keepEvolution = player.Character.TotalEquipmentBonus.MaintainEvolution;
+                foreach (var c in mine)
+                {
+                    // ✅ evoluído volta para a forma-base no fim, exceto com Aura de manutenção de evolução (e vivo)
+                    if (!keepEvolution || c.Digimon.IsKnockedOut)
+                        c.Digimon.Devolve();
+                }
                 player.Zone?.Broadcast(new RefreshCharacterInfoPacket(player.Character, TamerState.Idle));
                 foreach (var c in mine)
                 {
-                    // ✅ evoluído volta para a forma-base no fim (sem Aura); 0x84 sai com HP = 0 nos nocauteados
-                    c.Digimon.Devolve();
                     if (sendSummary) player.Send(new BattleDigimonStatusPacket(c.Digimon));
                     // ✅ conn=408 (S2C 0xB4 pid=313462): apenas o líder revive no mapa (HP = 10) para voltar a regenerar;
                     // os demais digimons nocauteados permanecem com HP = 0 (sem regeneração automática)

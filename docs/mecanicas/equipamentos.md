@@ -56,13 +56,18 @@ Confirmado em `captures.db` (`conn=234`, `pid=115772..115794`):
 
 ---
 
-## ✅ Bônus de Status (`item_info_us.dat` col. 28)
+## ✅ Bônus de Status e Auras (`item_info_us.dat` col. 28 e cols. 4–12)
 
-Os bônus são extraídos automaticamente da coluna 28 de `item_info_us.dat` na carga do servidor (`ClientTables.ParseEquipmentBonus`):
+Os bônus são extraídos automaticamente na carga do servidor (`ClientTables.ParseEquipmentBonus`):
 - **Atributos (`STR`, `AGI`, `CON`, `INT`, `All stats`):** somam antes de `StatFormulas.Combat` (✅ exato em `conn=234`: `Digimental #215` `+6 STR/AGI/CON` eleva `InputName L1` de `145/87/131/115/115` para `183/105/139/146/125`).
 - **Status flat (`ATK`, `DEF`, `BR`, `HP`, `VP`) e `%` (`ATK%`, `DEF%`, `BR%`):** somam após `StatFormulas.Combat` (✅ exato em `conn=234`: `Crest #107` `+75 ATK / +40 DEF / +350 BR` leva `InputName L1` a `258/145/489/146/125` com 1 Crest + 1 Digimental e `333/185/839/146/125` com 2 Crests + 1 Digimental).
-- **Efeitos extras:** `Card Slash N times` (D-ark expande o limite de 20 usos por batalha), `Digimon EXP +N%` (multiplicador na recompensa de batalha), `Tamer EXP +N` e recuperação de `HP/VP/EVP`.
+- **Auras (`Type 8` e `Type 27`, 29 itens):**
+  - **Regeneração extra (`HP / VP / EVP Recovery Amount`):** somada ao tick `0xB2` de `Zone.AutoRecovery` (base `5 / 3 / 10`).
+  - **Manutenção de evolução (`Aura of Evolution` #555, `Aura of Thunder` #569, `Aura of Triple Circle` #578 e `Aura T of Deva` #718 / #9101..#23751):** Digimons vivos não revertem ao fim da batalha (`Battle.End`); ao desequipar a Aura no mapa (`ItemMoveHandler`), revertem para a forma-base.
+  - **Auto-invocação (`Aura of High-Velocity` #529..#535 e `Summon N more Digimon`):** invoca parceiros vivos extras já na abertura da batalha (`0x63`).
+- **Modificadores de batalha:** `Card Slash N times` (D-ark) + `Extra Card Slash N Times`, `Digimon EXP +N%`, `Damage +N%`, `Single/Multi/Melee/Ranged Skill Damage +N%`, `Recover N HP/VP when attacking`.
 - **Triplas em `ItemRecord` (`+36..83`):** até 4 triplas `(effectId, statCode, value)` (`1..4` = STR/AGI/CON/INT, `301..305` = ATK/DEF/BR/HP/VP), conforme observado em `conn=234/238/428`.
+- ❓ **Ainda em aberto:** restrição de gênero do avatar/tamer, passivas/características (`Characteristic Activation Chances`), velocidade de movimento (`Movement speed +N%`) e `Tamer EXP +N` (aguardando persistência de EXP do Tamer).
 
 ---
 

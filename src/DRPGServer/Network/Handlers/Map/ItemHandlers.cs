@@ -158,6 +158,13 @@ public sealed class ItemMoveHandler : PlayerHandler
     {
         var c = player.Character;
         c.SyncEquipmentBonuses();
+        // Ao desequipar uma Aura que mantém evolução, Digimons evoluídos no mapa voltam para a forma-base
+        if (!c.TotalEquipmentBonus.MaintainEvolution)
+        {
+            foreach (var digimon in c.Digimons)
+                if (digimon.IsEvolved)
+                    digimon.Devolve();
+        }
         player.RequestImmediateSave();
         player.Send(new TamerExpPacket(c));
         foreach (var digimon in c.Digimons)

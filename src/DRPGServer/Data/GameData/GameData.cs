@@ -25,11 +25,21 @@ public readonly record struct EquipmentBonus(
     int BonusDefPercent = 0,
     int BonusBrPercent = 0,
     int CardSlashLimit = 0,
+    int ExtraCardSlashes = 0,
     int DigimonExpPercent = 0,
     int TamerExpFlat = 0,
     int HpRecovery = 0,
     int VpRecovery = 0,
-    int EvpRecovery = 0)
+    int EvpRecovery = 0,
+    bool MaintainEvolution = false,
+    int AutoSummonPartners = 0,
+    int BonusDamagePercent = 0,
+    int SingleSkillDamagePercent = 0,
+    int MultiSkillDamagePercent = 0,
+    int MeleeSkillDamagePercent = 0,
+    int RangedSkillDamagePercent = 0,
+    int OnHitHealHp = 0,
+    int OnHitHealVp = 0)
 {
     public static EquipmentBonus Empty => default;
 
@@ -38,8 +48,14 @@ public readonly record struct EquipmentBonus(
         && BonusHp == 0 && BonusVp == 0
         && BonusAtk == 0 && BonusDef == 0 && BonusBr == 0
         && BonusAtkPercent == 0 && BonusDefPercent == 0 && BonusBrPercent == 0
-        && CardSlashLimit == 0 && DigimonExpPercent == 0 && TamerExpFlat == 0
-        && HpRecovery == 0 && VpRecovery == 0 && EvpRecovery == 0;
+        && CardSlashLimit == 0 && ExtraCardSlashes == 0
+        && DigimonExpPercent == 0 && TamerExpFlat == 0
+        && HpRecovery == 0 && VpRecovery == 0 && EvpRecovery == 0
+        && !MaintainEvolution && AutoSummonPartners == 0
+        && BonusDamagePercent == 0
+        && SingleSkillDamagePercent == 0 && MultiSkillDamagePercent == 0
+        && MeleeSkillDamagePercent == 0 && RangedSkillDamagePercent == 0
+        && OnHitHealHp == 0 && OnHitHealVp == 0;
 
     public static EquipmentBonus operator +(EquipmentBonus a, EquipmentBonus b) => new(
         Attributes: a.Attributes + b.Attributes,
@@ -52,11 +68,21 @@ public readonly record struct EquipmentBonus(
         BonusDefPercent: a.BonusDefPercent + b.BonusDefPercent,
         BonusBrPercent: a.BonusBrPercent + b.BonusBrPercent,
         CardSlashLimit: Math.Max(a.CardSlashLimit, b.CardSlashLimit),
+        ExtraCardSlashes: a.ExtraCardSlashes + b.ExtraCardSlashes,
         DigimonExpPercent: a.DigimonExpPercent + b.DigimonExpPercent,
         TamerExpFlat: a.TamerExpFlat + b.TamerExpFlat,
         HpRecovery: a.HpRecovery + b.HpRecovery,
         VpRecovery: a.VpRecovery + b.VpRecovery,
-        EvpRecovery: a.EvpRecovery + b.EvpRecovery);
+        EvpRecovery: a.EvpRecovery + b.EvpRecovery,
+        MaintainEvolution: a.MaintainEvolution || b.MaintainEvolution,
+        AutoSummonPartners: a.AutoSummonPartners + b.AutoSummonPartners,
+        BonusDamagePercent: a.BonusDamagePercent + b.BonusDamagePercent,
+        SingleSkillDamagePercent: a.SingleSkillDamagePercent + b.SingleSkillDamagePercent,
+        MultiSkillDamagePercent: a.MultiSkillDamagePercent + b.MultiSkillDamagePercent,
+        MeleeSkillDamagePercent: a.MeleeSkillDamagePercent + b.MeleeSkillDamagePercent,
+        RangedSkillDamagePercent: a.RangedSkillDamagePercent + b.RangedSkillDamagePercent,
+        OnHitHealHp: a.OnHitHealHp + b.OnHitHealHp,
+        OnHitHealVp: a.OnHitHealVp + b.OnHitHealVp);
 }
 
 /// <summary>Item de <c>item_info_us</c> com as colunas que o registro de 108 bytes repete (ver <see cref="ClientTables.Items"/>).</summary>
