@@ -34,6 +34,32 @@ public sealed class Player(Session session, AuthenticatedAccount account, Charac
     /// <summary>Hora (do mundo) do último 0x20 aceito ou do último teleporte.</summary>
     public TimeSpan LastMoveAt { get; internal set; }
 
+    /// <summary>Persistência híbrida: true se houve alteração desde o último snapshot enviado ao banco.</summary>
+    public bool IsDirty { get; private set; }
+
+    /// <summary>Persistência híbrida: true em eventos críticos (itens, captura, batalha, depository) para salvar já no próximo tick.</summary>
+    public bool NeedsImmediateSave { get; private set; }
+
+    /// <summary>Hora (do mundo) em que o último snapshot deste jogador foi enfileirado.</summary>
+    public TimeSpan LastSavedAt { get; internal set; }
+
+    /// <summary>Marca alteração de baixo risco (movimento, slots internos, pontos) para o próximo ciclo de autosave.</summary>
+    public void MarkDirty() => IsDirty = true;
+
+    /// <summary>Agenda gravação imediata na fila de persistência (eventos críticos / anti-duplicação).</summary>
+    public void RequestImmediateSave()
+    {
+        IsDirty = true;
+        NeedsImmediateSave = true;
+    }
+
+    internal void MarkSaved(TimeSpan now)
+    {
+        IsDirty = false;
+        NeedsImmediateSave = false;
+        LastSavedAt = now;
+    }
+
     public void Send(ServerPacket packet) => Session.Send(packet);
 
     public override string ToString() => $"{Character.Name}({Account.Username})";

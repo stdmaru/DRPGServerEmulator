@@ -29,6 +29,7 @@ public sealed class ItemMoveHandler : PlayerHandler
                 if (player.Zone is not { } zone || zone.FindDrop(uid) is not { } drop || drop.ItemId != itemId) return;
                 if (bag.Add(drop.ItemId, 1) is not [.., var item]) return;   // inventário cheio: fica no chão
                 zone.RemoveDrop(drop);
+                player.RequestImmediateSave();
                 player.Send(new ItemMovePacket(header with { ToA = item.Row, ToB = item.Column }, item));
                 break;
             }
@@ -37,7 +38,10 @@ public sealed class ItemMoveHandler : PlayerHandler
                 int from = SlotOf(header.FromA, header.FromB), to = SlotOf(header.ToA, header.ToB);
                 if (bag[from] is not { } item || item.Uid != uid) return;
                 if (bag.Move(from, to, out var displaced))
+                {
+                    player.MarkDirty();
                     player.Send(new ItemMovePacket(header, item, displaced));
+                }
                 break;
             }
             // ❓ bolsas extras (0x33, 0x3D) ainda não
@@ -62,6 +66,7 @@ public sealed class ItemDestroyHandler : PlayerHandler
         int slot = ItemMoveHandler.SlotOf(header.FromA, header.FromB);
         if (bag[slot] is not { } item || item.Uid != uid) return;
         bag.Destroy(slot);
+        player.RequestImmediateSave();
         player.Send(new ItemDestroyPacket(header, item));
     }
 }
@@ -81,6 +86,7 @@ public sealed class InventorySortHandler : PlayerHandler
         var bagKind = (BagKind)packet.ReadU16();
         if (action != 0 || bagKind is not (BagKind.Inventory or BagKind.Battle)) return;
         player.Character.Inventory.BagOf(bagKind).Sort();
+        player.MarkDirty();
         player.Send(new InventoryRefreshPacket(player.Character));
     }
 }

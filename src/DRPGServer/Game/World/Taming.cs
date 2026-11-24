@@ -63,6 +63,7 @@ public sealed class Taming(GameData data, DigimonUids uids, IOptions<GameOptions
         }
 
         c.Inventory.Main.Consume(item, 1);
+        player.RequestImmediateSave();
         if (random.Next(100) >= net.Chance || Tame(c, wild.Leader.Species) is not { } digimon)
         {
             player.Send(new ItemUseFailedPacket());     // ❓ falha de rede com chance < 100 não capturada

@@ -26,12 +26,17 @@ public static class Progression
         owner.Send(new LevelUpPacket(digimon));
         if (digimon.BecomeRookie())
         {
+            owner.RequestImmediateSave();
             owner.Send(new DigimonEvolvedPacket(digimon));
             return;
         }
         byte stage = digimon.UnlockStage();
-        // ✅ só em batalha a evolução é automática; no mapa a forma nova fica liberada para o menu
-        if (stage >= StatFormulas.Champion && inBattle && digimon.LineSpecies(stage) is { } next && digimon.EvolveTo(next))
-            owner.Send(new DigimonEvolvedPacket(digimon));
+        if (stage >= StatFormulas.Champion)
+        {
+            owner.RequestImmediateSave();
+            // ✅ só em batalha a evolução é automática; no mapa a forma nova fica liberada para o menu
+            if (inBattle && digimon.LineSpecies(stage) is { } next && digimon.EvolveTo(next))
+                owner.Send(new DigimonEvolvedPacket(digimon));
+        }
     }
 }

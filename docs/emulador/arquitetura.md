@@ -30,7 +30,10 @@
 ## Modelo de threads
 - Cada sessão tem um laço de recepção. **Login e channel** rodam no laço da sessão (`ISessionPacketHandler`, async, podem ir ao banco).
 - **Jogo no mapa:** `IWorldPacketHandler` é postado para a **thread do mundo** (`GameWorld`, tick de 50 ms). Estado do mundo (zonas, jogadores, batalhas) só se toca nela. Sistemas: `ZoneSystem`, `BattleSystem`, `PlayerSystem`.
-- **Banco fora do mundo:** gravações vão para a `PersistenceQueue` (snapshot imutável) e o `PersistenceService` grava em segundo plano. A entrada no mapa espera `FlushAsync` antes de carregar o personagem.
+- **Banco fora do mundo (persistência híbrida):** gravações vão para a `PersistenceQueue` (snapshot imutável, com **coalescing por `CharacterUid`** para evitar transações redundantes) e o `PersistenceService` grava em segundo plano dentro de uma única transação MySQL:
+  - **Gravação imediata (`player.RequestImmediateSave()`):** eventos críticos/anti-duplicação — coleta/descarte/uso de itens, captura, Depository (`0x89`/`0x94`), renomeação, fim de batalha, evolução permanente, NPCs e troca de mapa por portal.
+  - **Dirty + autosave periódico (`player.MarkDirty()`):** ações frequentes de baixo risco (movimento, organização interna de inventário, distribuição de pontos, ordem do time) são gravadas no próximo ciclo de `AutosaveSeconds` (padrão 60 s), apenas para jogadores alterados.
+  - **Logout / Relogin / Shutdown:** `Leave` e `Shutdown` sempre enfileiram gravação; a entrada no mapa espera `FlushAsync` antes de carregar o personagem.
 - Ordem dos serviços: persistência → mundo → rede. Na parada, a rede fecha primeiro e a persistência grava o resto por último.
 
 ## Handlers

@@ -7,16 +7,41 @@ namespace DRPGServer.Data.Persistence;
 
 /// <summary>
 /// Gravações em segundo plano, em ordem. O mundo enfileira snapshots e segue sem esperar o banco.
+/// Gravações do mesmo personagem são coalescidas para o snapshot mais recente pendente (evita transações redundantes).
 /// Quem precisa ler o que acabou de ser salvo (entrar no mapa logo depois de sair) chama <see cref="FlushAsync"/>.
 /// </summary>
 public sealed class PersistenceQueue
 {
     private readonly Channel<Func<CancellationToken, Task>> _jobs = Channel.CreateUnbounded<Func<CancellationToken, Task>>(
         new UnboundedChannelOptions { SingleReader = true });
+    private readonly Dictionary<uint, Func<CancellationToken, Task>> _pendingCharacterSaves = [];
+    private readonly Lock _coalesceLock = new();
 
     internal ChannelReader<Func<CancellationToken, Task>> Reader => _jobs.Reader;
 
     public void Enqueue(Func<CancellationToken, Task> job) => _jobs.Writer.TryWrite(job);
+
+    /// <summary>
+    /// Enfileira a gravação de um personagem com coalescing por <paramref name="characterUid"/>:
+    /// se já existe um snapshot aguardando na fila, substitui pelo mais recente sem duplicar transações.
+    /// </summary>
+    public void EnqueueCharacterSave(uint characterUid, Func<CancellationToken, Task> job)
+    {
+        lock (_coalesceLock)
+        {
+            bool alreadyQueued = _pendingCharacterSaves.ContainsKey(characterUid);
+            _pendingCharacterSaves[characterUid] = job;
+            if (alreadyQueued) return;
+
+            _jobs.Writer.TryWrite(ct =>
+            {
+                Func<CancellationToken, Task>? latest;
+                lock (_coalesceLock)
+                    _pendingCharacterSaves.Remove(characterUid, out latest);
+                return latest is null ? Task.CompletedTask : latest(ct);
+            });
+        }
+    }
 
     /// <summary>Completa quando tudo o que foi enfileirado antes desta chamada estiver gravado.</summary>
     public Task FlushAsync()
@@ -69,5 +94,5 @@ public sealed class PersistenceService(PersistenceQueue queue, ILogger<Persisten
 public static class PersistenceQueueExtensions
 {
     public static void SaveCharacter(this PersistenceQueue queue, CharacterRepository repository, CharacterSnapshot snapshot) =>
-        queue.Enqueue(ct => repository.SaveAsync(snapshot, ct));
+        queue.EnqueueCharacterSave(snapshot.Uid, ct => repository.SaveAsync(snapshot, ct));
 }

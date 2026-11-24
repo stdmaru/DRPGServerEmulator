@@ -23,7 +23,10 @@ public sealed class AddAbilityPointHandler : PlayerHandler
         if (player.InBattle || player.Character.FindDigimon(uid) is not { } digimon || stat is < 1 or > 4) return;
         if (digimon.FormAtStage(stage) is not { } form) return;
         if (digimon.AllocatePoint(form, (StatKind)stat))
+        {
+            player.MarkDirty();
             player.Send(new AddAbilityPointPacket(digimon, form, stage, stat));
+        }
     }
 }
 
@@ -41,7 +44,10 @@ public sealed class SkillUpgradeHandler : PlayerHandler
         if (player.InBattle || player.Character.FindDigimon(uid) is not { } digimon || skill is < 1 or > DigimonForm.SkillSlots) return;
         if (digimon.FormAtStage(stage) is not { } form) return;
         if (digimon.UpgradeSkill(form, skill - 1))
+        {
+            player.MarkDirty();
             player.Send(new SkillUpgradePacket(digimon, form, stage, skill));
+        }
     }
 }
 
@@ -84,7 +90,10 @@ public sealed class SetLeaderHandler : PlayerHandler
         var c = player.Character;
         if (player.InBattle || characterUid != c.Uid || c.FindDigimon(digimonUid) is not { } digimon) return;
         if (c.SetLeader(digimon))
+        {
+            player.MarkDirty();
             player.Send(new SetLeaderPacket(c.Uid, digimon.Uid));
+        }
     }
 }
 
@@ -98,7 +107,10 @@ public sealed class PartySwapHandler : PlayerHandler
         ushort button = packet.ReadU16();
         if (player.InBattle || button > Character.PartySize - 3) return;
         if (player.Character.SwapSlots(button + 1, button + 2))
+        {
+            player.MarkDirty();
             player.Send(new PartySwapPacket(button));
+        }
     }
 }
 
@@ -137,6 +149,7 @@ public sealed partial class RenameHandler : IWorldPacketHandler
         }
         digimon!.Name = name;
         digimon.FreeRename = false;
+        player.RequestImmediateSave();
         player.Send(new RenamePacket(RenameResult.Renamed, RenameKind.Digimon, uid, name));
     }
 }
