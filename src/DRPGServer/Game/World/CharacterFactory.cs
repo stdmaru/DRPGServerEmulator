@@ -82,6 +82,9 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
         }
         foreach (var flag in record.Flags) character.SetFlag(flag);
         character.SetBits(row.Bits);
+        character.SetMedals(row.Medals);
+        character.SetCoins(row.Coins);
+        character.SetLadderPoints(row.LadderPoints);
         return character;
     }
 

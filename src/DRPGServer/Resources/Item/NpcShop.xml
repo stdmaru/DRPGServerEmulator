@@ -10,39 +10,39 @@
     <Entry ID="23427" /> <!-- Digital Anvil (10.000.000 Bits) -->
   </Shop>
 
-  <!-- ✅ Capturado em captures.db (loja especial de evento / 1 Bit) -->
-  <Shop ID="5050" Kind="Item" Name="Loja Especial (1 Bit)">
-    <Entry ID="21008" Price="1" /> <!-- Exchange Ticket : Super Ultimate X (Virus) -->
-    <Entry ID="21009" Price="1" /> <!-- Exchange Ticket : Super Ultimate X (Vaccine) -->
-    <Entry ID="21010" Price="1" /> <!-- Exchange Ticket : Super Ultimate X (Data) -->
-    <Entry ID="22037" Price="1" /> <!-- Shining Digimental of Miracles X -->
-    <Entry ID="24271" Price="1" /> <!-- Black Digitron X -->
-    <Entry ID="22066" Price="1" /> <!-- Special Taming Net X -->
-    <Entry ID="2000040" Price="1" /> <!-- Omegamon Zwart DⅠ Evolution Card X -->
-    <Entry ID="2000042" Price="1" /> <!-- Omegamon Zwart DⅡ Evolution Card X -->
-    <Entry ID="2000044" Price="1" /> <!-- Omegamon Zwart DⅢ Evolution Card X -->
-    <Entry ID="24623" Price="1" /> <!-- Will of Fusion X -->
-    <Entry ID="23333" Price="1" /> <!-- Torn Lady Devimon Evolution Card X -->
-    <Entry ID="2000251" Price="1" /> <!-- Lotusmon Evolution Card 1 X -->
-    <Entry ID="2000152" Price="1" /> <!-- Meicoomon Evolution Card 1 X -->
-    <Entry ID="2000153" Price="1" /> <!-- Meicrackmon : Vicious Mode Evolution Card 1 X -->
-    <Entry ID="2000151" Price="1" /> <!-- Aegisdramon Evolution Card X -->
-    <Entry ID="2000159" Price="1" /> <!-- Raguelmon Evolution Card 1 X -->
-    <Entry ID="2000161" Price="1" /> <!-- Ofanimon : Falldown Mode Evolution Card 1 X -->
-    <Entry ID="24562" Price="1" /> <!-- Imperfect Spirit X -->
-    <Entry ID="24182" Price="1" /> <!-- Will of White Lopmon X -->
-    <Entry ID="24190" Price="1" /> <!-- Power of General X -->
-    <Entry ID="24261" Price="1" /> <!-- Over Storage X -->
-    <Entry ID="24331" Price="1" /> <!-- Faded Digivice X -->
-    <Entry ID="24418" Price="1" /> <!-- Darkness Loader X -->
-    <Entry ID="22018" Price="1" /> <!-- Evil Ring X -->
-    <Entry ID="24621" Price="1" /> <!-- Ofanimon Evolution Return X -->
-    <Entry ID="9710" Price="1" /> <!-- Groovy Mirror Ball X -->
-    <Entry ID="9513" Price="1" /> <!-- Groovy Equalizer X -->
-    <Entry ID="25005" Price="1" /> <!-- Key - Omega X -->
-    <Entry ID="25032" Price="1" /> <!-- Key - Alpha X -->
-    <Entry ID="25069" Price="1" /> <!-- Key - Chrondigizoid X -->
-    <Entry ID="25227" Price="1" /> <!-- Key - Dragon Emperor X -->
+  <!-- ✅ Capturado em captures.db (loja especial de Coins / DR's Earned Coin — preço vem de item_info_us col. 15 / ItemRecord +90) -->
+  <Shop ID="5050" Kind="Item" Currency="Coins" Name="Loja Especial (Coins)">
+    <Entry ID="21008" /> <!-- Exchange Ticket : Super Ultimate X (Virus) (150 Coins) -->
+    <Entry ID="21009" /> <!-- Exchange Ticket : Super Ultimate X (Vaccine) (150 Coins) -->
+    <Entry ID="21010" /> <!-- Exchange Ticket : Super Ultimate X (Data) (150 Coins) -->
+    <Entry ID="22037" /> <!-- Shining Digimental of Miracles X (20 Coins) -->
+    <Entry ID="24271" /> <!-- Black Digitron X (20 Coins) -->
+    <Entry ID="22066" /> <!-- Special Taming Net X (50 Coins) -->
+    <Entry ID="2000040" /> <!-- Omegamon Zwart DⅠ Evolution Card X -->
+    <Entry ID="2000042" /> <!-- Omegamon Zwart DⅡ Evolution Card X -->
+    <Entry ID="2000044" /> <!-- Omegamon Zwart DⅢ Evolution Card X -->
+    <Entry ID="24623" /> <!-- Will of Fusion X -->
+    <Entry ID="23333" /> <!-- Torn Lady Devimon Evolution Card X -->
+    <Entry ID="2000251" /> <!-- Lotusmon Evolution Card 1 X -->
+    <Entry ID="2000152" /> <!-- Meicoomon Evolution Card 1 X -->
+    <Entry ID="2000153" /> <!-- Meicrackmon : Vicious Mode Evolution Card 1 X -->
+    <Entry ID="2000151" /> <!-- Aegisdramon Evolution Card X -->
+    <Entry ID="2000159" /> <!-- Raguelmon Evolution Card 1 X -->
+    <Entry ID="2000161" /> <!-- Ofanimon : Falldown Mode Evolution Card 1 X -->
+    <Entry ID="24562" /> <!-- Imperfect Spirit X -->
+    <Entry ID="24182" /> <!-- Will of White Lopmon X -->
+    <Entry ID="24190" /> <!-- Power of General X -->
+    <Entry ID="24261" /> <!-- Over Storage X -->
+    <Entry ID="24331" /> <!-- Faded Digivice X -->
+    <Entry ID="24418" /> <!-- Darkness Loader X -->
+    <Entry ID="22018" /> <!-- Evil Ring X -->
+    <Entry ID="24621" /> <!-- Ofanimon Evolution Return X -->
+    <Entry ID="9710" /> <!-- Groovy Mirror Ball X -->
+    <Entry ID="9513" /> <!-- Groovy Equalizer X -->
+    <Entry ID="25005" /> <!-- Key - Omega X (200 Coins) -->
+    <Entry ID="25032" /> <!-- Key - Alpha X (200 Coins) -->
+    <Entry ID="25069" /> <!-- Key - Chrondigizoid X (200 Coins) -->
+    <Entry ID="25227" /> <!-- Key - Dragon Emperor X (200 Coins) -->
   </Shop>
 
   <!-- ✅ Capturado em captures.db (Digital Administration Bureau — Itens) -->

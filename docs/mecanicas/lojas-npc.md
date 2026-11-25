@@ -9,10 +9,19 @@ Especificação das lojas genéricas de NPC (compra e venda por Bits), baseada n
 Cada `<Shop>` possui:
 - `ID`: identificador enviado pelo cliente em `C2S 0x0050` (cards) ou `C2S 0x0052` (itens).
 - `Kind`: `Card` (`0x0050`/`0x0051`) ou `Item` (`0x0052`/`0x0053`).
-- Até 40 `<Entry ID="..." [Price="..."] />`. Quando `Price` é omitido, o servidor usa `BuyPrice` de `item_info_us.dat` / `card_info_us.dat`.
+- `Currency` *(opcional, padrão `Bits`)*: `Bits`, `Medals`, `Coins` ou `LadderPoints` (confirmado em `table\textattach_us.dat` strings `3545..3549` e `DigimonRPG.bin @ 0x00AEEC90..0x00AEF238` / `0x00B131EA..0x00B132E0`):
+  - `Bits` (`action=1`): preço em `ItemRecord +20` (`BuyPrice`), saldo em `double [player+0x12F0]`.
+  - `Medals` (`action=3`): preço em `ItemRecord +88` (`u16`), saldo em `WORD [player+0x4070]`.
+  - `Coins` (`action=4`, loja `5050`): preço em `ItemRecord +90` (`u16` = `Col16`), saldo em `WORD [player+0x4072]` (máx. 20.000).
+  - `LadderPoints` (`action=5`): preço em `ItemRecord +92` (`u32` = `Col17`), saldo em `DWORD [player+0x12B0]`.
+- Até 40 `<Entry ID="..." [Price="..."] />`. Quando `Price` é omitido, o servidor usa o campo de preço correspondente na tabela do cliente.
+
+### `Map 0x00CB` — Atualizar Moedas (`S2C`, 16 B) ✅
+- **Evidência**: `DigimonRPG.bin @ 0x00ABFAC2`.
+- `+0x00` (`double`): `Bits`; `+0x08` (`u32`): `Medals`; `+0x0C` (`u32`): `Coins`.
 
 Lojas capturadas incluídas inicialmente:
-- **Itens (`0x0052`)**: `1101` (Freyja/Digital Anvil), `5050` (Loja especial 1 Bit), `5101` (Digital Administration Bureau), `13602` (Símbolos e roupas Beginner), `40101` (Gekomon Village).
+- **Itens (`0x0052`)**: `1101` (Freyja/Digital Anvil), `5050` (Loja especial de **Coins**), `5101` (Digital Administration Bureau), `13602` (Símbolos e roupas Beginner), `40101` (Gekomon Village).
 - **Cards (`0x0050`)**: `5201` (Digital Administration Bureau), `40201` (Gekomon Village).
 
 ---

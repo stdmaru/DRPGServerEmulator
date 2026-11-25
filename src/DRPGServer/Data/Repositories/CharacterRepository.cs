@@ -17,6 +17,9 @@ public sealed class CharacterRow
     public short PosX { get; set; }
     public short PosY { get; set; }
     public double Bits { get; set; }
+    public ushort Medals { get; set; }
+    public ushort Coins { get; set; }
+    public uint LadderPoints { get; set; }
     public int TotalWins { get; set; }
     public int TotalBattles { get; set; }
     public byte DepositorySlots { get; set; }
@@ -73,8 +76,8 @@ public sealed record CharacterRecord(
 
 /// <summary>O que é salvo de um personagem. Montado na thread do mundo, gravado fora dela.</summary>
 public sealed record CharacterSnapshot(
-    uint Uid, ushort Level, byte MapId, short X, short Y, double Bits, int TotalWins, int TotalBattles,
-    byte DepositorySlots,
+    uint Uid, ushort Level, byte MapId, short X, short Y, double Bits, ushort Medals, ushort Coins, uint LadderPoints,
+    int TotalWins, int TotalBattles, byte DepositorySlots,
     IReadOnlyList<DigimonSnapshot> Digimons, IReadOnlyList<FormRow> Forms, IReadOnlyList<ItemRow> Items,
     IReadOnlyList<ushort> Flags, IReadOnlyList<TitleRow> Titles)
 {
@@ -106,7 +109,8 @@ public sealed record CharacterSnapshot(
         var items = new[] { c.Inventory.Main, c.Inventory.Battle, c.Inventory.CardSlots, c.Inventory.Equipment }
             .SelectMany(b => b.Items.Select(i => new ItemRow((byte)b.Kind, (byte)i.Slot, i.Uid, i.ItemId, i.Amount, i.ExpiresAt)))
             .ToList();
-        return new(c.Uid, c.Level, c.MapId, c.X, c.Y, c.Bits, c.TotalWins, c.TotalBattles, c.DepositorySlots,
+        return new(c.Uid, c.Level, c.MapId, c.X, c.Y, c.Bits, c.Medals, c.Coins, c.LadderPoints,
+            c.TotalWins, c.TotalBattles, c.DepositorySlots,
             digimons, forms, items, c.Flags.Order().ToList(), titles);
     }
 }
@@ -124,7 +128,7 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
 {
     private const string SelectWithLeader = """
         SELECT c.uid, c.account_uid, c.slot, c.name, c.tamer_id, c.level, c.map_id, c.pos_x, c.pos_y,
-               c.bits, c.total_wins, c.total_battles, c.depository_slots,
+               c.bits, c.medals, c.coins, c.ladder_points, c.total_wins, c.total_battles, c.depository_slots,
                d.uid AS digimon_uid, d.digimon_id, d.name AS digimon_name, d.level AS digimon_level,
                d.exp AS digimon_exp, d.alloc_str, d.alloc_agi, d.alloc_con, d.alloc_int,
                d.ability_points, d.skill_points, d.total_wins AS digimon_wins, d.total_battles AS digimon_battles
@@ -226,6 +230,7 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
         await db.ExecuteAsync(new CommandDefinition("""
             UPDATE `character`
             SET level = @Level, map_id = @MapId, pos_x = @X, pos_y = @Y, bits = @Bits,
+                medals = @Medals, coins = @Coins, ladder_points = @LadderPoints,
                 total_wins = @TotalWins, total_battles = @TotalBattles, depository_slots = @DepositorySlots
             WHERE uid = @Uid
             """, s, tx, cancellationToken: ct));

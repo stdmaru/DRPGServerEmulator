@@ -83,6 +83,8 @@ public sealed class JoinCharacterHandler(
     {
         player.Send(new CharacterDataPacket(player.Character));
         player.Send(new InventoryDataPacket(player.Character.Inventory));
+        if (player.Character.Medals > 0 || player.Character.Coins > 0)
+            player.Send(new CurrencyUpdatePacket(player.Character));
         for (int i = 0x29; i <= 0x2F; i++) player.Send(new Unknown7EPacket(i));
         for (int i = 0x3D; i <= 0x43; i++) player.Send(new Unknown7FPacket(i));
         player.Send(new Unknown05Packet());

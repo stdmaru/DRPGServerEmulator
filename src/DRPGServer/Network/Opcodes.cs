@@ -95,6 +95,7 @@ public enum MapOpcode : ushort
     BattleItemReceive = 0xC8,      // S2C ✅ item na bolsa de batalha (registro de 76)
     InventoryItemReceive = 0xC9,
     CashDepositoryAuth = 0xCA,     // ✅ Cash Depository: autenticar/abrir janela 0x46 (C2S 117 B → S2C 103 B)
+    CurrencyUpdate = 0xCB,         // ✅ S2C (16 B): sincroniza Bits (f64), Medals (u32) e Coins (u32) (DigimonRPG.bin @ 0x00ABFAC2)
     CashDepositoryWithdraw = 0xDD, // ✅ Cash Depository: retirar card (1) ou item (2) (C2S 206 B → S2C 192 B)
     CashDepositoryList = 0xDE,     // ✅ Cash Depository: listar 24 cards + 24 items (C2S 4434 B → S2C 4420 B)
     ExpEvent = 0xE6,

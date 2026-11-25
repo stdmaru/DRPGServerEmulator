@@ -151,7 +151,10 @@ public sealed class ItemShopTradeHandler(GameData data) : PlayerHandler
         switch ((NpcShopAction)actionRaw)
         {
             case NpcShopAction.Buy:
-                HandleBuy(player, shopId, itemId, quantity);
+            case NpcShopAction.BuyMedals:
+            case NpcShopAction.BuyCoins:
+            case NpcShopAction.BuyLadderPoints:
+                HandleBuy(player, (NpcShopAction)actionRaw, shopId, itemId, quantity);
                 break;
             case NpcShopAction.Sell:
                 HandleSell(player, shopId, place, col, row, uid, itemId, quantity);
@@ -159,36 +162,65 @@ public sealed class ItemShopTradeHandler(GameData data) : PlayerHandler
         }
     }
 
-    private void HandleBuy(Player player, uint shopId, uint itemId, uint quantity)
+    private void HandleBuy(Player player, NpcShopAction action, uint shopId, uint itemId, uint quantity)
     {
         if (data.FindNpcShop(shopId, NpcShopKind.Item) is not { } shop) return;
+        if ((uint)shop.Currency != (uint)action) return; // bloqueia compra com moeda incompatível com a loja
         if (shop.FindEntry(itemId) is not { } entry) return;
         if (data.FindItem(itemId) is not { } info) return;
 
         // Itens não empilháveis (MaxStack == 1) comprados 1 por vez
         if (info.MaxStack <= 1 && quantity > 1) return;
 
-        uint unitPrice = entry.PriceOverride ?? info.BuyPrice;
-        double totalCost = (double)unitPrice * quantity;
-        if (player.Character.Bits < totalCost) return;
-
         var bag = player.Character.Inventory.Main;
         if (bag.Room(itemId) < quantity) return;
 
-        if (!player.Character.TrySpendBits(totalCost)) return;
+        var character = player.Character;
+        uint unitPrice = shop.Currency switch
+        {
+            NpcShopCurrency.Bits => entry.PriceOverride ?? info.BuyPrice,
+            NpcShopCurrency.Medals => entry.PriceOverride ?? (info.Type == 7 ? 32000u : 9999u),
+            NpcShopCurrency.Coins => entry.PriceOverride ?? info.Col16,
+            NpcShopCurrency.LadderPoints => entry.PriceOverride ?? info.Col17,
+            _ => 0u,
+        };
+        if (unitPrice == 0) return;
+
+        ulong totalCostLong = (ulong)unitPrice * quantity;
+        if (totalCostLong > uint.MaxValue && shop.Currency != NpcShopCurrency.Bits) return;
+
+        bool spent = shop.Currency switch
+        {
+            NpcShopCurrency.Bits => character.TrySpendBits((double)unitPrice * quantity),
+            NpcShopCurrency.Medals => character.TrySpendMedals((uint)totalCostLong),
+            NpcShopCurrency.Coins => character.TrySpendCoins((uint)totalCostLong),
+            NpcShopCurrency.LadderPoints => character.TrySpendLadderPoints((uint)totalCostLong),
+            _ => false,
+        };
+        if (!spent) return;
+
         var added = bag.Add(itemId, quantity);
         if (added.Count == 0)
         {
-            player.Character.AddBits(totalCost);
+            // Rollback se falhar ao adicionar
+            switch (shop.Currency)
+            {
+                case NpcShopCurrency.Bits: character.AddBits((double)unitPrice * quantity); break;
+                case NpcShopCurrency.Medals: character.AddMedals((uint)totalCostLong); break;
+                case NpcShopCurrency.Coins: character.AddCoins((uint)totalCostLong); break;
+                case NpcShopCurrency.LadderPoints: character.AddLadderPoints((uint)totalCostLong); break;
+            }
             return;
         }
 
         player.RequestImmediateSave();
         var primary = added[0];
         player.Send(new ItemShopTradePacket(
-            NpcShopAction.Buy, primary, quantity, player.Character.Bits,
-            ItemPlace.Inventory, primary.Column, primary.Row, shopId));
+            action, primary, quantity, character.Bits,
+            ItemPlace.Inventory, primary.Column, primary.Row, shopId, character.Coins));
         player.Send(new ItemReceivePacket(added));
+        if (shop.Currency is NpcShopCurrency.Medals or NpcShopCurrency.Coins)
+            player.Send(new CurrencyUpdatePacket(character));
     }
 
     private void HandleSell(Player player, uint shopId, ItemPlace place, int col, int row, uint uid, uint itemId, uint quantity)

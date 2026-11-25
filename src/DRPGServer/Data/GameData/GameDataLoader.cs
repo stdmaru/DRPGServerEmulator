@@ -212,6 +212,14 @@ public static class GameDataLoader
                 _ => throw new GameDataException($"NpcShop {id}: Kind '{kindStr}' inválido (esperado 'Card' ou 'Item')"),
             };
             string name = (string?)s.Attribute("Name") ?? "";
+            var currency = (string?)s.Attribute("Currency") switch
+            {
+                null or "" or "Bits" => NpcShopCurrency.Bits,
+                "Medals" => NpcShopCurrency.Medals,
+                "Coins" => NpcShopCurrency.Coins,
+                "LadderPoints" => NpcShopCurrency.LadderPoints,
+                var other => throw new GameDataException($"NpcShop {id}: Currency '{other}' inválido (esperado Bits, Medals, Coins ou LadderPoints)"),
+            };
             var entries = s.Elements("Entry")
                 .Select(e => new NpcShopEntry(
                     U32(e, "ID"),
@@ -219,7 +227,7 @@ public static class GameDataLoader
                 .ToList();
             if (entries.Count > NpcShop.MaxSlots)
                 throw new GameDataException($"NpcShop {id}: {entries.Count} itens excede o máximo de {NpcShop.MaxSlots}");
-            if (!shops.TryAdd(id, new NpcShop(id, kind, name, entries)))
+            if (!shops.TryAdd(id, new NpcShop(id, kind, name, entries, currency)))
                 throw new GameDataException($"NpcShop {id} duplicado");
         }
         return shops.ToFrozenDictionary();

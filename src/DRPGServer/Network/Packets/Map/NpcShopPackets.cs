@@ -7,8 +7,27 @@ namespace DRPGServer.Network.Packets.Map;
 /// <summary>✅ Ações de compra/venda em lojas de NPC (<c>0x0051</c> e <c>0x0053</c>; <c>DigimonRPG.bin @ 0x00AEE718 / 0x00AEEC90</c>).</summary>
 public enum NpcShopAction : uint
 {
-    Buy = 1,
-    Sell = 2,
+    Buy = 1,             // Bits (0xDD9)
+    Sell = 2,            // Venda por Bits (0xDDD)
+    BuyMedals = 3,       // Medals (0xDDA, ItemRecord +88)
+    BuyCoins = 4,        // Coins / DR's Earned Coin (0xDDB, ItemRecord +90 = Col16)
+    BuyLadderPoints = 5, // Ladder Points (0xDDC, ItemRecord +92 = Col17)
+}
+
+/// <summary>
+/// ✅ Map 0x00CB (16 B): sincroniza Bits (<c>double</c>), Medals (<c>u32 → WORD [player+0x4070]</c>) e
+/// Coins (<c>u32 → WORD [player+0x4072]</c>). Confirmado em <c>DigimonRPG.bin @ 0x00ABFAC2</c>.
+/// </summary>
+public sealed class CurrencyUpdatePacket(Character character) : ServerPacket
+{
+    public override ushort Opcode => (ushort)MapOpcode.CurrencyUpdate;
+
+    protected override void Write(PacketWriter w)
+    {
+        w.WriteF64(character.Bits);        // +0x00
+        w.WriteU32(character.Medals);      // +0x08
+        w.WriteU32(character.Coins);       // +0x0C (16 B total)
+    }
 }
 
 /// <summary>
@@ -64,7 +83,14 @@ public sealed class ItemShopListPacket(NpcShop shop, GameData data) : ServerPack
             var info = data.FindItem(entry.ItemId);
             if (info is null) continue;
             if (entry.PriceOverride is { } price)
-                info = info with { BuyPrice = price };
+            {
+                info = shop.Currency switch
+                {
+                    NpcShopCurrency.Coins => info with { Col16 = (ushort)Math.Min(price, ushort.MaxValue) },
+                    NpcShopCurrency.LadderPoints => info with { Col17 = price },
+                    _ => info with { BuyPrice = price },
+                };
+            }
 
             uint expiresAt = info.IsTimed
                 ? (uint)Math.Clamp(now + info.DurationSeconds, 1, uint.MaxValue)
@@ -129,7 +155,8 @@ public sealed class ItemShopTradePacket(
     ItemPlace place,
     int col,
     int row,
-    uint shopId) : ServerPacket
+    uint shopId,
+    ushort coinsAfter = 0) : ServerPacket
 {
     public override ushort Opcode => (ushort)MapOpcode.ItemShopTrade;
 
@@ -143,7 +170,7 @@ public sealed class ItemShopTradePacket(
         w.WriteU32(quantity);              // +0x70
         w.WriteU32(0);                     // +0x74
         w.WriteF64(bits);                  // +0x78
-        w.WriteU16(0);                     // +0x80
+        w.WriteU16(coinsAfter);            // +0x80 ✅ novo saldo de Coins quando action == BuyCoins (0x00AEEDE5)
         w.WriteU16((ushort)place);         // +0x82 (3 = Inventory)
         w.WriteI32(col);                   // +0x84
         w.WriteI32(row);                   // +0x88

@@ -209,11 +209,25 @@ public enum NpcShopKind : byte
     Item = 2,
 }
 
+/// <summary>Moeda aceita por uma loja genérica de NPC (<c>0x0053</c>: 1=Bits, 3=Medals, 4=Coins, 5=LadderPoints).</summary>
+public enum NpcShopCurrency : byte
+{
+    Bits = 1,
+    Medals = 3,
+    Coins = 4,
+    LadderPoints = 5,
+}
+
 /// <summary>Um item ou card vendido por uma loja de NPC (<c>Resources/Item/NpcShop.xml</c>).</summary>
 public sealed record NpcShopEntry(uint ItemId, uint? PriceOverride = null);
 
 /// <summary>Uma loja genérica de NPC (até 40 itens ou cards).</summary>
-public sealed record NpcShop(uint ShopId, NpcShopKind Kind, string Name, IReadOnlyList<NpcShopEntry> Entries)
+public sealed record NpcShop(
+    uint ShopId,
+    NpcShopKind Kind,
+    string Name,
+    IReadOnlyList<NpcShopEntry> Entries,
+    NpcShopCurrency Currency = NpcShopCurrency.Bits)
 {
     public const int MaxSlots = 40;
 
