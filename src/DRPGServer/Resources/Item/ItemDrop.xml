@@ -1,6 +1,126 @@
 <DropTable>
+    <!-- Convenção: ID=1 reservado para o Yuramon do tutorial (Mapa 79); demais grupos usam o DigimonID da espécie. -->
+    <!-- Todas as taxas iniciam em 100% para validação/coleta inicial e serão calibradas depois. -->
     <DropGroup ID="1"> <!-- ✅ Yuramon do tutorial: duas Yuramon's Seeds por vitória (sessões 53 e 56) -->
         <Item ID="41" DropRate="100"/>
         <Item ID="41" DropRate="100"/>
+    </DropGroup>
+    <DropGroup ID="13"> <!-- ✅ captures.db | Tokomon -->
+        <Item ID="40" DropRate="100"/> <!-- Tokomon's Tooth -->
+    </DropGroup>
+    <DropGroup ID="14"> <!-- ✅ captures.db | Yuramon -->
+        <Item ID="41" DropRate="100"/> <!-- Yuramon's Seed -->
+        <Item ID="25" DropRate="100"/> <!-- Bread -->
+    </DropGroup>
+    <DropGroup ID="15"> <!-- ❓ item_info_us.dat (Type=5) | Pagumon(Ore-type) -->
+        <Item ID="42" DropRate="100"/> <!-- Pagumon's Tear -->
+    </DropGroup>
+    <DropGroup ID="16"> <!-- ❓ item_info_us.dat (Type=5) | Nyaromon -->
+        <Item ID="43" DropRate="100"/> <!-- Nyaromon's Beard -->
+    </DropGroup>
+    <DropGroup ID="17"> <!-- ❓ item_info_us.dat (Type=5) | Zurumon -->
+        <Item ID="44" DropRate="100"/> <!-- Zurumon's Poison -->
+    </DropGroup>
+    <DropGroup ID="18"> <!-- ❓ item_info_us.dat (Type=5) | Choromon -->
+        <Item ID="45" DropRate="100"/> <!-- Choromon's Flame -->
+    </DropGroup>
+    <DropGroup ID="19"> <!-- ❓ item_info_us.dat (Type=5) | Mochimon -->
+        <Item ID="46" DropRate="100"/> <!-- Mochimon's Tear -->
+    </DropGroup>
+    <DropGroup ID="20"> <!-- ❓ item_info_us.dat (Type=5) | Tunomon -->
+        <Item ID="47" DropRate="100"/> <!-- Tunomon's Horn Piece -->
+    </DropGroup>
+    <DropGroup ID="21"> <!-- ❓ item_info_us.dat (Type=5) | Koromon -->
+        <Item ID="48" DropRate="100"/> <!-- Koromon's Tear -->
+    </DropGroup>
+    <DropGroup ID="22"> <!-- ✅ captures.db | Pyocomon -->
+        <Item ID="49" DropRate="100"/> <!-- Pyocomon's Pollen -->
+    </DropGroup>
+    <DropGroup ID="23"> <!-- ✅ captures.db | Pukamon(Beast-type) -->
+        <Item ID="50" DropRate="100"/> <!-- Pukamon's Bubble -->
+    </DropGroup>
+    <DropGroup ID="25"> <!-- ❓ item_info_us.dat (Type=5) | Poromon -->
+        <Item ID="1014" DropRate="100"/> <!-- Poromon's Feather -->
+    </DropGroup>
+    <DropGroup ID="26"> <!-- ❓ item_info_us.dat (Type=5) | Upamon -->
+        <Item ID="1015" DropRate="100"/> <!-- Upamon's Wings -->
+    </DropGroup>
+    <DropGroup ID="28"> <!-- ❓ item_info_us.dat (Type=5) | Chocomon(Vice) -->
+        <Item ID="1016" DropRate="100"/> <!-- Chocomon's Horn -->
+    </DropGroup>
+    <DropGroup ID="32"> <!-- ❓ item_info_us.dat (Type=5) | Caprimon(Knight-type) -->
+        <Item ID="1017" DropRate="100"/> <!-- Caprimon's Helmet -->
+    </DropGroup>
+    <DropGroup ID="33"> <!-- ❓ item_info_us.dat (Type=5) | Peti Meramon(Wizard-type) -->
+        <Item ID="1018" DropRate="100"/> <!-- Peti Meramon's Flame -->
+    </DropGroup>
+    <DropGroup ID="35"> <!-- ❓ item_info_us.dat (Type=5) | Minomon -->
+        <Item ID="1019" DropRate="100"/> <!-- Minomon's Skin -->
+    </DropGroup>
+    <DropGroup ID="36"> <!-- ❓ item_info_us.dat (Type=5) | Paomon -->
+        <Item ID="1020" DropRate="100"/> <!-- Paomon's Fur -->
+    </DropGroup>
+    <DropGroup ID="37"> <!-- ❓ item_info_us.dat (Type=5) | Pagumon(Oni-type) -->
+        <Item ID="42" DropRate="100"/> <!-- Pagumon's Tear -->
+    </DropGroup>
+    <DropGroup ID="38"> <!-- ❓ item_info_us.dat (Type=5) | Caprimon(Warrior-type) -->
+        <Item ID="1017" DropRate="100"/> <!-- Caprimon's Helmet -->
+    </DropGroup>
+    <DropGroup ID="39"> <!-- ❓ item_info_us.dat (Type=5) | Kuramon -->
+        <Item ID="1021" DropRate="100"/> <!-- Kuramon's Eye -->
+    </DropGroup>
+    <DropGroup ID="41"> <!-- ❓ item_info_us.dat (Type=5) | Zurumon(Aquatic-type) -->
+        <Item ID="44" DropRate="100"/> <!-- Zurumon's Poison -->
+    </DropGroup>
+    <DropGroup ID="43"> <!-- ❓ item_info_us.dat (Type=5) | Pukamon(Aquatic-type) -->
+        <Item ID="50" DropRate="100"/> <!-- Pukamon's Bubble -->
+    </DropGroup>
+    <DropGroup ID="47"> <!-- ❓ item_info_us.dat (Type=5) | Pagumon(Satan-type) -->
+        <Item ID="42" DropRate="100"/> <!-- Pagumon's Tear -->
+    </DropGroup>
+    <DropGroup ID="48"> <!-- ❓ item_info_us.dat (Type=5) | Mochimon(Insect-type) -->
+        <Item ID="46" DropRate="100"/> <!-- Mochimon's Tear -->
+    </DropGroup>
+    <DropGroup ID="49"> <!-- ❓ item_info_us.dat (Type=5) | Peti Meramon(Meteorite-type) -->
+        <Item ID="1018" DropRate="100"/> <!-- Peti Meramon's Flame -->
+    </DropGroup>
+    <DropGroup ID="50"> <!-- ❓ item_info_us.dat (Type=5) | Pagumon(Demon-type) -->
+        <Item ID="42" DropRate="100"/> <!-- Pagumon's Tear -->
+    </DropGroup>
+    <DropGroup ID="54"> <!-- ❓ item_info_us.dat (Type=5) | Patamon -->
+        <Item ID="51" DropRate="100"/> <!-- Patamon's Fur -->
+    </DropGroup>
+    <DropGroup ID="56"> <!-- ✅ captures.db | Palmon -->
+        <Item ID="53" DropRate="100"/> <!-- Palmon's Petal -->
+        <Item ID="25" DropRate="100"/> <!-- Bread -->
+    </DropGroup>
+    <DropGroup ID="61"> <!-- ❓ item_info_us.dat (Type=5) | Goburimon -->
+        <Item ID="56" DropRate="100"/> <!-- Goburimon's Earrings -->
+    </DropGroup>
+    <DropGroup ID="63"> <!-- ❓ item_info_us.dat (Type=5) | Piyomon -->
+        <Item ID="57" DropRate="100"/> <!-- Piyomon's Feather -->
+    </DropGroup>
+    <DropGroup ID="65"> <!-- ✅ captures.db | Plotmon -->
+        <Item ID="59" DropRate="100"/> <!-- Plotmon's Fur -->
+    </DropGroup>
+    <DropGroup ID="68"> <!-- ❓ item_info_us.dat (Type=5) | Tentomon -->
+        <Item ID="60" DropRate="100"/> <!-- Tentomon's Claw -->
+    </DropGroup>
+    <DropGroup ID="70"> <!-- ❓ item_info_us.dat (Type=5) | Floramon -->
+        <Item ID="62" DropRate="100"/> <!-- Floramon's Petal -->
+    </DropGroup>
+    <DropGroup ID="72"> <!-- ✅ captures.db | Penmon -->
+        <Item ID="64" DropRate="100"/> <!-- Penmon's Fur -->
+        <Item ID="21" DropRate="100"/> <!-- Theme Park -->
+    </DropGroup>
+    <DropGroup ID="73"> <!-- ❓ item_info_us.dat (Type=5) | Kunemon -->
+        <Item ID="65" DropRate="100"/> <!-- Kunemon's Sting -->
+    </DropGroup>
+    <DropGroup ID="78"> <!-- ✅ captures.db | Lopmon(Vice) -->
+        <Item ID="26" DropRate="100"/> <!-- French Fries -->
+        <Item ID="31" DropRate="100"/> <!-- Vitamin A -->
+    </DropGroup>
+    <DropGroup ID="633"> <!-- ✅ captures.db | Dracumon -->
+        <Item ID="31" DropRate="100"/> <!-- Vitamin A -->
     </DropGroup>
 </DropTable>

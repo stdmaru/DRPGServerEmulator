@@ -20,9 +20,9 @@
         <Point X="154" Y="32"/>
         <Point X="155" Y="37"/>
         <Point X="156" Y="28"/>
-        <SpawnOption DigimonID="14" Level="1" ExpReward="10" BitReward="5" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="14" Level="1" ExpReward="10" BitReward="5" AppearanceRate="79" DropGroup="0"/>
-        <SpawnOption DigimonID="14" Level="1" ExpReward="10" BitReward="5" AppearanceRate="62" DropGroup="0"/>
+        <SpawnOption DigimonID="14" Level="1" ExpReward="10" BitReward="5" AppearanceRate="100" DropGroup="14"/>
+        <SpawnOption DigimonID="14" Level="1" ExpReward="10" BitReward="5" AppearanceRate="79" DropGroup="14"/>
+        <SpawnOption DigimonID="14" Level="1" ExpReward="10" BitReward="5" AppearanceRate="62" DropGroup="14"/>
     </Spawn>
     <!-- Zurumon (ID 17) Lv.2: 6 grupos -->
     <Spawn MapID="2" RespawnTime="10">
@@ -32,9 +32,9 @@
         <Point X="140" Y="59"/>
         <Point X="140" Y="66"/>
         <Point X="144" Y="63"/>
-        <SpawnOption DigimonID="17" Level="2" ExpReward="11" BitReward="7" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="17" Level="2" ExpReward="11" BitReward="7" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="17" Level="2" ExpReward="11" BitReward="7" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="17" Level="2" ExpReward="11" BitReward="7" AppearanceRate="100" DropGroup="17"/>
+        <SpawnOption DigimonID="17" Level="2" ExpReward="11" BitReward="7" AppearanceRate="75" DropGroup="17"/>
+        <SpawnOption DigimonID="17" Level="2" ExpReward="11" BitReward="7" AppearanceRate="60" DropGroup="17"/>
     </Spawn>
     <!-- Zurumon(Aquatic-type (ID 41) Lv.2: 5 grupos -->
     <Spawn MapID="2" RespawnTime="10">
@@ -43,9 +43,9 @@
         <Point X="118" Y="175"/>
         <Point X="122" Y="162"/>
         <Point X="122" Y="171"/>
-        <SpawnOption DigimonID="41" Level="2" ExpReward="11" BitReward="7" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="41" Level="2" ExpReward="11" BitReward="7" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="41" Level="2" ExpReward="11" BitReward="7" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="41" Level="2" ExpReward="11" BitReward="7" AppearanceRate="100" DropGroup="41"/>
+        <SpawnOption DigimonID="41" Level="2" ExpReward="11" BitReward="7" AppearanceRate="75" DropGroup="41"/>
+        <SpawnOption DigimonID="41" Level="2" ExpReward="11" BitReward="7" AppearanceRate="60" DropGroup="41"/>
     </Spawn>
     <!-- Tokomon (ID 13) Lv.3: 16 grupos -->
     <Spawn MapID="2" RespawnTime="10">
@@ -65,9 +65,9 @@
         <Point X="146" Y="185"/>
         <Point X="146" Y="192"/>
         <Point X="148" Y="197"/>
-        <SpawnOption DigimonID="13" Level="3" ExpReward="12" BitReward="9" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="13" Level="3" ExpReward="12" BitReward="9" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="13" Level="3" ExpReward="12" BitReward="9" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="13" Level="3" ExpReward="12" BitReward="9" AppearanceRate="100" DropGroup="13"/>
+        <SpawnOption DigimonID="13" Level="3" ExpReward="12" BitReward="9" AppearanceRate="75" DropGroup="13"/>
+        <SpawnOption DigimonID="13" Level="3" ExpReward="12" BitReward="9" AppearanceRate="60" DropGroup="13"/>
     </Spawn>
     <!-- Nyaromon (ID 16) Lv.4: 12 grupos -->
     <Spawn MapID="2" RespawnTime="10">
@@ -83,9 +83,9 @@
         <Point X="103" Y="94"/>
         <Point X="106" Y="98"/>
         <Point X="107" Y="90"/>
-        <SpawnOption DigimonID="16" Level="4" ExpReward="7" BitReward="11" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="16" Level="4" ExpReward="7" BitReward="11" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="16" Level="4" ExpReward="7" BitReward="11" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="16" Level="4" ExpReward="7" BitReward="11" AppearanceRate="100" DropGroup="16"/>
+        <SpawnOption DigimonID="16" Level="4" ExpReward="7" BitReward="11" AppearanceRate="75" DropGroup="16"/>
+        <SpawnOption DigimonID="16" Level="4" ExpReward="7" BitReward="11" AppearanceRate="60" DropGroup="16"/>
     </Spawn>
     <!-- Puroromon (ID 46) Lv.4: 10 grupos -->
     <Spawn MapID="2" RespawnTime="10">
@@ -121,9 +121,9 @@
         <Point X="94" Y="170"/>
         <Point X="96" Y="177"/>
         <Point X="98" Y="169"/>
-        <SpawnOption DigimonID="18" Level="5" ExpReward="12" BitReward="13" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="18" Level="5" ExpReward="12" BitReward="13" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="18" Level="5" ExpReward="12" BitReward="13" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="18" Level="5" ExpReward="12" BitReward="13" AppearanceRate="100" DropGroup="18"/>
+        <SpawnOption DigimonID="18" Level="5" ExpReward="12" BitReward="13" AppearanceRate="75" DropGroup="18"/>
+        <SpawnOption DigimonID="18" Level="5" ExpReward="12" BitReward="13" AppearanceRate="60" DropGroup="18"/>
     </Spawn>
     <!-- Peti Meramon(Wizard- (ID 33) Lv.6: 7 grupos -->
     <Spawn MapID="2" RespawnTime="10">
@@ -134,9 +134,9 @@
         <Point X="40" Y="59"/>
         <Point X="40" Y="69"/>
         <Point X="64" Y="100"/>
-        <SpawnOption DigimonID="33" Level="6" ExpReward="18" BitReward="15" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="33" Level="6" ExpReward="18" BitReward="15" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="33" Level="6" ExpReward="18" BitReward="15" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="33" Level="6" ExpReward="18" BitReward="15" AppearanceRate="100" DropGroup="33"/>
+        <SpawnOption DigimonID="33" Level="6" ExpReward="18" BitReward="15" AppearanceRate="75" DropGroup="33"/>
+        <SpawnOption DigimonID="33" Level="6" ExpReward="18" BitReward="15" AppearanceRate="60" DropGroup="33"/>
     </Spawn>
     <!-- Peti Meramon(Meteori (ID 49) Lv.6: 5 grupos -->
     <Spawn MapID="2" RespawnTime="10">
@@ -145,9 +145,9 @@
         <Point X="61" Y="191"/>
         <Point X="64" Y="184"/>
         <Point X="65" Y="108"/>
-        <SpawnOption DigimonID="49" Level="6" ExpReward="18" BitReward="15" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="49" Level="6" ExpReward="18" BitReward="15" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="49" Level="6" ExpReward="18" BitReward="15" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="49" Level="6" ExpReward="18" BitReward="15" AppearanceRate="100" DropGroup="49"/>
+        <SpawnOption DigimonID="49" Level="6" ExpReward="18" BitReward="15" AppearanceRate="75" DropGroup="49"/>
+        <SpawnOption DigimonID="49" Level="6" ExpReward="18" BitReward="15" AppearanceRate="60" DropGroup="49"/>
     </Spawn>
 
     <!-- ===== Mapa 46 — House of Gennai (8 grupos) ===== -->
@@ -160,9 +160,9 @@
         <Point X="13" Y="19"/>
         <Point X="14" Y="9"/>
         <Point X="14" Y="15"/>
-        <SpawnOption DigimonID="61" Level="11" ExpReward="32" BitReward="25" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="61" Level="11" ExpReward="32" BitReward="25" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="61" Level="11" ExpReward="32" BitReward="25" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="61" Level="11" ExpReward="32" BitReward="25" AppearanceRate="100" DropGroup="61"/>
+        <SpawnOption DigimonID="61" Level="11" ExpReward="32" BitReward="25" AppearanceRate="75" DropGroup="61"/>
+        <SpawnOption DigimonID="61" Level="11" ExpReward="32" BitReward="25" AppearanceRate="60" DropGroup="61"/>
     </Spawn>
     <!-- V-mon(Tamed) (ID 635) Lv.11: 1 grupos -->
     <Spawn MapID="46" RespawnTime="10" Exclusive="true">
@@ -199,9 +199,9 @@
         <Point X="110" Y="160"/>
         <Point X="114" Y="167"/>
         <Point X="115" Y="154"/>
-        <SpawnOption DigimonID="22" Level="1" ExpReward="10" BitReward="5" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="22" Level="1" ExpReward="10" BitReward="5" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="22" Level="1" ExpReward="10" BitReward="5" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="22" Level="1" ExpReward="10" BitReward="5" AppearanceRate="100" DropGroup="22"/>
+        <SpawnOption DigimonID="22" Level="1" ExpReward="10" BitReward="5" AppearanceRate="75" DropGroup="22"/>
+        <SpawnOption DigimonID="22" Level="1" ExpReward="10" BitReward="5" AppearanceRate="60" DropGroup="22"/>
     </Spawn>
     <!-- Mochimon (ID 19) Lv.2: 15 grupos -->
     <Spawn MapID="3" RespawnTime="10">
@@ -220,9 +220,9 @@
         <Point X="110" Y="129"/>
         <Point X="110" Y="137"/>
         <Point X="112" Y="134"/>
-        <SpawnOption DigimonID="19" Level="2" ExpReward="11" BitReward="7" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="19" Level="2" ExpReward="11" BitReward="7" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="19" Level="2" ExpReward="11" BitReward="7" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="19" Level="2" ExpReward="11" BitReward="7" AppearanceRate="100" DropGroup="19"/>
+        <SpawnOption DigimonID="19" Level="2" ExpReward="11" BitReward="7" AppearanceRate="75" DropGroup="19"/>
+        <SpawnOption DigimonID="19" Level="2" ExpReward="11" BitReward="7" AppearanceRate="60" DropGroup="19"/>
     </Spawn>
     <!-- Mochimon(Insect-type (ID 48) Lv.2: 12 grupos -->
     <Spawn MapID="3" RespawnTime="10">
@@ -238,9 +238,9 @@
         <Point X="98" Y="120"/>
         <Point X="101" Y="123"/>
         <Point X="102" Y="114"/>
-        <SpawnOption DigimonID="48" Level="2" ExpReward="11" BitReward="7" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="48" Level="2" ExpReward="11" BitReward="7" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="48" Level="2" ExpReward="11" BitReward="7" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="48" Level="2" ExpReward="11" BitReward="7" AppearanceRate="100" DropGroup="48"/>
+        <SpawnOption DigimonID="48" Level="2" ExpReward="11" BitReward="7" AppearanceRate="75" DropGroup="48"/>
+        <SpawnOption DigimonID="48" Level="2" ExpReward="11" BitReward="7" AppearanceRate="60" DropGroup="48"/>
     </Spawn>
     <!-- Upamon (ID 26) Lv.3: 26 grupos -->
     <Spawn MapID="3" RespawnTime="10">
@@ -270,9 +270,9 @@
         <Point X="113" Y="101"/>
         <Point X="115" Y="112"/>
         <Point X="116" Y="104"/>
-        <SpawnOption DigimonID="26" Level="3" ExpReward="12" BitReward="9" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="26" Level="3" ExpReward="12" BitReward="9" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="26" Level="3" ExpReward="12" BitReward="9" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="26" Level="3" ExpReward="12" BitReward="9" AppearanceRate="100" DropGroup="26"/>
+        <SpawnOption DigimonID="26" Level="3" ExpReward="12" BitReward="9" AppearanceRate="75" DropGroup="26"/>
+        <SpawnOption DigimonID="26" Level="3" ExpReward="12" BitReward="9" AppearanceRate="60" DropGroup="26"/>
     </Spawn>
     <!-- Minomon (ID 35) Lv.4: 24 grupos -->
     <Spawn MapID="3" RespawnTime="10">
@@ -300,9 +300,9 @@
         <Point X="107" Y="26"/>
         <Point X="108" Y="20"/>
         <Point X="112" Y="23"/>
-        <SpawnOption DigimonID="35" Level="4" ExpReward="7" BitReward="11" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="35" Level="4" ExpReward="7" BitReward="11" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="35" Level="4" ExpReward="7" BitReward="11" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="35" Level="4" ExpReward="7" BitReward="11" AppearanceRate="100" DropGroup="35"/>
+        <SpawnOption DigimonID="35" Level="4" ExpReward="7" BitReward="11" AppearanceRate="75" DropGroup="35"/>
+        <SpawnOption DigimonID="35" Level="4" ExpReward="7" BitReward="11" AppearanceRate="60" DropGroup="35"/>
     </Spawn>
     <!-- Paomon (ID 36) Lv.5: 14 grupos -->
     <Spawn MapID="3" RespawnTime="10">
@@ -320,9 +320,9 @@
         <Point X="94" Y="56"/>
         <Point X="95" Y="52"/>
         <Point X="96" Y="54"/>
-        <SpawnOption DigimonID="36" Level="5" ExpReward="12" BitReward="13" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="36" Level="5" ExpReward="12" BitReward="13" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="36" Level="5" ExpReward="12" BitReward="13" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="36" Level="5" ExpReward="12" BitReward="13" AppearanceRate="100" DropGroup="36"/>
+        <SpawnOption DigimonID="36" Level="5" ExpReward="12" BitReward="13" AppearanceRate="75" DropGroup="36"/>
+        <SpawnOption DigimonID="36" Level="5" ExpReward="12" BitReward="13" AppearanceRate="60" DropGroup="36"/>
     </Spawn>
     <!-- Tunomon (ID 20) Lv.6: 21 grupos -->
     <Spawn MapID="3" RespawnTime="10">
@@ -347,9 +347,9 @@
         <Point X="116" Y="42"/>
         <Point X="118" Y="38"/>
         <Point X="118" Y="50"/>
-        <SpawnOption DigimonID="20" Level="6" ExpReward="18" BitReward="15" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="20" Level="6" ExpReward="18" BitReward="15" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="20" Level="6" ExpReward="18" BitReward="15" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="20" Level="6" ExpReward="18" BitReward="15" AppearanceRate="100" DropGroup="20"/>
+        <SpawnOption DigimonID="20" Level="6" ExpReward="18" BitReward="15" AppearanceRate="75" DropGroup="20"/>
+        <SpawnOption DigimonID="20" Level="6" ExpReward="18" BitReward="15" AppearanceRate="60" DropGroup="20"/>
     </Spawn>
     <!-- Kuramon (ID 39) Lv.6: 13 grupos -->
     <Spawn MapID="3" RespawnTime="10">
@@ -366,9 +366,9 @@
         <Point X="89" Y="142"/>
         <Point X="89" Y="146"/>
         <Point X="90" Y="142"/>
-        <SpawnOption DigimonID="39" Level="6" ExpReward="18" BitReward="15" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="39" Level="6" ExpReward="18" BitReward="15" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="39" Level="6" ExpReward="18" BitReward="15" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="39" Level="6" ExpReward="18" BitReward="15" AppearanceRate="100" DropGroup="39"/>
+        <SpawnOption DigimonID="39" Level="6" ExpReward="18" BitReward="15" AppearanceRate="75" DropGroup="39"/>
+        <SpawnOption DigimonID="39" Level="6" ExpReward="18" BitReward="15" AppearanceRate="60" DropGroup="39"/>
     </Spawn>
 
     <!-- ===== Mapa 4 — North of Theme Park (207 grupos) ===== -->
@@ -395,9 +395,9 @@
         <Point X="108" Y="54"/>
         <Point X="109" Y="46"/>
         <Point X="110" Y="54"/>
-        <SpawnOption DigimonID="23" Level="7" ExpReward="20" BitReward="17" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="23" Level="7" ExpReward="20" BitReward="17" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="23" Level="7" ExpReward="20" BitReward="17" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="23" Level="7" ExpReward="20" BitReward="17" AppearanceRate="100" DropGroup="23"/>
+        <SpawnOption DigimonID="23" Level="7" ExpReward="20" BitReward="17" AppearanceRate="75" DropGroup="23"/>
+        <SpawnOption DigimonID="23" Level="7" ExpReward="20" BitReward="17" AppearanceRate="60" DropGroup="23"/>
     </Spawn>
     <!-- Pukamon(Aquatic-type (ID 43) Lv.7: 22 grupos -->
     <Spawn MapID="4" RespawnTime="10">
@@ -423,9 +423,9 @@
         <Point X="113" Y="114"/>
         <Point X="116" Y="118"/>
         <Point X="116" Y="126"/>
-        <SpawnOption DigimonID="43" Level="7" ExpReward="20" BitReward="17" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="43" Level="7" ExpReward="20" BitReward="17" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="43" Level="7" ExpReward="20" BitReward="17" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="43" Level="7" ExpReward="20" BitReward="17" AppearanceRate="100" DropGroup="43"/>
+        <SpawnOption DigimonID="43" Level="7" ExpReward="20" BitReward="17" AppearanceRate="75" DropGroup="43"/>
+        <SpawnOption DigimonID="43" Level="7" ExpReward="20" BitReward="17" AppearanceRate="60" DropGroup="43"/>
     </Spawn>
     <!-- Tanemon (ID 44) Lv.7: 29 grupos -->
     <Spawn MapID="4" RespawnTime="10">
@@ -510,9 +510,9 @@
         <Point X="82" Y="117"/>
         <Point X="84" Y="114"/>
         <Point X="84" Y="119"/>
-        <SpawnOption DigimonID="21" Level="8" ExpReward="22" BitReward="19" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="21" Level="8" ExpReward="22" BitReward="19" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="21" Level="8" ExpReward="22" BitReward="19" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="21" Level="8" ExpReward="22" BitReward="19" AppearanceRate="100" DropGroup="21"/>
+        <SpawnOption DigimonID="21" Level="8" ExpReward="22" BitReward="19" AppearanceRate="75" DropGroup="21"/>
+        <SpawnOption DigimonID="21" Level="8" ExpReward="22" BitReward="19" AppearanceRate="60" DropGroup="21"/>
     </Spawn>
     <!-- Poromon (ID 25) Lv.8: 15 grupos -->
     <Spawn MapID="4" RespawnTime="10">
@@ -531,9 +531,9 @@
         <Point X="102" Y="131"/>
         <Point X="102" Y="136"/>
         <Point X="104" Y="128"/>
-        <SpawnOption DigimonID="25" Level="8" ExpReward="22" BitReward="19" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="25" Level="8" ExpReward="22" BitReward="19" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="25" Level="8" ExpReward="22" BitReward="19" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="25" Level="8" ExpReward="22" BitReward="19" AppearanceRate="100" DropGroup="25"/>
+        <SpawnOption DigimonID="25" Level="8" ExpReward="22" BitReward="19" AppearanceRate="75" DropGroup="25"/>
+        <SpawnOption DigimonID="25" Level="8" ExpReward="22" BitReward="19" AppearanceRate="60" DropGroup="25"/>
     </Spawn>
     <!-- Chocomon(Vice) (ID 28) Lv.8: 14 grupos -->
     <Spawn MapID="4" RespawnTime="10">
@@ -551,9 +551,9 @@
         <Point X="78" Y="170"/>
         <Point X="79" Y="174"/>
         <Point X="97" Y="56"/>
-        <SpawnOption DigimonID="28" Level="8" ExpReward="22" BitReward="19" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="28" Level="8" ExpReward="22" BitReward="19" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="28" Level="8" ExpReward="22" BitReward="19" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="28" Level="8" ExpReward="22" BitReward="19" AppearanceRate="100" DropGroup="28"/>
+        <SpawnOption DigimonID="28" Level="8" ExpReward="22" BitReward="19" AppearanceRate="75" DropGroup="28"/>
+        <SpawnOption DigimonID="28" Level="8" ExpReward="22" BitReward="19" AppearanceRate="60" DropGroup="28"/>
     </Spawn>
     <!-- Caprimon(Knight-type (ID 32) Lv.9: 16 grupos -->
     <Spawn MapID="4" RespawnTime="10">
@@ -573,9 +573,9 @@
         <Point X="112" Y="72"/>
         <Point X="114" Y="68"/>
         <Point X="118" Y="72"/>
-        <SpawnOption DigimonID="32" Level="9" ExpReward="25" BitReward="21" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="32" Level="9" ExpReward="25" BitReward="21" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="32" Level="9" ExpReward="25" BitReward="21" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="32" Level="9" ExpReward="25" BitReward="21" AppearanceRate="100" DropGroup="32"/>
+        <SpawnOption DigimonID="32" Level="9" ExpReward="25" BitReward="21" AppearanceRate="75" DropGroup="32"/>
+        <SpawnOption DigimonID="32" Level="9" ExpReward="25" BitReward="21" AppearanceRate="60" DropGroup="32"/>
     </Spawn>
     <!-- Caprimon(Warrior-typ (ID 38) Lv.9: 14 grupos -->
     <Spawn MapID="4" RespawnTime="10">
@@ -593,9 +593,9 @@
         <Point X="108" Y="87"/>
         <Point X="110" Y="93"/>
         <Point X="112" Y="86"/>
-        <SpawnOption DigimonID="38" Level="9" ExpReward="25" BitReward="21" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="38" Level="9" ExpReward="25" BitReward="21" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="38" Level="9" ExpReward="25" BitReward="21" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="38" Level="9" ExpReward="25" BitReward="21" AppearanceRate="100" DropGroup="38"/>
+        <SpawnOption DigimonID="38" Level="9" ExpReward="25" BitReward="21" AppearanceRate="75" DropGroup="38"/>
+        <SpawnOption DigimonID="38" Level="9" ExpReward="25" BitReward="21" AppearanceRate="60" DropGroup="38"/>
     </Spawn>
     <!-- Pagumon(Ore-type) (ID 15) Lv.10: 10 grupos -->
     <Spawn MapID="4" RespawnTime="10">
@@ -609,9 +609,9 @@
         <Point X="76" Y="44"/>
         <Point X="76" Y="47"/>
         <Point X="80" Y="45"/>
-        <SpawnOption DigimonID="15" Level="10" ExpReward="28" BitReward="23" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="15" Level="10" ExpReward="28" BitReward="23" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="15" Level="10" ExpReward="28" BitReward="23" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="15" Level="10" ExpReward="28" BitReward="23" AppearanceRate="100" DropGroup="15"/>
+        <SpawnOption DigimonID="15" Level="10" ExpReward="28" BitReward="23" AppearanceRate="75" DropGroup="15"/>
+        <SpawnOption DigimonID="15" Level="10" ExpReward="28" BitReward="23" AppearanceRate="60" DropGroup="15"/>
     </Spawn>
     <!-- Pagumon(Oni-type) (ID 37) Lv.10: 10 grupos -->
     <Spawn MapID="4" RespawnTime="10">
@@ -625,9 +625,9 @@
         <Point X="97" Y="95"/>
         <Point X="99" Y="99"/>
         <Point X="102" Y="95"/>
-        <SpawnOption DigimonID="37" Level="10" ExpReward="28" BitReward="23" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="37" Level="10" ExpReward="28" BitReward="23" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="37" Level="10" ExpReward="28" BitReward="23" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="37" Level="10" ExpReward="28" BitReward="23" AppearanceRate="100" DropGroup="37"/>
+        <SpawnOption DigimonID="37" Level="10" ExpReward="28" BitReward="23" AppearanceRate="75" DropGroup="37"/>
+        <SpawnOption DigimonID="37" Level="10" ExpReward="28" BitReward="23" AppearanceRate="60" DropGroup="37"/>
     </Spawn>
     <!-- Pagumon(Satan-type) (ID 47) Lv.10: 8 grupos -->
     <Spawn MapID="4" RespawnTime="10">
@@ -639,9 +639,9 @@
         <Point X="47" Y="132"/>
         <Point X="50" Y="128"/>
         <Point X="50" Y="135"/>
-        <SpawnOption DigimonID="47" Level="10" ExpReward="28" BitReward="23" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="47" Level="10" ExpReward="28" BitReward="23" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="47" Level="10" ExpReward="28" BitReward="23" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="47" Level="10" ExpReward="28" BitReward="23" AppearanceRate="100" DropGroup="47"/>
+        <SpawnOption DigimonID="47" Level="10" ExpReward="28" BitReward="23" AppearanceRate="75" DropGroup="47"/>
+        <SpawnOption DigimonID="47" Level="10" ExpReward="28" BitReward="23" AppearanceRate="60" DropGroup="47"/>
     </Spawn>
     <!-- Pagumon(Demon-type) (ID 50) Lv.10: 8 grupos -->
     <Spawn MapID="4" RespawnTime="10">
@@ -653,9 +653,9 @@
         <Point X="67" Y="155"/>
         <Point X="69" Y="161"/>
         <Point X="70" Y="155"/>
-        <SpawnOption DigimonID="50" Level="10" ExpReward="28" BitReward="23" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="50" Level="10" ExpReward="28" BitReward="23" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="50" Level="10" ExpReward="28" BitReward="23" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="50" Level="10" ExpReward="28" BitReward="23" AppearanceRate="100" DropGroup="50"/>
+        <SpawnOption DigimonID="50" Level="10" ExpReward="28" BitReward="23" AppearanceRate="75" DropGroup="50"/>
+        <SpawnOption DigimonID="50" Level="10" ExpReward="28" BitReward="23" AppearanceRate="60" DropGroup="50"/>
     </Spawn>
 
     <!-- ===== Mapa 6 — South of Theme Park (281 grupos) ===== -->
@@ -700,9 +700,9 @@
         <Point X="157" Y="221"/>
         <Point X="157" Y="228"/>
         <Point X="158" Y="232"/>
-        <SpawnOption DigimonID="78" Level="16" ExpReward="56" BitReward="35" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="78" Level="16" ExpReward="56" BitReward="35" AppearanceRate="95" DropGroup="0"/>
-        <SpawnOption DigimonID="78" Level="16" ExpReward="56" BitReward="35" AppearanceRate="40" DropGroup="0"/>
+        <SpawnOption DigimonID="78" Level="16" ExpReward="56" BitReward="35" AppearanceRate="100" DropGroup="78"/>
+        <SpawnOption DigimonID="78" Level="16" ExpReward="56" BitReward="35" AppearanceRate="95" DropGroup="78"/>
+        <SpawnOption DigimonID="78" Level="16" ExpReward="56" BitReward="35" AppearanceRate="40" DropGroup="78"/>
     </Spawn>
     <!-- Lopmon(Vice) (ID 78) Lv.16 [Veteran]: 21 grupos -->
     <Spawn MapID="6" RespawnTime="10" Exclusive="true" Grade="3">
@@ -727,11 +727,11 @@
         <Point X="160" Y="161"/>
         <Point X="161" Y="167"/>
         <Point X="164" Y="163"/>
-        <SpawnOption DigimonID="78" Level="16" ExpReward="112" BitReward="35" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="78" Level="16" ExpReward="112" BitReward="35" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="78" Level="16" ExpReward="112" BitReward="35" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="78" Level="16" ExpReward="112" BitReward="35" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="78" Level="16" ExpReward="112" BitReward="35" AppearanceRate="50" DropGroup="0"/>
+        <SpawnOption DigimonID="78" Level="16" ExpReward="112" BitReward="35" AppearanceRate="100" DropGroup="78"/>
+        <SpawnOption DigimonID="78" Level="16" ExpReward="112" BitReward="35" AppearanceRate="100" DropGroup="78"/>
+        <SpawnOption DigimonID="78" Level="16" ExpReward="112" BitReward="35" AppearanceRate="100" DropGroup="78"/>
+        <SpawnOption DigimonID="78" Level="16" ExpReward="112" BitReward="35" AppearanceRate="75" DropGroup="78"/>
+        <SpawnOption DigimonID="78" Level="16" ExpReward="112" BitReward="35" AppearanceRate="50" DropGroup="78"/>
     </Spawn>
     <!-- Plotmon (ID 65) Lv.17: 71 grupos -->
     <Spawn MapID="6" RespawnTime="10">
@@ -806,9 +806,9 @@
         <Point X="162" Y="57"/>
         <Point X="162" Y="65"/>
         <Point X="164" Y="62"/>
-        <SpawnOption DigimonID="65" Level="17" ExpReward="62" BitReward="37" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="65" Level="17" ExpReward="62" BitReward="37" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="65" Level="17" ExpReward="62" BitReward="37" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="65" Level="17" ExpReward="62" BitReward="37" AppearanceRate="100" DropGroup="65"/>
+        <SpawnOption DigimonID="65" Level="17" ExpReward="62" BitReward="37" AppearanceRate="75" DropGroup="65"/>
+        <SpawnOption DigimonID="65" Level="17" ExpReward="62" BitReward="37" AppearanceRate="60" DropGroup="65"/>
     </Spawn>
     <!-- Plotmon (ID 65) Lv.17 [Veteran]: 20 grupos -->
     <Spawn MapID="6" RespawnTime="10" Exclusive="true" Grade="3">
@@ -832,11 +832,11 @@
         <Point X="116" Y="112"/>
         <Point X="116" Y="121"/>
         <Point X="120" Y="117"/>
-        <SpawnOption DigimonID="65" Level="17" ExpReward="124" BitReward="37" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="65" Level="17" ExpReward="124" BitReward="37" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="65" Level="17" ExpReward="124" BitReward="37" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="65" Level="17" ExpReward="124" BitReward="37" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="65" Level="17" ExpReward="124" BitReward="37" AppearanceRate="50" DropGroup="0"/>
+        <SpawnOption DigimonID="65" Level="17" ExpReward="124" BitReward="37" AppearanceRate="100" DropGroup="65"/>
+        <SpawnOption DigimonID="65" Level="17" ExpReward="124" BitReward="37" AppearanceRate="100" DropGroup="65"/>
+        <SpawnOption DigimonID="65" Level="17" ExpReward="124" BitReward="37" AppearanceRate="100" DropGroup="65"/>
+        <SpawnOption DigimonID="65" Level="17" ExpReward="124" BitReward="37" AppearanceRate="75" DropGroup="65"/>
+        <SpawnOption DigimonID="65" Level="17" ExpReward="124" BitReward="37" AppearanceRate="50" DropGroup="65"/>
     </Spawn>
     <!-- Floramon (ID 70) Lv.18: 37 grupos -->
     <Spawn MapID="6" RespawnTime="10">
@@ -877,9 +877,9 @@
         <Point X="151" Y="184"/>
         <Point X="156" Y="184"/>
         <Point X="158" Y="182"/>
-        <SpawnOption DigimonID="70" Level="18" ExpReward="69" BitReward="39" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="70" Level="18" ExpReward="69" BitReward="39" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="70" Level="18" ExpReward="69" BitReward="39" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="70" Level="18" ExpReward="69" BitReward="39" AppearanceRate="100" DropGroup="70"/>
+        <SpawnOption DigimonID="70" Level="18" ExpReward="69" BitReward="39" AppearanceRate="75" DropGroup="70"/>
+        <SpawnOption DigimonID="70" Level="18" ExpReward="69" BitReward="39" AppearanceRate="60" DropGroup="70"/>
     </Spawn>
     <!-- Floramon (ID 70) Lv.18 [Veteran]: 18 grupos -->
     <Spawn MapID="6" RespawnTime="10" Exclusive="true" Grade="3">
@@ -901,11 +901,11 @@
         <Point X="96" Y="136"/>
         <Point X="98" Y="142"/>
         <Point X="102" Y="130"/>
-        <SpawnOption DigimonID="70" Level="18" ExpReward="138" BitReward="39" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="70" Level="18" ExpReward="138" BitReward="39" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="70" Level="18" ExpReward="138" BitReward="39" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="70" Level="18" ExpReward="138" BitReward="39" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="70" Level="18" ExpReward="138" BitReward="39" AppearanceRate="50" DropGroup="0"/>
+        <SpawnOption DigimonID="70" Level="18" ExpReward="138" BitReward="39" AppearanceRate="100" DropGroup="70"/>
+        <SpawnOption DigimonID="70" Level="18" ExpReward="138" BitReward="39" AppearanceRate="100" DropGroup="70"/>
+        <SpawnOption DigimonID="70" Level="18" ExpReward="138" BitReward="39" AppearanceRate="100" DropGroup="70"/>
+        <SpawnOption DigimonID="70" Level="18" ExpReward="138" BitReward="39" AppearanceRate="75" DropGroup="70"/>
+        <SpawnOption DigimonID="70" Level="18" ExpReward="138" BitReward="39" AppearanceRate="50" DropGroup="70"/>
     </Spawn>
     <!-- Dracumon (ID 633) Lv.18 [Veteran]: 7 grupos -->
     <Spawn MapID="6" RespawnTime="10" Exclusive="true" Grade="3">
@@ -916,11 +916,11 @@
         <Point X="9" Y="235"/>
         <Point X="10" Y="230"/>
         <Point X="11" Y="223"/>
-        <SpawnOption DigimonID="633" Level="18" ExpReward="138" BitReward="39" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="633" Level="18" ExpReward="138" BitReward="39" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="633" Level="18" ExpReward="138" BitReward="39" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="633" Level="18" ExpReward="138" BitReward="39" AppearanceRate="78" DropGroup="0"/>
-        <SpawnOption DigimonID="633" Level="18" ExpReward="138" BitReward="39" AppearanceRate="28" DropGroup="0"/>
+        <SpawnOption DigimonID="633" Level="18" ExpReward="138" BitReward="39" AppearanceRate="100" DropGroup="633"/>
+        <SpawnOption DigimonID="633" Level="18" ExpReward="138" BitReward="39" AppearanceRate="100" DropGroup="633"/>
+        <SpawnOption DigimonID="633" Level="18" ExpReward="138" BitReward="39" AppearanceRate="100" DropGroup="633"/>
+        <SpawnOption DigimonID="633" Level="18" ExpReward="138" BitReward="39" AppearanceRate="78" DropGroup="633"/>
+        <SpawnOption DigimonID="633" Level="18" ExpReward="138" BitReward="39" AppearanceRate="28" DropGroup="633"/>
     </Spawn>
     <!-- Betamon (ID 66) Lv.19: 29 grupos -->
     <Spawn MapID="6" RespawnTime="10">
@@ -996,9 +996,9 @@
         <Point X="126" Y="130"/>
         <Point X="127" Y="134"/>
         <Point X="129" Y="129"/>
-        <SpawnOption DigimonID="68" Level="20" ExpReward="86" BitReward="43" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="68" Level="20" ExpReward="86" BitReward="43" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="68" Level="20" ExpReward="86" BitReward="43" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="68" Level="20" ExpReward="86" BitReward="43" AppearanceRate="100" DropGroup="68"/>
+        <SpawnOption DigimonID="68" Level="20" ExpReward="86" BitReward="43" AppearanceRate="75" DropGroup="68"/>
+        <SpawnOption DigimonID="68" Level="20" ExpReward="86" BitReward="43" AppearanceRate="60" DropGroup="68"/>
     </Spawn>
     <!-- Tentomon (ID 68) Lv.20 [Veteran]: 10 grupos -->
     <Spawn MapID="6" RespawnTime="10" Exclusive="true" Grade="3">
@@ -1012,11 +1012,11 @@
         <Point X="122" Y="155"/>
         <Point X="122" Y="160"/>
         <Point X="125" Y="158"/>
-        <SpawnOption DigimonID="68" Level="20" ExpReward="172" BitReward="43" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="68" Level="20" ExpReward="172" BitReward="43" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="68" Level="20" ExpReward="172" BitReward="43" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="68" Level="20" ExpReward="172" BitReward="43" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="68" Level="20" ExpReward="172" BitReward="43" AppearanceRate="50" DropGroup="0"/>
+        <SpawnOption DigimonID="68" Level="20" ExpReward="172" BitReward="43" AppearanceRate="100" DropGroup="68"/>
+        <SpawnOption DigimonID="68" Level="20" ExpReward="172" BitReward="43" AppearanceRate="100" DropGroup="68"/>
+        <SpawnOption DigimonID="68" Level="20" ExpReward="172" BitReward="43" AppearanceRate="100" DropGroup="68"/>
+        <SpawnOption DigimonID="68" Level="20" ExpReward="172" BitReward="43" AppearanceRate="75" DropGroup="68"/>
+        <SpawnOption DigimonID="68" Level="20" ExpReward="172" BitReward="43" AppearanceRate="50" DropGroup="68"/>
     </Spawn>
 
     <!-- ===== Mapa 7 — East of Theme Park (247 grupos) ===== -->
@@ -1053,9 +1053,9 @@
         <Point X="143" Y="26"/>
         <Point X="145" Y="20"/>
         <Point X="146" Y="26"/>
-        <SpawnOption DigimonID="63" Level="11" ExpReward="32" BitReward="25" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="63" Level="11" ExpReward="32" BitReward="25" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="63" Level="11" ExpReward="32" BitReward="25" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="63" Level="11" ExpReward="32" BitReward="25" AppearanceRate="100" DropGroup="63"/>
+        <SpawnOption DigimonID="63" Level="11" ExpReward="32" BitReward="25" AppearanceRate="75" DropGroup="63"/>
+        <SpawnOption DigimonID="63" Level="11" ExpReward="32" BitReward="25" AppearanceRate="60" DropGroup="63"/>
     </Spawn>
     <!-- Piyomon (ID 63) Lv.11 [Veteran]: 15 grupos -->
     <Spawn MapID="7" RespawnTime="10" Exclusive="true" Grade="3">
@@ -1074,11 +1074,11 @@
         <Point X="149" Y="52"/>
         <Point X="150" Y="179"/>
         <Point X="152" Y="183"/>
-        <SpawnOption DigimonID="63" Level="11" ExpReward="64" BitReward="25" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="63" Level="11" ExpReward="64" BitReward="25" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="63" Level="11" ExpReward="64" BitReward="25" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="63" Level="11" ExpReward="64" BitReward="25" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="63" Level="11" ExpReward="64" BitReward="25" AppearanceRate="50" DropGroup="0"/>
+        <SpawnOption DigimonID="63" Level="11" ExpReward="64" BitReward="25" AppearanceRate="100" DropGroup="63"/>
+        <SpawnOption DigimonID="63" Level="11" ExpReward="64" BitReward="25" AppearanceRate="100" DropGroup="63"/>
+        <SpawnOption DigimonID="63" Level="11" ExpReward="64" BitReward="25" AppearanceRate="100" DropGroup="63"/>
+        <SpawnOption DigimonID="63" Level="11" ExpReward="64" BitReward="25" AppearanceRate="75" DropGroup="63"/>
+        <SpawnOption DigimonID="63" Level="11" ExpReward="64" BitReward="25" AppearanceRate="50" DropGroup="63"/>
     </Spawn>
     <!-- Patamon (ID 54) Lv.12: 30 grupos -->
     <Spawn MapID="7" RespawnTime="10">
@@ -1112,9 +1112,9 @@
         <Point X="161" Y="116"/>
         <Point X="162" Y="122"/>
         <Point X="164" Y="112"/>
-        <SpawnOption DigimonID="54" Level="12" ExpReward="36" BitReward="27" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="54" Level="12" ExpReward="36" BitReward="27" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="54" Level="12" ExpReward="36" BitReward="27" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="54" Level="12" ExpReward="36" BitReward="27" AppearanceRate="100" DropGroup="54"/>
+        <SpawnOption DigimonID="54" Level="12" ExpReward="36" BitReward="27" AppearanceRate="75" DropGroup="54"/>
+        <SpawnOption DigimonID="54" Level="12" ExpReward="36" BitReward="27" AppearanceRate="60" DropGroup="54"/>
     </Spawn>
     <!-- Patamon (ID 54) Lv.12 [Veteran]: 10 grupos -->
     <Spawn MapID="7" RespawnTime="10" Exclusive="true" Grade="3">
@@ -1128,11 +1128,11 @@
         <Point X="94" Y="246"/>
         <Point X="95" Y="238"/>
         <Point X="96" Y="231"/>
-        <SpawnOption DigimonID="54" Level="12" ExpReward="72" BitReward="27" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="54" Level="12" ExpReward="72" BitReward="27" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="54" Level="12" ExpReward="72" BitReward="27" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="54" Level="12" ExpReward="72" BitReward="27" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="54" Level="12" ExpReward="72" BitReward="27" AppearanceRate="50" DropGroup="0"/>
+        <SpawnOption DigimonID="54" Level="12" ExpReward="72" BitReward="27" AppearanceRate="100" DropGroup="54"/>
+        <SpawnOption DigimonID="54" Level="12" ExpReward="72" BitReward="27" AppearanceRate="100" DropGroup="54"/>
+        <SpawnOption DigimonID="54" Level="12" ExpReward="72" BitReward="27" AppearanceRate="100" DropGroup="54"/>
+        <SpawnOption DigimonID="54" Level="12" ExpReward="72" BitReward="27" AppearanceRate="75" DropGroup="54"/>
+        <SpawnOption DigimonID="54" Level="12" ExpReward="72" BitReward="27" AppearanceRate="50" DropGroup="54"/>
     </Spawn>
     <!-- Kunemon (ID 73) Lv.13: 51 grupos -->
     <Spawn MapID="7" RespawnTime="10">
@@ -1187,9 +1187,9 @@
         <Point X="163" Y="144"/>
         <Point X="164" Y="166"/>
         <Point X="166" Y="160"/>
-        <SpawnOption DigimonID="73" Level="13" ExpReward="40" BitReward="29" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="73" Level="13" ExpReward="40" BitReward="29" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="73" Level="13" ExpReward="40" BitReward="29" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="73" Level="13" ExpReward="40" BitReward="29" AppearanceRate="100" DropGroup="73"/>
+        <SpawnOption DigimonID="73" Level="13" ExpReward="40" BitReward="29" AppearanceRate="75" DropGroup="73"/>
+        <SpawnOption DigimonID="73" Level="13" ExpReward="40" BitReward="29" AppearanceRate="60" DropGroup="73"/>
     </Spawn>
     <!-- Kunemon (ID 73) Lv.13 [Veteran]: 27 grupos -->
     <Spawn MapID="7" RespawnTime="10" Exclusive="true" Grade="3">
@@ -1220,11 +1220,11 @@
         <Point X="146" Y="86"/>
         <Point X="150" Y="88"/>
         <Point X="153" Y="91"/>
-        <SpawnOption DigimonID="73" Level="13" ExpReward="80" BitReward="29" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="73" Level="13" ExpReward="80" BitReward="29" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="73" Level="13" ExpReward="80" BitReward="29" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="73" Level="13" ExpReward="80" BitReward="29" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="73" Level="13" ExpReward="80" BitReward="29" AppearanceRate="50" DropGroup="0"/>
+        <SpawnOption DigimonID="73" Level="13" ExpReward="80" BitReward="29" AppearanceRate="100" DropGroup="73"/>
+        <SpawnOption DigimonID="73" Level="13" ExpReward="80" BitReward="29" AppearanceRate="100" DropGroup="73"/>
+        <SpawnOption DigimonID="73" Level="13" ExpReward="80" BitReward="29" AppearanceRate="100" DropGroup="73"/>
+        <SpawnOption DigimonID="73" Level="13" ExpReward="80" BitReward="29" AppearanceRate="75" DropGroup="73"/>
+        <SpawnOption DigimonID="73" Level="13" ExpReward="80" BitReward="29" AppearanceRate="50" DropGroup="73"/>
     </Spawn>
     <!-- Labramon (ID 86) Lv.14: 19 grupos -->
     <Spawn MapID="7" RespawnTime="10">
@@ -1307,9 +1307,9 @@
         <Point X="76" Y="196"/>
         <Point X="77" Y="25"/>
         <Point X="78" Y="200"/>
-        <SpawnOption DigimonID="56" Level="15" ExpReward="50" BitReward="33" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="56" Level="15" ExpReward="50" BitReward="33" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="56" Level="15" ExpReward="50" BitReward="33" AppearanceRate="60" DropGroup="0"/>
+        <SpawnOption DigimonID="56" Level="15" ExpReward="50" BitReward="33" AppearanceRate="100" DropGroup="56"/>
+        <SpawnOption DigimonID="56" Level="15" ExpReward="50" BitReward="33" AppearanceRate="75" DropGroup="56"/>
+        <SpawnOption DigimonID="56" Level="15" ExpReward="50" BitReward="33" AppearanceRate="60" DropGroup="56"/>
     </Spawn>
     <!-- Palmon (ID 56) Lv.15 [Veteran]: 18 grupos -->
     <Spawn MapID="7" RespawnTime="10" Exclusive="true" Grade="3">
@@ -1331,11 +1331,11 @@
         <Point X="142" Y="242"/>
         <Point X="145" Y="244"/>
         <Point X="146" Y="238"/>
-        <SpawnOption DigimonID="56" Level="15" ExpReward="100" BitReward="33" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="56" Level="15" ExpReward="100" BitReward="33" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="56" Level="15" ExpReward="100" BitReward="33" AppearanceRate="100" DropGroup="0"/>
-        <SpawnOption DigimonID="56" Level="15" ExpReward="100" BitReward="33" AppearanceRate="75" DropGroup="0"/>
-        <SpawnOption DigimonID="56" Level="15" ExpReward="100" BitReward="33" AppearanceRate="50" DropGroup="0"/>
+        <SpawnOption DigimonID="56" Level="15" ExpReward="100" BitReward="33" AppearanceRate="100" DropGroup="56"/>
+        <SpawnOption DigimonID="56" Level="15" ExpReward="100" BitReward="33" AppearanceRate="100" DropGroup="56"/>
+        <SpawnOption DigimonID="56" Level="15" ExpReward="100" BitReward="33" AppearanceRate="100" DropGroup="56"/>
+        <SpawnOption DigimonID="56" Level="15" ExpReward="100" BitReward="33" AppearanceRate="75" DropGroup="56"/>
+        <SpawnOption DigimonID="56" Level="15" ExpReward="100" BitReward="33" AppearanceRate="50" DropGroup="56"/>
     </Spawn>
 
 </DigimonSpawns>
