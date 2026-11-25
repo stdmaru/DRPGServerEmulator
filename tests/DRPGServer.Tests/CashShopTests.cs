@@ -337,7 +337,7 @@ public class CashShopTests
             w.WriteU8(0);
             w.WriteU8(1);
             var authHandler = new CashDepositoryAuthHandler();
-            authHandler.Handle(session, new PacketReader(w.ToFrame(0).AsSpan(PacketHeader.Length).ToArray()));
+            authHandler.Dispatch(session, new PacketReader(w.ToFrame(0).AsSpan(PacketHeader.Length).ToArray()));
             var authFrames = session.DrainOutgoing();
             Assert.Single(authFrames);
             Assert.Equal(0, authFrames[0][PacketHeader.Length + 101]); // result = 0

@@ -1,100 +1,86 @@
+using System.Text.RegularExpressions;
 using DRPGServer.Game;
 using DRPGServer.Game.Entities;
-using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;
-using DRPGServer.Network.Protocol;
 
 namespace DRPGServer.Network.Handlers;
 
 /// <summary>
-/// 0x71 (C2S 718): ✅ bloco de status ecoado (uid em 0, serial em 4), u8 estágio da forma e u8 atributo (1..4).
-/// O ponto vai para a forma daquele estágio (a janela de evolução deixa distribuir nas formas liberadas).
+/// 0x71: distribuir ponto. O ponto vai para a forma daquele estágio (a janela de evolução deixa distribuir nas formas
+/// liberadas).
 /// </summary>
 [PacketHandler(MapOpcode.DigimonAddAbilityPoint)]
-public sealed class AddAbilityPointHandler : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class AddAbilityPointHandler : PlayerHandler<AddAbilityPointRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, AddAbilityPointRequest request)
     {
-        uint uid = packet.ReadU32();
-        packet.Skip(DigimonStatusBlock.Length - 4);
-        var stage = packet.ReadU8();
-        var stat = packet.ReadU8();
-
-        if (player.InBattle || player.Character.FindDigimon(uid) is not { } digimon || stat is < 1 or > 4) return;
-        if (digimon.FormAtStage(stage) is not { } form) return;
-        if (digimon.AllocatePoint(form, (StatKind)stat))
+        if (request.Stat is < 1 or > 4 || player.Character.FindDigimon(request.DigimonUid) is not { } digimon) return;
+        if (digimon.FormAtStage(request.Stage) is not { } form) return;
+        if (digimon.AllocatePoint(form, (StatKind)request.Stat))
         {
             player.MarkDirty();
-            player.Send(new AddAbilityPointPacket(digimon, form, stage, stat));
+            player.Send(new AddAbilityPointPacket(digimon, form, request.Stage, request.Stat));
         }
     }
 }
 
-/// <summary>0x72 (C2S 718): ✅ bloco ecoado, u8 estágio da forma e u8 skill (1 ou 2). Gasta um ponto de skill.</summary>
+/// <summary>0x72: subir skill (1 ou 2). Gasta um ponto de skill.</summary>
 [PacketHandler(MapOpcode.DigimonSkillUpgrade)]
-public sealed class SkillUpgradeHandler : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class SkillUpgradeHandler : PlayerHandler<SkillUpgradeRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, SkillUpgradeRequest request)
     {
-        uint uid = packet.ReadU32();
-        packet.Skip(DigimonStatusBlock.Length - 4);
-        var stage = packet.ReadU8();
-        var skill = packet.ReadU8();
-
-        if (player.InBattle || player.Character.FindDigimon(uid) is not { } digimon || skill is < 1 or > DigimonForm.SkillSlots) return;
-        if (digimon.FormAtStage(stage) is not { } form) return;
-        if (digimon.UpgradeSkill(form, skill - 1))
+        if (request.Skill is < 1 or > DigimonForm.SkillSlots || player.Character.FindDigimon(request.DigimonUid) is not { } digimon) return;
+        if (digimon.FormAtStage(request.Stage) is not { } form) return;
+        if (digimon.UpgradeSkill(form, request.Skill - 1))
         {
             player.MarkDirty();
-            player.Send(new SkillUpgradePacket(digimon, form, stage, skill));
+            player.Send(new SkillUpgradePacket(digimon, form, request.Stage, request.Skill));
         }
     }
 }
 
-/// <summary>0x82 (C2S 734): ✅ janela de evolução: u32 estágio (0 = atual), u32 0, bloco ecoado. Responde o bloco da forma.</summary>
+/// <summary>0x82: janela de evolução (estágio 0 = atual). Responde o bloco da forma.</summary>
 [PacketHandler(MapOpcode.DigimonFormInfo)]
-public sealed class DigimonFormInfoHandler : PlayerHandler
+[RequiresState(PlayerStates.Any)]
+public sealed class DigimonFormInfoHandler : PlayerHandler<DigimonFormInfoRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, DigimonFormInfoRequest request)
     {
-        uint stage = packet.ReadU32();
-        packet.ReadU32();
-        uint uid = packet.ReadU32();
-        if (stage > byte.MaxValue || player.Character.FindDigimon(uid) is not { } digimon) return;
-        if (digimon.FormAtStage((byte)stage) is not { } form) return;
-        player.Send(new DigimonFormInfoPacket(stage, digimon, form));
+        if (request.Stage > byte.MaxValue || player.Character.FindDigimon(request.DigimonUid) is not { } digimon) return;
+        if (digimon.FormAtStage((byte)request.Stage) is not { } form) return;
+        player.Send(new DigimonFormInfoPacket(request.Stage, digimon, form));
     }
 }
 
-/// <summary>0x97 (C2S 1622): ✅ abrir janela de títulos do digimon: u32 2, u32 digimonUid.</summary>
+/// <summary>0x97: abrir a janela de títulos do digimon.</summary>
 [PacketHandler(MapOpcode.DigimonTitleList)]
-public sealed class DigimonTitleListHandler : PlayerHandler
+[RequiresState(PlayerStates.Any)]
+public sealed class DigimonTitleListHandler : PlayerHandler<DigimonTitleListRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, DigimonTitleListRequest request)
     {
-        uint action = packet.ReadU32();
-        uint digimonUid = packet.ReadU32();
-        if (action != 2) return;
-
-        if (player.Character.FindDigimon(digimonUid) is not { } digimon)
+        if (request.Action != 2) return;
+        if (player.Character.FindDigimon(request.DigimonUid) is not { } digimon)
         {
-            player.Send(new DigimonTitleListPacket(digimonUid, [], success: false));
+            player.Send(new DigimonTitleListPacket(request.DigimonUid, [], success: false));
             return;
         }
         player.Send(new DigimonTitleListPacket(digimon.Uid, digimon.Titles));
     }
 }
 
-/// <summary>0x99 (C2S 26): ✅ equipar/desequipar título do digimon: u32 2, u32 digimonUid, u32 titleId (0 = remover).</summary>
+/// <summary>0x99: equipar/desequipar (título 0) o título do digimon.</summary>
 [PacketHandler(MapOpcode.DigimonTitleEquip)]
-public sealed class DigimonTitleEquipHandler : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class DigimonTitleEquipHandler : PlayerHandler<DigimonTitleEquipRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, DigimonTitleEquipRequest request)
     {
-        uint action = packet.ReadU32();
-        uint digimonUid = packet.ReadU32();
-        uint titleId = packet.ReadU32();
-        if (player.InBattle || action != 2) return;
+        var (action, digimonUid, titleId) = request;
+        if (action != 2) return;
 
         if (player.Character.FindDigimon(digimonUid) is not { } digimon || !digimon.EquipTitle(titleId))
         {
@@ -111,29 +97,24 @@ public sealed class DigimonTitleEquipHandler : PlayerHandler
     }
 }
 
-/// <summary>0x9E (C2S 18): ✅ u32 uid do digimon; o servidor responde as formas para evoluir agora (só em batalha).</summary>
+/// <summary>0x9E: formas para evoluir agora (só em batalha).</summary>
 [PacketHandler(MapOpcode.EvolutionList)]
-public sealed class EvolutionListHandler : PlayerHandler
+[RequiresState(PlayerStates.InBattle)]
+public sealed class EvolutionListHandler : PlayerHandler<EvolutionListRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
-    {
-        uint uid = packet.ReadU32();
-        if (player.Battle is { } battle)
-            player.Send(new EvolutionListPacket(battle.EvolutionOptions(player, uid)));
-    }
+    protected override void Handle(Player player, EvolutionListRequest request) =>
+        player.Send(new EvolutionListPacket(player.Battle!.EvolutionOptions(player, request.DigimonUid)));
 }
 
-/// <summary>0xF1 (C2S 26): ✅ u32 0, u32 personagem, u32 digimon: o digimon vira líder (troca com a posição 0).</summary>
+/// <summary>0xF1: o digimon vira líder (troca com a posição 0).</summary>
 [PacketHandler(MapOpcode.SetLeader)]
-public sealed class SetLeaderHandler : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class SetLeaderHandler : PlayerHandler<SetLeaderRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, SetLeaderRequest request)
     {
-        packet.ReadU32();
-        uint characterUid = packet.ReadU32();
-        uint digimonUid = packet.ReadU32();
         var c = player.Character;
-        if (player.InBattle || characterUid != c.Uid || c.FindDigimon(digimonUid) is not { } digimon) return;
+        if (request.CharacterUid != c.Uid || c.FindDigimon(request.DigimonUid) is not { } digimon) return;
         if (c.SetLeader(digimon))
         {
             player.MarkDirty();
@@ -142,15 +123,15 @@ public sealed class SetLeaderHandler : PlayerHandler
     }
 }
 
-/// <summary>0x173 (C2S 22): ✅ u16 0, u16 botão k (0..2): troca as posições k + 1 e k + 2 do time.</summary>
+/// <summary>0x173: o botão k (0..2) troca as posições k + 1 e k + 2 do time.</summary>
 [PacketHandler(MapOpcode.PartySwap)]
-public sealed class PartySwapHandler : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class PartySwapHandler : PlayerHandler<PartySwapRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, PartySwapRequest request)
     {
-        packet.ReadU16();
-        ushort button = packet.ReadU16();
-        if (player.InBattle || button > Character.PartySize - 3) return;
+        var button = request.Button;
+        if (button > Character.PartySize - 3) return;
         if (player.Character.SwapSlots(button + 1, button + 2))
         {
             player.MarkDirty();
@@ -160,27 +141,22 @@ public sealed class PartySwapHandler : PlayerHandler
 }
 
 /// <summary>
-/// 0xF0 (C2S 42): ✅ renomear. u8 0, u8 tipo (1 tamer, 2 digimon), u16 0, u32 uid, nome[20]. Sem nome é consulta.
-/// Digimon: uma renomeação grátis para quem nasceu "InputName"; o nome segue a regra da criação (letras e números).
-/// ❓ Renomeação paga (item) ainda não; tamer sempre 2, como o oficial na entrada.
+/// 0xF0: renomear; sem nome é consulta. Digimon: uma renomeação grátis para quem nasceu "InputName"; o nome segue a
+/// regra da criação (letras e números). ❓ Renomeação paga (item) ainda não; tamer sempre 2, como o oficial na entrada.
 /// </summary>
 [PacketHandler(MapOpcode.Rename)]
-public sealed partial class RenameHandler : IWorldPacketHandler
+[RequiresState(PlayerStates.Any)]
+public sealed partial class RenameHandler : PlayerHandler<RenameRequest>
 {
-    [System.Text.RegularExpressions.GeneratedRegex("^[a-zA-Z0-9]{1,19}$")]
-    private static partial System.Text.RegularExpressions.Regex ValidName();
+    [GeneratedRegex("^[a-zA-Z0-9]{1,19}$")]
+    private static partial Regex ValidName();
 
-    public void Handle(Session session, PacketReader packet)
+    protected override void Handle(Player player, RenameRequest request)
     {
-        packet.ReadU8();
-        var kind = (RenameKind)packet.ReadU8();
-        packet.ReadU16();
-        uint uid = packet.ReadU32();
-        var name = packet.ReadFixedString(RenamePacket.NameLength);
-        // o tipo 1 chega logo na entrada, às vezes antes de o personagem estar no mundo: não derruba a conexão
-        if (kind != RenameKind.Digimon || session.Player is not { } player)
+        var (kind, uid, name) = request;
+        if (kind != RenameKind.Digimon)
         {
-            session.Send(new RenamePacket(RenameResult.NotAvailable, kind, uid, ""));
+            player.Send(NotAvailable(kind, uid));
             return;
         }
 
@@ -188,8 +164,9 @@ public sealed partial class RenameHandler : IWorldPacketHandler
         bool free = digimon is { FreeRename: true } && !player.InBattle;
         if (name.Length == 0 || !free || !ValidName().IsMatch(name))
         {
-            player.Send(new RenamePacket(free && name.Length == 0 ? RenameResult.Free : RenameResult.NotAvailable,
-                RenameKind.Digimon, uid, ""));
+            player.Send(free && name.Length == 0
+                ? new RenamePacket(RenameResult.Free, RenameKind.Digimon, uid, "")
+                : NotAvailable(RenameKind.Digimon, uid));
             return;
         }
         digimon!.Name = name;
@@ -197,20 +174,25 @@ public sealed partial class RenameHandler : IWorldPacketHandler
         player.RequestImmediateSave();
         player.Send(new RenamePacket(RenameResult.Renamed, RenameKind.Digimon, uid, name));
     }
+
+    /// <summary>O tipo 1 chega logo na entrada, às vezes antes de o personagem estar no mundo: responde sem derrubar.</summary>
+    protected override void OnNotInWorld(Session session, RenameRequest request) =>
+        session.Send(NotAvailable(request.Kind, request.Uid));
+
+    private static RenamePacket NotAvailable(RenameKind kind, uint uid) => new(RenameResult.NotAvailable, kind, uid, "");
 }
 
 /// <summary>
-/// 0xB4 (C2S, bloco de status): ✅ o cliente manda um por digimon 6,6 s depois do 0x6D, ao sair da tela de
-/// resultado; o oficial ecoa o bloco de cada um com os dados dele.
+/// 0xB4: ✅ o cliente manda um por digimon 6,6 s depois do 0x6D, ao sair da tela de resultado; o oficial ecoa o bloco
+/// de cada um com os dados dele.
 /// </summary>
 [PacketHandler(MapOpcode.SingleDigimonInfo)]
-public sealed class DigimonInfoHandler : PlayerHandler
+[RequiresState(PlayerStates.Any)]
+public sealed class DigimonInfoHandler : PlayerHandler<DigimonInfoRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, DigimonInfoRequest request)
     {
-        packet.ReadU32();
-        var serial = Serial.Read(packet);
-        if (player.Character.FindDigimon(serial) is { } digimon)
+        if (player.Character.FindDigimon(request.Digimon) is { } digimon)
             player.Send(new SingleDigimonInfoPacket(digimon));
     }
 }

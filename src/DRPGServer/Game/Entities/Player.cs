@@ -15,6 +15,17 @@ public enum TamerState : byte
     InBattle = 11,
 }
 
+/// <summary>Estado do jogador para as pré-condições dos handlers (<c>[RequiresState]</c>).</summary>
+[Flags]
+public enum PlayerStates
+{
+    /// <summary>No mapa, livre para agir.</summary>
+    Idle = 1,
+    /// <summary>Numa batalha.</summary>
+    InBattle = 2,
+    Any = Idle | InBattle,
+}
+
 /// <summary>Personagem online no mapa. Vive na thread do mundo.</summary>
 public sealed class Player(
     Session session,
@@ -31,6 +42,7 @@ public sealed class Player(
     public Zone? Zone { get; internal set; }
     public Battle.Battle? Battle { get; internal set; }
     public bool InBattle => Battle is not null;
+    public PlayerStates State => InBattle ? PlayerStates.InBattle : PlayerStates.Idle;
     public bool IsOnline => !Session.IsClosed;
     public bool IsAdmin => Account.Authority >= Authority.Administrator;
 

@@ -2,7 +2,6 @@ using DRPGServer.Game;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;
-using DRPGServer.Network.Protocol;
 
 namespace DRPGServer.Network.Handlers;
 
@@ -12,15 +11,12 @@ namespace DRPGServer.Network.Handlers;
 /// Confirmado em conn=437, 442, 446: 3→2 (equipar), 2→3 (desequipar), 2→2, 3→3 e 1→3 (coletar).
 /// </summary>
 [PacketHandler(MapOpcode.CardMove)]
-public sealed class CardMoveHandler : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class CardMoveHandler : PlayerHandler<CardMoveRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, CardMoveRequest request)
     {
-        var header = ItemMoveHeader.Read(packet);
-        uint uid = packet.ReadU32();
-        uint cardId = packet.ReadU32();
-        if (player.InBattle) return;
-
+        var (header, uid, cardId) = request;
         var cardBag = player.Character.Inventory.Battle;
         var cardSlots = player.Character.Inventory.CardSlots;
 
@@ -73,14 +69,12 @@ public sealed class CardMoveHandler : PlayerHandler
 /// inventário: linha e coluna de origem e destino, trocando se o destino está ocupado.
 /// </summary>
 [PacketHandler(MapOpcode.ItemDropGet)]
-public sealed class ItemMoveHandler : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class ItemMoveHandler : PlayerHandler<ItemMoveRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, ItemMoveRequest request)
     {
-        var header = ItemMoveHeader.Read(packet);
-        uint uid = packet.ReadU32();
-        uint itemId = packet.ReadU32();
-        if (player.InBattle) return;
+        var (header, uid, itemId) = request;
         var bag = player.Character.Inventory.Main;
         var equipment = player.Character.Inventory.Equipment;
 
@@ -183,13 +177,13 @@ public sealed class ItemMoveHandler : PlayerHandler
 
 /// <summary>0xBD (C2S 254): ✅ cabeçalho (inventário → chão, linha e coluna) + registro: o item é destruído.</summary>
 [PacketHandler(MapOpcode.ItemDestroy)]
-public sealed class ItemDestroyHandler : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class ItemDestroyHandler : PlayerHandler<ItemDestroyRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, ItemDestroyRequest request)
     {
-        var header = ItemMoveHeader.Read(packet);
-        uint uid = packet.ReadU32();
-        if (player.InBattle || header.From != ItemPlace.Inventory) return;
+        var (header, uid) = request;
+        if (header.From != ItemPlace.Inventory) return;
         var bag = player.Character.Inventory.Main;
         int slot = ItemMoveHandler.SlotOf(header.FromA, header.FromB);
         if (bag[slot] is not { } item || item.Uid != uid) return;
@@ -205,20 +199,17 @@ public sealed class ItemDestroyHandler : PlayerHandler
 /// [aba 0, +0x17B8]; 3/4 = warehouse). Ignorado em batalha; junta pilhas parciais, ordena os itens e devolve 0xFC.
 /// </summary>
 [PacketHandler(MapOpcode.InventorySort)]
-public sealed class InventorySortHandler : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class InventorySortHandler : PlayerHandler<InventorySortRequest>
 {
     public const ushort MainInventoryType = 1;
     public const ushort BattleBagType = 2;
 
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, InventorySortRequest request)
     {
-        if (player.InBattle) return;
-        uint action = packet.ReadU32();
-        packet.ReadU32();
-        ushort bagType = packet.ReadU16();
-        if (action != 0) return;
+        if (request.Action != 0) return;
 
-        BagKind? bagKind = bagType switch
+        BagKind? bagKind = request.BagType switch
         {
             MainInventoryType => BagKind.Inventory,
             BattleBagType => BagKind.Battle,
@@ -234,19 +225,15 @@ public sealed class InventorySortHandler : PlayerHandler
 
 /// <summary>
 /// 0x41 (C2S 822): ✅ usar item. u32 3, registro do item (uid em +0), bloco do digimon alvo (selvagem: uid 0 e o
-/// serial dele em +4). Por ora só a Taming Net (<see cref="Taming"/>); o resto responde 0xC3.
+/// serial dele em +4). Por ora só a Taming Net (<see cref="Taming"/>); o resto responde 0xC3. Em batalha também 0xC3.
 /// </summary>
 [PacketHandler(MapOpcode.ItemUse)]
-public sealed class ItemUseHandler(Taming taming, GameWorld world) : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class ItemUseHandler(Taming taming, GameWorld world) : PlayerHandler<ItemUseRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, ItemUseRequest request)
     {
-        packet.ReadU32();
-        uint itemUid = packet.ReadU32();
-        packet.Skip(ItemRecord.Length - 4);
-        packet.ReadU32();                       // uid do alvo (0 no selvagem)
-        var target = Serial.Read(packet);
-
+        var (itemUid, _, target) = request;
         if (player.Character.Inventory.Main.FindByUid(itemUid) is not { } item)
         {
             player.Send(new ItemUseFailedPacket());
@@ -258,6 +245,8 @@ public sealed class ItemUseHandler(Taming taming, GameWorld world) : PlayerHandl
             player.Send(new ItemUseFailedPacket());     // ❓ outros itens (consumíveis, tickets) ainda não
         }
     }
+
+    protected override void OnRejected(Player player, ItemUseRequest request) => player.Send(new ItemUseFailedPacket());
 }
 
 /// <summary>
@@ -266,20 +255,16 @@ public sealed class ItemUseHandler(Taming taming, GameWorld world) : PlayerHandl
 /// Resposta oficial: 0x10 (broadcast na zona) → 0x85 (124 B) → 0xC9 (604 B com quantidade atualizada).
 /// </summary>
 [PacketHandler(MapOpcode.ItemTeleport)]
-public sealed class ItemTeleportHandler(GameWorld world) : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class ItemTeleportHandler(GameWorld world) : PlayerHandler<ItemTeleportRequest>
 {
     public const uint TeleportItemId = 900;
     public const uint TeleportXItemId = 907;
 
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, ItemTeleportRequest request)
     {
-        int targetX = packet.ReadI32();
-        int targetY = packet.ReadI32();
-        uint place = packet.ReadU32();
-        uint uid = packet.ReadU32();
-        uint itemId = packet.ReadU32();
-
-        if (player.InBattle || player.Zone is not { } zone) return;
+        var (targetX, targetY, place, uid, itemId) = request;
+        if (player.Zone is not { } zone) return;
         if (place != (uint)ItemPlace.Inventory) return;
         if (itemId is not (TeleportItemId or TeleportXItemId)) return;
         if (targetX < short.MinValue || targetX > short.MaxValue || targetY < short.MinValue || targetY > short.MaxValue) return;

@@ -141,7 +141,7 @@ public class EquipmentTests
         var handler = new ItemMoveHandler();
 
         // 1. Equipar Crest 107 no slot Crest1 (4)
-        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest1.Row, crest1.Column, 0, 0, crest1.Uid, 107));
+        handler.Dispatch(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest1.Row, crest1.Column, 0, 0, crest1.Uid, 107));
         var s1 = player.Leader.Stats;
         Assert.Equal((220, 127, 481, 115, 115), (s1.Atk, s1.Def, s1.Br, s1.MaxHp, s1.MaxVp));
         // Também aplica ao 2º Digimon da party
@@ -153,17 +153,17 @@ public class EquipmentTests
             session.SentOpcodes());
 
         // 2. Equipar Digimental 215 no slot Digimental1 (7)
-        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Digimental1, egg1.Row, egg1.Column, 0, 0, egg1.Uid, 215));
+        handler.Dispatch(session, MovePacket(ItemPlace.Inventory, ItemPlace.Digimental1, egg1.Row, egg1.Column, 0, 0, egg1.Uid, 215));
         var s2 = player.Leader.Stats;
         Assert.Equal((258, 145, 489, 146, 125), (s2.Atk, s2.Def, s2.Br, s2.MaxHp, s2.MaxVp));
 
         // 3. Equipar 2ª Crest 107 no slot Crest2 (5)
-        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest2, crest2.Row, crest2.Column, 0, 0, crest2.Uid, 107));
+        handler.Dispatch(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest2, crest2.Row, crest2.Column, 0, 0, crest2.Uid, 107));
         var s3 = player.Leader.Stats;
         Assert.Equal((333, 185, 839, 146, 125), (s3.Atk, s3.Def, s3.Br, s3.MaxHp, s3.MaxVp));
 
         // 4. Desequipar Crest1 volta para s2
-        handler.Handle(session, MovePacket(ItemPlace.Crest1, ItemPlace.Inventory, 0, 0, 0, 0, crest1.Uid, 107));
+        handler.Dispatch(session, MovePacket(ItemPlace.Crest1, ItemPlace.Inventory, 0, 0, 0, 0, crest1.Uid, 107));
         Assert.Null(inv.EquippedAt(ItemPlace.Crest1));
         Assert.Equal(crest1, inv.Main[0]);
         Assert.Equal(s2, player.Leader.Stats);
@@ -215,33 +215,33 @@ public class EquipmentTests
         var handler = new ItemMoveHandler();
 
         // Tipo incompatível: Digimental (Type 2) em Crest1 (aceita só Type 1)
-        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, egg.Row, egg.Column, 0, 0, egg.Uid, 215));
+        handler.Dispatch(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, egg.Row, egg.Column, 0, 0, egg.Uid, 215));
         Assert.Null(inv.EquippedAt(ItemPlace.Crest1));
         Assert.Empty(session.SentOpcodes());
 
         // Consumível em slot de equipamento
-        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Ring, bread.Row, bread.Column, 0, 0, bread.Uid, 25));
+        handler.Dispatch(session, MovePacket(ItemPlace.Inventory, ItemPlace.Ring, bread.Row, bread.Column, 0, 0, bread.Uid, 25));
         Assert.Null(inv.EquippedAt(ItemPlace.Ring));
 
         // Nível insuficiente (Tamer L5 vs Ring L30)
-        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Ring, ring.Row, ring.Column, 0, 0, ring.Uid, 668));
+        handler.Dispatch(session, MovePacket(ItemPlace.Inventory, ItemPlace.Ring, ring.Row, ring.Column, 0, 0, ring.Uid, 668));
         Assert.Null(inv.EquippedAt(ItemPlace.Ring));
 
         // UID forjado / ItemId trocado
-        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest.Row, crest.Column, 0, 0, crest.Uid + 999, 107));
-        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest.Row, crest.Column, 0, 0, crest.Uid, 215));
+        handler.Dispatch(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest.Row, crest.Column, 0, 0, crest.Uid + 999, 107));
+        handler.Dispatch(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest.Row, crest.Column, 0, 0, crest.Uid, 215));
         Assert.Null(inv.EquippedAt(ItemPlace.Crest1));
 
         // Coordenadas não-zero no slot de equipamento
-        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest.Row, crest.Column, 1, 0, crest.Uid, 107));
+        handler.Dispatch(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest.Row, crest.Column, 1, 0, crest.Uid, 107));
         Assert.Null(inv.EquippedAt(ItemPlace.Crest1));
 
         // Equipar válido e tentar desequipar em cima do pão (troca inválida: pão não pode ir para Crest1)
-        handler.Handle(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest.Row, crest.Column, 0, 0, crest.Uid, 107));
+        handler.Dispatch(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest.Row, crest.Column, 0, 0, crest.Uid, 107));
         Assert.Equal(crest, inv.EquippedAt(ItemPlace.Crest1));
         session.SentOpcodes();
 
-        handler.Handle(session, MovePacket(ItemPlace.Crest1, ItemPlace.Inventory, 0, 0, bread.Row, bread.Column, crest.Uid, 107));
+        handler.Dispatch(session, MovePacket(ItemPlace.Crest1, ItemPlace.Inventory, 0, 0, bread.Row, bread.Column, crest.Uid, 107));
         Assert.Equal(crest, inv.EquippedAt(ItemPlace.Crest1));
         Assert.Equal(bread, inv.Main[bread.Slot]);
         Assert.Empty(session.SentOpcodes());
@@ -375,7 +375,7 @@ public class EquipmentTests
         Assert.Equal(evolvedSpecies.Id, leader.SpeciesId);
 
         // Ao desequipar a Aura no mapa -> reverte para a forma-base
-        new ItemMoveHandler().Handle(session, MovePacket(ItemPlace.Aura, ItemPlace.Inventory, 0, 0, 0, 0, auraItem.Uid, 718));
+        new ItemMoveHandler().Dispatch(session, MovePacket(ItemPlace.Aura, ItemPlace.Inventory, 0, 0, 0, 0, auraItem.Uid, 718));
         Assert.False(leader.IsEvolved);
         Assert.Equal(baseSpecies.Id, leader.SpeciesId);
     }

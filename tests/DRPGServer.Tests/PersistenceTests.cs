@@ -124,7 +124,7 @@ public class PersistenceTests
         character.Inventory.Main.Place(character.Inventory.Create(41, 2, 1, 10));
         var sortPayload = new byte[12];
         sortPayload[8] = (byte)InventorySortHandler.MainInventoryType;
-        new InventorySortHandler().Handle(session, new PacketReader(sortPayload));
+        new InventorySortHandler().Dispatch(session, new PacketReader(sortPayload));
         Assert.True(player.IsDirty);
         Assert.False(player.NeedsImmediateSave);
 
@@ -134,7 +134,7 @@ public class PersistenceTests
         new ItemMoveHeader(ItemPlace.Ground, ItemPlace.Inventory, 56, 56, 0, 0).Write(w);
         w.WriteU32(drop.Uid);
         w.WriteU32(drop.ItemId);
-        new ItemMoveHandler().Handle(session, new PacketReader(w.Payload.ToArray()));
+        new ItemMoveHandler().Dispatch(session, new PacketReader(w.Payload.ToArray()));
         Assert.True(player.NeedsImmediateSave);
     }
 

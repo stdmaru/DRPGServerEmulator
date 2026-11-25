@@ -49,7 +49,7 @@ public sealed class PacketDispatcher
             case ISessionPacketHandler sessionHandler:
                 try
                 {
-                    await sessionHandler.HandleAsync(session, new PacketReader(frame.Payload), ct);
+                    await sessionHandler.HandleAsync(session, frame.Payload, ct);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                 catch (Exception e)
@@ -59,12 +59,22 @@ public sealed class PacketDispatcher
                 break;
 
             case IWorldPacketHandler worldHandler:
+                Action work;
+                try
+                {
+                    work = worldHandler.Prepare(session, frame.Payload);
+                }
+                catch (Exception e)
+                {
+                    Report(session, frame, e);
+                    break;
+                }
                 _world.Post(() =>
                 {
                     if (session.IsClosed) return;
                     try
                     {
-                        worldHandler.Handle(session, new PacketReader(frame.Payload));
+                        work();
                     }
                     catch (Exception e)
                     {
@@ -79,7 +89,11 @@ public sealed class PacketDispatcher
     {
         var opcode = OpcodeNames.Of(session.Role, frame.Opcode);
         if (e is PacketFormatException)
+        {
+            // o cliente oficial nunca manda pacote fora do layout: é cliente modificado ou fluxo corrompido
             _log.LogWarning("Pacote {Opcode} malformado de {Session}: {Message}", opcode, session, e.Message);
+            session.Close($"pacote {opcode} malformado");
+        }
         else
             _log.LogError(e, "Erro tratando {Opcode} de {Session}", opcode, session);
     }

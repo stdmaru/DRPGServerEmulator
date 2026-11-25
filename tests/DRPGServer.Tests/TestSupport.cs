@@ -1,7 +1,9 @@
 using DRPGServer.Configuration;
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.World;
+using System.Reflection;
 using DRPGServer.Network;
+using DRPGServer.Network.Handlers;
 using DRPGServer.Network.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -51,4 +53,48 @@ internal static class Entities
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = map, X = 56, Y = 56,
         };
+}
+
+/// <summary>
+/// Entrega um payload ao handler pelo mesmo caminho do <see cref="PacketDispatcher"/> (parse tipado e, no mundo,
+/// <c>Prepare</c> seguido da ação). Payloads mais curtos que o mínimo do request são completados com zeros, para os
+/// testes montarem só os campos que importam.
+/// </summary>
+internal static class HandlerDispatch
+{
+    public static void Dispatch(this IWorldPacketHandler handler, Session session, ReadOnlyMemory<byte> payload) =>
+        handler.Prepare(session, Pad(handler, payload))();
+
+    public static void Dispatch(this IWorldPacketHandler handler, Session session, PacketReader packet) =>
+        handler.Dispatch(session, packet.ReadBytes(packet.Remaining));
+
+    public static ValueTask DispatchAsync(this ISessionPacketHandler handler, Session session, ReadOnlyMemory<byte> payload,
+        CancellationToken ct = default) => handler.HandleAsync(session, Pad(handler, payload), ct);
+
+    public static ValueTask DispatchAsync(this ISessionPacketHandler handler, Session session, PacketReader packet,
+        CancellationToken ct = default) => handler.DispatchAsync(session, packet.ReadBytes(packet.Remaining), ct);
+
+    /// <summary>Tamanho mínimo do request do handler (<see cref="IClientPacket{TSelf}.Length"/>).</summary>
+    public static PacketLength RequestLength(Type handlerType)
+    {
+        for (var t = handlerType; t is not null; t = t.BaseType)
+        {
+            if (!t.IsGenericType) continue;
+            var def = t.GetGenericTypeDefinition();
+            if (def == typeof(PlayerHandler<>) || def == typeof(SessionHandler<>))
+                return (PacketLength)t.GetGenericArguments()[0]
+                    .GetProperty(nameof(IClientPacket<IgnoredPayload>.Length), BindingFlags.Public | BindingFlags.Static)!
+                    .GetValue(null)!;
+        }
+        throw new InvalidOperationException($"{handlerType.Name} não deriva de PlayerHandler<T> nem SessionHandler<T>");
+    }
+
+    private static ReadOnlyMemory<byte> Pad(object handler, ReadOnlyMemory<byte> payload)
+    {
+        int min = RequestLength(handler.GetType()).Min;
+        if (payload.Length >= min) return payload;
+        var padded = new byte[min];
+        payload.CopyTo(padded);
+        return padded;
+    }
 }

@@ -81,7 +81,7 @@ public class DigimonTitleTests
 
         // 0x97: lista de títulos desbloqueados (1608 B)
         var listHandler = new DigimonTitleListHandler();
-        listHandler.Handle(session, new PacketReader(TitleListRequest(2, digimon.Uid)));
+        listHandler.Dispatch(session, new PacketReader(TitleListRequest(2, digimon.Uid)));
         var listFrame = Assert.Single(session.DrainOutgoing());
         Assert.Equal((ushort)MapOpcode.DigimonTitleList, PacketHeader.Read(listFrame).Opcode);
         var listPayload = listFrame.AsSpan(PacketHeader.Length);
@@ -94,13 +94,13 @@ public class DigimonTitleTests
         Assert.Equal(1u, BitConverter.ToUInt32(listPayload[20..]));
 
         // Guard: Digimon de outro jogador / inexistente devolve result = 0
-        listHandler.Handle(session, new PacketReader(TitleListRequest(2, 99999)));
+        listHandler.Dispatch(session, new PacketReader(TitleListRequest(2, 99999)));
         var badList = Assert.Single(session.DrainOutgoing());
         Assert.Equal(0u, BitConverter.ToUInt32(badList.AsSpan(PacketHeader.Length)));
 
         // Guard: tentar equipar título NÃO desbloqueado (20200) falha com result = 0
         var equipHandler = new DigimonTitleEquipHandler();
-        equipHandler.Handle(session, new PacketReader(TitleEquipRequest(2, digimon.Uid, 20200)));
+        equipHandler.Dispatch(session, new PacketReader(TitleEquipRequest(2, digimon.Uid, 20200)));
         var denied = Assert.Single(session.DrainOutgoing());
         Assert.Equal((ushort)MapOpcode.DigimonTitleEquip, PacketHeader.Read(denied).Opcode);
         Assert.Equal(0u, BitConverter.ToUInt32(denied.AsSpan(PacketHeader.Length)));
@@ -108,7 +108,7 @@ public class DigimonTitleTests
 
         // Equipar 20030 (Endless Journey: +15 todos os atributos)
         var statsBefore = digimon.Stats;
-        equipHandler.Handle(session, new PacketReader(TitleEquipRequest(2, digimon.Uid, 20030)));
+        equipHandler.Dispatch(session, new PacketReader(TitleEquipRequest(2, digimon.Uid, 20030)));
         Assert.Equal(20030u, digimon.TitleId);
         Assert.True(digimon.Stats.Atk > statsBefore.Atk);
         Assert.True(digimon.Stats.MaxHp > statsBefore.MaxHp);
@@ -138,7 +138,7 @@ public class DigimonTitleTests
         Assert.Equal(20030u, BitConverter.ToUInt32(p99[8..]));
 
         // Desequipar (titleId = 0) volta aos status originais
-        equipHandler.Handle(session, new PacketReader(TitleEquipRequest(2, digimon.Uid, 0)));
+        equipHandler.Dispatch(session, new PacketReader(TitleEquipRequest(2, digimon.Uid, 0)));
         Assert.Equal(0u, digimon.TitleId);
         Assert.Equal(statsBefore, digimon.Stats);
     }

@@ -1,7 +1,6 @@
 using DRPGServer.Configuration;
 using DRPGServer.Game.Entities;
 using DRPGServer.Network.Packets.Map;
-using DRPGServer.Network.Protocol;
 using Microsoft.Extensions.Options;
 
 namespace DRPGServer.Network.Handlers;
@@ -11,18 +10,12 @@ namespace DRPGServer.Network.Handlers;
 /// Ver <c>docs/mecanicas/depository.md</c>.
 /// </summary>
 [PacketHandler(MapOpcode.DepositoryAction)]
-public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : PlayerHandler<DepositoryActionRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, DepositoryActionRequest request)
     {
-        if (player.InBattle) return;
-
-        ushort page = packet.ReadU16();
-        var action = (DepositoryAction)packet.ReadU8();
-        packet.ReadU8();
-        uint partyDigimonUid = packet.ReadU32();
-        uint depositoryDigimonUid = packet.ReadU32();
-
+        var (page, action, partyDigimonUid, depositoryDigimonUid) = request;
         var character = player.Character;
         ushort clampedPage = Math.Clamp(page, (ushort)1, character.DepositoryTotalPages);
         double depositoryFee = options.Value.DigimonDepositoryFee;
@@ -77,19 +70,18 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
 }
 
 /// <summary>
-/// ✅ Map 0x94 (C2S 15 B): expande +1 slot no Digimon Depository consumindo o item 901 (0x385) ou 929 (0x3A1).
+/// ✅ Map 0x94 (C2S 15 B, ❓ não capturado na v322): expande +1 slot no Digimon Depository consumindo o item 901 (0x385) ou 929 (0x3A1).
 /// Confirmado em <c>DigimonRPG.bin @ 0x00B7BBDA / 0x00B7BBEC / 0x00AC2883</c>.
 /// </summary>
 [PacketHandler(MapOpcode.DepositoryExpand)]
-public sealed class DepositoryExpandHandler : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class DepositoryExpandHandler : PlayerHandler<DepositoryExpandRequest>
 {
     public const uint ExpansionItemId = 901;        // 0x385
     public const uint EventExpansionItemId = 929;   // 0x3A1
 
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, DepositoryExpandRequest request)
     {
-        if (player.InBattle) return;
-
         var character = player.Character;
         if (character.DepositorySlots >= Character.MaxDepositorySlots)
         {

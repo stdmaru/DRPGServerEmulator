@@ -173,7 +173,7 @@ public class TutorialTests
         var zone = _zones.Find(79)!;
         var drop = zone.Drop(41, 64, 27);
         _session.DrainOutgoing();
-        new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, drop.X, drop.Y, 4, 6, drop.Uid, 41)));
+        new ItemMoveHandler().Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, drop.X, drop.Y, 4, 6, drop.Uid, 41)));
         // ✅ o oficial tira do chão (0x13 com 108 zeros + x, y) antes do 0x91
         var pickFrames = _session.DrainOutgoing();
         Assert.Equal([(ushort)0x13, (ushort)0x91], pickFrames.Select(f => PacketHeader.Read(f).Opcode).ToArray());
@@ -183,12 +183,12 @@ public class TutorialTests
         var seed = bag[0]!;
         Assert.Equal(1u, seed.Amount);
 
-        new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Inventory, ItemPlace.Inventory, 0, 0, 3, 5, seed.Uid, 41)));
+        new ItemMoveHandler().Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Inventory, ItemPlace.Inventory, 0, 0, 3, 5, seed.Uid, 41)));
         Assert.Equal([(ushort)0x91], _session.SentOpcodes());
         Assert.Same(seed, bag[23]);
         Assert.Null(bag[0]);
 
-        new ItemDestroyHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Inventory, ItemPlace.Ground, 3, 5, 0, 0, seed.Uid, 41)));
+        new ItemDestroyHandler().Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Inventory, ItemPlace.Ground, 3, 5, 0, 0, seed.Uid, 41)));
         Assert.Equal([(ushort)0xBD], _session.SentOpcodes());
         Assert.Empty(bag.Items);
     }
@@ -255,8 +255,8 @@ public class TutorialTests
         var d2 = zone.Drop(41, 64, 27);
         _session.DrainOutgoing();
 
-        new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d1.X, d1.Y, 4, 6, d1.Uid, 41)));
-        new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d2.X, d2.Y, 4, 6, d2.Uid, 41)));
+        new ItemMoveHandler().Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d1.X, d1.Y, 4, 6, d1.Uid, 41)));
+        new ItemMoveHandler().Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d2.X, d2.Y, 4, 6, d2.Uid, 41)));
 
         var bag = _player.Character.Inventory.Main;
         Assert.Single(bag.Items);
@@ -277,7 +277,7 @@ public class TutorialTests
 
         var payload = new byte[38];
         BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), 1); // bagType 1 = Main Inventory
-        new InventorySortHandler().Handle(_session, new PacketReader(payload));
+        new InventorySortHandler().Dispatch(_session, new PacketReader(payload));
 
         Assert.Equal([(ushort)0xFC], _session.SentOpcodes());
         // ordenado por Type (74: Type 4, 41: Type 5 [8 + 2], 22004: Type 26) nos slots 0..3
@@ -296,7 +296,7 @@ public class TutorialTests
         inv.Battle.Place(inv.Create(74, slot: 8, amount: 3));
         inv.Battle.Place(inv.Create(74, slot: 15, amount: 4));
         BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), 2);
-        new InventorySortHandler().Handle(_session, new PacketReader(payload));
+        new InventorySortHandler().Dispatch(_session, new PacketReader(payload));
 
         Assert.Equal([(ushort)0xFC], _session.SentOpcodes());
         Assert.Equal(74u, inv.Battle[0]!.ItemId);

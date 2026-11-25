@@ -4,7 +4,6 @@ using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Channel;
-using DRPGServer.Network.Protocol;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -28,9 +27,9 @@ public sealed class CharacterListService(CharacterRepository characters)
 
 /// <summary>0x03: o jogador clicou num canal.</summary>
 [PacketHandler(ChannelOpcode.ChannelSelect)]
-public sealed class ChannelSelectHandler(IOptions<GameOptions> options) : ISessionPacketHandler
+public sealed class ChannelSelectHandler(IOptions<GameOptions> options) : SessionHandler<ChannelSelectRequest>
 {
-    public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    protected override ValueTask HandleAsync(Session session, ChannelSelectRequest request, CancellationToken ct)
     {
         session.Send(new ChannelSelectPacket(options.Value.FourthStarterDigimon));
         return ValueTask.CompletedTask;
@@ -39,24 +38,17 @@ public sealed class ChannelSelectHandler(IOptions<GameOptions> options) : ISessi
 
 /// <summary>0x04: autenticação por usuário + auth key (a do launcher).</summary>
 [PacketHandler(ChannelOpcode.Authenticate)]
-public sealed class AuthenticateHandler(AccountRepository accounts, AccountRegistry registry, ILogger<AuthenticateHandler> log) : ISessionPacketHandler
+public sealed class AuthenticateHandler(AccountRepository accounts, AccountRegistry registry, ILogger<AuthenticateHandler> log)
+    : SessionHandler<AuthenticateRequest>
 {
-    public async ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    protected override async ValueTask HandleAsync(Session session, AuthenticateRequest request, CancellationToken ct)
     {
-        packet.ReadI32();
-        packet.ReadI32();
-        var username = packet.ReadFixedString(21);
-        var authKey = packet.ReadFixedString(40);
-        packet.Skip(60);
-        var mac1 = packet.ReadFixedString(21);
-        var mac2 = packet.ReadFixedString(21);
-        var mac3 = packet.ReadFixedString(21);
-
-        var record = await accounts.FindByUsernameAsync(username, ct);
-        if (record is null || string.IsNullOrEmpty(record.AuthKey) || record.AuthKey != authKey)
+        var record = await accounts.FindByUsernameAsync(request.Username, ct);
+        if (record is null || string.IsNullOrEmpty(record.AuthKey) || record.AuthKey != request.AuthKey)
         {
-            log.LogWarning("Autenticação recusada para {Username} de {Session}", username, session);
-            session.Send(new AuthenticationPacket(ChannelError.InvalidCredentials, username, authKey, mac1, mac2, mac3));
+            log.LogWarning("Autenticação recusada para {Username} de {Session}", request.Username, session);
+            session.Send(new AuthenticationPacket(ChannelError.InvalidCredentials, request.Username, request.AuthKey,
+                request.Mac1, request.Mac2, request.Mac3));
             return;
         }
 
@@ -68,23 +60,19 @@ public sealed class AuthenticateHandler(AccountRepository accounts, AccountRegis
 
 /// <summary>0x12: lista de personagens.</summary>
 [PacketHandler(ChannelOpcode.CharacterList)]
-public sealed class CharacterListHandler(CharacterListService list) : ISessionPacketHandler
+public sealed class CharacterListHandler(CharacterListService list) : AccountHandler<CharacterListRequest>
 {
-    public async ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
-    {
-        if (session.Account is { } account)
-            await list.SendAsync(session, account.Uid, ct);
-    }
+    protected override async ValueTask HandleAsync(Session session, AuthenticatedAccount account, CharacterListRequest request, CancellationToken ct) =>
+        await list.SendAsync(session, account.Uid, ct);
 }
 
 /// <summary>0x14: confirmação do usuário.</summary>
 [PacketHandler(ChannelOpcode.UserCheck)]
-public sealed class UserCheckHandler : ISessionPacketHandler
+public sealed class UserCheckHandler : AccountHandler<UserCheckRequest>
 {
-    public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    protected override ValueTask HandleAsync(Session session, AuthenticatedAccount account, UserCheckRequest request, CancellationToken ct)
     {
-        if (session.Account is { } account)
-            session.Send(new UserCheckPacket(account.Username));
+        session.Send(new UserCheckPacket(account.Username));
         return ValueTask.CompletedTask;
     }
 }
@@ -92,7 +80,7 @@ public sealed class UserCheckHandler : ISessionPacketHandler
 /// <summary>0x10: criar personagem.</summary>
 [PacketHandler(ChannelOpcode.CharacterCreate)]
 public sealed partial class CharacterCreateHandler(
-    CharacterRepository characters, CharacterListService list, IOptions<GameOptions> options, ILogger<CharacterCreateHandler> log) : ISessionPacketHandler
+    CharacterRepository characters, CharacterListService list, IOptions<GameOptions> options, ILogger<CharacterCreateHandler> log) : AccountHandler<CharacterCreateRequest>
 {
     private static readonly ushort[] Starters = [10, 11, 12];
     private static readonly ushort[] FourthStarters = [24, 27, 31, 40]; // Chibimon, Yarmon, Hopmon, Dorimon
@@ -104,17 +92,9 @@ public sealed partial class CharacterCreateHandler(
     [GeneratedRegex("^[a-zA-Z0-9]{1,23}$")]
     private static partial Regex ValidDigimonName();
 
-    public async ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    protected override async ValueTask HandleAsync(Session session, AuthenticatedAccount account, CharacterCreateRequest request, CancellationToken ct)
     {
-        if (session.Account is not { } account) return;
-
-        packet.ReadI32();
-        packet.ReadI32();
-        var header = new CharacterCreateHeader(packet.ReadU8(), packet.ReadU8(), packet.ReadU16(), packet.ReadU16());
-        var tamerId = packet.ReadU8();
-        var name = packet.ReadFixedString(21);
-        var digimonId = packet.ReadU16();
-        var digimonName = packet.ReadFixedString(26);
+        var (header, tamerId, name, digimonId, digimonName) = request;
 
         var o = options.Value;
         bool validDigimon = Starters.Contains(digimonId) ||
@@ -154,19 +134,22 @@ public sealed partial class CharacterCreateHandler(
 
 /// <summary>0x11: apagar personagem.</summary>
 [PacketHandler(ChannelOpcode.CharacterDelete)]
-public sealed class CharacterDeleteHandler(CharacterRepository characters, CharacterListService list, ILogger<CharacterDeleteHandler> log) : ISessionPacketHandler
+public sealed class CharacterDeleteHandler(CharacterRepository characters, CharacterListService list, ILogger<CharacterDeleteHandler> log)
+    : AccountHandler<CharacterDeleteRequest>
 {
-    public async ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    protected override async ValueTask HandleAsync(Session session, AuthenticatedAccount account, CharacterDeleteRequest request, CancellationToken ct)
     {
-        if (session.Account is not { } account) return;
-        packet.ReadI32();
-        packet.ReadI32();
-        var uid = packet.ReadU32();
-        var passwordMd5 = packet.ReadFixedString(40); // ❓ o oficial confere; aqui não há senha local
-
+        var uid = request.CharacterUid;
         if (!await characters.DeleteAsync(uid, account.Uid, ct)) return;
         log.LogInformation("{Username} apagou o personagem {Uid}", account.Username, uid);
-        session.Send(new CharacterDeletePacket(uid, passwordMd5));
+        session.Send(new CharacterDeletePacket(uid, request.PasswordMd5));
         await list.SendAsync(session, account.Uid, ct);
     }
+}
+
+public sealed class ChannelLifecycle(AccountRegistry accounts) : ISessionLifecycle
+{
+    public ServerRole Role => ServerRole.Channel;
+    public void OnConnected(Session session) { }
+    public void OnDisconnected(Session session) => accounts.Release(session);
 }

@@ -40,7 +40,7 @@ public class ItemTeleportTests
         session.DrainOutgoing();
 
         var handler = new ItemTeleportHandler(world);
-        handler.Handle(session, new PacketReader(TeleportPayload(70, 80, ItemPlace.Inventory, teleport.Uid, 907)));
+        handler.Dispatch(session, new PacketReader(TeleportPayload(70, 80, ItemPlace.Inventory, teleport.Uid, 907)));
 
         Assert.Equal((short)70, character.X);
         Assert.Equal((short)80, character.Y);
@@ -55,7 +55,7 @@ public class ItemTeleportTests
         Assert.Equal(604, frames[2].Length - PacketHeader.Length);
 
         // Última carga: consome e esvazia o slot
-        handler.Handle(session, new PacketReader(TeleportPayload(56, 56, ItemPlace.Inventory, teleport.Uid, 907)));
+        handler.Dispatch(session, new PacketReader(TeleportPayload(56, 56, ItemPlace.Inventory, teleport.Uid, 907)));
         Assert.Null(character.Inventory.Main.FindByUid(teleport.Uid));
         Assert.Equal(3, session.DrainOutgoing().Count);
     }
@@ -82,13 +82,13 @@ public class ItemTeleportTests
         var handler = new ItemTeleportHandler(world);
 
         // Item comum (41) não pode ser usado como teleporte
-        handler.Handle(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Inventory, seed.Uid, 41)));
+        handler.Dispatch(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Inventory, seed.Uid, 41)));
         // Place inválido (Ground)
-        handler.Handle(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Ground, teleport.Uid, 907)));
+        handler.Dispatch(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Ground, teleport.Uid, 907)));
         // Célula não-andável no grid (todos 0)
-        handler.Handle(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Inventory, teleport.Uid, 907)));
+        handler.Dispatch(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Inventory, teleport.Uid, 907)));
         // UID / ItemId trocados
-        handler.Handle(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Inventory, seed.Uid, 907)));
+        handler.Dispatch(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Inventory, seed.Uid, 907)));
 
         Assert.Empty(session.DrainOutgoing());
         Assert.Equal(5u, teleport.Amount);

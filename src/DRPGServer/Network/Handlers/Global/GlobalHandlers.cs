@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Security.Cryptography;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Global;
@@ -10,12 +11,12 @@ namespace DRPGServer.Network.Handlers;
 
 /// <summary>0x64: primeiro pacote no global (usuário + personagem).</summary>
 [PacketHandler(GlobalOpcode.UserAuth)]
-public sealed class GlobalUserAuthHandler(AccountRegistry accounts, ILogger<GlobalUserAuthHandler> log) : ISessionPacketHandler
+public sealed class GlobalUserAuthHandler(AccountRegistry accounts, ILogger<GlobalUserAuthHandler> log)
+    : SessionHandler<GlobalUserAuthRequest>
 {
-    public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    protected override ValueTask HandleAsync(Session session, GlobalUserAuthRequest request, CancellationToken ct)
     {
-        var username = packet.ReadFixedString(21);
-        packet.ReadFixedString(21);             // personagem
+        var username = request.Username;
         if (session.Account is null && accounts.Claim(username, session) is null)
         {
             log.LogWarning("{Session}: {Username} no global sem login no channel", session, username);
@@ -33,23 +34,13 @@ public sealed class GlobalUserAuthHandler(AccountRegistry accounts, ILogger<Glob
 /// Ecoa o uid enviado pelo cliente e marca as espécies dos Digimons guardados no Digimon Depository.
 /// </summary>
 [PacketHandler(GlobalOpcode.EncyclopediaData)]
-public sealed class EncyclopediaDataHandler(AccountRegistry accounts, GameWorld world) : ISessionPacketHandler
+public sealed class EncyclopediaDataHandler(AccountRegistry accounts, GameWorld world) : AccountHandler<EncyclopediaDataRequest>
 {
-    public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    protected override ValueTask HandleAsync(Session session, AuthenticatedAccount account, EncyclopediaDataRequest request, CancellationToken ct)
     {
         var aesKey = session.GlobalAesKey ?? GlobalSessionCipher.DeriveKey(HelloPacket.DefaultSeed);
-        uint digimonUid = 0;
-        if (packet.Remaining >= GlobalSessionCipher.BlockSize)
-        {
-            var firstBlock = GlobalSessionCipher.DecryptBlocks(aesKey, packet.ReadBytes(GlobalSessionCipher.BlockSize));
-            digimonUid = BinaryPrimitives.ReadUInt32LittleEndian(firstBlock);
-        }
-
-        if (session.Account is not { } account)
-        {
-            session.Send(new EncyclopediaDataPacket(aesKey, digimonUid, []));
-            return ValueTask.CompletedTask;
-        }
+        var firstBlock = GlobalSessionCipher.DecryptBlocks(aesKey, request.FirstBlock);
+        uint digimonUid = BinaryPrimitives.ReadUInt32LittleEndian(firstBlock);
 
         world.Post(() =>
         {
@@ -90,16 +81,11 @@ public sealed class EncyclopediaDataHandler(AccountRegistry accounts, GameWorld 
 /// Lê os 5 slots do personagem na thread do <see cref="GameWorld"/>.
 /// </summary>
 [PacketHandler(GlobalOpcode.EncyclopediaCollection)]
-public sealed class EncyclopediaCollectionHandler(AccountRegistry accounts, GameWorld world) : ISessionPacketHandler
+public sealed class EncyclopediaCollectionHandler(AccountRegistry accounts, GameWorld world) : AccountHandler<EncyclopediaCollectionRequest>
 {
-    public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    protected override ValueTask HandleAsync(Session session, AuthenticatedAccount account, EncyclopediaCollectionRequest request, CancellationToken ct)
     {
         var aesKey = session.GlobalAesKey ?? GlobalSessionCipher.DeriveKey(HelloPacket.DefaultSeed);
-        if (session.Account is not { } account)
-        {
-            session.Send(new EncyclopediaCollectionPacket(aesKey, []));
-            return ValueTask.CompletedTask;
-        }
 
         world.Post(() =>
         {
@@ -114,4 +100,19 @@ public sealed class EncyclopediaCollectionHandler(AccountRegistry accounts, Game
         });
         return ValueTask.CompletedTask;
     }
+}
+
+/// <summary>Boas-vindas (0x0E) no global; ao desconectar, solta a conta.</summary>
+public sealed class GlobalLifecycle(AccountRegistry accounts) : ISessionLifecycle
+{
+    public ServerRole Role => ServerRole.Global;
+
+    public void OnConnected(Session session)
+    {
+        var seed = RandomNumberGenerator.GetBytes(GlobalSessionCipher.BlockSize);
+        session.GlobalAesKey = GlobalSessionCipher.DeriveKey(seed);
+        session.Send(new HelloPacket((ushort)GlobalOpcode.Hello, seed));
+    }
+
+    public void OnDisconnected(Session session) => accounts.Release(session);
 }

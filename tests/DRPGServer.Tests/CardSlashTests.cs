@@ -71,7 +71,7 @@ public class CardSlashTests
         var handler = new CardMoveHandler();
 
         // 3 → 2: equipar Golden Drill X no Card Slot 0
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 0, 0, drill.Uid, 74)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 0, 0, drill.Uid, 74)));
         Assert.Null(inv.Battle[0]);
         Assert.Same(drill, inv.CardSlots[0]);
         Assert.Equal(0, drill.Slot);
@@ -80,7 +80,7 @@ public class CardSlashTests
         Assert.Equal(172, frame1.Length - PacketHeader.Length);
 
         // 3 → 2: equipar Defense Plug-In C no Card Slot 0 já ocupado (troca com Golden Drill X)
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 1, 0, 0, defense.Uid, 5)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 1, 0, 0, defense.Uid, 5)));
         Assert.Same(defense, inv.CardSlots[0]);
         Assert.Same(drill, inv.Battle[1]);
         Assert.Equal(1, drill.Slot);
@@ -90,21 +90,21 @@ public class CardSlashTests
         Assert.Equal(74u, BitConverter.ToUInt32(payload2[(ItemMoveHeader.Length + CardRecord.Length + 4)..]));
 
         // 2 → 2: mover dentro dos 6 Card Slots (slot 0 → slot 5)
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.CardSlots, ItemPlace.CardSlots, 0, 0, 0, 5, defense.Uid, 5)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.CardSlots, ItemPlace.CardSlots, 0, 0, 0, 5, defense.Uid, 5)));
         Assert.Null(inv.CardSlots[0]);
         Assert.Same(defense, inv.CardSlots[5]);
         Assert.Equal(5, defense.Slot);
         Assert.Single(session.DrainOutgoing());
 
         // 2 → 3: desequipar do Card Slot 5 para a mochila (row 2, col 3 = slot 15)
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.CardSlots, ItemPlace.Inventory, 0, 5, 2, 3, defense.Uid, 5)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.CardSlots, ItemPlace.Inventory, 0, 5, 2, 3, defense.Uid, 5)));
         Assert.Null(inv.CardSlots[5]);
         Assert.Same(defense, inv.Battle[15]);
         Assert.Equal(15, defense.Slot);
         Assert.Single(session.DrainOutgoing());
 
         // 3 → 3: mover na mochila (slot 15 → slot 23)
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.Inventory, 2, 3, 3, 5, defense.Uid, 5)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.Inventory, 2, 3, 3, 5, defense.Uid, 5)));
         Assert.Null(inv.Battle[15]);
         Assert.Same(defense, inv.Battle[23]);
         Assert.Single(session.DrainOutgoing());
@@ -118,8 +118,8 @@ public class CardSlashTests
         var handler = new CardMoveHandler();
 
         // row != 0 ou col >= 6 nos Card Slots são inválidos
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 1, 0, drill.Uid, 74)));
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 0, 6, drill.Uid, 74)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 1, 0, drill.Uid, 74)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 0, 6, drill.Uid, 74)));
         Assert.Empty(session.DrainOutgoing());
         Assert.Same(drill, player.Character.Inventory.Battle[0]);
     }
@@ -251,7 +251,7 @@ public class CardSlashTests
         var unequip = new BattleCardUnequipHandler();
 
         // Card nos 6 CardSlots equipa normalmente no slot 1 (sem resposta S2C)
-        equip.Handle(session, new PacketReader(BattleCardPayload(1, equippedDrill!.Uid, 74)));
+        equip.Dispatch(session, new PacketReader(BattleCardPayload(1, equippedDrill!.Uid, 74)));
         Assert.Empty(session.DrainOutgoing());
 
         // Card apenas na mochila (não nos 6 CardSlots) é rejeitado
@@ -265,7 +265,7 @@ public class CardSlashTests
         Assert.False(battle.EquipCard(player, 0, equippedDrill.Uid, 5));
 
         // Desequipar slot 1 via 0xA1 (sem resposta S2C)
-        unequip.Handle(session, new PacketReader(BattleCardPayload(1, equippedDrill.Uid, 74)));
+        unequip.Dispatch(session, new PacketReader(BattleCardPayload(1, equippedDrill.Uid, 74)));
         Assert.Empty(session.DrainOutgoing());
         Assert.Equal(CardBattleState.MaxCardSlashesPerBattle, battle.CardSlashesRemaining(player));
     }

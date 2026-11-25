@@ -1,19 +1,17 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Entities;
 using DRPGServer.Network.Packets.Map;
-using DRPGServer.Network.Protocol;
 
 namespace DRPGServer.Network.Handlers;
 
 /// <summary>✅ Map 0x0050 (C2S 18 B): abrir lista de cards de uma loja de NPC.</summary>
 [PacketHandler(MapOpcode.CardShopList)]
-public sealed class CardShopListHandler(GameData data) : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class CardShopListHandler(GameData data) : PlayerHandler<NpcShopListRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, NpcShopListRequest request)
     {
-        if (player.InBattle || packet.Remaining < 4) return;
-        uint shopId = packet.ReadU32();
-        if (data.FindNpcShop(shopId, NpcShopKind.Card) is not { } shop) return;
+        if (data.FindNpcShop(request.ShopId, NpcShopKind.Card) is not { } shop) return;
 
         player.Send(new CardShopListPacket(shop, data));
     }
@@ -21,13 +19,12 @@ public sealed class CardShopListHandler(GameData data) : PlayerHandler
 
 /// <summary>✅ Map 0x0052 (C2S 18 B): abrir lista de itens de uma loja de NPC.</summary>
 [PacketHandler(MapOpcode.ItemShopList)]
-public sealed class ItemShopListHandler(GameData data) : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class ItemShopListHandler(GameData data) : PlayerHandler<NpcShopListRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, NpcShopListRequest request)
     {
-        if (player.InBattle || packet.Remaining < 4) return;
-        uint shopId = packet.ReadU32();
-        if (data.FindNpcShop(shopId, NpcShopKind.Item) is not { } shop) return;
+        if (data.FindNpcShop(request.ShopId, NpcShopKind.Item) is not { } shop) return;
 
         player.Send(new ItemShopListPacket(shop, data));
     }
@@ -35,29 +32,17 @@ public sealed class ItemShopListHandler(GameData data) : PlayerHandler
 
 /// <summary>✅ Map 0x0051 (C2S 126 B): comprar (1) ou vender (2) card em loja de NPC.</summary>
 [PacketHandler(MapOpcode.CardShopTrade)]
-public sealed class CardShopTradeHandler(GameData data) : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class CardShopTradeHandler(GameData data) : PlayerHandler<CardShopTradeRequest>
 {
     private const uint MaxTradeQuantity = 999;
 
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, CardShopTradeRequest request)
     {
-        if (player.InBattle || packet.Remaining < 112) return;
-
-        uint actionRaw = packet.ReadU32();   // +0x00
-        uint uid = packet.ReadU32();         // +0x04 (CardRecord +0)
-        uint cardId = packet.ReadU32();      // +0x08 (CardRecord +4)
-        packet.Skip(68);                     // +0x0C..+0x4F (restante do CardRecord de 76 B)
-        uint quantity = packet.ReadU32();    // +0x50
-        packet.Skip(12);                     // +0x54..+0x5F (pad + double bits)
-        var place = (ItemPlace)packet.ReadU16(); // +0x60
-        packet.Skip(2);                      // +0x62
-        int col = packet.ReadI32();          // +0x64
-        int row = packet.ReadI32();          // +0x68
-        uint shopId = packet.ReadU32();      // +0x6C
-
+        var (action, uid, cardId, quantity, place, col, row, shopId) = request;
         if (quantity is 0 or > MaxTradeQuantity) return;
 
-        switch ((NpcShopAction)actionRaw)
+        switch (action)
         {
             case NpcShopAction.Buy:
                 HandleBuy(player, shopId, cardId, quantity);
@@ -127,31 +112,20 @@ public sealed class CardShopTradeHandler(GameData data) : PlayerHandler
 
 /// <summary>✅ Map 0x0053 (C2S 158 B): comprar (1) ou vender (2) item em loja de NPC.</summary>
 [PacketHandler(MapOpcode.ItemShopTrade)]
-public sealed class ItemShopTradeHandler(GameData data) : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class ItemShopTradeHandler(GameData data) : PlayerHandler<ItemShopTradeRequest>
 {
     private const uint MaxTradeQuantity = 999;
 
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, ItemShopTradeRequest request)
     {
-        if (player.InBattle || packet.Remaining < 144) return;
-
-        uint actionRaw = packet.ReadU32();   // +0x00
-        uint uid = packet.ReadU32();         // +0x04 (ItemRecord +0)
-        uint itemId = packet.ReadU32();      // +0x08 (ItemRecord +4)
-        packet.Skip(100);                    // +0x0C..+0x6F (restante do ItemRecord de 108 B)
-        uint quantity = packet.ReadU32();    // +0x70
-        packet.Skip(14);                     // +0x74..+0x81 (pad + double bits + u16 0)
-        var place = (ItemPlace)packet.ReadU16(); // +0x82
-        int col = packet.ReadI32();          // +0x84
-        int row = packet.ReadI32();          // +0x88
-        uint shopId = packet.ReadU32();      // +0x8C
-
+        var (action, uid, itemId, quantity, place, col, row, shopId) = request;
         if (quantity is 0 or > MaxTradeQuantity) return;
 
         // ✅ DigimonRPG.bin @ 0x00ADD1CB: em C2S 0x0053 o cliente sempre envia action=1 (Buy) para qualquer moeda
         // (Bits, Medals, Coins ou LadderPoints) e action=2 (Sell). O servidor determina a moeda pela loja (shopId)
         // e responde no S2C 0x0053 com action = (NpcShopAction)shop.Currency (1, 3, 4 ou 5).
-        switch ((NpcShopAction)actionRaw)
+        switch (action)
         {
             case NpcShopAction.Buy:
                 HandleBuy(player, shopId, itemId, quantity);

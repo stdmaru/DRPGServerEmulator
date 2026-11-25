@@ -1,36 +1,21 @@
+using System.Security.Cryptography;
 using DRPGServer.Data.Persistence;
 using DRPGServer.Data.Repositories;
-using DRPGServer.Game;
 using DRPGServer.Game.Commands;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.World;
+using DRPGServer.Game;
 using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
 using Microsoft.Extensions.Logging;
 
 namespace DRPGServer.Network.Handlers;
 
-/// <summary>Base dos handlers do mapa que precisam do jogador já no mundo.</summary>
-public abstract class PlayerHandler : IWorldPacketHandler
-{
-    public void Handle(Session session, PacketReader packet)
-    {
-        if (session.Player is not { } player)
-        {
-            session.Close("pacote de jogo antes de entrar no mapa");
-            return;
-        }
-        Handle(player, packet);
-    }
-
-    protected abstract void Handle(Player player, PacketReader packet);
-}
-
 /// <summary>0x49: primeiro pedido no mapa.</summary>
 [PacketHandler(MapOpcode.JoinHandshakeReq)]
-public sealed class JoinHandshakeHandler : ISessionPacketHandler
+public sealed class JoinHandshakeHandler : SessionHandler<JoinHandshakeRequest>
 {
-    public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    protected override ValueTask HandleAsync(Session session, JoinHandshakeRequest request, CancellationToken ct)
     {
         session.Send(new JoinHandshakePacket());
         return ValueTask.CompletedTask;
@@ -44,14 +29,12 @@ public sealed class JoinHandshakeHandler : ISessionPacketHandler
 [PacketHandler(MapOpcode.JoinCharacter)]
 public sealed class JoinCharacterHandler(
     AccountRegistry accounts, CharacterRepository characters, CharacterFactory factory, PersistenceQueue persistence,
-    GameWorld world, PlayerSystem players, ExpEventService expEvents, ILogger<JoinCharacterHandler> log) : ISessionPacketHandler
+    GameWorld world, PlayerSystem players, ExpEventService expEvents, ILogger<JoinCharacterHandler> log) : SessionHandler<JoinCharacterRequest>
 {
-    public async ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    protected override async ValueTask HandleAsync(Session session, JoinCharacterRequest request, CancellationToken ct)
     {
         if (session.Account is not null) return;   // já entrou
-        var nickname = packet.ReadFixedString(21);
-        var username = packet.ReadFixedString(21);
-        packet.ReadU8();
+        var (nickname, username) = request;
 
         var account = accounts.Claim(username, session);
         if (account is null)
@@ -98,37 +81,31 @@ public sealed class JoinCharacterHandler(
 
 /// <summary>0x04: o cliente pede os dados do personagem (ao conectar no global).</summary>
 [PacketHandler(MapOpcode.RefreshCharacterInfoReq)]
-public sealed class RefreshCharacterInfoHandler : PlayerHandler
+[RequiresState(PlayerStates.Any)]
+public sealed class RefreshCharacterInfoHandler : PlayerHandler<RefreshCharacterInfoRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, RefreshCharacterInfoRequest request)
     {
-        packet.ReadBytes(Serial.Length);        // serial do personagem
         player.Send(new RefreshCharacterInfoPacket(player.Character));
     }
 }
 
 /// <summary>0x20: andar. Pisar num portal troca de mapa.</summary>
 [PacketHandler(MapOpcode.MoveCharacter)]
-public sealed class MoveCharacterHandler(ZoneSystem zones) : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class MoveCharacterHandler(ZoneSystem zones) : PlayerHandler<MoveCharacterRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
-    {
-        packet.ReadI16();                       // ✅ sempre 5
-        short x = packet.ReadI16();
-        short y = packet.ReadI16();             // ✅ os 14 bytes seguintes são zero
-        if (player.InBattle) return;
-        zones.Move(player, x, y);
-    }
+    protected override void Handle(Player player, MoveCharacterRequest request) => zones.Move(player, request.X, request.Y);
 }
 
 /// <summary>0x21: chat normal; "/" no começo é comando de GM.</summary>
 [PacketHandler(MapOpcode.ChatNormal)]
-public sealed class ChatNormalHandler(ChatCommands commands) : PlayerHandler
+[RequiresState(PlayerStates.Any)]
+public sealed class ChatNormalHandler(ChatCommands commands) : PlayerHandler<ChatNormalRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, ChatNormalRequest request)
     {
-        packet.ReadFixedString(21);             // apelido (o do servidor vale)
-        var message = packet.ReadFixedString(44);
+        var message = request.Message;
         if (message.StartsWith('/') && commands.TryExecute(player, message[1..]))
             return;
         player.Zone?.Broadcast(new ChatNormalPacket(player.Character.Name, message));
@@ -137,9 +114,9 @@ public sealed class ChatNormalHandler(ChatCommands commands) : PlayerHandler
 
 /// <summary>0x2B: sair do jogo.</summary>
 [PacketHandler(MapOpcode.ExitGame)]
-public sealed class ExitGameHandler : ISessionPacketHandler
+public sealed class ExitGameHandler : SessionHandler<ExitGameRequest>
 {
-    public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    protected override ValueTask HandleAsync(Session session, ExitGameRequest request, CancellationToken ct)
     {
         session.Send(new ExitGamePacket());
         return ValueTask.CompletedTask;
@@ -148,11 +125,30 @@ public sealed class ExitGameHandler : ISessionPacketHandler
 
 /// <summary>0x121: o cliente pede; o servidor responde com o conteúdo capturado.</summary>
 [PacketHandler(MapOpcode.Unknown121)]
-public sealed class Unknown121Handler : ISessionPacketHandler
+public sealed class Unknown121Handler : SessionHandler<Unknown121Request>
 {
-    public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    protected override ValueTask HandleAsync(Session session, Unknown121Request request, CancellationToken ct)
     {
         session.Send(new Unknown121Packet());
         return ValueTask.CompletedTask;
+    }
+}
+
+/// <summary>Boas-vindas (0x0E) no mapa; ao desconectar, tira do mundo e solta a conta.</summary>
+public sealed class MapLifecycle(GameWorld world, PlayerSystem players, AccountRegistry accounts) : ISessionLifecycle
+{
+    public ServerRole Role => ServerRole.Map;
+
+    public void OnConnected(Session session)
+    {
+        var seed = RandomNumberGenerator.GetBytes(GlobalSessionCipher.BlockSize);
+        session.MapAesKey = GlobalSessionCipher.DeriveKey(seed);
+        session.Send(new HelloPacket((ushort)MapOpcode.Hello, seed));
+    }
+
+    public void OnDisconnected(Session session)
+    {
+        world.Post(() => players.Leave(session));
+        accounts.Release(session);
     }
 }

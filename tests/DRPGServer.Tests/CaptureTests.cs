@@ -72,7 +72,7 @@ public class CaptureTests
     }
 
     private void UseItem(Player player, Taming taming, InventoryItem item, Serial target) =>
-        new ItemUseHandler(taming, _world).Handle(player.Session, new PacketReader(ItemUsePayload(item.Uid, target)));
+        new ItemUseHandler(taming, _world).Dispatch(player.Session, new PacketReader(ItemUsePayload(item.Uid, target)));
 
     // ---------- Taming Net ----------
 
@@ -147,10 +147,10 @@ public class CaptureTests
         var tamed = NewTaming().Tame(player.Character, TestSupport.Data.Species[14])!;
         var handler = new RenameHandler();
 
-        handler.Handle(player.Session, new PacketReader(RenamePayload(tamed.Uid, "")));
-        handler.Handle(player.Session, new PacketReader(RenamePayload(tamed.Uid, "Tuno")));
-        handler.Handle(player.Session, new PacketReader(RenamePayload(tamed.Uid, "")));
-        handler.Handle(player.Session, new PacketReader(RenamePayload(tamed.Uid, "Other")));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(tamed.Uid, "")));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(tamed.Uid, "Tuno")));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(tamed.Uid, "")));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(tamed.Uid, "Other")));
 
         var results = player.Session.DrainOutgoing().Select(f => f[PacketHeader.Length]).ToArray();
         // ✅ 1 = grátis, 3 = renomeado, 2 = sem renomeação
@@ -167,9 +167,9 @@ public class CaptureTests
         var tamed = NewTaming().Tame(player.Character, TestSupport.Data.Species[14])!;
         var handler = new RenameHandler();
 
-        handler.Handle(player.Session, new PacketReader(RenamePayload(starter.Uid, "Name")));
-        handler.Handle(player.Session, new PacketReader(RenamePayload(tamed.Uid, "bad name!")));
-        handler.Handle(player.Session, new PacketReader(RenamePayload(tamed.Uid, "x", kind: 1)));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(starter.Uid, "Name")));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(tamed.Uid, "bad name!")));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(tamed.Uid, "x", kind: 1)));
 
         var results = player.Session.DrainOutgoing().Select(f => f[PacketHeader.Length]).ToArray();
         Assert.Equal([(byte)2, (byte)2, (byte)2], results);

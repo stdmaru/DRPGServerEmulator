@@ -29,7 +29,7 @@ Cada camada só conhece a de baixo. Regra de negócio nunca fica em handler nem 
 | Camada | Pasta | Faz | Não faz |
 |---|---|---|---|
 | Protocolo | `Network/Protocol` | framing, CRC, `PacketReader`/`PacketWriter`, `ServerPacket`, `IClientPacket<T>` | nada de jogo |
-| Pacotes | `Network/Packets/<Servidor>` | layout de cada S2C (`ServerPacket`) e de cada C2S (`IClientPacket<T>`, **PR #41: N1**) | validar regra, mudar estado |
+| Pacotes | `Network/Packets/<Servidor>` | layout de cada S2C (`ServerPacket`) e de cada C2S (`IClientPacket<T>`) | validar regra, mudar estado |
 | Handlers | `Network/Handlers` | recebe o request tipado, declara pré-condições, chama **um** serviço, envia a resposta | calcular preço, mexer em inventário, ir ao banco |
 | Serviços | `Game/<Domínio>` | regras, validação autoritativa, orquestração, efeitos colaterais | ler bytes, abrir conexão de banco direto |
 | Entidades | `Game/Entities` | estado e invariantes (não deixa o estado ficar inválido) | I/O, rede, regras que cruzam entidades |

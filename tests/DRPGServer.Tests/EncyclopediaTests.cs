@@ -150,8 +150,8 @@ public class EncyclopediaTests
         await world.StartAsync(CancellationToken.None);
         try
         {
-            await dataHandler.HandleAsync(globalSession, new PacketReader(req7BCipher), CancellationToken.None);
-            await collectionHandler.HandleAsync(globalSession, new PacketReader(new byte[64]), CancellationToken.None);
+            await dataHandler.DispatchAsync(globalSession, new PacketReader(req7BCipher), CancellationToken.None);
+            await collectionHandler.DispatchAsync(globalSession, new PacketReader(new byte[64]), CancellationToken.None);
             await world.InvokeAsync(() => true);
         }
         finally
