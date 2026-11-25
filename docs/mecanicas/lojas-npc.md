@@ -19,6 +19,7 @@ Cada `<Shop>` possui:
 ### `Map 0x00CB` — Atualizar Moedas (`S2C`, 16 B) ✅
 - **Evidência**: `DigimonRPG.bin @ 0x00ABFAC2`.
 - `+0x00` (`double`): `Bits`; `+0x08` (`u32`): `Medals`; `+0x0C` (`u32`): `Coins`.
+- Na entrada do mapa (`S2C 0x02` `CharacterDataPacket`, `DigimonRPG.bin @ 0x00B5C028..0x00B5C126`), as 4 moedas são carregadas diretamente: `Bits` (`+0x40`), `LadderPoints` (`+0x5C`, `u32`), `Medals` (`+0x19A8`, `u16`) e `Coins` (`+0x19AA`, `u16`).
 
 Lojas capturadas incluídas inicialmente:
 - **Itens (`0x0052`)**: `1101` (Freyja/Digital Anvil), `5050` (Loja especial de **Coins**), `5101` (Digital Administration Bureau), `13602` (Símbolos e roupas Beginner), `40101` (Gekomon Village).

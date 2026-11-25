@@ -29,9 +29,11 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
         w.WriteI32(c.TotalBattles);
         w.WriteI16(0);                          // vitórias ranqueadas
         w.WriteI16(0);                          // batalhas ranqueadas
-        w.WriteI32(1800);                       // pontos ranqueados
-        w.WriteU8((byte)Rank.ChromeDigizoid);   // 88
-        w.WriteZeros(11);                       // 89..99
+        w.WriteI32(1800);                       // pontos ranqueados (84..87 = 0x54)
+        w.WriteU16((ushort)Rank.ChromeDigizoid);// 88..89 (0x58) ✅ WORD [player+0x12AC]
+        w.WriteZeros(2);                        // 90..91 (0x5A)
+        w.WriteU32(c.LadderPoints);             // 92..95 (0x5C) ✅ DWORD [player+0x12B0] (DigimonRPG.bin @ 0x00B5C119)
+        w.WriteZeros(4);                        // 96..99 (0x60)
         // 100..747: ✅ 6 equipamentos primários (Crests 4..6 + Digimentals 7..9; 6 × 108 = 648 B, conn=238/428)
         foreach (var place in EquipmentSlots.PrimarySlots)
         {
@@ -56,33 +58,38 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
         w.WriteI16(c.X);                        // 4720 na v322 (4680 na v242)
         w.WriteI16(c.Y);
         // 4724..7599 (2876 B): ✅ 23 slots de equipamento do Tamer (DigimonRPG.bin @ 0x00B5BF21..0x00B5C150)
-        // + bytes esparsos preservados onde não há equipamento
-        WriteEquipmentTail(w, c.Inventory);
+        // + Medals (0x19A8), Coins (0x19AA) e serverTime UTC (0x19B0)
+        WriteEquipmentTail(w, c);
     }
 
-    private static void WriteEquipmentTail(PacketWriter w, Inventory inventory)
+    private static void WriteEquipmentTail(PacketWriter w, Character character)
     {
         const int tailLength = 2876;
-        // ✅ DigimonRPG.bin @ 0x00ABE028 & captures.db (conn=238/428): offset 0x19B0 (6576 = 4724 + 1852)
-        // envia o Unix timestamp UTC atual do servidor (u32) para o cliente calcular o tempo restante de itens de período.
-        const int serverTimeTailOffset = 0x19B0 - 4724; // 1852 (entre Spirit3 [1736..1844] e Wings [2144..2252])
+        // ✅ DigimonRPG.bin @ 0x00B5C028 / 0x00B5C044 / 0x00ABE028 & captures.db (conn=238/428):
+        //   0x19A8 (4724 + 1844): u16 Medals (WORD [player+0x4070])
+        //   0x19AA (4724 + 1846): u16 Coins  (WORD [player+0x4072])
+        //   0x19B0 (4724 + 1852): u32 Unix timestamp UTC do servidor (para itens de período)
+        const int currenciesTailOffset = 0x19A8 - 4724; // 1844 (logo após Spirit3 [1736..1844], antes de Wings [2144..2252])
         int tailStart = w.Position;
         int cursor = 0;
-        bool wroteServerTime = false;
+        bool wroteCurrenciesAndTime = false;
 
         foreach (var (place, offset) in EquipmentSlots.TailSlots)
         {
-            if (!wroteServerTime && offset > serverTimeTailOffset)
+            if (!wroteCurrenciesAndTime && offset > currenciesTailOffset)
             {
-                if (serverTimeTailOffset > cursor)
-                    w.WriteZeros(serverTimeTailOffset - cursor);
+                if (currenciesTailOffset > cursor)
+                    w.WriteZeros(currenciesTailOffset - cursor);
+                w.WriteU16(character.Medals);
+                w.WriteU16(character.Coins);
+                w.WriteZeros(4); // 0x19AC..0x19AF
                 w.WriteU32((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-                cursor = serverTimeTailOffset + 4;
-                wroteServerTime = true;
+                cursor = currenciesTailOffset + 12; // 1856 = 0x19B4 - 4724
+                wroteCurrenciesAndTime = true;
             }
             if (offset > cursor)
                 w.WriteZeros(offset - cursor);
-            if (inventory.EquippedAt(place) is { } eq)
+            if (character.Inventory.EquippedAt(place) is { } eq)
                 ItemRecord.Write(w, eq);
             else
                 w.WriteZeros(ItemRecord.Length);

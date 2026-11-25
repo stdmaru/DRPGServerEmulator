@@ -99,7 +99,8 @@ public sealed class ChatCommands
             }
             p.RequestImmediateSave();
             p.Send(new CurrencyUpdatePacket(p.Character));
-            Reply(p, $"Moedas: Bits={p.Character.Bits:F0}, Medals={p.Character.Medals}, Coins={p.Character.Coins}, Ladder={p.Character.LadderPoints}.");
+            var hint = args[0].Equals("ladder", StringComparison.OrdinalIgnoreCase) ? " (relogue para atualizar Ladder na UI)" : "";
+            Reply(p, $"Moedas: Bits={p.Character.Bits:F0}, Medals={p.Character.Medals}, Coins={p.Character.Coins}, Ladder={p.Character.LadderPoints}.{hint}");
         });
     }
 

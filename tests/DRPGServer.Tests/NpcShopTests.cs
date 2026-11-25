@@ -245,6 +245,14 @@ public class NpcShopTests
         itemTrade.Handle(session, BuildItemTrade(NpcShopAction.BuyLadderPoints, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5051));
         Assert.Equal(500u, player.Character.LadderPoints);
         Assert.Equal([(ushort)MapOpcode.ItemShopTrade, (ushort)MapOpcode.InventoryItemReceive], session.SentOpcodes());
+
+        // 4. CharacterDataPacket (S2C 0x02) inclui LadderPoints (+0x5C), Medals (+0x19A8) e Coins (+0x19AA)
+        player.Character.SetMedals(77);
+        var charPayload = new CharacterDataPacket(player.Character).Encode().AsSpan(PacketHeader.Length);
+        Assert.Equal(7600, charPayload.Length);
+        Assert.Equal(500u, BinaryPrimitives.ReadUInt32LittleEndian(charPayload.Slice(0x5C)));
+        Assert.Equal((ushort)77, BinaryPrimitives.ReadUInt16LittleEndian(charPayload.Slice(0x19A8)));
+        Assert.Equal((ushort)50, BinaryPrimitives.ReadUInt16LittleEndian(charPayload.Slice(0x19AA)));
     }
 
     [Fact]
