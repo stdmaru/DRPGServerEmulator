@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Collections.Frozen;
 using DRPGServer.Data.GameData;
+using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Stats;
 using DRPGServer.Network;
@@ -32,7 +33,7 @@ public class NpcShopTests
             ]),
             [5050] = new NpcShop(5050, NpcShopKind.Item, "Coins Shop", [
                 new NpcShopEntry(21008),
-            ], NpcShopCurrency.Coins),
+            ], NpcShopCurrency.Coins, NpcShopDelivery.ShopDepository),
             [5051] = new NpcShop(5051, NpcShopKind.Item, "Ladder Shop", [
                 new NpcShopEntry(21008),
             ], NpcShopCurrency.LadderPoints),
@@ -214,34 +215,67 @@ public class NpcShopTests
         Assert.Empty(session.SentOpcodes());
     }
 
+    private sealed class FakeCashStore : ICashStore
+    {
+        public List<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> Deposited { get; } = [];
+        public bool FailDeposit { get; set; }
+
+        public Task<CashBalance?> GetBalanceAsync(uint accountUid, CancellationToken ct) => Task.FromResult<CashBalance?>(null);
+        public Task<CashBalance?> AddCashAsync(uint accountUid, uint cashDelta, uint bonusCashDelta, CancellationToken ct) => Task.FromResult<CashBalance?>(null);
+        public Task<IReadOnlyList<CashDepositoryRow>> ListDepositoryAsync(uint accountUid, CancellationToken ct) => Task.FromResult<IReadOnlyList<CashDepositoryRow>>([]);
+        public Task<CashPurchaseOutcome> PurchaseAsync(uint accountUid, uint itemDataId, uint quantity, uint unitPrice, uint totalPrice, IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries, CancellationToken ct) =>
+            Task.FromResult(new CashPurchaseOutcome(CashPurchaseResult.Ok, default));
+        public Task<CashShopHistoryPage> GetHistoryAsync(uint accountUid, ushort year, ushort month, ushort page, CancellationToken ct) =>
+            Task.FromResult(new CashShopHistoryPage([], 1));
+        public Task<CashDepositoryRow?> TakeDepositoryItemAsync(uint accountUid, CashShopItemKind kind, uint uid, CancellationToken ct) => Task.FromResult<CashDepositoryRow?>(null);
+        public Task RestoreDepositoryItemAsync(uint accountUid, CashDepositoryRow row, CancellationToken ct) => Task.CompletedTask;
+        public Task<bool> DepositAsync(uint accountUid, IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries, CancellationToken ct)
+        {
+            if (FailDeposit) return Task.FromResult(false);
+            Deposited.AddRange(entries);
+            return Task.FromResult(true);
+        }
+    }
+
     [Fact]
     public void Special_currency_shops_use_coins_and_ladder_points_from_c2s_buy_action()
     {
         var (data, player, session) = MakeEnv(bits: 5000);
         player.Character.SetCoins(200);
         player.Character.SetLadderPoints(1500);
-        var itemTrade = new ItemShopTradeHandler(data);
+        var cashStore = new FakeCashStore();
+        var itemTrade = new ItemShopTradeHandler(data, cashStore);
 
-        // 1. Cliente sempre envia action=1 (Buy) em C2S 0x0053; servidor resolve Currency=Coins da loja 5050,
-        // debita 150 Coins (Col16), não mexe em Bits, responde S2C action=4 + 0xC9 + 0xCB
+        // 1. Cliente sempre envia action=1 (Buy) em C2S 0x0053; loja 5050 (Coins + ShopDepository):
+        // debita 150 Coins (Col16), deposita no Shop Depository (não na mochila), responde S2C action=4 + 0xCB (sem 0xC9)
         itemTrade.Handle(session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
         Assert.Equal(5000.0, player.Character.Bits);
         Assert.Equal((ushort)50, player.Character.Coins);
-        Assert.Equal(1u, player.Character.Inventory.Main.Count(21008));
+        Assert.Equal(0u, player.Character.Inventory.Main.Count(21008));
+        Assert.Single(cashStore.Deposited);
+        Assert.Equal((CashShopItemKind.Item, 21008u, 1u, 0u), cashStore.Deposited[0]);
         var frames = session.DrainOutgoing();
-        Assert.Equal(3, frames.Count);
+        Assert.Equal(2, frames.Count);
         Assert.Equal((ushort)MapOpcode.ItemShopTrade, PacketHeader.Read(frames[0]).Opcode);
         Assert.Equal((uint)NpcShopAction.BuyCoins, BinaryPrimitives.ReadUInt32LittleEndian(frames[0].AsSpan(PacketHeader.Length + 0x00)));
         Assert.Equal((ushort)50, BinaryPrimitives.ReadUInt16LittleEndian(frames[0].AsSpan(PacketHeader.Length + 0x80)));
-        Assert.Equal((ushort)MapOpcode.InventoryItemReceive, PacketHeader.Read(frames[1]).Opcode);
-        Assert.Equal((ushort)MapOpcode.CurrencyUpdate, PacketHeader.Read(frames[2]).Opcode);
-        Assert.Equal(16, frames[2].Length - PacketHeader.Length);
-        Assert.Equal(50u, BinaryPrimitives.ReadUInt32LittleEndian(frames[2].AsSpan(PacketHeader.Length + 0x0C)));
+        Assert.Equal((ushort)MapOpcode.CurrencyUpdate, PacketHeader.Read(frames[1]).Opcode);
+        Assert.Equal(16, frames[1].Length - PacketHeader.Length);
+        Assert.Equal(50u, BinaryPrimitives.ReadUInt32LittleEndian(frames[1].AsSpan(PacketHeader.Length + 0x0C)));
 
         // 2. Com Coins insuficientes (50 < 150), bloqueia a compra
         itemTrade.Handle(session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
         Assert.Equal((ushort)50, player.Character.Coins);
         Assert.Empty(session.SentOpcodes());
+
+        // 2b. Se o Shop Depository estiver cheio, reembolsa os Coins
+        player.Character.SetCoins(200);
+        cashStore.FailDeposit = true;
+        itemTrade.Handle(session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
+        Assert.Equal((ushort)200, player.Character.Coins);
+        Assert.Single(cashStore.Deposited);
+        Assert.Equal([(ushort)MapOpcode.ChatNotice], session.SentOpcodes());
+        cashStore.FailDeposit = false;
 
         // 3. Loja de LadderPoints (5051): C2S action=1 debita 1000 (Col17), resta 500, S2C responde action=5
         itemTrade.Handle(session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5051));
@@ -253,6 +287,7 @@ public class NpcShopTests
 
         // 4. CharacterDataPacket (S2C 0x02) inclui LadderPoints (+0x5C), Medals (+0x19A8) e Coins (+0x19AA)
         player.Character.SetMedals(77);
+        player.Character.SetCoins(50);
         var charPayload = new CharacterDataPacket(player.Character).Encode().AsSpan(PacketHeader.Length);
         Assert.Equal(7600, charPayload.Length);
         Assert.Equal(500u, BinaryPrimitives.ReadUInt32LittleEndian(charPayload.Slice(0x5C)));

@@ -218,6 +218,13 @@ public enum NpcShopCurrency : byte
     LadderPoints = 5,
 }
 
+/// <summary>Destino dos itens comprados em uma loja genérica de NPC (<c>Inventory</c> ou <c>ShopDepository</c>).</summary>
+public enum NpcShopDelivery : byte
+{
+    Inventory = 0,
+    ShopDepository = 1,
+}
+
 /// <summary>Um item ou card vendido por uma loja de NPC (<c>Resources/Item/NpcShop.xml</c>).</summary>
 public sealed record NpcShopEntry(uint ItemId, uint? PriceOverride = null);
 
@@ -227,7 +234,8 @@ public sealed record NpcShop(
     NpcShopKind Kind,
     string Name,
     IReadOnlyList<NpcShopEntry> Entries,
-    NpcShopCurrency Currency = NpcShopCurrency.Bits)
+    NpcShopCurrency Currency = NpcShopCurrency.Bits,
+    NpcShopDelivery DeliverTo = NpcShopDelivery.Inventory)
 {
     public const int MaxSlots = 40;
 

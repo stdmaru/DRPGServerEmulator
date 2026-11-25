@@ -85,6 +85,28 @@ public class CashShopTests
             return Task.FromResult(new CashPurchaseOutcome(CashPurchaseResult.Ok, after));
         }
 
+        public Task<bool> DepositAsync(
+            uint accountUid,
+            IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries,
+            CancellationToken ct)
+        {
+            _depo.TryAdd(accountUid, []);
+            var list = _depo[accountUid];
+            var usedCards = list.Where(r => r.Kind == CashShopItemKind.Card).Select(r => (int)r.Slot).ToHashSet();
+            var usedItems = list.Where(r => r.Kind == CashShopItemKind.Item).Select(r => (int)r.Slot).ToHashSet();
+            var toAdd = new List<CashDepositoryRow>();
+            foreach (var (kind, itemId, amount, expiresAt) in entries)
+            {
+                var used = kind == CashShopItemKind.Card ? usedCards : usedItems;
+                int slot = Enumerable.Range(0, CashRepository.DepositoryCapacityPerKind).FirstOrDefault(i => !used.Contains(i), -1);
+                if (slot < 0) return Task.FromResult(false);
+                used.Add(slot);
+                toAdd.Add(new CashDepositoryRow(kind, (byte)slot, _nextUid++, itemId, amount, expiresAt));
+            }
+            list.AddRange(toAdd);
+            return Task.FromResult(true);
+        }
+
         public Task<CashShopHistoryPage> GetHistoryAsync(uint accountUid, ushort year, ushort month, ushort page, CancellationToken ct)
         {
             if (!_history.TryGetValue(accountUid, out var all))

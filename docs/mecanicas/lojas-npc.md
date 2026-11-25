@@ -14,6 +14,7 @@ Cada `<Shop>` possui:
   - `Medals` (`action=3`): preço em `ItemRecord +88` (`u16`), saldo em `WORD [player+0x4070]`.
   - `Coins` (`action=4`, loja `5050`): preço em `ItemRecord +90` (`u16` = `Col16`), saldo em `WORD [player+0x4072]` (máx. 20.000).
   - `LadderPoints` (`action=5`): preço em `ItemRecord +92` (`u32` = `Col17`), saldo em `DWORD [player+0x12B0]`.
+- `DeliverTo` *(opcional, padrão `Inventory`)*: `Inventory` (entrega na mochila + `S2C 0x00C9`) ou `ShopDepository` (deposita em `cash_depository_item` sem enviar `0x00C9`; usado pela loja `5050` de Coins, onde o cliente exibe `"The purchased item has been delivered to the Shop Depository"`, `DigimonRPG.bin @ 0x00AEEE49..0x00AEF199`).
 - Até 40 `<Entry ID="..." [Price="..."] />`. Quando `Price` é omitido, o servidor usa o campo de preço correspondente na tabela do cliente.
 
 ### `Map 0x00CB` — Atualizar Moedas (`S2C`, 16 B) ✅

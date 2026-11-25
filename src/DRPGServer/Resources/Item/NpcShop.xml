@@ -10,8 +10,8 @@
     <Entry ID="23427" /> <!-- Digital Anvil (10.000.000 Bits) -->
   </Shop>
 
-  <!-- ✅ Capturado em captures.db (loja especial de Coins / DR's Earned Coin — preço vem de item_info_us col. 15 / ItemRecord +90) -->
-  <Shop ID="5050" Kind="Item" Currency="Coins" Name="Loja Especial (Coins)">
+  <!-- ✅ Capturado em captures.db (loja especial de Coins / DR's Earned Coin — preço vem de item_info_us col. 15 / ItemRecord +90; entrega no Shop Depository) -->
+  <Shop ID="5050" Kind="Item" Currency="Coins" DeliverTo="ShopDepository" Name="Loja Especial (Coins)">
     <Entry ID="21008" /> <!-- Exchange Ticket : Super Ultimate X (Virus) (150 Coins) -->
     <Entry ID="21009" /> <!-- Exchange Ticket : Super Ultimate X (Vaccine) (150 Coins) -->
     <Entry ID="21010" /> <!-- Exchange Ticket : Super Ultimate X (Data) (150 Coins) -->

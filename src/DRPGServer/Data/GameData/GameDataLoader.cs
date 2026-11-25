@@ -220,6 +220,12 @@ public static class GameDataLoader
                 "LadderPoints" => NpcShopCurrency.LadderPoints,
                 var other => throw new GameDataException($"NpcShop {id}: Currency '{other}' inválido (esperado Bits, Medals, Coins ou LadderPoints)"),
             };
+            var deliverTo = (string?)s.Attribute("DeliverTo") switch
+            {
+                null or "" or "Inventory" => NpcShopDelivery.Inventory,
+                "ShopDepository" => NpcShopDelivery.ShopDepository,
+                var other => throw new GameDataException($"NpcShop {id}: DeliverTo '{other}' inválido (esperado Inventory ou ShopDepository)"),
+            };
             var entries = s.Elements("Entry")
                 .Select(e => new NpcShopEntry(
                     U32(e, "ID"),
@@ -227,7 +233,7 @@ public static class GameDataLoader
                 .ToList();
             if (entries.Count > NpcShop.MaxSlots)
                 throw new GameDataException($"NpcShop {id}: {entries.Count} itens excede o máximo de {NpcShop.MaxSlots}");
-            if (!shops.TryAdd(id, new NpcShop(id, kind, name, entries, currency)))
+            if (!shops.TryAdd(id, new NpcShop(id, kind, name, entries, currency, deliverTo)))
                 throw new GameDataException($"NpcShop {id} duplicado");
         }
         return shops.ToFrozenDictionary();
