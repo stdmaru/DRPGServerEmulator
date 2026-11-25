@@ -50,7 +50,7 @@ public abstract class NpcScriptBase
 
     /// <summary>Troca atômica de itens uma única vez via <see cref="Player.ExchangeItems"/>.</summary>
     protected static bool ExchangeItemsOnce(
-        Player player, uint choiceId, uint takeItemId, uint takeAmount, params (uint ItemId, uint Amount)[] giveItems)
+        Player player, uint choiceId, uint takeItemId, uint takeAmount, params (uint ItemId, int AmountOrDuration)[] giveItems)
     {
         if (HasDone(player, choiceId)) return false;
 

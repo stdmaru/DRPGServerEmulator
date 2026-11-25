@@ -194,4 +194,31 @@ public class TimedItemTests
         var reloadedAura = reloaded.Inventory.EquippedAt(ItemPlace.Aura)!;
         Assert.Equal(futureTs, reloadedAura.ExpiresAt);
     }
+
+    [Fact]
+    public void ExchangeItems_supports_timed_and_permanent_and_GiveCards_accepts_batch()
+    {
+        var (player, session) = MakePlayer();
+        Assert.True(player.GiveItem(25, 5, refresh: false));
+        session.SentOpcodes();
+
+        // ExchangeItems aceita -1 (permanente) e período arbitrário (86400 s) no mesmo lote
+        Assert.True(player.ExchangeItems(25, 5, [(718, -1), (1, 86400)]));
+        Assert.Equal(0u, player.Character.Inventory.Main.Count(25));
+        var permAura = player.Character.Inventory.Main.Find(718)!;
+        var timedCrest = player.Character.Inventory.Main.Find(1)!;
+        Assert.False(permAura.IsTimed);
+        Assert.True(timedCrest.IsTimed);
+
+        // GiveCards entrega múltiplos cards em um único pacote 0xC8
+        session.SentOpcodes();
+        Assert.True(player.GiveCards([(74, 50), (19, 10)], refresh: false));
+        Assert.Equal(50u, player.Character.Inventory.Battle.Count(74));
+        Assert.Equal(10u, player.Character.Inventory.Battle.Count(19));
+        Assert.Equal([(ushort)MapOpcode.BattleItemReceive], session.SentOpcodes());
+
+        // GiveCards rejeita quantidade 0 sem alterar nada
+        Assert.False(player.GiveCards([(74, 1), (19, 0)], refresh: false));
+        Assert.Equal(50u, player.Character.Inventory.Battle.Count(74));
+    }
 }

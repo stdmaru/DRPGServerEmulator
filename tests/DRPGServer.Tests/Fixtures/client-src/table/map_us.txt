@@ -13,3 +13,4 @@
 79|Map SeventyNine|2|1|R079|0|3|a|b|c|-|-|0|0|||Entire|0|0|0|Entire|0|0|0|Entire|0|0|0|Entire|0|0|0
 90|Map Ninety|2|1|R090|0|3|a|b|c|-|-|0|0|||Map NinetyOne|1|10|10|Entire|0|0|0|Entire|0|0|0|Entire|0|0|0
 91|Map NinetyOne|2|1|R091|0|3|a|b|c|-|-|0|0|||Map Ninety|1|50|50|Map Ninety|1|90|10|Entire|0|0|0|Entire|0|0|0
+46|TestMap46|1|0|0|0|0
