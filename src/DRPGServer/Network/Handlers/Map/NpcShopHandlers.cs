@@ -148,13 +148,13 @@ public sealed class ItemShopTradeHandler(GameData data) : PlayerHandler
 
         if (quantity is 0 or > MaxTradeQuantity) return;
 
+        // ✅ DigimonRPG.bin @ 0x00ADD1CB: em C2S 0x0053 o cliente sempre envia action=1 (Buy) para qualquer moeda
+        // (Bits, Medals, Coins ou LadderPoints) e action=2 (Sell). O servidor determina a moeda pela loja (shopId)
+        // e responde no S2C 0x0053 com action = (NpcShopAction)shop.Currency (1, 3, 4 ou 5).
         switch ((NpcShopAction)actionRaw)
         {
             case NpcShopAction.Buy:
-            case NpcShopAction.BuyMedals:
-            case NpcShopAction.BuyCoins:
-            case NpcShopAction.BuyLadderPoints:
-                HandleBuy(player, (NpcShopAction)actionRaw, shopId, itemId, quantity);
+                HandleBuy(player, shopId, itemId, quantity);
                 break;
             case NpcShopAction.Sell:
                 HandleSell(player, shopId, place, col, row, uid, itemId, quantity);
@@ -162,10 +162,9 @@ public sealed class ItemShopTradeHandler(GameData data) : PlayerHandler
         }
     }
 
-    private void HandleBuy(Player player, NpcShopAction action, uint shopId, uint itemId, uint quantity)
+    private void HandleBuy(Player player, uint shopId, uint itemId, uint quantity)
     {
         if (data.FindNpcShop(shopId, NpcShopKind.Item) is not { } shop) return;
-        if ((uint)shop.Currency != (uint)action) return; // bloqueia compra com moeda incompatível com a loja
         if (shop.FindEntry(itemId) is not { } entry) return;
         if (data.FindItem(itemId) is not { } info) return;
 
@@ -215,8 +214,9 @@ public sealed class ItemShopTradeHandler(GameData data) : PlayerHandler
 
         player.RequestImmediateSave();
         var primary = added[0];
+        var responseAction = (NpcShopAction)(uint)shop.Currency;
         player.Send(new ItemShopTradePacket(
-            action, primary, quantity, character.Bits,
+            responseAction, primary, quantity, character.Bits,
             ItemPlace.Inventory, primary.Column, primary.Row, shopId, character.Coins));
         player.Send(new ItemReceivePacket(added));
         if (shop.Currency is NpcShopCurrency.Medals or NpcShopCurrency.Coins)

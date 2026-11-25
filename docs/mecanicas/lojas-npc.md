@@ -55,16 +55,17 @@ Lojas capturadas incluídas inicialmente:
 - Na compra (`action == 1`), seguido de `S2C 0x00C8` (`BattleItemReceivePacket`).
 
 ### `Map 0x0053` — Comprar / Vender Item ✅
-- **Evidência**: `captures.db` (conn 145/221) + `DigimonRPG.bin @ 0x00ABF47A / 0x00AEEC90`.
+- **Evidência**: `captures.db` (conn 145/221) + `DigimonRPG.bin @ 0x00ABF47A / 0x00ADD1CB / 0x00AEEC90`.
 - **Tamanho S2C**: `144` bytes (`C2S` 158 B).
-  - `+0x00` (`u32`): `action` (`1` = Comprar, `2` = Vender)
+  - Em `C2S`, o cliente sempre envia `action = 1` (Comprar, independente da moeda da loja) ou `2` (Vender). O servidor resolve a moeda pelo `shopId` e devolve no `S2C` o `action` correspondente (`1` = Bits, `3` = Medals, `4` = Coins, `5` = LadderPoints).
+  - `+0x00` (`u32`): `action` (`1` = Bits, `2` = Vender, `3` = Medals, `4` = Coins, `5` = LadderPoints)
   - `+0x04..+0x6F` (`108 B`): `ItemRecord` (zerado quando a venda esvazia o slot)
   - `+0x70` (`u32`): `quantity`
   - `+0x74` (`u32`): `0`
   - `+0x78` (`double`): Bits restantes do personagem
-  - `+0x80` (`u16`): `0`
+  - `+0x80` (`u16`): Coins restantes do personagem (quando `action == 4`)
   - `+0x82` (`u16`): `place` (`3` = aba Items)
   - `+0x84` (`i32`): `col` (`slot % 6`)
   - `+0x88` (`i32`): `row` (`slot / 6`)
   - `+0x8C` (`u32`): `shopId`
-- Na compra (`action == 1`), seguido de `S2C 0x00C9` (`ItemReceivePacket`).
+- Na compra, seguido de `S2C 0x00C9` (`ItemReceivePacket`) e, para `Medals`/`Coins`, `S2C 0x00CB` (`CurrencyUpdatePacket`).
