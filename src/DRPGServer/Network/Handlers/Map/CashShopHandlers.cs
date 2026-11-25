@@ -36,7 +36,7 @@ public sealed class CashShopBuyHandler(CashShopService cashShop) : PlayerHandler
 
 /// <summary>✅ Map 0x0161 (C2S 1006 B): consultar histórico de compras do Cash Shop.</summary>
 [PacketHandler(MapOpcode.CashShopHistory)]
-public sealed class CashShopHistoryHandler : PlayerHandler
+public sealed class CashShopHistoryHandler(CashShopService cashShop) : PlayerHandler
 {
     protected override void Handle(Player player, PacketReader packet)
     {
@@ -47,14 +47,7 @@ public sealed class CashShopHistoryHandler : PlayerHandler
         ushort month = packet.ReadU16();     // +0x0E
         ushort page = packet.ReadU16();      // +0x10
 
-        player.Send(new CashShopHistoryPacket(
-            headerWord,
-            errorCode: 0,
-            year,
-            month,
-            Math.Max((ushort)1, page),
-            totalPages: 1,
-            player.Account.Uid));
+        _ = cashShop.GetHistoryAsync(player, headerWord, year, month, page);
     }
 }
 

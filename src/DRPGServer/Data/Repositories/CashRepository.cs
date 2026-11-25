@@ -28,7 +28,19 @@ public enum CashPurchaseResult : byte
 
 public sealed record CashPurchaseOutcome(CashPurchaseResult Result, CashBalance Balance);
 
-/// <summary>Persistência de saldo de Cash e Cash Depository por conta.</summary>
+/// <summary>Registro de 48 bytes do histórico de compras (<c>S2C 0x0161</c>; <c>DigimonRPG.bin @ 0x0097AC93..0x0097B03F</c>).</summary>
+public sealed record CashShopHistoryEntry(
+    long OrderId,
+    uint ItemDataId,
+    uint Quantity,
+    uint UnitPrice,
+    uint CashAfter,
+    uint BonusCashAfter,
+    long PurchasedAt);
+
+public sealed record CashShopHistoryPage(IReadOnlyList<CashShopHistoryEntry> Entries, ushort TotalPages);
+
+/// <summary>Persistência de saldo de Cash, Cash Depository e histórico de compras por conta.</summary>
 public interface ICashStore
 {
     Task<CashBalance?> GetBalanceAsync(uint accountUid, CancellationToken ct);
@@ -36,9 +48,13 @@ public interface ICashStore
     Task<IReadOnlyList<CashDepositoryRow>> ListDepositoryAsync(uint accountUid, CancellationToken ct);
     Task<CashPurchaseOutcome> PurchaseAsync(
         uint accountUid,
+        uint itemDataId,
+        uint quantity,
+        uint unitPrice,
         uint totalPrice,
         IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries,
         CancellationToken ct);
+    Task<CashShopHistoryPage> GetHistoryAsync(uint accountUid, ushort year, ushort month, ushort page, CancellationToken ct);
     Task<CashDepositoryRow?> TakeDepositoryItemAsync(uint accountUid, CashShopItemKind kind, uint uid, CancellationToken ct);
     Task RestoreDepositoryItemAsync(uint accountUid, CashDepositoryRow row, CancellationToken ct);
 }
@@ -46,6 +62,7 @@ public interface ICashStore
 public sealed class CashRepository(Database database) : ICashStore
 {
     public const int DepositoryCapacityPerKind = 24;
+    public const int HistoryPageSize = 20;
 
     private sealed class BalanceRow
     {
@@ -111,6 +128,9 @@ public sealed class CashRepository(Database database) : ICashStore
 
     public async Task<CashPurchaseOutcome> PurchaseAsync(
         uint accountUid,
+        uint itemDataId,
+        uint quantity,
+        uint unitPrice,
         uint totalPrice,
         IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries,
         CancellationToken ct)
@@ -183,8 +203,54 @@ public sealed class CashRepository(Database database) : ICashStore
             r.ExpiresAt,
         }), tx, cancellationToken: ct));
 
+        await db.ExecuteAsync(new CommandDefinition("""
+            INSERT INTO cash_shop_history (account_uid, item_data_id, quantity, unit_price, cash_after, bonus_cash_after, purchased_at)
+            VALUES (@AccountUid, @ItemDataId, @Quantity, @UnitPrice, @CashAfter, @BonusCashAfter, @PurchasedAt)
+            """, new
+        {
+            AccountUid = accountUid,
+            ItemDataId = itemDataId,
+            Quantity = quantity,
+            UnitPrice = unitPrice,
+            CashAfter = newCash,
+            BonusCashAfter = newBonus,
+            PurchasedAt = (uint)Math.Clamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds(), 0, uint.MaxValue),
+        }, tx, cancellationToken: ct));
+
         await tx.CommitAsync(ct);
         return new CashPurchaseOutcome(CashPurchaseResult.Ok, new CashBalance(newCash, newBonus));
+    }
+
+    public async Task<CashShopHistoryPage> GetHistoryAsync(uint accountUid, ushort year, ushort month, ushort page, CancellationToken ct)
+    {
+        if (year < 2000 || month is < 1 or > 12)
+            return new CashShopHistoryPage([], 1);
+
+        long startTs = new DateTimeOffset(year, month, 1, 0, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+        long endTs = new DateTimeOffset(year, month, 1, 0, 0, 0, TimeSpan.Zero).AddMonths(1).ToUnixTimeSeconds();
+
+        await using var db = await database.OpenAsync(ct);
+        int totalCount = await db.ExecuteScalarAsync<int>(new CommandDefinition("""
+            SELECT COUNT(*)
+            FROM cash_shop_history
+            WHERE account_uid = @accountUid AND purchased_at >= @startTs AND purchased_at < @endTs
+            """, new { accountUid, startTs, endTs }, cancellationToken: ct));
+
+        ushort totalPages = (ushort)Math.Max(1, (totalCount + HistoryPageSize - 1) / HistoryPageSize);
+        int clampedPage = Math.Clamp((int)page, 1, totalPages);
+        int offset = (clampedPage - 1) * HistoryPageSize;
+
+        var rows = await db.QueryAsync<CashShopHistoryEntry>(new CommandDefinition("""
+            SELECT id AS OrderId, item_data_id AS ItemDataId, quantity AS Quantity,
+                   unit_price AS UnitPrice, cash_after AS CashAfter,
+                   bonus_cash_after AS BonusCashAfter, purchased_at AS PurchasedAt
+            FROM cash_shop_history
+            WHERE account_uid = @accountUid AND purchased_at >= @startTs AND purchased_at < @endTs
+            ORDER BY id DESC
+            LIMIT @limit OFFSET @offset
+            """, new { accountUid, startTs, endTs, limit = HistoryPageSize, offset }, cancellationToken: ct));
+
+        return new CashShopHistoryPage(rows.ToList(), totalPages);
     }
 
     public async Task<CashDepositoryRow?> TakeDepositoryItemAsync(uint accountUid, CashShopItemKind kind, uint uid, CancellationToken ct)

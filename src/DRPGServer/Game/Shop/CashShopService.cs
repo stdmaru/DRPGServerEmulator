@@ -93,7 +93,7 @@ public sealed class CashShopService(
         uint accountUid = player.Account.Uid;
         try
         {
-            var outcome = await store.PurchaseAsync(accountUid, totalPrice, expanded, ct);
+            var outcome = await store.PurchaseAsync(accountUid, product.ItemDataId, quantity, product.Price, totalPrice, expanded, ct);
             log.LogInformation("CashShopBuy resultado ({Player}): result={Result} itemDataId={ItemDataId} totalPrice={Price} saldo={Cash}+{Bonus}",
                 player, outcome.Result, product.ItemDataId, totalPrice, outcome.Balance.Cash, outcome.Balance.BonusCash);
             world.Post(() =>
@@ -131,6 +131,39 @@ public sealed class CashShopService(
             {
                 if (player.IsOnline)
                     player.SendNotice("[Cash Shop]", "Erro interno ao processar compra.");
+            });
+        }
+    }
+
+    /// <summary>✅ Consulta o histórico de compras por ano/mês/página (<c>0x0161</c>).</summary>
+    public async Task GetHistoryAsync(Player player, uint headerWord, ushort year, ushort month, ushort page, CancellationToken ct = default)
+    {
+        uint accountUid = player.Account.Uid;
+        ushort clampedPage = Math.Max((ushort)1, page);
+        try
+        {
+            var history = await store.GetHistoryAsync(accountUid, year, month, clampedPage, ct);
+            world.Post(() =>
+            {
+                if (!player.IsOnline) return;
+                player.Send(new CashShopHistoryPacket(
+                    headerWord,
+                    errorCode: 0,
+                    year,
+                    month,
+                    Math.Min(clampedPage, history.TotalPages),
+                    history.TotalPages,
+                    accountUid,
+                    history.Entries));
+            });
+        }
+        catch (Exception e)
+        {
+            log.LogWarning(e, "Falha ao consultar histórico Cash Shop da conta {AccountUid}", accountUid);
+            world.Post(() =>
+            {
+                if (player.IsOnline)
+                    player.Send(new CashShopHistoryPacket(headerWord, errorCode: 0, year, month, clampedPage, 1, accountUid, []));
             });
         }
     }

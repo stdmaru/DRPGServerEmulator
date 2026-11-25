@@ -20,12 +20,15 @@ public class CashShopTests
     {
         private readonly Dictionary<uint, CashBalance> _balances = [];
         private readonly Dictionary<uint, List<CashDepositoryRow>> _depo = [];
+        private readonly Dictionary<uint, List<CashShopHistoryEntry>> _history = [];
         private uint _nextUid = 1000;
+        private long _nextOrderId = 1;
 
         public void Seed(uint accountUid, uint cash, uint bonusCash = 0)
         {
             _balances[accountUid] = new CashBalance(cash, bonusCash);
             _depo.TryAdd(accountUid, []);
+            _history.TryAdd(accountUid, []);
         }
 
         public Task<CashBalance?> GetBalanceAsync(uint accountUid, CancellationToken ct) =>
@@ -44,6 +47,9 @@ public class CashShopTests
 
         public Task<CashPurchaseOutcome> PurchaseAsync(
             uint accountUid,
+            uint itemDataId,
+            uint quantity,
+            uint unitPrice,
             uint totalPrice,
             IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries,
             CancellationToken ct)
@@ -73,7 +79,23 @@ public class CashShopTests
             var after = new CashBalance(bal.Cash - fromCash, bal.BonusCash - fromBonus);
             _balances[accountUid] = after;
             list.AddRange(toAdd);
+            _history[accountUid].Add(new CashShopHistoryEntry(
+                _nextOrderId++, itemDataId, quantity, unitPrice, after.Cash, after.BonusCash,
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds()));
             return Task.FromResult(new CashPurchaseOutcome(CashPurchaseResult.Ok, after));
+        }
+
+        public Task<CashShopHistoryPage> GetHistoryAsync(uint accountUid, ushort year, ushort month, ushort page, CancellationToken ct)
+        {
+            if (!_history.TryGetValue(accountUid, out var all))
+                return Task.FromResult(new CashShopHistoryPage([], 1));
+            long startTs = new DateTimeOffset(year, month, 1, 0, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+            long endTs = new DateTimeOffset(year, month, 1, 0, 0, 0, TimeSpan.Zero).AddMonths(1).ToUnixTimeSeconds();
+            var filtered = all.Where(e => e.PurchasedAt >= startTs && e.PurchasedAt < endTs).OrderByDescending(e => e.OrderId).ToList();
+            ushort totalPages = (ushort)Math.Max(1, (filtered.Count + CashRepository.HistoryPageSize - 1) / CashRepository.HistoryPageSize);
+            int p = Math.Clamp((int)page, 1, totalPages);
+            var slice = filtered.Skip((p - 1) * CashRepository.HistoryPageSize).Take(CashRepository.HistoryPageSize).ToList();
+            return Task.FromResult(new CashShopHistoryPage(slice, totalPages));
         }
 
         public Task<CashDepositoryRow?> TakeDepositoryItemAsync(uint accountUid, CashShopItemKind kind, uint uid, CancellationToken ct)
@@ -204,6 +226,21 @@ public class CashShopTests
             var buyPayload = buyFrames[0].AsSpan(PacketHeader.Length);
             Assert.Equal(0L, BinaryPrimitives.ReadInt64LittleEndian(buyPayload.Slice(0x28)));
             Assert.Equal(40L, BinaryPrimitives.ReadInt64LittleEndian(buyPayload.Slice(0x30)));
+
+            // 2.5. Consultar histórico de compras (0x0161): deve listar a compra recém-feita
+            var now = DateTimeOffset.UtcNow;
+            await service.GetHistoryAsync(player, 0, (ushort)now.Year, (ushort)now.Month, 1);
+            await world.InvokeAsync(() => 0);
+            var histFrames = session.DrainOutgoing();
+            Assert.Single(histFrames);
+            Assert.Equal((ushort)MapOpcode.CashShopHistory, PacketHeader.Read(histFrames[0]).Opcode);
+            var histPayload = histFrames[0].AsSpan(PacketHeader.Length);
+            Assert.Equal(1L, BinaryPrimitives.ReadInt64LittleEndian(histPayload.Slice(0x20)));          // orderId
+            Assert.Equal(1u, BinaryPrimitives.ReadUInt32LittleEndian(histPayload.Slice(0x28)));         // itemDataId
+            Assert.Equal(1u, BinaryPrimitives.ReadUInt32LittleEndian(histPayload.Slice(0x2C)));         // quantity
+            Assert.Equal(160L, BinaryPrimitives.ReadInt64LittleEndian(histPayload.Slice(0x30)));        // unitPrice
+            Assert.Equal(0L, BinaryPrimitives.ReadInt64LittleEndian(histPayload.Slice(0x38)));          // cashAfter
+            Assert.Equal(40L, BinaryPrimitives.ReadInt64LittleEndian(histPayload.Slice(0x40)));         // bonusCashAfter
 
             // 3. Listar Cash Depository (0x00DE): deve conter 1 card (#74 x50) e 1 item (#718 x1)
             await service.ListDepositoryAsync(player);

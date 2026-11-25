@@ -71,7 +71,14 @@ Especificação técnica levantada a partir das capturas oficiais v322 (`capture
 - `+0x08` (`u8`): `1` (C2S) / `2` (S2C).
 - `+0x0C` (`u16`): ano; `+0x0E` (`u16`): mês; `+0x10` (`u16`): página solicitada; `+0x12` (`u16`): total de páginas.
 - `+0x18` (`i64`): `accountNo`.
-- `+0x20..+0x3DF` (`960` B): até 20 registros de compra de 48 bytes (`0x30`) cada (`❓` layout interno do registro ainda a detalhar se necessário).
+- `+0x20..+0x3DF` (`960` B): até 20 registros de compra de 48 bytes (`0x30`) cada (`✅` confirmado em `DigimonRPG.bin @ 0x0097AC93..0x0097B03F`):
+  - `+0x00` (`i64`): `orderId` (`> 0`; `0` = slot vazio)
+  - `+0x08` (`u32`): `itemDataId` (usado para buscar o nome em `ingameshop_item_data_us.dat`)
+  - `+0x0C` (`u32`): `quantity`
+  - `+0x10` (`i64`): `unitPrice` (cliente exibe `unitPrice * quantity`)
+  - `+0x18` (`i64`): `cashAfter`
+  - `+0x20` (`i64`): `bonusCashAfter` (cliente exibe `cashAfter + bonusCashAfter`)
+  - `+0x28` (`i64`): `purchasedAt` (Unix timestamp UTC; cliente formata `YYYY-MM-DD`)
 
 ---
 

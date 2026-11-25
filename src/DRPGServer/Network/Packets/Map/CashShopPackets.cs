@@ -1,4 +1,5 @@
 using DRPGServer.Data.GameData;
+using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Entities;
 using DRPGServer.Network.Protocol;
 
@@ -75,7 +76,9 @@ public sealed class CashShopBuyPacket(
 
 /// <summary>
 /// ✅ Map 0x0161 (992 B = 32 B cabeçalho + 20 × 48 B registros): histórico de compras do Cash Shop.
-/// Confirmado em <c>captures.db</c> (conn 137/399) e <c>DigimonRPG.bin @ 0x00ACA3E9 / 0x0097C6E0</c>.
+/// Confirmado em <c>captures.db</c> (conn 137/399) e <c>DigimonRPG.bin @ 0x00ACA3E9 / 0x0097C6E0 / 0x0097AC93..0x0097B03F</c>.
+/// Cada registro (48 B): +0x00 i64 orderId, +0x08 u32 itemDataId, +0x0C u32 quantity, +0x10 i64 unitPrice,
+/// +0x18 i64 cashAfter, +0x20 i64 bonusCashAfter, +0x28 i64 purchasedAt (Unix timestamp UTC).
 /// </summary>
 public sealed class CashShopHistoryPacket(
     uint headerWord,
@@ -84,8 +87,12 @@ public sealed class CashShopHistoryPacket(
     ushort month,
     ushort page,
     ushort totalPages,
-    uint accountNo) : ServerPacket
+    uint accountNo,
+    IReadOnlyList<CashShopHistoryEntry>? entries = null) : ServerPacket
 {
+    public const int MaxEntries = 20;
+    public const int EntrySize = 48;
+
     public override ushort Opcode => (ushort)MapOpcode.CashShopHistory;
 
     protected override void Write(PacketWriter w)
@@ -100,7 +107,25 @@ public sealed class CashShopHistoryPacket(
         w.WriteU16(totalPages);            // +0x12
         w.WriteZeros(4);                   // +0x14..+0x17
         w.WriteI64(accountNo);             // +0x18
-        w.WriteZeros(20 * 48);             // +0x20..+0x3DF (960 B = 20 registros vazios; 992 B total)
+
+        int written = 0;
+        if (entries is not null)
+        {
+            foreach (var e in entries)
+            {
+                if (written >= MaxEntries) break;
+                w.WriteI64(e.OrderId);         // +0x00
+                w.WriteU32(e.ItemDataId);      // +0x08
+                w.WriteU32(e.Quantity);        // +0x0C
+                w.WriteI64(e.UnitPrice);       // +0x10
+                w.WriteI64(e.CashAfter);       // +0x18
+                w.WriteI64(e.BonusCashAfter);  // +0x20
+                w.WriteI64(e.PurchasedAt);     // +0x28 (48 B)
+                written++;
+            }
+        }
+        if (written < MaxEntries)
+            w.WriteZeros((MaxEntries - written) * EntrySize);
     }
 }
 
