@@ -56,15 +56,21 @@ public sealed class CashShopService(
     /// </summary>
     public async Task BuyProductAsync(Player player, uint headerWord, uint productId, uint quantity, CancellationToken ct = default)
     {
+        log.LogInformation("CashShopBuy recebido de {Player}: itemDataId={ProductId} qty={Qty} inBattle={InBattle}",
+            player, productId, quantity, player.InBattle);
+
         // Validações autoritativas na thread do mundo antes de tocar no banco
         if (player.InBattle) return;
         if (quantity is 0 or > MaxPurchaseQuantity)
         {
+            log.LogWarning("CashShopBuy rejeitado ({Player}): quantidade inválida {Qty}", player, quantity);
             player.SendNotice("[Cash Shop]", "Quantidade inválida.");
             return;
         }
         if (data.FindCashShopProduct(productId) is not { } product)
         {
+            log.LogWarning("CashShopBuy rejeitado ({Player}): itemDataId={ProductId} não encontrado no catálogo ({Count} produtos)",
+                player, productId, data.CashShopProducts.Count);
             player.SendNotice("[Cash Shop]", $"Produto #{productId} não encontrado.");
             return;
         }
@@ -88,6 +94,8 @@ public sealed class CashShopService(
         try
         {
             var outcome = await store.PurchaseAsync(accountUid, totalPrice, expanded, ct);
+            log.LogInformation("CashShopBuy resultado ({Player}): result={Result} itemDataId={ItemDataId} totalPrice={Price} saldo={Cash}+{Bonus}",
+                player, outcome.Result, product.ItemDataId, totalPrice, outcome.Balance.Cash, outcome.Balance.BonusCash);
             world.Post(() =>
             {
                 if (!player.IsOnline) return;
