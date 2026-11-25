@@ -31,6 +31,12 @@ public sealed class PlayerSystem : IWorldSystem
         _characters = characters;
         _options = options.Value;
         _log = log;
+        // fail-fast: o mapa inicial (GameOptions) precisa existir nas tabelas carregadas
+        var start = zones.Find(_options.StartMapId)
+            ?? throw new InvalidOperationException($"{GameOptions.Section}:StartMapId = {_options.StartMapId}: mapa não carregado");
+        if (!start.IsWalkable(_options.StartPosX, _options.StartPosY))
+            throw new InvalidOperationException(
+                $"{GameOptions.Section}:StartPosX/StartPosY = ({_options.StartPosX}, {_options.StartPosY}): célula não andável no mapa {start.MapId}");
         world.AddSystem(this);
     }
 
@@ -51,8 +57,7 @@ public sealed class PlayerSystem : IWorldSystem
         if (zone is null)
         {
             _log.LogWarning("{Name}: mapa {Map} não carregado, indo para o inicial", character.Name, character.MapId);
-            zone = _zones.Find(_options.StartMapId)
-                ?? throw new InvalidOperationException($"mapa inicial {_options.StartMapId} não carregado");
+            zone = _zones.Find(_options.StartMapId)!;   // conferido na construção
             character.MapId = zone.MapId;
             character.X = _options.StartPosX;
             character.Y = _options.StartPosY;

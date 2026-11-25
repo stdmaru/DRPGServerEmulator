@@ -50,9 +50,13 @@ builder.Logging.AddSimpleConsole(o =>
 });
 
 var services = builder.Services;
-services.Configure<ServersOptions>(builder.Configuration.GetSection(ServersOptions.Section));
-services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.Section));
-services.Configure<GameOptions>(builder.Configuration.GetSection(GameOptions.Section));
+// opções validadas na partida (Configuration/OptionsValidation.cs): valor fora do intervalo não sobe o servidor
+services.AddOptions<ServersOptions>().Bind(builder.Configuration.GetSection(ServersOptions.Section)).ValidateOnStart();
+services.AddOptions<DatabaseOptions>().Bind(builder.Configuration.GetSection(DatabaseOptions.Section)).ValidateOnStart();
+services.AddOptions<GameOptions>().Bind(builder.Configuration.GetSection(GameOptions.Section)).ValidateOnStart();
+services.AddSingleton<IValidateOptions<ServersOptions>, ServersOptionsValidator>();
+services.AddSingleton<IValidateOptions<DatabaseOptions>, DatabaseOptionsValidator>();
+services.AddSingleton<IValidateOptions<GameOptions>, GameOptionsValidator>();
 services.AddSingleton(TimeProvider.System);
 services.AddSingleton<IGameClock, GameClock>();
 
@@ -106,6 +110,25 @@ services.AddPacketHandlers();
 
 using var host = builder.Build();
 var log = host.Services.GetRequiredService<ILogger<Program>>();
+
+// todas as seções de uma vez, antes de qualquer serviço ler a configuração
+var invalidOptions = new List<string>();
+foreach (var read in new Action[]
+{
+    () => _ = host.Services.GetRequiredService<IOptions<ServersOptions>>().Value,
+    () => _ = host.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value,
+    () => _ = host.Services.GetRequiredService<IOptions<GameOptions>>().Value,
+})
+{
+    try { read(); }
+    catch (OptionsValidationException e) { invalidOptions.AddRange(e.Failures); }
+}
+if (invalidOptions.Count > 0)
+{
+    log.LogCritical("Configuração inválida (appsettings*.json / DRPG_*):{Errors}",
+        string.Concat(invalidOptions.Select(f => Environment.NewLine + "  - " + f)));
+    return 1;
+}
 
 try
 {

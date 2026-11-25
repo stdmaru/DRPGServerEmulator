@@ -56,8 +56,7 @@ public sealed class ExpEventService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        int intervalSeconds = Math.Max(5, options.Value.EventPollSeconds);
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(options.Value.EventPollSeconds));
 
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
