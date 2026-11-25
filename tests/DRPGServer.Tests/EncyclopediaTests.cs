@@ -113,7 +113,7 @@ public class EncyclopediaTests
     [Fact]
     public async Task Global_handlers_reply_with_live_character_party_and_echoed_uid()
     {
-        var accounts = new AccountRegistry(TestSupport.GameOptions(), TimeProvider.System);
+        var accounts = new AccountRegistry(TestSupport.NetworkOptions(), TimeProvider.System);
         var world = TestSupport.NewWorld();
         var account = new AuthenticatedAccount(1, "tester", Authority.None);
 

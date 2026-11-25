@@ -10,11 +10,14 @@ Modelo de ameaça e controles do servidor. Vale desde já, mesmo com o jogo inco
 - O alvo principal é a **economia**: duplicar item, moeda ou digimon, ou obter algo sem pagar. Depois vêm roubo de conta e derrubada do servidor.
 - O banco pode vazar: nada que permita entrar numa conta fica em claro.
 
-## Autenticação entre servidores (**PR #41: S1**)
-- O channel autentica (usuário + `auth_key`) e emite um **ticket** da conta com: IP da conexão do channel, validade (`Network:AccountTicketSeconds`) e uma vaga por servidor (mapa e global).
-- Mapa e global só aceitam a conta se houver ticket válido, **do mesmo IP**, e se a vaga daquele servidor estiver livre. O username do pacote só serve para achar o ticket, nunca para autenticar.
-- A vaga é liberada quando a sessão daquele servidor fecha. Enquanto a conta tiver alguma sessão aberta, o ticket é renovado. Depois que a última sessão fecha, ele expira na validade.
-- Um segundo login no channel invalida o ticket anterior e derruba as sessões dele.
+## Autenticação entre servidores
+Código: `Network/AccountRegistry.cs`. Testes: `AccountRegistryTests`.
+- O channel autentica (usuário + `auth_key`) e emite um **ticket** da conta, amarrado ao IP da conexão do channel (IPv4 mapeado em IPv6 conta como IPv4). Uma segunda autenticação na mesma conexão fecha a conexão.
+- Mapa e global só aceitam a conta com ticket válido e **do mesmo IP**. O username do pacote só serve para achar o ticket, nunca para autenticar.
+- O ticket vale **uma vez por servidor**: uma segunda conexão de mapa é recusada, mesmo depois que a primeira fecha. Entrar de novo exige autenticar no channel. ✅ O cliente mantém o channel aberto durante o jogo e fecha as três conexões juntas ao sair (`first-access`, `login-into-map`). ❓ Voltar para a seleção de personagem sem sair do jogo não foi capturado; se o cliente fizer isso sem um novo `0x04`, o channel vai precisar reemitir o ticket.
+- Enquanto alguma sessão da conta está aberta, o ticket não vence. Depois que a última fecha, ele vale por `Network:AccountTicketSeconds` (padrão 60).
+- Um novo login no channel substitui o ticket e derruba as sessões do anterior (channel, mapa e global).
+- Recusa vai para o log com o motivo (`ClaimRejection`: sem ticket, vencido, outro IP, já usado) e fecha a conexão.
 - `auth_key` é guardada como hash PBKDF2-SHA256 com sal, e a comparação é em tempo constante (**PR #41: S8**).
 
 ## Entrada e saída do mundo (**PR #41: S2**)

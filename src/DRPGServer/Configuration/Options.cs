@@ -35,6 +35,18 @@ public sealed class DatabaseOptions
     public int ConnectTimeoutSeconds { get; set; } = 60;
 }
 
+/// <summary>Seção "Network": autenticação entre servidores e limites de recurso (docs/emulador/seguranca.md).</summary>
+public sealed class NetworkOptions
+{
+    public const string Section = "Network";
+
+    /// <summary>
+    /// Validade do ticket emitido pelo channel depois que a última sessão da conta fecha. Enquanto alguma sessão da
+    /// conta está aberta (o channel fica aberto durante o jogo), o ticket não vence.
+    /// </summary>
+    public int AccountTicketSeconds { get; set; } = 60;
+}
+
 /// <summary>Seção "Game": regras ajustáveis (antigo ServerConsts.xml).</summary>
 public sealed class GameOptions
 {
@@ -74,9 +86,6 @@ public sealed class GameOptions
 
     /// <summary>Intervalo (segundos) para consultar a tabela <c>exp_event</c> no banco de dados. Padrão: 60 s.</summary>
     public int EventPollSeconds { get; set; } = 60;
-
-    /// <summary>Por quanto tempo o login no channel vale para entrar no mapa depois que a conexão do channel cai.</summary>
-    public int AccountTicketGraceSeconds { get; set; } = 120;
 
     /// <summary>Slots iniciais liberados no Digimon Depository ao criar personagem (0..210). Padrão 10; 0 exige item (901/929).</summary>
     public byte DefaultDepositorySlots { get; set; } = 10;

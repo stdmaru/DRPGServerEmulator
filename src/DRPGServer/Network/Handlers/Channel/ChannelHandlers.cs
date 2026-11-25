@@ -43,6 +43,12 @@ public sealed class AuthenticateHandler(AccountRepository accounts, AccountRegis
 {
     protected override async ValueTask HandleAsync(Session session, AuthenticateRequest request, CancellationToken ct)
     {
+        if (session.Account is not null)
+        {
+            session.Close("segunda autenticação na mesma conexão");
+            return;
+        }
+
         var record = await accounts.FindByUsernameAsync(request.Username, ct);
         if (record is null || string.IsNullOrEmpty(record.AuthKey) || record.AuthKey != request.AuthKey)
         {
@@ -52,7 +58,11 @@ public sealed class AuthenticateHandler(AccountRepository accounts, AccountRegis
             return;
         }
 
-        registry.SignIn(record.Account, session);
+        if (!registry.SignIn(record.Account, session))
+        {
+            session.Close("conexão sem endereço");
+            return;
+        }
         log.LogInformation("{Username} autenticado ({Authority})", record.Account.Username, record.Account.Authority);
         session.Send(new AuthenticationPacket(ChannelError.None, record.Account.Username));
     }

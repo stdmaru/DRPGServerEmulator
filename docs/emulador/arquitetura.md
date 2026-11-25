@@ -15,7 +15,7 @@ Páginas desta seção:
 - **Sempre no devcontainer** (é o ambiente de trabalho): `dotnet run --project src/DRPGServer` e `dotnet test DRPGServer.sln`. De fora: `docker exec -w /workspaces/DRPGServer server_devcontainer-server-1 dotnet ...`.
 - O compose publica 7000–7003 e 3306 em 127.0.0.1, para o cliente (Wine) e as ferramentas Python do host.
 - **Protocolo alvo: v322.**
-- **Configuração:** `appsettings.json`, depois `appsettings.Local.json` (fora do git) e variáveis `DRPG_<Seção>__<Chave>`. Seções: `Servers` (porta e IP de cada servidor), `Database`, `Game` (taxas, nível máximo, mapa inicial, autosave), `Network` (limites de conexão e de pacotes, **PR #41: S6**). Toda opção é validada na partida (`Configuration/OptionsValidation.cs`, `ValidateOnStart`): o boot lista todos os erros de uma vez e não sobe. O que depende das tabelas (mapa e posição inicial) é conferido pelo `PlayerSystem` na construção. `Database:Name` só aceita letras, números e `_`, porque entra no `CREATE DATABASE`. Opção nova entra com o limite dela no validador.
+- **Configuração:** `appsettings.json`, depois `appsettings.Local.json` (fora do git) e variáveis `DRPG_<Seção>__<Chave>`. Seções: `Servers` (porta e IP de cada servidor), `Database`, `Game` (taxas, nível máximo, mapa inicial, autosave), `Network` (validade do ticket entre servidores; limites de conexão e de pacotes, **PR #41: S6**). Toda opção é validada na partida (`Configuration/OptionsValidation.cs`, `ValidateOnStart`): o boot lista todos os erros de uma vez e não sobe. O que depende das tabelas (mapa e posição inicial) é conferido pelo `PlayerSystem` na construção. `Database:Name` só aceita letras, números e `_`, porque entra no `CREATE DATABASE`. Opção nova entra com o limite dela no validador.
 
 ## Banco e migrações
 - `sql/upgrade/NNNN_descricao.sql` roda **sozinho na partida**, em ordem. As aplicadas ficam em `schema_version` com SHA-256; um arquivo aplicado que mudou **impede a partida**.
@@ -66,7 +66,7 @@ Antes de escrever uma função de jogo, procure o serviço do domínio. Se uma l
 - Entidades não recebem serviços. Quem precisa de `GameData` recebe os dados que usa.
 
 ## Autenticação entre servidores
-O channel valida usuário + `auth_key` e emite um **ticket** da conta, amarrado ao IP da conexão. Mapa e global só aceitam a conta com ticket válido, do mesmo IP, e uma sessão por servidor de cada vez. Um segundo login no channel derruba o primeiro. Detalhes em [segurança](seguranca.md#autenticação-entre-servidores) (**PR #41: S1**).
+O channel valida usuário + `auth_key` e emite um **ticket** da conta, amarrado ao IP da conexão. Mapa e global só aceitam a conta com ticket válido, do mesmo IP, e uma vez por servidor. Um segundo login no channel derruba o primeiro. Detalhes em [segurança](seguranca.md#autenticação-entre-servidores).
 
 ## Verificação
 - Testes unitários em `tests/DRPGServer.Tests`, um arquivo por domínio: CRC contra capturas, framing, tamanho de payload dos S2C contra o capturado, conta, digimon, batalha simulada, migrações, entradas inválidas de cada handler.

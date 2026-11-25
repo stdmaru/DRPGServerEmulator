@@ -63,6 +63,17 @@ public sealed partial class DatabaseOptionsValidator : IValidateOptions<Database
     }
 }
 
+public sealed class NetworkOptionsValidator : IValidateOptions<NetworkOptions>
+{
+    public ValidateOptionsResult Validate(string? name, NetworkOptions o)
+    {
+        var e = new OptionsErrors();
+        const string s = NetworkOptions.Section;
+        e.Range(o.AccountTicketSeconds, 5, 600, $"{s}:AccountTicketSeconds");
+        return e.Result();
+    }
+}
+
 public sealed class GameOptionsValidator : IValidateOptions<GameOptions>
 {
     public ValidateOptionsResult Validate(string? name, GameOptions o)
@@ -81,7 +92,6 @@ public sealed class GameOptionsValidator : IValidateOptions<GameOptions>
         e.Range(o.StartPosY, 0, short.MaxValue, $"{s}:StartPosY");
         e.Range(o.AutosaveSeconds, 5, 3600, $"{s}:AutosaveSeconds");
         e.Range(o.EventPollSeconds, 5, 86_400, $"{s}:EventPollSeconds");
-        e.Range(o.AccountTicketGraceSeconds, 0, 3600, $"{s}:AccountTicketGraceSeconds");
         e.Range(o.DefaultDepositorySlots, 0, Character.MaxDepositorySlots, $"{s}:DefaultDepositorySlots");
         e.Range(o.DigimonDepositoryFee, -1, 1_000_000_000, $"{s}:DigimonDepositoryFee");
         return e.Result();

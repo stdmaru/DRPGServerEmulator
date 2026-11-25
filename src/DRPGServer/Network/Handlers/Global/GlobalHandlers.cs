@@ -16,11 +16,12 @@ public sealed class GlobalUserAuthHandler(AccountRegistry accounts, ILogger<Glob
 {
     protected override ValueTask HandleAsync(Session session, GlobalUserAuthRequest request, CancellationToken ct)
     {
-        var username = request.Username;
-        if (session.Account is null && accounts.Claim(username, session) is null)
+        // repetido na mesma conexão: só responde de novo (a conta não troca)
+        var claim = session.Account is null ? accounts.Claim(request.Username, session) : default;
+        if (session.Account is null)
         {
-            log.LogWarning("{Session}: {Username} no global sem login no channel", session, username);
-            session.Close("sem autenticação no channel");
+            log.LogWarning("{Session}: {Username} recusado no global ({Reason})", session, request.Username, claim.Rejection);
+            session.Close("ticket do channel inválido");
             return ValueTask.CompletedTask;
         }
         session.Send(new UnknownE1Packet());

@@ -53,9 +53,11 @@ var services = builder.Services;
 // opções validadas na partida (Configuration/OptionsValidation.cs): valor fora do intervalo não sobe o servidor
 services.AddOptions<ServersOptions>().Bind(builder.Configuration.GetSection(ServersOptions.Section)).ValidateOnStart();
 services.AddOptions<DatabaseOptions>().Bind(builder.Configuration.GetSection(DatabaseOptions.Section)).ValidateOnStart();
+services.AddOptions<NetworkOptions>().Bind(builder.Configuration.GetSection(NetworkOptions.Section)).ValidateOnStart();
 services.AddOptions<GameOptions>().Bind(builder.Configuration.GetSection(GameOptions.Section)).ValidateOnStart();
 services.AddSingleton<IValidateOptions<ServersOptions>, ServersOptionsValidator>();
 services.AddSingleton<IValidateOptions<DatabaseOptions>, DatabaseOptionsValidator>();
+services.AddSingleton<IValidateOptions<NetworkOptions>, NetworkOptionsValidator>();
 services.AddSingleton<IValidateOptions<GameOptions>, GameOptionsValidator>();
 services.AddSingleton(TimeProvider.System);
 services.AddSingleton<IGameClock, GameClock>();
@@ -117,6 +119,7 @@ foreach (var read in new Action[]
 {
     () => _ = host.Services.GetRequiredService<IOptions<ServersOptions>>().Value,
     () => _ = host.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value,
+    () => _ = host.Services.GetRequiredService<IOptions<NetworkOptions>>().Value,
     () => _ = host.Services.GetRequiredService<IOptions<GameOptions>>().Value,
 })
 {

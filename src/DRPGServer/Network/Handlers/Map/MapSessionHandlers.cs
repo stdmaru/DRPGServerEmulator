@@ -36,11 +36,11 @@ public sealed class JoinCharacterHandler(
         if (session.Account is not null) return;   // já entrou
         var (nickname, username) = request;
 
-        var account = accounts.Claim(username, session);
-        if (account is null)
+        var claim = accounts.Claim(username, session);
+        if (claim.Account is not { } account)
         {
-            log.LogWarning("{Session}: {Username} tentou entrar no mapa sem login no channel", session, username);
-            session.Close("sem autenticação no channel");
+            log.LogWarning("{Session}: {Username} recusado no mapa ({Reason})", session, username, claim.Rejection);
+            session.Close("ticket do channel inválido");
             return;
         }
 

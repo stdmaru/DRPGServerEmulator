@@ -26,14 +26,16 @@ public sealed class Session
     private readonly CancellationTokenSource _closed = new();
     private string? _closeReason;
 
-    public Session(Socket? socket, ServerRole role, ILogger log, PacketTrace trace)
+    /// <param name="remote">Endereço do cliente; sem ele, vale o do socket (testes passam um fixo).</param>
+    public Session(Socket? socket, ServerRole role, ILogger log, PacketTrace trace, IPEndPoint? remote = null)
     {
         _socket = socket!;
         _log = log;
         _trace = trace;
         Role = role;
         Id = Interlocked.Increment(ref _nextId);
-        RemoteEndPoint = socket?.RemoteEndPoint as IPEndPoint;
+        RemoteEndPoint = remote ?? socket?.RemoteEndPoint as IPEndPoint;
+        RemoteAddress = RemoteEndPoint?.Address is { } address && address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : RemoteEndPoint?.Address;
     }
 
     /// <summary>Testes: tira da fila o que seria enviado.</summary>
@@ -47,6 +49,9 @@ public sealed class Session
     public long Id { get; }
     public ServerRole Role { get; }
     public IPEndPoint? RemoteEndPoint { get; }
+
+    /// <summary>IP do cliente, com IPv4 mapeado em IPv6 convertido para IPv4 (para comparar entre servidores).</summary>
+    public IPAddress? RemoteAddress { get; }
     public bool IsClosed => _closed.IsCancellationRequested;
     public CancellationToken ClosedToken => _closed.Token;
 

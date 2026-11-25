@@ -1,3 +1,4 @@
+using System.Net;
 using System.Reflection;
 using DRPGServer.Configuration;
 using DRPGServer.Data.GameData;
@@ -31,8 +32,17 @@ internal static class TestSupport
         return Options.Create(o);
     }
 
-    public static Session NewSession(ServerRole role = ServerRole.Map) =>
-        new(null, role, NullLogger.Instance, new PacketTrace(NullLogger<PacketTrace>.Instance));
+    public static IOptions<NetworkOptions> NetworkOptions(Action<NetworkOptions>? configure = null)
+    {
+        var o = new NetworkOptions();
+        configure?.Invoke(o);
+        return Options.Create(o);
+    }
+
+    /// <summary>Sessão sem socket, vinda de <paramref name="address"/> (padrão 127.0.0.1).</summary>
+    public static Session NewSession(ServerRole role = ServerRole.Map, string address = "127.0.0.1") =>
+        new(null, role, NullLogger.Instance, new PacketTrace(NullLogger<PacketTrace>.Instance),
+            new IPEndPoint(IPAddress.Parse(address), 50_000));
 
     public static GameWorld NewWorld() => new(NullLogger<GameWorld>.Instance);
 
