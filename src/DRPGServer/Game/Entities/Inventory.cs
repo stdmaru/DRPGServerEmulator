@@ -84,6 +84,24 @@ public sealed class InventoryItem
 }
 
 /// <summary>Uma bolsa de itens ou cards (24 posições nas mochilas; 6 nos Card Slots equipados).</summary>
+/// <summary>O que um <see cref="Bag.Grant"/> mudou, para <see cref="Bag.Revert"/>.</summary>
+public sealed class BagGrant
+{
+    internal readonly record struct Part(InventoryItem Item, uint Put, bool Created);
+
+    internal BagGrant(Bag bag, IReadOnlyList<Part> parts)
+    {
+        Bag = bag;
+        Parts = parts;
+    }
+
+    internal Bag Bag { get; }
+    internal IReadOnlyList<Part> Parts { get; }
+
+    /// <summary>Posições alteradas (para o pacote de recebimento).</summary>
+    public IReadOnlyList<InventoryItem> Changed => Parts.Select(p => p.Item).ToList();
+}
+
 public sealed class Bag
 {
     private readonly InventoryItem?[] _slots;
@@ -121,11 +139,18 @@ public sealed class Bag
     /// Para itens não empilháveis (<c>MaxStack == 1</c>), <paramref name="durationSeconds"/> pode ser:
     /// <c>null</c> (usa duração padrão do <see cref="ItemInfo"/>), <c>-1</c> (permanente) ou <c>&gt; 0</c> (duração arbitrária em segundos).
     /// </summary>
-    public IReadOnlyList<InventoryItem> Add(uint itemId, uint amount, long? durationSeconds = null)
+    public IReadOnlyList<InventoryItem> Add(uint itemId, uint amount, long? durationSeconds = null) =>
+        Grant(itemId, amount, durationSeconds)?.Changed ?? [];
+
+    /// <summary>
+    /// Como <see cref="Add"/>, mas devolve o que mudou de forma que <see cref="Revert"/> desfaça exatamente (rollback de
+    /// transferência). Null se não couber tudo.
+    /// </summary>
+    public BagGrant? Grant(uint itemId, uint amount, long? durationSeconds = null)
     {
-        if (amount == 0 || Room(itemId) < amount) return [];
+        if (amount == 0 || Room(itemId) < amount) return null;
         uint max = _owner.MaxStackOf(itemId, IsCardBag);
-        var changed = new List<InventoryItem>();
+        var parts = new List<BagGrant.Part>();
         if (max > 1)
         {
             foreach (var stack in _slots.Where(s => s?.ItemId == itemId && s.Amount < max).Cast<InventoryItem>())
@@ -133,8 +158,8 @@ public sealed class Bag
                 uint put = Math.Min(amount, max - stack.Amount);
                 stack.Amount += put;
                 amount -= put;
-                changed.Add(stack);
-                if (amount == 0) return changed;
+                parts.Add(new(stack, put, Created: false));
+                if (amount == 0) return new BagGrant(this, parts);
             }
         }
         uint expiresAt = ResolveExpiresAt(itemId, max, durationSeconds);
@@ -145,9 +170,23 @@ public sealed class Bag
             var item = _owner.Create(itemId, slot, put, isCard: IsCardBag, expiresAt: expiresAt);
             _slots[slot] = item;
             amount -= put;
-            changed.Add(item);
+            parts.Add(new(item, put, Created: true));
         }
-        return changed;
+        return new BagGrant(this, parts);
+    }
+
+    /// <summary>Desfaz um <see cref="Grant"/> desta bolsa: tira as quantidades postas e as posições criadas.</summary>
+    public void Revert(BagGrant grant)
+    {
+        if (grant.Bag != this) throw new ArgumentException("o grant é de outra bolsa", nameof(grant));
+        for (int i = grant.Parts.Count - 1; i >= 0; i--)
+        {
+            var (item, put, created) = grant.Parts[i];
+            int slot = Array.IndexOf(_slots, item);
+            if (slot < 0) continue;
+            item.Amount -= Math.Min(put, item.Amount);
+            if (created || item.Amount == 0) _slots[slot] = null;
+        }
     }
 
     private uint ResolveExpiresAt(uint itemId, uint maxStack, long? durationSeconds)

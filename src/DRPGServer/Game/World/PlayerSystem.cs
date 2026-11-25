@@ -145,8 +145,15 @@ public sealed class PlayerSystem : IWorldSystem
             _battles.PlayerLeft(player);
             player.Zone?.Leave(player);
             session.Player = null;
-            Save(player, _world.Now);
-            StartSaving(player.Account.Uid, _persistence.FlushAsync());   // o flush vem depois do save na fila
+            if (player.PendingTransfer is { } transfer)
+            {
+                StartSaving(player.Account.Uid, SaveAfterAsync(player, transfer));
+            }
+            else
+            {
+                Save(player, _world.Now);
+                StartSaving(player.Account.Uid, _persistence.FlushAsync());   // o flush vem depois do save na fila
+            }
             _log.LogInformation("{Player} saiu do mundo ({Count} online)", player, _bySession.Count);
         }
         else if (session.Account is { } account && _presence.TryGetValue(account.Uid, out var presence) &&
@@ -171,6 +178,18 @@ public sealed class PlayerSystem : IWorldSystem
         }), TaskScheduler.Default);
     }
 
+    /// <summary>Snapshot final de quem saiu no meio de uma transferência: só depois do commit ou do rollback dela.</summary>
+    private async Task SaveAfterAsync(Player player, Task transfer)
+    {
+        await transfer;
+        var flushed = await _world.InvokeAsync(() =>
+        {
+            Save(player, _world.Now);
+            return _persistence.FlushAsync();
+        });
+        await flushed;
+    }
+
     private void Save(Player player, TimeSpan now)
     {
         player.MarkSaved(now);
@@ -182,6 +201,7 @@ public sealed class PlayerSystem : IWorldSystem
         var dirtyInterval = TimeSpan.FromSeconds(Math.Max(1, _options.AutosaveSeconds));
         foreach (var player in _bySession.Values)
         {
+            if (player.PendingTransfer is not null) continue;   // o snapshot da transferência vem antes
             if (player.NeedsImmediateSave)
             {
                 Save(player, now);

@@ -3,7 +3,7 @@ using System.Collections.Frozen;
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Entities;
-using DRPGServer.Game.Shop;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
@@ -77,9 +77,9 @@ public class NpcShopTests
         return (data, player, session);
     }
 
-    /// <summary>Handler 0x53 com um <see cref="CashShopService"/> sobre <paramref name="io"/> (sem I/O, um mundo parado basta).</summary>
-    private static ItemShopTradeHandler ItemTrade(GameData data, ICashStore? cashStore = null, WorldIo? io = null) =>
-        new(data, new CashShopService(data, cashStore ?? new FakeCashStore(), io ?? new WorldIo(TestSupport.NewWorld(), NullLogger<WorldIo>.Instance), TestSupport.Clock, NullLogger<CashShopService>.Instance));
+    /// <summary>Handler 0x53. Sem <paramref name="world"/>, um mundo parado basta (compras que não usam o depósito da conta).</summary>
+    private static ItemShopTradeHandler ItemTrade(GameData data, InMemoryCashStore? store = null, WorldHarness? world = null) =>
+        new(data, new ItemService((world ?? new WorldHarness()).Transfers, store ?? new InMemoryCashStore(), TestSupport.Clock));
 
     private static PacketReader BuildItemTrade(NpcShopAction action, uint uid, uint itemId, uint quantity, ItemPlace place, int col, int row, uint shopId)
     {
@@ -222,38 +222,16 @@ public class NpcShopTests
         Assert.Empty(session.SentOpcodes());
     }
 
-    private sealed class FakeCashStore : ICashStore
-    {
-        public List<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> Deposited { get; } = [];
-        public bool FailDeposit { get; set; }
-
-        public Task<CashBalance?> GetBalanceAsync(uint accountUid, CancellationToken ct) => Task.FromResult<CashBalance?>(null);
-        public Task<CashBalance?> AddCashAsync(uint accountUid, uint cashDelta, uint bonusCashDelta, CancellationToken ct) => Task.FromResult<CashBalance?>(null);
-        public Task<IReadOnlyList<CashDepositoryRow>> ListDepositoryAsync(uint accountUid, CancellationToken ct) => Task.FromResult<IReadOnlyList<CashDepositoryRow>>([]);
-        public Task<CashPurchaseOutcome> PurchaseAsync(uint accountUid, uint itemDataId, uint quantity, uint unitPrice, uint totalPrice, IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries, CancellationToken ct) =>
-            Task.FromResult(new CashPurchaseOutcome(CashPurchaseResult.Ok, default));
-        public Task<CashShopHistoryPage> GetHistoryAsync(uint accountUid, ushort year, ushort month, ushort page, CancellationToken ct) =>
-            Task.FromResult(new CashShopHistoryPage([], 1));
-        public Task<CashDepositoryRow?> TakeDepositoryItemAsync(uint accountUid, CashShopItemKind kind, uint uid, CancellationToken ct) => Task.FromResult<CashDepositoryRow?>(null);
-        public Task RestoreDepositoryItemAsync(uint accountUid, CashDepositoryRow row, CancellationToken ct) => Task.CompletedTask;
-        public Task<bool> DepositAsync(uint accountUid, IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries, CancellationToken ct)
-        {
-            if (FailDeposit) return Task.FromResult(false);
-            Deposited.AddRange(entries);
-            return Task.FromResult(true);
-        }
-    }
-
     [Fact]
     public async Task Special_currency_shops_use_coins_and_ladder_points_from_c2s_buy_action()
     {
-        var cashStore = new FakeCashStore();
+        var cashStore = new InMemoryCashStore();
         var (data, player, session) = MakeEnv(bits: 5000);
         await using var world = new WorldHarness();
         await world.StartAsync();
         player.Character.SetCoins(200);
         player.Character.SetLadderPoints(1500);
-        var itemTrade = ItemTrade(data, cashStore, world.Io);
+        var itemTrade = ItemTrade(data, cashStore, world);
 
         // 1. Cliente sempre envia action=1 (Buy) em C2S 0x0053; loja 5050 (Coins + ShopDepository):
         // debita 150 Coins (Col16), deposita no Shop Depository (não na mochila), responde S2C action=4 + 0xCB (sem 0xC9)
@@ -261,8 +239,10 @@ public class NpcShopTests
         Assert.Equal(5000.0, player.Character.Bits);
         Assert.Equal((ushort)50, player.Character.Coins);
         Assert.Equal(0u, player.Character.Inventory.Main.Count(21008));
-        Assert.Single(cashStore.Deposited);
-        Assert.Equal((CashShopItemKind.Item, 21008u, 1u, 0u), cashStore.Deposited[0]);
+        var deposited = Assert.Single(await cashStore.ListDepositoryAsync(1, CancellationToken.None));
+        Assert.Equal((CashShopItemKind.Item, 21008u, 1u, 0u), (deposited.Kind, deposited.ItemId, deposited.Amount, deposited.ExpiresAt));
+        // a moeda gasta foi no mesmo commit do depósito
+        Assert.Equal((ushort)50, Assert.Single(cashStore.Snapshots).Coins);
         var frames = session.DrainOutgoing();
         Assert.Equal(2, frames.Count);
         Assert.Equal((ushort)MapOpcode.ItemShopTrade, PacketHeader.Read(frames[0]).Opcode);
@@ -279,12 +259,23 @@ public class NpcShopTests
 
         // 2b. Se o Shop Depository estiver cheio, reembolsa os Coins
         await world.RunAsync(() => player.Character.SetCoins(200));
-        cashStore.FailDeposit = true;
+        cashStore.Fill(1, CashShopItemKind.Item);
         await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
         Assert.Equal((ushort)200, player.Character.Coins);
-        Assert.Single(cashStore.Deposited);
+        Assert.Single(cashStore.Snapshots);
         Assert.Equal([(ushort)MapOpcode.ChatNotice], session.SentOpcodes());
-        cashStore.FailDeposit = false;
+        Assert.True(player.NeedsImmediateSave);                 // o reembolso vai para o banco
+        Assert.Equal(PlayerStates.Idle, player.State);
+
+        // 2c. Erro de banco: nada gravado, Coins de volta
+        cashStore = new InMemoryCashStore();
+        cashStore.FailTransfers = true;
+        itemTrade = ItemTrade(data, cashStore, world);
+        await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
+        Assert.Equal((ushort)200, player.Character.Coins);
+        Assert.Empty(cashStore.Snapshots);
+        Assert.Equal([(ushort)MapOpcode.ChatNotice], session.SentOpcodes());
+        cashStore.FailTransfers = false;
 
         // 3. Loja de LadderPoints (5051): C2S action=1 debita 1000 (Col17), resta 500, S2C responde action=5
         await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5051));

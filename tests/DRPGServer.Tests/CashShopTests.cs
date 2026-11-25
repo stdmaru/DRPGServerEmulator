@@ -3,6 +3,7 @@ using System.Collections.Frozen;
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.Shop;
 using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
@@ -66,7 +67,7 @@ public class CashShopTests
         var world = new WorldHarness();
         var store = new InMemoryCashStore();
         store.Seed(42, cash: 100, bonusCash: 100);
-        var service = new CashShopService(data, store, world.Io, TestSupport.Clock, NullLogger<CashShopService>.Instance);
+        var service = TestSupport.NewCashShop(world, store, data);
         return (data, player, session, world, store, service);
     }
 
@@ -197,7 +198,7 @@ public class CashShopTests
             Assert.Equal((ushort)MapOpcode.CashDepositoryWithdraw, PacketHeader.Read(frames[0]).Opcode);
             Assert.Equal((uint)CashDepositoryWithdrawResult.InventoryFull,
                 BinaryPrimitives.ReadUInt32LittleEndian(frames[0].AsSpan(PacketHeader.Length + 188)));
-            // Item foi restaurado no Cash Depository (sem perda!)
+            // o item nunca saiu do Cash Depository
             Assert.Contains(await store.ListDepositoryAsync(42, CancellationToken.None), r => r.Uid == itemRow.Uid);
 
             // 3. Autenticação 0x00CA rejeita username de outra conta
@@ -218,32 +219,127 @@ public class CashShopTests
         }
     }
 
+    /// <summary>Compra o Starter Pack e devolve a linha do item (#718) no Cash Depository.</summary>
+    private static async Task<CashDepositoryRow> BuyStarterAsync(WorldHarness world, Player player, Session session,
+        InMemoryCashStore store, CashShopService service)
+    {
+        await world.RunAsync(() => service.BuyProduct(player, 0, 1, 1));
+        session.DrainOutgoing();
+        return (await store.ListDepositoryAsync(42, CancellationToken.None)).Single(r => r.Kind == CashShopItemKind.Item);
+    }
+
     [Fact]
-    public async Task Withdraw_returns_item_to_depository_when_player_leaves_during_io()
+    public async Task Withdraw_commits_depository_and_character_together_even_if_the_player_leaves()
     {
         var (_, player, session, world, store, service) = MakeEnv();
         await world.StartAsync();
         try
         {
-            await world.RunAsync(() => service.BuyProduct(player, 0, 1, 1));
-            session.DrainOutgoing();
-            var itemRow = (await store.ListDepositoryAsync(42, CancellationToken.None)).Single(r => r.Kind == CashShopItemKind.Item);
+            var itemRow = await BuyStarterAsync(world, player, session, store, service);
 
             var release = new TaskCompletionSource();
-            store.HoldTake = release.Task;
+            store.HoldTransfers = release.Task;
             await world.InvokeAsync(() =>
             {
                 service.WithdrawDepository(player, CashShopItemKind.Item, itemRow.Uid);
                 return true;
             });
-            Assert.DoesNotContain(await store.ListDepositoryAsync(42, CancellationToken.None), r => r.Uid == itemRow.Uid);
+            await world.Io.DrainAsync();                                    // leu a linha; a transferência espera o banco
+            await world.InvokeAsync(() => true);
+            Assert.Equal(PlayerStates.Transacting, await world.InvokeAsync(() => player.State));
+            Assert.Contains(await store.ListDepositoryAsync(42, CancellationToken.None), r => r.Uid == itemRow.Uid);
 
             session.Close("teste: saiu durante a retirada");
             release.SetResult();
             await world.SettleAsync();
 
+            Assert.DoesNotContain(await store.ListDepositoryAsync(42, CancellationToken.None), r => r.Uid == itemRow.Uid);
+            var snapshot = Assert.Single(store.Snapshots);
+            Assert.Contains(snapshot.Items, i => i.ItemId == 718);
+            Assert.Equal(1u, player.Character.Inventory.Main.Count(718));
+            Assert.Equal(PlayerStates.Idle, player.State);
+        }
+        finally
+        {
+            await world.StopAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Failed_withdraw_keeps_the_row_and_rolls_back_the_bag()
+    {
+        var (_, player, session, world, store, service) = MakeEnv();
+        await world.StartAsync();
+        try
+        {
+            var itemRow = await BuyStarterAsync(world, player, session, store, service);
+
+            store.FailTransfers = true;
+            await world.RunAsync(() => service.WithdrawDepository(player, CashShopItemKind.Item, itemRow.Uid));
+
+            var frame = Assert.Single(session.DrainOutgoing());
+            Assert.Equal((uint)CashDepositoryWithdrawResult.Failed,
+                BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(PacketHeader.Length + 188)));
             Assert.Contains(await store.ListDepositoryAsync(42, CancellationToken.None), r => r.Uid == itemRow.Uid);
             Assert.Equal(0u, player.Character.Inventory.Main.Count(718));
+            Assert.Empty(store.Snapshots);
+            Assert.True(player.NeedsImmediateSave);
+            Assert.Equal(PlayerStates.Idle, player.State);
+        }
+        finally
+        {
+            await world.StopAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Withdraw_of_a_row_taken_by_another_connection_changes_nothing()
+    {
+        var (_, player, session, world, store, service) = MakeEnv();
+        await world.StartAsync();
+        try
+        {
+            var itemRow = await BuyStarterAsync(world, player, session, store, service);
+            var items = new ItemService(world.Transfers, store, TestSupport.Clock);
+
+            // a linha foi lida, mas outra conexão a retira antes da transferência
+            Assert.True(await store.TakeAsync(42, itemRow, CharacterSnapshot.Of(player.Character), CancellationToken.None));
+            StorageTake? take = null;
+            await world.RunAsync(() => items.TakeFromAccountStorage(player, itemRow, t => take = t));
+
+            Assert.Equal(StorageTakeResult.NotFound, take!.Value.Result);
+            Assert.Equal(0u, player.Character.Inventory.Main.Count(718));
+        }
+        finally
+        {
+            await world.StopAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Second_withdraw_while_the_first_is_pending_is_refused()
+    {
+        var (_, player, session, world, store, service) = MakeEnv();
+        await world.StartAsync();
+        try
+        {
+            var itemRow = await BuyStarterAsync(world, player, session, store, service);
+            var items = new ItemService(world.Transfers, store, TestSupport.Clock);
+
+            var release = new TaskCompletionSource();
+            store.HoldTransfers = release.Task;
+            var results = new List<StorageTakeResult>();
+            await world.InvokeAsync(() =>
+            {
+                items.TakeFromAccountStorage(player, itemRow, t => results.Add(t.Result));
+                items.TakeFromAccountStorage(player, itemRow, t => results.Add(t.Result));
+                return true;
+            });
+            release.SetResult();
+            await world.SettleAsync();
+
+            Assert.Equal([StorageTakeResult.Busy, StorageTakeResult.Ok], results);
+            Assert.Equal(1u, player.Character.Inventory.Main.Count(718));
         }
         finally
         {

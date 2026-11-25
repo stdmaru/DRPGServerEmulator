@@ -2,9 +2,12 @@ using System.Net;
 using System.Reflection;
 using DRPGServer.Configuration;
 using DRPGServer.Data.GameData;
+using DRPGServer.Data.Persistence;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Battle;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Items;
+using DRPGServer.Game.Shop;
 using DRPGServer.Game.World;
 using DRPGServer.Game;
 using DRPGServer.Network.Handlers;
@@ -77,6 +80,10 @@ internal static class TestSupport
         Assert.True(start.Ready.IsCompleted, "a conta tem save pendente: use WorldEntry");
         return players.CompleteEntry(session, account, character) ?? throw new InvalidOperationException("entrada descartada");
     }
+
+    /// <summary>Cash Shop sobre o mundo do <paramref name="world"/>, com o depósito e as transferências em <paramref name="store"/>.</summary>
+    public static CashShopService NewCashShop(WorldHarness world, InMemoryCashStore store, GameData? data = null) =>
+        new(data ?? Data, store, new ItemService(world.Transfers, store, Clock), world.Io, NullLogger<CashShopService>.Instance);
 
     /// <summary>Opcodes enviados (na ordem) e esvazia a fila.</summary>
     public static List<ushort> SentOpcodes(this Session session) =>
@@ -152,25 +159,39 @@ internal static class HandlerDispatch
 internal sealed class WorldHarness : IAsyncDisposable
 {
     private static readonly TimeSpan SettleTimeout = TimeSpan.FromSeconds(10);
+    private readonly PersistenceService _persistenceService;
 
     public GameWorld World { get; } = TestSupport.NewWorld();
     public WorldIo Io { get; }
+    public PersistenceQueue Persistence { get; } = new();
+    public CharacterTransfers Transfers { get; }
 
-    public WorldHarness() => Io = new WorldIo(World, NullLogger<WorldIo>.Instance);
+    public WorldHarness()
+    {
+        Io = new WorldIo(World, NullLogger<WorldIo>.Instance);
+        Transfers = new CharacterTransfers(World, Persistence, NullLogger<CharacterTransfers>.Instance);
+        _persistenceService = new PersistenceService(Persistence, NullLogger<PersistenceService>.Instance);
+    }
 
-    public Task StartAsync() => World.StartAsync(CancellationToken.None);
+    public async Task StartAsync()
+    {
+        await World.StartAsync(CancellationToken.None);
+        await _persistenceService.StartAsync(CancellationToken.None);
+    }
 
+    /// <summary>Mesma ordem do host: I/O do mundo, mundo, gravações.</summary>
     public async Task StopAsync()
     {
         await Io.StopAsync(CancellationToken.None);
         await World.StopAsync(CancellationToken.None);
+        await _persistenceService.StopAsync(CancellationToken.None);
     }
 
     public ValueTask DisposeAsync() => new(StopAsync());
 
     public Task<T> InvokeAsync<T>(Func<T> work) => World.InvokeAsync(work);
 
-    /// <summary>Roda <paramref name="action"/> na thread do mundo e espera o I/O que ela iniciou.</summary>
+    /// <summary>Roda <paramref name="action"/> na thread do mundo e espera o I/O e as gravações que ela iniciou.</summary>
     public async Task RunAsync(Action action)
     {
         await World.InvokeAsync(() =>
@@ -181,7 +202,20 @@ internal sealed class WorldHarness : IAsyncDisposable
         await SettleAsync();
     }
 
-    public Task SettleAsync() => Io.DrainAsync(new CancellationTokenSource(SettleTimeout).Token);
+    /// <summary>
+    /// Espera o I/O do mundo, a fila de gravação e o que eles postaram de volta no mundo. Uma continuação pode iniciar
+    /// mais trabalho (ler a linha, depois transferir), por isso algumas rodadas.
+    /// </summary>
+    public async Task SettleAsync()
+    {
+        using var timeout = new CancellationTokenSource(SettleTimeout);
+        for (int round = 0; round < 3 || Io.Pending > 0; round++)
+        {
+            await Io.DrainAsync(timeout.Token);
+            await Persistence.FlushAsync().WaitAsync(timeout.Token);
+            await World.InvokeAsync(() => true).WaitAsync(timeout.Token);
+        }
+    }
 
     /// <summary>Entrega o payload ao handler na thread do mundo e espera o I/O dele.</summary>
     public Task DispatchAsync(IWorldPacketHandler handler, Session session, PacketReader packet) =>

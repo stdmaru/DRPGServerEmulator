@@ -1,3 +1,4 @@
+using Dapper;
 using DRPGServer.Configuration;
 using Microsoft.Extensions.Options;
 using MySqlConnector;
@@ -7,6 +8,9 @@ namespace DRPGServer.Data;
 /// <summary>Abre conexões (com pool) para o banco do jogo.</summary>
 public sealed class Database(IOptions<DatabaseOptions> options)
 {
+    // colunas snake_case (item_id) nas propriedades PascalCase (ItemId) de todo repositório
+    static Database() => DefaultTypeMap.MatchNamesWithUnderscores = true;
+
     private readonly string _connectionString = Build(options.Value, withDatabase: true);
 
     public string ServerConnectionString { get; } = Build(options.Value, withDatabase: false);
@@ -18,6 +22,9 @@ public sealed class Database(IOptions<DatabaseOptions> options)
         await connection.OpenAsync(ct);
         return connection;
     }
+
+    /// <summary>Abre uma conexão com uma transação (<see cref="UnitOfWork"/>).</summary>
+    public Task<UnitOfWork> BeginAsync(CancellationToken ct = default) => UnitOfWork.BeginAsync(this, ct);
 
     private static string Build(DatabaseOptions o, bool withDatabase)
     {

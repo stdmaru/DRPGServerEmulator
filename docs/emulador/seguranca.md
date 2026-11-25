@@ -29,14 +29,18 @@ Cada conta tem um estado no `PlayerSystem`: `Offline → Loading → Online → 
 - **Sair** (`Leave`): o jogador sai do mundo, o snapshot vai para a fila e a conta fica em `Saving` até o flush depois dele. Uma entrada que fecha no meio da carga também deixa a conta em `Saving` até o save que ela esperava.
 - O estado é por **conta**, não por personagem: o depósito da conta é compartilhado.
 - Nunca se carrega do banco um personagem cujo último estado ainda está só em memória ou na fila.
-- Uma transferência pendente adia o snapshot final até ela terminar (**PR #41: S3**). Um save que falha de vez ainda libera a conta (**PR #41: S7**).
+- Uma transferência pendente adia o snapshot final até ela terminar. Um save que falha de vez ainda libera a conta (**PR #41: S7**).
 
-## Transferências entre conta e personagem (**PR #41: S3**)
+## Transferências entre conta e personagem
+Código: `CharacterTransfers` (o fluxo), `ItemService` (a API de itens), `AccountTransferRepository` (a transação). Testes: `TransferTests`, `CashShopTests`, `NpcShopTests` e `AccountTransferDatabaseTests` (contra o MariaDB).
+
 Estado da conta (Cash, Cash/Shop Depository) é gravado direto no banco. Estado do personagem é gravado por snapshot. Mover algo entre os dois é uma **transferência**:
-1. Na thread do mundo, o serviço valida tudo, aplica a mudança no personagem, coloca o jogador em `PlayerState.Transacting` (fora de `Idle`, então nenhuma outra ação de economia é aceita) e tira o snapshot.
-2. A `PersistenceQueue` recebe um job **não coalescível** que, numa transação só, aplica a mudança da conta (com `FOR UPDATE` e recheck de capacidade ou existência) e grava o snapshot. Saves pendentes do mesmo personagem que estavam antes dele são descartados, porque o snapshot do job é mais novo.
-3. Se der certo, o mundo confirma e manda os pacotes. Se falhar, o mundo desfaz a mudança no personagem, grava de novo e avisa o jogador. Nos dois casos, o jogador volta para `Idle`.
-- A API é do `ItemService` (`SendToAccountStorage`, `TakeFromAccountStorage`) e de `Wallet`. Loja NPC, Cash Depository, correio e troca usam a mesma API.
+1. Na thread do mundo, o serviço valida tudo e aplica a mudança no personagem. `CharacterTransfers.Run` põe o jogador em `PlayerStates.Transacting` (fora de `Idle`, então nenhum handler de economia é aceito) e tira o snapshot.
+2. A `PersistenceQueue` recebe um job **não coalescível** (`EnqueueCharacterTransfer`) que, numa `UnitOfWork`, trava a linha da conta, aplica a mudança da conta com recheck (posição livre; a linha retirada é exatamente a lida) e grava o snapshot. Um save coalescido do mesmo personagem que ainda esperava na fila é descartado, porque o snapshot do job é mais novo.
+3. O resultado volta para a thread do mundo **também com o jogador offline**: `Committed` manda os pacotes. `Refused` (depósito cheio, linha já retirada) ou `Failed` (erro de banco) desfaz a mudança no personagem (`undo` da moeda, `Bag.Revert` do que entrou na mochila), pede save imediato e avisa o jogador. Nos dois casos, o jogador volta para `Idle`.
+- Enquanto a transferência não termina, o `PlayerSystem` não grava o jogador (um snapshot com a mudança sem a parte da conta seria duplicação). Se ele sai no meio, a conta fica em `Saving` até a transferência terminar e o snapshot final gravar.
+- Se o servidor para no meio, o banco fica consistente: ou a transação gravou os dois lados, ou nenhum.
+- A API é do `ItemService`: `SendToAccountStorage(player, entries, undo, done)` (quem chama já aplicou o custo e passa como desfazê-lo) e `TakeFromAccountStorage(player, row, done)`. Loja NPC (Shop Depository) e Cash Depository já usam. Correio e troca vão usar a mesma API; `Wallet` entra com os serviços de domínio (**PR #41: G**).
 - Operação só da conta (comprar no Cash Shop: debita Cash e põe no depósito) é uma transação de banco simples e não passa pelo personagem.
 
 ## Interação e alcance (**PR #41: S4, S5**)

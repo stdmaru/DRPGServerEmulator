@@ -43,6 +43,19 @@ public sealed class PersistenceQueue
         }
     }
 
+    /// <summary>
+    /// Enfileira uma transferência conta ↔ personagem (não coalescível). O snapshot dela é o mais novo do personagem,
+    /// então um save coalescido do mesmo personagem que ainda espera na fila é descartado.
+    /// </summary>
+    public void EnqueueCharacterTransfer(uint characterUid, Func<CancellationToken, Task> job)
+    {
+        lock (_coalesceLock)
+        {
+            _pendingCharacterSaves.Remove(characterUid);
+            _jobs.Writer.TryWrite(job);
+        }
+    }
+
     /// <summary>Completa quando tudo o que foi enfileirado antes desta chamada estiver gravado.</summary>
     public Task FlushAsync()
     {

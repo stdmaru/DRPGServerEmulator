@@ -1,4 +1,3 @@
-using Dapper;
 using DRPGServer.Configuration;
 using DRPGServer.Data;
 using DRPGServer.Data.GameData;
@@ -8,6 +7,7 @@ using DRPGServer.Game.Battle;
 using DRPGServer.Game.Commands;
 using DRPGServer.Game.Npcs;
 using DRPGServer.Game.Shop;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
 using DRPGServer.Network.Handlers;
@@ -17,7 +17,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 // extract-client <pasta do cliente> <saída>: copia o pacote de tabelas e gera o grids.bin (docs/cliente/arquivos-de-dados.md)
 if (args is ["extract-client", var clientDir, var outDir])
@@ -69,7 +68,9 @@ services.AddSingleton<AccountRepository>();
 services.AddSingleton<DRPGServer.Game.DigimonUids>();
 services.AddSingleton<CharacterRepository>();
 services.AddSingleton<ICharacterSnapshotStore>(sp => sp.GetRequiredService<CharacterRepository>());
-services.AddSingleton<ICashStore, CashRepository>();
+services.AddSingleton<CashRepository>();
+services.AddSingleton<ICashStore>(sp => sp.GetRequiredService<CashRepository>());
+services.AddSingleton<IAccountTransferStore, AccountTransferRepository>();
 services.AddSingleton<IExpEventStore, ExpEventRepository>();
 services.AddSingleton(sp =>
 {
@@ -99,6 +100,8 @@ services.AddSingleton<PlayerSystem>();
 services.AddSingleton<CharacterFactory>();
 services.AddSingleton<ICharacterLoader, CharacterLoader>();
 services.AddSingleton<WorldEntry>();
+services.AddSingleton<CharacterTransfers>();
+services.AddSingleton<ItemService>();
 services.AddSingleton<NpcScriptBase, VillageOfBeginningNpcs>();
 services.AddSingleton<NpcScriptBase, DigitalBureauNpcs>();
 services.AddSingleton<NpcScriptRegistry>();

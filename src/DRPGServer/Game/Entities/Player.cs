@@ -23,7 +23,12 @@ public enum PlayerStates
     Idle = 1,
     /// <summary>Numa batalha.</summary>
     InBattle = 2,
-    Any = Idle | InBattle,
+    /// <summary>
+    /// Esperando uma transferência conta ↔ personagem gravar (<see cref="World.CharacterTransfers"/>). Nenhuma outra ação
+    /// de economia é aceita até ela terminar.
+    /// </summary>
+    Transacting = 4,
+    Any = Idle | InBattle | Transacting,
 }
 
 /// <summary>Personagem online no mapa. Vive na thread do mundo.</summary>
@@ -40,7 +45,30 @@ public sealed class Player(
     public Zone? Zone { get; internal set; }
     public Battle.Battle? Battle { get; internal set; }
     public bool InBattle => Battle is not null;
-    public PlayerStates State => InBattle ? PlayerStates.InBattle : PlayerStates.Idle;
+    public PlayerStates State => _transfer is not null ? PlayerStates.Transacting
+        : InBattle ? PlayerStates.InBattle
+        : PlayerStates.Idle;
+
+    private TaskCompletionSource? _transfer;
+
+    /// <summary>
+    /// Transferência em andamento (null se nenhuma). Completa na thread do mundo, depois de o commit ou o rollback ter
+    /// sido aplicado ao personagem.
+    /// </summary>
+    public Task? PendingTransfer => _transfer?.Task;
+
+    internal void BeginTransfer()
+    {
+        if (_transfer is not null) throw new InvalidOperationException($"{this}: transferência já em andamento");
+        _transfer = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    internal void EndTransfer()
+    {
+        var transfer = _transfer;
+        _transfer = null;
+        transfer?.TrySetResult();
+    }
     public bool IsOnline => !Session.IsClosed;
     public bool IsAdmin => Account.Authority >= Authority.Administrator;
 

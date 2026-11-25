@@ -130,7 +130,7 @@ public class ExpEventTests
         var zones = new ZoneSystem(TestSupport.Data, world.World, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
         var store = new FakeExpEventStore();
         var expEvents = TestSupport.NewExpEvents(store: store);
-        var cashShop = new CashShopService(TestSupport.Data, new InMemoryCashStore(), world.Io, TestSupport.Clock, NullLogger<CashShopService>.Instance);
+        var cashShop = TestSupport.NewCashShop(world, new InMemoryCashStore());
         var commands = new ChatCommands(zones, world.Io, TestSupport.GameOptions(), NullLogger<ChatCommands>.Instance, expEvents, cashShop);
 
         var gmSession = TestSupport.NewSession(ServerRole.Map);

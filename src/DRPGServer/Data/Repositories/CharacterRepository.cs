@@ -231,8 +231,16 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
 
     public async Task SaveAsync(CharacterSnapshot s, CancellationToken ct)
     {
-        await using var db = await database.OpenAsync(ct);
-        await using var tx = await db.BeginTransactionAsync(ct);
+        await using var uow = await database.BeginAsync(ct);
+        await SaveAsync(uow, s, ct);
+        await uow.CommitAsync(ct);
+    }
+
+    /// <summary>Grava o snapshot dentro de <paramref name="uow"/> (transferências conta ↔ personagem).</summary>
+    public async Task SaveAsync(UnitOfWork uow, CharacterSnapshot s, CancellationToken ct)
+    {
+        var db = uow.Connection;
+        var tx = uow.Transaction;
         await db.ExecuteAsync(new CommandDefinition("""
             UPDATE `character`
             SET level = @Level, map_id = @MapId, pos_x = @X, pos_y = @Y, bits = @Bits,
@@ -285,6 +293,5 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
         await db.ExecuteAsync(new CommandDefinition(
             "INSERT IGNORE INTO character_flag (character_uid, flag) VALUES (@CharacterUid, @Flag)",
             s.Flags.Select(f => new { CharacterUid = s.Uid, Flag = f }), tx, cancellationToken: ct));
-        await tx.CommitAsync(ct);
     }
 }

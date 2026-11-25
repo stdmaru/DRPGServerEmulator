@@ -21,7 +21,7 @@ Páginas desta seção:
 - `sql/upgrade/NNNN_descricao.sql` roda **sozinho na partida**, em ordem. As aplicadas ficam em `schema_version` com SHA-256; um arquivo aplicado que mudou **impede a partida**.
 - Nunca editar uma migração aplicada: criar a próxima. Regras em `sql/upgrade/README.md`.
 - O banco é criado se não existir; a partida espera o banco responder.
-- Escrita que envolve mais de uma tabela ou mais de uma fonte (conta e personagem) roda numa **unidade de trabalho** (`UnitOfWork`): os repositórios recebem a transação em vez de abrir a própria (**PR #41: S3**).
+- Escrita que envolve mais de uma tabela ou mais de uma fonte (conta e personagem) roda numa **unidade de trabalho** (`UnitOfWork`): os repositórios recebem a transação em vez de abrir a própria (ex.: `CashRepository.TakeAsync(uow, …)` + `CharacterRepository.SaveAsync(uow, …)` no `AccountTransferRepository`). O mapeamento `snake_case` → `PascalCase` do Dapper é ligado pelo próprio `Database`.
 
 ## Camadas
 Cada camada só conhece a de baixo. Regra de negócio nunca fica em handler nem em pacote.
@@ -56,7 +56,7 @@ Antes de escrever uma função de jogo, procure o serviço do domínio. Se uma l
 - **Persistência:** gravações vão para a `PersistenceQueue` (snapshot imutável, **coalescing por `CharacterUid`**), e o `PersistenceService` grava em segundo plano dentro de uma única transação MySQL:
   - **Gravação imediata (`player.RequestImmediateSave()`):** eventos críticos (coleta, descarte e uso de itens, captura, Depository, renomeação, fim de batalha, evolução permanente, NPCs, troca de mapa).
   - **Dirty + autosave (`player.MarkDirty()`):** ações frequentes de baixo risco (movimento, organização interna, pontos, ordem do time), gravadas a cada `AutosaveSeconds` (padrão 60 s).
-  - **Transferência conta ↔ personagem:** job **não coalescível** que grava o snapshot e a mudança da conta na mesma transação (**PR #41: S3**, ver [segurança](seguranca.md#transferências-entre-conta-e-personagem)).
+  - **Transferência conta ↔ personagem:** job **não coalescível** (`CharacterTransfers`) que grava o snapshot e a mudança da conta na mesma transação (ver [segurança](seguranca.md#transferências-entre-conta-e-personagem)).
   - **Falha:** retry com backoff e depois dead-letter. Uma gravação nunca é descartada em silêncio (**PR #41: S7**).
 - Ordem dos serviços: persistência → mundo → rede. Na parada, a rede fecha primeiro e a persistência grava o resto por último.
 - Tempo: o mundo usa `GameWorld.Now` (monotônico), e o tempo de calendário (expiração de itens, histórico) vem de `IGameClock`. Ninguém chama `DateTimeOffset.UtcNow` direto: entidades recebem o relógio (o `Inventory` guarda o dele) e pacotes recebem o horário pronto (ex.: `CharacterDataPacket(character, serverUnixTime)`). Prazos de infraestrutura (espera do banco, folga de ticket) usam `TimeProvider`. Nos testes, `GameClock` sobre `ManualTime` controla o calendário.
@@ -69,5 +69,6 @@ Antes de escrever uma função de jogo, procure o serviço do domínio. Se uma l
 O channel valida usuário + `auth_key` e emite um **ticket** da conta, amarrado ao IP da conexão. Mapa e global só aceitam a conta com ticket válido, do mesmo IP, e uma vez por servidor. Um segundo login no channel derruba o primeiro. Detalhes em [segurança](seguranca.md#autenticação-entre-servidores).
 
 ## Verificação
+- Testes de banco (`[DatabaseFact]`) rodam contra o MariaDB do devcontainer só com `DRPG_TEST_DB_HOST=database`, cada classe num banco descartável: `docker exec -e DRPG_TEST_DB_HOST=database -w /workspaces/DRPGServer server_devcontainer-server-1 dotnet test DRPGServer.sln`. Sem a variável, eles aparecem como pulados.
 - Testes unitários em `tests/DRPGServer.Tests`, um arquivo por domínio: CRC contra capturas, framing, tamanho de payload dos S2C contra o capturado, conta, digimon, batalha simulada, migrações, entradas inválidas de cada handler.
 - Replay de captura contra o emulador: [drpg_replay.py](../ferramentas/replay.md).

@@ -1,6 +1,6 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Entities;
-using DRPGServer.Game.Shop;
+using DRPGServer.Game.Items;
 using DRPGServer.Network.Packets.Map;
 
 namespace DRPGServer.Network.Handlers;
@@ -114,7 +114,7 @@ public sealed class CardShopTradeHandler(GameData data) : PlayerHandler<CardShop
 /// <summary>✅ Map 0x0053 (C2S 158 B): comprar (1) ou vender (2) item em loja de NPC.</summary>
 [PacketHandler(MapOpcode.ItemShopTrade)]
 [RequiresState(PlayerStates.Idle)]
-public sealed class ItemShopTradeHandler(GameData data, CashShopService cashShop) : PlayerHandler<ItemShopTradeRequest>
+public sealed class ItemShopTradeHandler(GameData data, ItemService items) : PlayerHandler<ItemShopTradeRequest>
 {
     private const uint MaxTradeQuantity = 999;
 
@@ -165,26 +165,26 @@ public sealed class ItemShopTradeHandler(GameData data, CashShopService cashShop
             if (!TrySpendCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong))
                 return;
 
-            // a continuação só roda com o jogador online (WorldIo)
-            cashShop.SendToShopDepository(player, info.Id, quantity, expiresAt: 0, deposited =>
-            {
-                if (!deposited)
+            // conta (depósito) e personagem (moeda gasta) gravam juntos; se não gravar, a moeda volta
+            items.SendToAccountStorage(player, ItemService.StorageEntries(player, CashShopItemKind.Item, info.Id, quantity),
+                undo: () => RefundCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong),
+                done: result =>
                 {
-                    RefundCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong);
-                    player.RequestImmediateSave();
-                    player.SendNotice("[Shop]", "Shop Depository cheio. Retire itens antes de comprar.");
-                    return;
-                }
+                    if (result != StorageSendResult.Ok)
+                    {
+                        player.SendNotice("[Shop]", result == StorageSendResult.Full
+                            ? "Shop Depository cheio. Retire itens antes de comprar."
+                            : "Não foi possível concluir a compra.");
+                        return;
+                    }
 
-                player.RequestImmediateSave();
-
-                var preview = new InventoryItem { Uid = 0, ItemId = info.Id, Info = info, Amount = quantity };
-                player.Send(new ItemShopTradePacket(
-                    (NpcShopAction)(uint)shop.Currency, preview, quantity, character.Bits,
-                    ItemPlace.Inventory, 0, 0, shop.ShopId, character.Coins));
-                if (shop.Currency is NpcShopCurrency.Medals or NpcShopCurrency.Coins)
-                    player.Send(new CurrencyUpdatePacket(character));
-            });
+                    var preview = new InventoryItem { Uid = 0, ItemId = info.Id, Info = info, Amount = quantity };
+                    player.Send(new ItemShopTradePacket(
+                        (NpcShopAction)(uint)shop.Currency, preview, quantity, character.Bits,
+                        ItemPlace.Inventory, 0, 0, shop.ShopId, character.Coins));
+                    if (shop.Currency is NpcShopCurrency.Medals or NpcShopCurrency.Coins)
+                        player.Send(new CurrencyUpdatePacket(character));
+                });
             return;
         }
 

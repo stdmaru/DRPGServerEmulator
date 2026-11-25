@@ -61,7 +61,8 @@ public sealed class ItemMoveHandler(ItemService items) : PlayerHandler<ItemMoveR
 - Descobertos por reflexão e registrados no DI. `HandlerContractTests` garante que todo handler usa uma base tipada, que todo `PlayerHandler` declara `[RequiresState]` e que todo request lê exatamente o tamanho declarado.
 - **Pré-condições declarativas**, aplicadas pela base `PlayerHandler<T>`:
   - `[RequiresState]` é obrigatório: sem ele o handler falha ao ser construído (na partida do servidor).
-  - `PlayerStates.Idle`: fora de batalha. É o padrão de quase todo pacote de mapa. A transação pendente entra como estado próprio com as transferências (**PR #41: S3**).
+  - `PlayerStates.Idle`: fora de batalha e sem transferência pendente. É o padrão de quase todo pacote de mapa.
+  - `PlayerStates.Transacting`: esperando uma [transferência](seguranca.md#transferências-entre-conta-e-personagem) gravar. Só `Any` aceita; nenhum handler de economia deve aceitar.
   - `PlayerStates.InBattle`: ações de batalha. `PlayerStates.Any`: consultas que valem nos dois (janelas de informação, renomear, Cash Shop).
   - A distância até o NPC, selvagem ou drop é conferida pelo serviço via `InteractionGuard` (**PR #41: S4**), porque o alvo só é conhecido depois de ler o request.
 - Ganchos da base, para os casos com resposta ✅ conhecida:
@@ -87,7 +88,7 @@ io.Run(player, "cash-shop.open",
 - O `WorldIo` registra a exceção com o contexto (operação, jogador), inclusive a da continuação. O serviço não escreve `try/catch` para isso.
 - Na parada, o `WorldIo` para antes do mundo e espera o I/O pendente e as continuações dele (inclusive o I/O que elas iniciarem). Só depois o mundo salva os jogadores. Estourou o tempo de parada: o token do `work` é cancelado.
 - Nos testes, `WorldHarness` (`TestSupport`) sobe o mundo e o `WorldIo`. `RunAsync` roda na thread do mundo e espera o I/O.
-- Mudança de estado do personagem que depende do banco segue o fluxo de [transferência](seguranca.md#transferências-entre-conta-e-personagem) (**PR #41: S3**), nunca um callback solto.
+- Mudança de estado do personagem que depende do banco segue o fluxo de [transferência](seguranca.md#transferências-entre-conta-e-personagem) (`ItemService`, `CharacterTransfers`), nunca um callback solto.
 
 ## Respostas (S2C)
 - Um `ServerPacket` por S2C, em `Network/Packets/<Servidor>/`. O pacote só serializa o que recebe, sem regra.
