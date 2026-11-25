@@ -59,7 +59,7 @@ Comportamento (curar, teleportar, capturar, dar item, atacar todos) é um **efei
 - Cada `Type` é uma classe C# de efeito com parâmetros tipados (`Amount`, `Percent`, `MapId`…). O loader liga atributo XML a parâmetro e recusa atributo que o efeito não declara.
 - Cada efeito tem `Validate` (pode aplicar agora? alvo certo, espaço, estado) e `Apply`. O serviço chama `Validate` de **todos** os efeitos antes de aplicar qualquer um, e só então consome o item.
 - Efeito que não cabe em parâmetros simples continua sendo uma classe de efeito com nome próprio, registrada pelo **tipo**, nunca pelo id do item.
-- **Sem mini-linguagem em string** (`OnUse="HealHP(150)"`): seria um parser de texto. O XML estruturado já dá a validação.
+- ❓ **Formato dos efeitos de uso de item em aberto**: elementos estruturados (acima) × scripts no estilo rAthena (plano do PR de item scripts). A decisão fica para depois da refatoração da fundação. Seja qual for o formato, os efeitos são validados na carga e nunca vêm de texto de UI.
 
 ## Regras de desbloqueio (**PR #41: E2**)
 Condições de jogo (títulos por vitórias, derrotas, nível e estágio) também são dados tipados:

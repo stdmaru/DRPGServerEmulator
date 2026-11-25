@@ -104,7 +104,7 @@ public static int StageLevel(byte stage) => stage switch
 
 Regras completas em [`docs/emulador/dados.md`](docs/emulador/dados.md).
 - **Texto de UI nunca define dado de jogo.** Não leia descrição, resumo ou nome (com regex ou qualquer parser) para extrair atributo, efeito, preço ou regra. Se o dado só existe como texto, gere XML estruturado **offline** com uma ferramenta versionada em `tools/`, revise e commite. O servidor só lê XML.
-- **Sem mini-linguagem em string** nos XML (`OnUse="HealHP(150)"`): use elementos e atributos tipados (`<Effect Type="HealHp" Amount="150" />`).
+- **Modificadores de status** (equipamento, título, card) usam elementos tipados (`<Modifier Kind="Atk" Value="15" />`). O formato dos **efeitos de uso de item** ainda está em aberto (ver [dados](docs/emulador/dados.md#efeitos-pr-41-e3-e4)).
 - **Coluna do cliente tem nome de domínio** (`CoinPrice`, não `Col16`). Desconhecida = `UnknownColNN`, com o que se sabe no comentário.
 - **Fail-fast na carga:** referência quebrada, valor fora do intervalo ou atributo desconhecido derrubam a partida com uma mensagem clara.
 - **Sem número mágico de jogo no código:** preço, chance e duração vêm de tabela ou XML. Constante de protocolo confirmada (✅) vira `const` com nome e evidência.
