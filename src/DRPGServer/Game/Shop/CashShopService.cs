@@ -98,7 +98,7 @@ public sealed class CashShopService(
                             headerWord,
                             errorCode: 0,
                             accountUid,
-                            product.ProductId,
+                            product.ItemDataId,
                             quantity,
                             product.Price,
                             outcome.Balance.Cash,

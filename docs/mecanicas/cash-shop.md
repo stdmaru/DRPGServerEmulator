@@ -58,7 +58,7 @@ Especificação técnica levantada a partir das capturas oficiais v322 (`capture
 | `+0x04` | `i32` | `0` | `errorCode` (`0` = sucesso) |
 | `+0x08` | `u8` | `1` (buy) | `2` (response) |
 | `+0x10` | `i64` | `accountNo` | `accountNo` |
-| `+0x18` | `u32` | `productId` (`ingameshop_itempage_us.dat` col. `0`) | `productId` |
+| `+0x18` | `u32` | `itemDataId` (`ingameshop_item_data_us.dat` col. `0` = `ingameshop_itempage_us.dat` col. `2`, confirmado em `0x0096C386`/`0x0096C424`) | `itemDataId` |
 | `+0x1C` | `u32` | `quantity` (unidades compradas) | `quantity` |
 | `+0x20` | `i64` | `unitPrice` (apenas informativo — **ignorar** e recalcular no servidor) | `unitPrice` |
 | `+0x28` | `i64` | `0` | `cash1After` (saldo principal restante) |

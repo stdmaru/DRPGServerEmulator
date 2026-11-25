@@ -105,7 +105,7 @@ public class CashShopTests
         };
         var products = new Dictionary<uint, CashShopProduct>
         {
-            [100001] = new CashShopProduct(100001, "Starter Pack", 1, Price: 160, Category: 2, [
+            [1] = new CashShopProduct(100001, "Starter Pack", ItemDataId: 1, Price: 160, Category: 2, [
                 new CashShopEntry(CashShopItemKind.Card, 74, 50),
                 new CashShopEntry(CashShopItemKind.Item, 718, 1),
             ]),
@@ -195,8 +195,8 @@ public class CashShopTests
             await world.InvokeAsync(() => 0);
             Assert.Equal([(ushort)MapOpcode.CashShopOpen], session.SentOpcodes());
 
-            // 2. Comprar Starter Pack (160 cash): debita 100 de cash + 60 de bonus -> resta 0 + 40
-            await service.BuyProductAsync(player, 0x0100FDBC, 100001, 1);
+            // 2. Comprar Starter Pack (ItemDataId=1, 160 cash): debita 100 de cash + 60 de bonus -> resta 0 + 40
+            await service.BuyProductAsync(player, 0x0100FDBC, 1, 1);
             await world.InvokeAsync(() => 0);
             var buyFrames = session.DrainOutgoing();
             Assert.Single(buyFrames);
@@ -241,14 +241,14 @@ public class CashShopTests
         try
         {
             // 1. Saldo insuficiente (2 * 160 = 320 > 200): não debita nem deposita
-            await service.BuyProductAsync(player, 0, 100001, 2);
+            await service.BuyProductAsync(player, 0, 1, 2);
             await world.InvokeAsync(() => 0);
             Assert.Equal(200, (await store.GetBalanceAsync(42, CancellationToken.None))!.Value.Total);
             Assert.Empty(await store.ListDepositoryAsync(42, CancellationToken.None));
             Assert.Equal([(ushort)MapOpcode.ChatNotice], session.SentOpcodes());
 
             // 2. Compra válida (160) seguida de tentativa de retirada com mochila cheia: restaura no depósito!
-            await service.BuyProductAsync(player, 0, 100001, 1);
+            await service.BuyProductAsync(player, 0, 1, 1);
             await world.InvokeAsync(() => 0);
             session.SentOpcodes();
             var itemRow = (await store.ListDepositoryAsync(42, CancellationToken.None)).Single(r => r.Kind == CashShopItemKind.Item);
@@ -297,8 +297,9 @@ public class CashShopTests
 
         var products = ClientTables.CashShopProducts(ClientPack.Open(packPath));
         Assert.True(products.Count > 500, $"Esperado > 500 produtos do Cash Shop, encontrado {products.Count}");
-        Assert.True(products.TryGetValue(100001, out var starter));
-        Assert.Equal(160u, starter!.Price);
+        Assert.True(products.TryGetValue(1, out var starter));
+        Assert.Equal(100001u, starter!.ProductId);
+        Assert.Equal(160u, starter.Price);
         Assert.NotEmpty(starter.Entries);
     }
 }

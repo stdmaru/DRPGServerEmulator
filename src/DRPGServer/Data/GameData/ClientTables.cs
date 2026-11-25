@@ -285,7 +285,8 @@ public static class ClientTables
             uint price = UInt(f, 5);
             byte category = Byte(f, 8);
             if (!entriesByDataId.TryGetValue(dataId, out var entries) || entries.Count == 0) continue;
-            products.TryAdd(productId, new CashShopProduct(productId, f[1], dataId, price, category, entries));
+            // ✅ O cliente envia ItemDataId (col. 2 de itempage = col. 0 de item_data) em C2S 0x0160 (+0x18; DigimonRPG.bin @ 0x0096C386 / 0x0096C424)
+            products.TryAdd(dataId, new CashShopProduct(productId, f[1], dataId, price, category, entries));
         }
         return products.ToFrozenDictionary();
     }
