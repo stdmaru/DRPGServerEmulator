@@ -21,7 +21,7 @@ public class BattleTests
     public BattleTests()
     {
         _zones = new ZoneSystem(TestSupport.Data, _world, NullLogger<ZoneSystem>.Instance);
-        _battles = new BattleSystem(_world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        _battles = TestSupport.NewBattles(_world, TestSupport.Data, TestSupport.GameOptions());
         _player = new Player(_session, new AuthenticatedAccount(1, "u", Authority.GameMaster), Entities.Character());
         _zones.Find(79)!.Enter(_player);
         _session.DrainOutgoing();
@@ -267,10 +267,10 @@ public class BattleTests
 
         var world = TestSupport.NewWorld();
         var zones = new ZoneSystem(data, world, NullLogger<ZoneSystem>.Instance);
-        var battles = new BattleSystem(world, data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        var battles = TestSupport.NewBattles(world, data, TestSupport.GameOptions());
         var session = TestSupport.NewSession();
         var leader = new Digimon(data, baseSpecies, 50) { Uid = 7, Name = "Testermon" };
-        var character = new Character(leader, new Inventory(data.FindItem, 999)) { Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79 };
+        var character = new Character(leader, new Inventory(data.FindItem, 999, _ => null)) { Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79 };
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
         var zone = zones.Find(79)!;
         zone.Enter(player);

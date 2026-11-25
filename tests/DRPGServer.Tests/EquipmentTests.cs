@@ -69,7 +69,7 @@ public class EquipmentTests
 
     private static (Player Player, Session Session) MakePlayer(ushort tamerLevel = 1)
     {
-        var inv = new Inventory(id => TestItems.GetValueOrDefault(id), 99);
+        var inv = new Inventory(id => TestItems.GetValueOrDefault(id), 99, _ => null);
         var species = InTrainingSpecies;
         var leader = new Digimon(TestSupport.Data, species, 1); // L1 In-Training (10/10/10/10)
         var second = new Digimon(TestSupport.Data, species, 1);
@@ -310,7 +310,7 @@ public class EquipmentTests
             EquipmentBonus = new EquipmentBonus(HpRecovery: 8, VpRecovery: 4, EvpRecovery: 13),
         };
         var items = new Dictionary<uint, ItemInfo>(TestItems) { [718] = auraDeva };
-        var inv = new Inventory(id => items.GetValueOrDefault(id), 99);
+        var inv = new Inventory(id => items.GetValueOrDefault(id), 99, _ => null);
         inv.Equipment.Place(inv.Create(718, (int)ItemPlace.Aura, 1));
 
         var leader = new Digimon(TestSupport.Data, InTrainingSpecies, 10);
@@ -344,7 +344,7 @@ public class EquipmentTests
             EquipmentBonus = new EquipmentBonus(MaintainEvolution: true),
         };
         var items = new Dictionary<uint, ItemInfo>(TestItems) { [718] = auraDeva };
-        var inv = new Inventory(id => items.GetValueOrDefault(id), 99);
+        var inv = new Inventory(id => items.GetValueOrDefault(id), 99, _ => null);
         var auraItem = inv.Create(718, (int)ItemPlace.Aura, 1);
         inv.Equipment.Place(auraItem);
 
@@ -359,7 +359,7 @@ public class EquipmentTests
         };
         var world = TestSupport.NewWorld();
         var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
-        var battles = new BattleSystem(world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        var battles = TestSupport.NewBattles(world, TestSupport.Data, TestSupport.GameOptions());
         var session = TestSupport.NewSession();
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
         session.Player = player;
@@ -389,7 +389,7 @@ public class EquipmentTests
             EquipmentBonus = new EquipmentBonus(VpRecovery: 8, EvpRecovery: 15, AutoSummonPartners: 1),
         };
         var items = new Dictionary<uint, ItemInfo>(TestItems) { [529] = highVel };
-        var inv = new Inventory(id => items.GetValueOrDefault(id), 99);
+        var inv = new Inventory(id => items.GetValueOrDefault(id), 99, _ => null);
         inv.Equipment.Place(inv.Create(529, (int)ItemPlace.Aura, 1));
 
         var leader = new Digimon(TestSupport.Data, InTrainingSpecies, 5);
@@ -402,7 +402,7 @@ public class EquipmentTests
 
         var world = TestSupport.NewWorld();
         var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
-        var battles = new BattleSystem(world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        var battles = TestSupport.NewBattles(world, TestSupport.Data, TestSupport.GameOptions());
         var session = TestSupport.NewSession();
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
         session.Player = player;

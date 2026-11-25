@@ -43,7 +43,7 @@ public class TimedItemTests
 
     private static (Player Player, Session Session) MakePlayer()
     {
-        var inv = new Inventory(id => TestItems.GetValueOrDefault(id), 99);
+        var inv = new Inventory(id => TestItems.GetValueOrDefault(id), 99, _ => null);
         var species = TestSupport.Data.Species.Values.First(s => s.Stage == StatFormulas.InTraining);
         var leader = new Digimon(TestSupport.Data, species, 10);
         var character = new Character(leader, inv)

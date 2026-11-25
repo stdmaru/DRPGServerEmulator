@@ -62,7 +62,7 @@ Antes de escrever uma função de jogo, procure o serviço do domínio. Se uma l
 - Tempo: o mundo usa `GameWorld.Now` (monotônico), e o tempo de calendário (expiração de itens, histórico) vem de `IGameClock`. Ninguém chama `DateTimeOffset.UtcNow` direto (**PR #41: N5**).
 
 ## Dependências
-- Todas as dependências são **obrigatórias** e vêm pelo construtor (DI). Não existe parâmetro `= null` para "funcionar sem" um serviço. Os testes usam fakes (`tests/DRPGServer.Tests/TestSupport.cs`), nunca um caminho alternativo no código de produção (**PR #41: N4**).
+- Todas as dependências são **obrigatórias** e vêm pelo construtor (DI). Não existe parâmetro `= null` para "funcionar sem" um serviço. Os testes usam fakes (`tests/DRPGServer.Tests/TestSupport.cs`), nunca um caminho alternativo no código de produção. O container de DI valida o grafo inteiro na partida (`ValidateOnBuild`), também em produção.
 - Entidades não recebem serviços. Quem precisa de `GameData` recebe os dados que usa.
 
 ## Autenticação entre servidores

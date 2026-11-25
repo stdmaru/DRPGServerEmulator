@@ -332,20 +332,17 @@ public sealed class Inventory
 
     /// <param name="lookup">Linha do item em <c>item_info_us</c>.</param>
     /// <param name="maxStackCap">Teto de pilha (configuração).</param>
-    /// <param name="cardLookup">Linha do card em <c>card_info_us</c> (opcional em testes sintéticos).</param>
-    public Inventory(Func<uint, ItemInfo?> lookup, uint maxStackCap, Func<uint, CardInfo?>? cardLookup = null)
+    /// <param name="cardLookup">Linha do card em <c>card_info_us</c>.</param>
+    public Inventory(Func<uint, ItemInfo?> lookup, uint maxStackCap, Func<uint, CardInfo?> cardLookup)
     {
         _lookup = lookup;
-        _cardLookup = cardLookup ?? (_ => null);
+        _cardLookup = cardLookup;
         _maxStackCap = Math.Max(1, maxStackCap);
         Main = new Bag(this, BagKind.Inventory, Size);
         Battle = new Bag(this, BagKind.Battle, Size);
         CardSlots = new Bag(this, BagKind.EquippedCards, CardSlotCount);
         Equipment = new Bag(this, BagKind.Equipment, EquipmentSlots.BagCapacity);
     }
-
-    /// <summary>Sem tabela de itens: toda pilha vai até <paramref name="maxStack"/>.</summary>
-    public Inventory(uint maxStack) : this(_ => null, maxStack, null) { }
 
     public Bag Main { get; }
     /// <summary>✅ Aba Cards (24 slots, registros de 76 bytes no 0x03/0xFC; recebe pelo 0xC8; move pelo 0x90).</summary>

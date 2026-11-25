@@ -37,7 +37,7 @@ public class CaptureTests
 
     private Player Join(params Digimon[] party)
     {
-        var c = new Character(party[0], new Inventory(TestSupport.Data.FindItem, 999))
+        var c = new Character(party[0], new Inventory(TestSupport.Data.FindItem, 999, _ => null))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };
@@ -127,7 +127,7 @@ public class CaptureTests
     {
         var player = Join(NewDigimon(50, 15, 1));
         var net = player.Character.Inventory.Main.Add(InTrainingNet, 1)[0];
-        var battles = new BattleSystem(_world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        var battles = TestSupport.NewBattles(_world, TestSupport.Data, TestSupport.GameOptions());
         var wild = Wild;
         Assert.NotNull(battles.StartPve(player, wild.Serial));
         player.Session.DrainOutgoing();
@@ -182,8 +182,7 @@ public class CaptureTests
     private (Battle battle, Player player, Digimon actor) StartBattle(double chance, params Digimon[] party)
     {
         var player = Join(party);
-        var battles = new BattleSystem(_world, TestSupport.Data, TestSupport.GameOptions(o => o.CaptureChance = chance),
-            NullLogger<BattleSystem>.Instance, NewTaming(chance));
+        var battles = TestSupport.NewBattles(_world, TestSupport.Data, TestSupport.GameOptions(o => o.CaptureChance = chance), taming: NewTaming(chance));
         var battle = battles.StartPve(player, Wild.Serial)!;
         battle.SendTeams(player);
         battle.ClientReady(player);

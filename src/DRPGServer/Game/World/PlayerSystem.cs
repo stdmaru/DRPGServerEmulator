@@ -17,12 +17,12 @@ public sealed class PlayerSystem : IWorldSystem
     private readonly ZoneSystem _zones;
     private readonly BattleSystem _battles;
     private readonly PersistenceQueue _persistence;
-    private readonly CharacterRepository _characters;
+    private readonly ICharacterSnapshotStore _characters;
     private readonly GameOptions _options;
     private readonly ILogger<PlayerSystem> _log;
 
     public PlayerSystem(GameWorld world, ZoneSystem zones, BattleSystem battles, PersistenceQueue persistence,
-        CharacterRepository characters, IOptions<GameOptions> options, ILogger<PlayerSystem> log)
+        ICharacterSnapshotStore characters, IOptions<GameOptions> options, ILogger<PlayerSystem> log)
     {
         _world = world;
         _zones = zones;

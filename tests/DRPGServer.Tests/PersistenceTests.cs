@@ -70,10 +70,10 @@ public class PersistenceTests
     {
         var world = TestSupport.NewWorld();
         var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
-        var battles = new BattleSystem(world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        var battles = TestSupport.NewBattles(world, TestSupport.Data, TestSupport.GameOptions());
         var queue = new PersistenceQueue();
         var options = TestSupport.GameOptions(o => o.AutosaveSeconds = 60);
-        var players = new PlayerSystem(world, zones, battles, queue, null!, options, NullLogger<PlayerSystem>.Instance);
+        var players = new PlayerSystem(world, zones, battles, queue, new RecordingSnapshotStore(), options, NullLogger<PlayerSystem>.Instance);
 
         var session1 = TestSupport.NewSession(ServerRole.Map);
         var player1 = players.Enter(session1, new AuthenticatedAccount(1, "u1", Authority.None), Entities.Character())!;
@@ -95,7 +95,7 @@ public class PersistenceTests
         Assert.Equal(TimeSpan.FromSeconds(60), player1.LastSavedAt);
 
         // RequestImmediateSave (Tier 1): salva imediatamente no próximo tick (50 ms) sem esperar AutosaveSeconds
-        var char2 = new Character(Entities.Digimon(), new Inventory(TestSupport.Data.FindItem, 999))
+        var char2 = new Character(Entities.Digimon(), new Inventory(TestSupport.Data.FindItem, 999, _ => null))
         {
             Uid = 2, AccountUid = 2, Slot = 0, Name = "Tester2", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };
@@ -147,7 +147,7 @@ public class PersistenceTests
         leader.SpendVp(30);
         ally.TakeDamage(ally.Stats.MaxHp); // nocauteado (HP = 0)
 
-        var character = new Character(leader, new Inventory(TestSupport.Data.FindItem, 999))
+        var character = new Character(leader, new Inventory(TestSupport.Data.FindItem, 999, _ => null))
         {
             Uid = 42, AccountUid = 1, Slot = 0, Name = "Hero", TamerId = 1, Level = 10, MapId = 79, X = 50, Y = 50,
         };

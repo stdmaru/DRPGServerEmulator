@@ -1,10 +1,14 @@
+using System.Reflection;
 using DRPGServer.Configuration;
 using DRPGServer.Data.GameData;
+using DRPGServer.Data.Repositories;
+using DRPGServer.Game.Battle;
+using DRPGServer.Game.Entities;
 using DRPGServer.Game.World;
-using System.Reflection;
-using DRPGServer.Network;
+using DRPGServer.Game;
 using DRPGServer.Network.Handlers;
 using DRPGServer.Network.Protocol;
+using DRPGServer.Network;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -32,6 +36,23 @@ internal static class TestSupport
 
     public static GameWorld NewWorld() => new(NullLogger<GameWorld>.Instance);
 
+    /// <summary>Inventário sem tabelas: toda pilha vai até <paramref name="maxStack"/>.</summary>
+    public static Inventory EmptyInventory(uint maxStack) => new(_ => null, maxStack, _ => null);
+
+    /// <summary>Serviço de eventos de EXP sobre um <see cref="FakeExpEventStore"/> (sem evento até um <c>Apply</c>).</summary>
+    public static ExpEventService NewExpEvents(IOptions<GameOptions>? options = null, FakeExpEventStore? store = null) =>
+        new(store ?? new FakeExpEventStore(), options ?? GameOptions(), NullLogger<ExpEventService>.Instance);
+
+    /// <summary>Sistema de batalha com as dependências reais de jogo e eventos de EXP falsos.</summary>
+    public static BattleSystem NewBattles(GameWorld world, GameData? data = null, IOptions<GameOptions>? options = null,
+        Taming? taming = null, ExpEventService? expEvents = null)
+    {
+        data ??= Data;
+        options ??= GameOptions();
+        return new BattleSystem(world, data, options, NullLogger<BattleSystem>.Instance,
+            taming ?? new Taming(data, new DigimonUids(), options), expEvents ?? NewExpEvents(options));
+    }
+
     /// <summary>Opcodes enviados (na ordem) e esvazia a fila.</summary>
     public static List<ushort> SentOpcodes(this Session session) =>
         session.DrainOutgoing().Select(f => PacketHeader.Read(f).Opcode).ToList();
@@ -49,7 +70,7 @@ internal static class Entities
         new(TestSupport.Data, TestSupport.Data.Species[species], level) { Uid = 7, Name = "Guilmon" };
 
     public static DRPGServer.Game.Entities.Character Character(byte map = 79) =>
-        new(Digimon(), new DRPGServer.Game.Entities.Inventory(TestSupport.Data.FindItem, 999))
+        new(Digimon(), new DRPGServer.Game.Entities.Inventory(TestSupport.Data.FindItem, 999, _ => null))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = map, X = 56, Y = 56,
         };
@@ -140,4 +161,29 @@ internal sealed class WorldHarness : IAsyncDisposable
     /// <summary>Entrega o payload ao handler na thread do mundo e espera o I/O dele.</summary>
     public Task DispatchAsync(IWorldPacketHandler handler, Session session, PacketReader packet) =>
         RunAsync(() => handler.Dispatch(session, packet));
+}
+
+/// <summary>Evento de EXP configurável no lugar da tabela <c>exp_event</c>.</summary>
+internal sealed class FakeExpEventStore : IExpEventStore
+{
+    public ActiveExpEvent? Active { get; set; }
+    public int Queries { get; private set; }
+
+    public Task<ActiveExpEvent?> FindActiveAsync(CancellationToken ct)
+    {
+        Queries++;
+        return Task.FromResult(Active);
+    }
+}
+
+/// <summary>Guarda os snapshots que seriam gravados no banco.</summary>
+internal sealed class RecordingSnapshotStore : ICharacterSnapshotStore
+{
+    public List<CharacterSnapshot> Saved { get; } = [];
+
+    public Task SaveAsync(CharacterSnapshot snapshot, CancellationToken ct)
+    {
+        Saved.Add(snapshot);
+        return Task.CompletedTask;
+    }
 }

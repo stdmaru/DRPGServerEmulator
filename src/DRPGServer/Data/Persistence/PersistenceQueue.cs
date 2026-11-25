@@ -93,6 +93,6 @@ public sealed class PersistenceService(PersistenceQueue queue, ILogger<Persisten
 
 public static class PersistenceQueueExtensions
 {
-    public static void SaveCharacter(this PersistenceQueue queue, CharacterRepository repository, CharacterSnapshot snapshot) =>
+    public static void SaveCharacter(this PersistenceQueue queue, ICharacterSnapshotStore repository, CharacterSnapshot snapshot) =>
         queue.EnqueueCharacterSave(snapshot.Uid, ct => repository.SaveAsync(snapshot, ct));
 }

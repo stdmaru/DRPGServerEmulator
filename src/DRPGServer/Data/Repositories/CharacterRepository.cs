@@ -124,7 +124,13 @@ public sealed record NewCharacter(
     uint AccountUid, byte Slot, string Name, byte TamerId, ushort DigimonId, string DigimonName, byte MapId, short X, short Y,
     byte DepositorySlots = 0);
 
-public sealed class CharacterRepository(Database database, Game.DigimonUids uids)
+/// <summary>Gravação do snapshot do personagem, a única coisa que o mundo pede ao banco do personagem.</summary>
+public interface ICharacterSnapshotStore
+{
+    Task SaveAsync(CharacterSnapshot snapshot, CancellationToken ct);
+}
+
+public sealed class CharacterRepository(Database database, Game.DigimonUids uids) : ICharacterSnapshotStore
 {
     private const string SelectWithLeader = """
         SELECT c.uid, c.account_uid, c.slot, c.name, c.tamer_id, c.level, c.map_id, c.pos_x, c.pos_y,

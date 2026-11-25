@@ -36,6 +36,12 @@ var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 builder.Configuration
     .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false)
     .AddEnvironmentVariables("DRPG_");
+// toda dependência é obrigatória: o container confere o grafo inteiro na partida, também em produção
+builder.ConfigureContainer(new DefaultServiceProviderFactory(new ServiceProviderOptions
+{
+    ValidateOnBuild = true,
+    ValidateScopes = true,
+}));
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(o =>
 {
@@ -55,8 +61,9 @@ services.AddSingleton<DatabaseMigrator>();
 services.AddSingleton<AccountRepository>();
 services.AddSingleton<DRPGServer.Game.DigimonUids>();
 services.AddSingleton<CharacterRepository>();
+services.AddSingleton<ICharacterSnapshotStore>(sp => sp.GetRequiredService<CharacterRepository>());
 services.AddSingleton<ICashStore, CashRepository>();
-services.AddSingleton<ExpEventRepository>();
+services.AddSingleton<IExpEventStore, ExpEventRepository>();
 services.AddSingleton(sp =>
 {
     var o = sp.GetRequiredService<IOptions<GameOptions>>().Value;

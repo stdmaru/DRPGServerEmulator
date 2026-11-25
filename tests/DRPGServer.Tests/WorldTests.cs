@@ -51,7 +51,7 @@ public class ZoneTickTests
         var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
         var session = TestSupport.NewSession();
         // nível 10: MaxEVP = L × (L − 1) = 90 (no nível 1 é 0)
-        var character = new Character(Entities.Digimon(level: 10), new Inventory(999))
+        var character = new Character(Entities.Digimon(level: 10), TestSupport.EmptyInventory(999))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };

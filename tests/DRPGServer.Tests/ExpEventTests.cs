@@ -4,6 +4,7 @@ using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Battle;
 using DRPGServer.Game.Commands;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Shop;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
 using DRPGServer.Network.Packets.Map;
@@ -71,7 +72,7 @@ public class ExpEventTests
     [Fact]
     public void ExpEventService_notifies_only_when_event_changes_unless_forced()
     {
-        var service = new ExpEventService(null, TestSupport.GameOptions(), NullLogger<ExpEventService>.Instance);
+        var service = TestSupport.NewExpEvents(TestSupport.GameOptions());
         var events = new List<ActiveExpEvent?>();
         service.Changed += e => events.Add(e);
 
@@ -99,10 +100,10 @@ public class ExpEventTests
     {
         var world = TestSupport.NewWorld();
         var options = TestSupport.GameOptions(o => { o.ExpRate = 2; o.AllowMultiLevelUp = true; });
-        var expEvents = new ExpEventService(null, options, NullLogger<ExpEventService>.Instance);
+        var expEvents = TestSupport.NewExpEvents(options);
         expEvents.Apply(new ActiveExpEvent(1, "Evento +500%", 500, false, DateTime.UtcNow.AddHours(-1), DateTime.UtcNow.AddHours(1)));
 
-        var battles = new BattleSystem(world, TestSupport.Data, options, NullLogger<BattleSystem>.Instance, expEvents: expEvents);
+        var battles = TestSupport.NewBattles(world, TestSupport.Data, options, expEvents: expEvents);
         var session = TestSupport.NewSession(ServerRole.Map);
         var character = Entities.Character();
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
@@ -122,17 +123,32 @@ public class ExpEventTests
     }
 
     [Fact]
-    public void ReloadEvents_command_requires_administrator()
+    public async Task ReloadEvents_command_requires_administrator_and_replies_from_the_world()
     {
-        var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
-        var expEvents = new ExpEventService(null, TestSupport.GameOptions(), NullLogger<ExpEventService>.Instance);
-        var commands = new ChatCommands(zones, new WorldIo(world, NullLogger<WorldIo>.Instance), TestSupport.GameOptions(), NullLogger<ChatCommands>.Instance, expEvents);
+        await using var world = new WorldHarness();
+        await world.StartAsync();
+        var zones = new ZoneSystem(TestSupport.Data, world.World, NullLogger<ZoneSystem>.Instance);
+        var store = new FakeExpEventStore();
+        var expEvents = TestSupport.NewExpEvents(store: store);
+        var cashShop = new CashShopService(TestSupport.Data, new InMemoryCashStore(), world.Io, NullLogger<CashShopService>.Instance);
+        var commands = new ChatCommands(zones, world.Io, TestSupport.GameOptions(), NullLogger<ChatCommands>.Instance, expEvents, cashShop);
 
-        var gm = new Player(TestSupport.NewSession(ServerRole.Map), new AuthenticatedAccount(1, "gm", Authority.GameMaster), Entities.Character());
-        var admin = new Player(TestSupport.NewSession(ServerRole.Map), new AuthenticatedAccount(2, "adm", Authority.Administrator), Entities.Character());
+        var gmSession = TestSupport.NewSession(ServerRole.Map);
+        var adminSession = TestSupport.NewSession(ServerRole.Map);
+        var gm = new Player(gmSession, new AuthenticatedAccount(1, "gm", Authority.GameMaster), Entities.Character());
+        var admin = new Player(adminSession, new AuthenticatedAccount(2, "adm", Authority.Administrator), Entities.Character());
 
-        Assert.False(commands.TryExecute(gm, "reloadevents"));
-        Assert.True(commands.TryExecute(admin, "reloadevents"));
+        bool gmRan = true, adminRan = false;
+        await world.RunAsync(() =>
+        {
+            gmRan = commands.TryExecute(gm, "reloadevents");
+            adminRan = commands.TryExecute(admin, "reloadevents");
+        });
+
+        Assert.False(gmRan);
+        Assert.True(adminRan);
+        Assert.Equal(1, store.Queries);
+        Assert.Empty(gmSession.SentOpcodes());
+        Assert.Equal([(ushort)MapOpcode.ChatNormal], adminSession.SentOpcodes());
     }
 }

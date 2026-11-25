@@ -22,8 +22,14 @@ public sealed record ActiveExpEvent(
     public byte SpriteIndex => (byte)Math.Clamp(BonusPercent / 25, 0, IsHotTime ? MaxHotTimeSpriteIndex : MaxNormalSpriteIndex);
 }
 
+/// <summary>Fonte do evento de EXP em vigor.</summary>
+public interface IExpEventStore
+{
+    Task<ActiveExpEvent?> FindActiveAsync(CancellationToken ct);
+}
+
 /// <summary>Leitura de eventos de EXP ativos na tabela <c>exp_event</c>.</summary>
-public sealed class ExpEventRepository(Database db)
+public sealed class ExpEventRepository(Database db) : IExpEventStore
 {
     private sealed class Row
     {
@@ -35,7 +41,7 @@ public sealed class ExpEventRepository(Database db)
         public DateTime EndsAt { get; set; }
     }
 
-    public async Task<ActiveExpEvent?> FindActiveAsync(CancellationToken ct = default)
+    public async Task<ActiveExpEvent?> FindActiveAsync(CancellationToken ct)
     {
         await using var conn = await db.OpenAsync(ct);
         var row = await conn.QuerySingleOrDefaultAsync<Row>(new CommandDefinition(

@@ -18,7 +18,7 @@ public sealed class ChatCommands
     private readonly ILogger<ChatCommands> _log;
 
     public ChatCommands(ZoneSystem zones, WorldIo io, IOptions<GameOptions> options, ILogger<ChatCommands> log,
-        ExpEventService? expEvents = null, CashShopService? cashShop = null)
+        ExpEventService expEvents, CashShopService cashShop)
     {
         _log = log;
         int maxLevel = options.Value.DigimonMaxLevel;
@@ -53,7 +53,6 @@ public sealed class ChatCommands
 
         Add("reloadevents", "/reloadevents", Authority.Administrator, (p, args) =>
         {
-            if (expEvents is null) return;
             io.Run(p, "gm.reloadevents",
                 work: ct => expEvents.ReloadAsync(forceNotify: true, ct),
                 then: active => Reply(p, active is null
@@ -86,7 +85,7 @@ public sealed class ChatCommands
 
         Add("cash", "/cash <valor> [bonus]", Authority.GameMaster, (p, args) =>
         {
-            if (cashShop is null || args.Length < 1 || !uint.TryParse(args[0], out var amount) || amount == 0) return;
+            if (args.Length < 1 || !uint.TryParse(args[0], out var amount) || amount == 0) return;
             bool bonus = args.Length >= 2 && args[1].Equals("bonus", StringComparison.OrdinalIgnoreCase);
             cashShop.GrantCash(p, bonus ? 0u : amount, bonus ? amount : 0u,
                 then: balance =>

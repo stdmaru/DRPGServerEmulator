@@ -120,7 +120,7 @@ public class EncyclopediaTests
         var channelSession = TestSupport.NewSession(ServerRole.Channel);
         accounts.SignIn(account, channelSession);
 
-        var character = new Character(Entities.Digimon(species: 50, level: 11), new Inventory(TestSupport.Data.FindItem, 999))
+        var character = new Character(Entities.Digimon(species: 50, level: 11), new Inventory(TestSupport.Data.FindItem, 999, _ => null))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };

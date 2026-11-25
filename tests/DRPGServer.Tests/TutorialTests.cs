@@ -27,7 +27,7 @@ public class TutorialTests
     public TutorialTests()
     {
         _zones = new ZoneSystem(TestSupport.Data, _world, NullLogger<ZoneSystem>.Instance);
-        _battles = new BattleSystem(_world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        _battles = TestSupport.NewBattles(_world, TestSupport.Data, TestSupport.GameOptions());
         _player = new Player(_session, new AuthenticatedAccount(1, "u", Authority.GameMaster), Entities.Character());
         _session.Player = _player;
         _zones.Find(79)!.Enter(_player);
@@ -39,7 +39,7 @@ public class TutorialTests
 
     private static Character NewCharacter(params Digimon[] party)
     {
-        var c = new Character(party[0], new Inventory(TestSupport.Data.FindItem, 999))
+        var c = new Character(party[0], new Inventory(TestSupport.Data.FindItem, 999, _ => null))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };

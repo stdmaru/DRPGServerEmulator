@@ -214,7 +214,7 @@ public class CardSlashTests
     {
         var world = TestSupport.NewWorld();
         var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
-        var battles = new BattleSystem(world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        var battles = TestSupport.NewBattles(world, TestSupport.Data, TestSupport.GameOptions());
 
         var inv = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id));
         setupInventory?.Invoke(inv)();
