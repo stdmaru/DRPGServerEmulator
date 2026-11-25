@@ -2,6 +2,10 @@ using DRPGServer.Game.Entities;
 using DRPGServer.Game.Npcs;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
+using DRPGServer.Network.Handlers;
+using DRPGServer.Network.Packets.Map;
+using DRPGServer.Network.Protocol;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DRPGServer.Tests;
 
@@ -15,6 +19,7 @@ public class InteractionGuardTests
     {
         o.NpcInteractionRange = 5;
         o.WildInteractionRange = 8;
+        o.DropPickupRange = 4;
     }));
 
     private static Player At(byte map, short x, short y)
@@ -87,5 +92,77 @@ public class InteractionGuardTests
     {
         var error = Assert.Throws<InvalidOperationException>(() => TestSupport.NewNpcRegistry(new ChoiceOfMissingNpc()));
         Assert.Contains("1:9999", error.Message);
+    }
+
+    // ---------- drops (relógio do mundo parado em zero) ----------
+
+    private static ItemDrop DropAt(short x, short y, uint? owner, TimeSpan droppedAt = default) =>
+        new(10_000, 41, x, y, droppedAt, owner);
+
+    [Theory]
+    [InlineData(4, true)]
+    [InlineData(5, false)]
+    public void Pickup_needs_the_drop_within_range(short dx, bool allowed) =>
+        Assert.Equal(allowed, _guard.CanPickUp(At(79, (short)(30 + dx), 30), DropAt(30, 30, owner: null)));
+
+    [Fact]
+    public void Only_the_owner_picks_up_until_the_owner_window_ends()
+    {
+        var other = At(79, 30, 30);            // personagem 1
+        Assert.True(_guard.CanPickUp(other, DropAt(30, 30, owner: 1)));
+        Assert.False(_guard.CanPickUp(other, DropAt(30, 30, owner: 2)));
+        Assert.False(_guard.CanPickUp(other, DropAt(30, 30, owner: 2, droppedAt: -Zone.DropOwnerWindow + TimeSpan.FromSeconds(1))));
+        Assert.True(_guard.CanPickUp(other, DropAt(30, 30, owner: 2, droppedAt: -Zone.DropOwnerWindow)));
+    }
+
+    [Fact]
+    public void Drop_of_another_character_stays_on_the_ground()
+    {
+        var world = TestSupport.NewWorld();
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
+        var zone = zones.Find(79)!;
+        var player = At(79, 40, 40);
+        player.Session.Player = player;
+        zone.Enter(player);
+        var drop = zone.Drop(41, 40, 40, ownerCharacterUid: 2);
+        player.Session.DrainOutgoing();
+
+        var w = new PacketWriter();
+        new ItemMoveHeader(ItemPlace.Ground, ItemPlace.Inventory, drop.Y, drop.X, 4, 6).Write(w);
+        w.WriteU32(drop.Uid);
+        w.WriteU32(drop.ItemId);
+        new ItemMoveHandler(TestSupport.Guard(world: world)).Dispatch(player.Session, new PacketReader(w.Payload.ToArray()));
+
+        Assert.Same(drop, zone.FindDrop(drop.Uid));
+        Assert.Equal(0u, player.Character.Inventory.Main.Count(41));
+        Assert.Empty(player.Session.DrainOutgoing());
+    }
+
+    [Fact]
+    public void Owned_drop_is_announced_again_when_the_window_ends_and_removed_at_its_lifetime()
+    {
+        var world = TestSupport.NewWorld();
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
+        var zone = zones.Find(79)!;
+        var player = At(79, 40, 40);
+        player.Session.Player = player;
+        zone.Enter(player);
+        var drop = zone.Drop(41, 40, 40, ownerCharacterUid: 1);
+        player.Session.DrainOutgoing();
+        var second = TimeSpan.FromSeconds(1);
+
+        List<byte[]> DropFramesAt(TimeSpan now)
+        {
+            zone.Update(now, second);
+            return player.Session.DrainOutgoing().Where(f => PacketHeader.Read(f).Opcode == (ushort)MapOpcode.ItemDrop).ToList();
+        }
+
+        Assert.Empty(DropFramesAt(Zone.DropOwnerWindow - second));
+        var announced = Assert.Single(DropFramesAt(Zone.DropOwnerWindow));
+        Assert.Equal(new ItemDropPacket(drop).EncodePayload(), announced.AsSpan(PacketHeader.Length).ToArray());
+        Assert.Empty(DropFramesAt(Zone.DropOwnerWindow + second));             // uma vez só
+
+        Assert.Single(DropFramesAt(Zone.DropLifetime));                        // remoção
+        Assert.Null(zone.FindDrop(drop.Uid));
     }
 }

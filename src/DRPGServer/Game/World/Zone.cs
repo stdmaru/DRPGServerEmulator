@@ -17,9 +17,14 @@ public sealed class Zone
     public static readonly TimeSpan RecoveryInterval = TimeSpan.FromMilliseconds(5200);
     /// <summary>✅ Primeira recuperação depois da batalha: mediana 0,2 s depois do 0x6D (41 batalhas, 0,04–0,34 s).</summary>
     public static readonly TimeSpan RecoveryAfterBattle = TimeSpan.FromMilliseconds(200);
-    /// <summary>✅ Itens no chão expiram em ~60 s nas capturas v322 (sessões 56 e 61: 60,3–60,5 s).</summary>
+    /// <summary>✅ Itens no chão expiram em ~60 s nas capturas v322 (sessões 56, 61 e 64: 60,1–60,5 s, 10 amostras).</summary>
     public static readonly TimeSpan DropCleanInterval = TimeSpan.FromSeconds(1);
     public static readonly TimeSpan DropLifetime = TimeSpan.FromSeconds(60);
+    /// <summary>
+    /// ✅ O oficial manda o mesmo 0x13 de novo ~40 s depois do drop (12 amostras, 40,1–40,5 s), também para quem está
+    /// longe. ❓ Tratado como o fim da janela do dono: as capturas têm um jogador só, sem tentativa de terceiro.
+    /// </summary>
+    public static readonly TimeSpan DropOwnerWindow = TimeSpan.FromSeconds(40);
     /// <summary>✅ Chance por tick de um selvagem parado começar a andar: 3276 de 65 462 ticks parados (5 %).</summary>
     public const double WildMoveChance = 0.05;
     /// <summary>
@@ -74,8 +79,7 @@ public sealed class Zone
         AutoRecovery(now);
 
         if (Every(ref _cleanTimer, dt, DropCleanInterval))
-            foreach (var drop in _drops.Values.Where(d => now - d.DroppedAt >= DropLifetime).ToList())
-                RemoveDrop(drop);
+            UpdateDrops(now);
     }
 
     private static bool Every(ref TimeSpan timer, TimeSpan dt, TimeSpan interval)
@@ -322,6 +326,18 @@ public sealed class Zone
                     return (cx, cy);
             }
         return (x, y);
+    }
+
+    private void UpdateDrops(TimeSpan now)
+    {
+        foreach (var drop in _drops.Values.Where(d => now - d.DroppedAt >= DropLifetime).ToList())
+            RemoveDrop(drop);
+        foreach (var drop in _drops.Values)
+        {
+            if (drop.Released || drop.OwnerCharacterUid is null || now - drop.DroppedAt < DropOwnerWindow) continue;
+            drop.Released = true;
+            Broadcast(new ItemDropPacket(drop));
+        }
     }
 
     public ItemDrop? FindDrop(uint uid) => _drops.GetValueOrDefault(uid);

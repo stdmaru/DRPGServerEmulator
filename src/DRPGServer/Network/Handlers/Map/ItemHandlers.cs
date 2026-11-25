@@ -12,7 +12,7 @@ namespace DRPGServer.Network.Handlers;
 /// </summary>
 [PacketHandler(MapOpcode.CardMove)]
 [RequiresState(PlayerStates.Idle)]
-public sealed class CardMoveHandler : PlayerHandler<CardMoveRequest>
+public sealed class CardMoveHandler(InteractionGuard guard) : PlayerHandler<CardMoveRequest>
 {
     protected override void Handle(Player player, CardMoveRequest request)
     {
@@ -24,7 +24,8 @@ public sealed class CardMoveHandler : PlayerHandler<CardMoveRequest>
         {
             case (ItemPlace.Ground, ItemPlace.Inventory):
             {
-                if (player.Zone is not { } zone || zone.FindDrop(uid) is not { IsCard: true } drop || drop.ItemId != cardId) return;
+                if (player.Zone is not { } zone || zone.FindDrop(uid) is not { IsCard: true } drop || drop.ItemId != cardId
+                    || !guard.CanPickUp(player, drop)) return;
                 if (cardBag.Add(drop.ItemId, 1) is not [.., var card]) return;
                 zone.RemoveDrop(drop);
                 player.RequestImmediateSave();
@@ -64,13 +65,14 @@ public sealed class CardMoveHandler : PlayerHandler<CardMoveRequest>
 }
 
 /// <summary>
-/// 0x91 (C2S 250): ✅ mover item (<see cref="ItemMoveHeader"/> + registro do item). Do chão: origem (x, y) e destino
+/// 0x91 (C2S 250): ✅ mover item (<see cref="ItemMoveHeader"/> + registro do item). Do chão: origem (y, x) e destino
 /// "qualquer lugar"; o oficial tira o item do chão (0x13 zerado com x, y) e responde com a posição usada. Dentro do
-/// inventário: linha e coluna de origem e destino, trocando se o destino está ocupado.
+/// inventário: linha e coluna de origem e destino, trocando se o destino está ocupado. A coleta passa pelo
+/// <see cref="InteractionGuard.CanPickUp"/> (distância e janela do dono).
 /// </summary>
 [PacketHandler(MapOpcode.ItemDropGet)]
 [RequiresState(PlayerStates.Idle)]
-public sealed class ItemMoveHandler : PlayerHandler<ItemMoveRequest>
+public sealed class ItemMoveHandler(InteractionGuard guard) : PlayerHandler<ItemMoveRequest>
 {
     protected override void Handle(Player player, ItemMoveRequest request)
     {
@@ -81,7 +83,8 @@ public sealed class ItemMoveHandler : PlayerHandler<ItemMoveRequest>
 
         if (header.From == ItemPlace.Ground && header.To == ItemPlace.Inventory)
         {
-            if (player.Zone is not { } zone || zone.FindDrop(uid) is not { IsCard: false } drop || drop.ItemId != itemId) return;
+            if (player.Zone is not { } zone || zone.FindDrop(uid) is not { IsCard: false } drop || drop.ItemId != itemId
+                || !guard.CanPickUp(player, drop)) return;
             if (bag.Add(drop.ItemId, 1) is not [.., var item]) return;   // inventário cheio: fica no chão
             zone.RemoveDrop(drop);
             player.RequestImmediateSave();

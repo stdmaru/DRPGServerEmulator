@@ -11,10 +11,11 @@ namespace DRPGServer.Game.World;
 /// está no mapa do jogador e dentro da distância daquela interação. A distância é em casas, no maior eixo
 /// (<c>max(|dx|, |dy|)</c>). Thread do mundo. Recusa vai para o log: o cliente legítimo só manda essas ações de perto.
 /// </summary>
-public sealed class InteractionGuard(GameData data, IOptions<GameOptions> options, ILogger<InteractionGuard> log)
+public sealed class InteractionGuard(GameData data, GameWorld world, IOptions<GameOptions> options, ILogger<InteractionGuard> log)
 {
     private int NpcRange => options.Value.NpcInteractionRange;
     private int WildRange => options.Value.WildInteractionRange;
+    private int DropRange => options.Value.DropPickupRange;
 
     /// <summary>Loja de NPC: a loja pertence a um NPC deste mapa, e ele está perto.</summary>
     public bool CanUseShop(Player player, uint shopId)
@@ -50,6 +51,17 @@ public sealed class InteractionGuard(GameData data, IOptions<GameOptions> option
         if (wild.CanBattle && Distance(player, wild.X, wild.Y) <= WildRange)
             return true;
         Reject(player, $"selvagem {wild.Leader.Name}", wild.CanBattle ? $"a {Distance(player, wild.X, wild.Y)} casas" : $"estado {wild.State}");
+        return false;
+    }
+
+    /// <summary>Coleta de item ou card do chão da zona do jogador: perto e, na janela do dono, só ele.</summary>
+    public bool CanPickUp(Player player, ItemDrop drop)
+    {
+        int distance = Distance(player, drop.X, drop.Y);
+        bool free = drop.IsFreeFor(player.Character.Uid, world.Now);
+        if (free && distance <= DropRange)
+            return true;
+        Reject(player, $"drop {drop.Uid} ({drop.X}, {drop.Y})", free ? $"a {distance} casas" : $"do personagem {drop.OwnerCharacterUid}");
         return false;
     }
 

@@ -138,7 +138,7 @@ public class EquipmentTests
         var s0 = player.Leader.Stats;
         Assert.Equal((145, 87, 131, 115, 115), (s0.Atk, s0.Def, s0.Br, s0.MaxHp, s0.MaxVp));
 
-        var handler = new ItemMoveHandler();
+        var handler = new ItemMoveHandler(TestSupport.Guard());
 
         // 1. Equipar Crest 107 no slot Crest1 (4)
         handler.Dispatch(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, crest1.Row, crest1.Column, 0, 0, crest1.Uid, 107));
@@ -212,7 +212,7 @@ public class EquipmentTests
         var egg = inv.Add(215, 1)!;            // slot 1 (Type 2)
         var bread = inv.Add(25, 1)!;           // slot 2 (Type 4, consumível)
         var ring = inv.Add(668, 1)!;           // slot 3 (Type 25, nível 30)
-        var handler = new ItemMoveHandler();
+        var handler = new ItemMoveHandler(TestSupport.Guard());
 
         // Tipo incompatível: Digimental (Type 2) em Crest1 (aceita só Type 1)
         handler.Dispatch(session, MovePacket(ItemPlace.Inventory, ItemPlace.Crest1, egg.Row, egg.Column, 0, 0, egg.Uid, 215));
@@ -375,7 +375,7 @@ public class EquipmentTests
         Assert.Equal(evolvedSpecies.Id, leader.SpeciesId);
 
         // Ao desequipar a Aura no mapa -> reverte para a forma-base
-        new ItemMoveHandler().Dispatch(session, MovePacket(ItemPlace.Aura, ItemPlace.Inventory, 0, 0, 0, 0, auraItem.Uid, 718));
+        new ItemMoveHandler(TestSupport.Guard()).Dispatch(session, MovePacket(ItemPlace.Aura, ItemPlace.Inventory, 0, 0, 0, 0, auraItem.Uid, 718));
         Assert.False(leader.IsEvolved);
         Assert.Equal(baseSpecies.Id, leader.SpeciesId);
     }

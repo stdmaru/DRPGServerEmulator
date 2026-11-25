@@ -44,7 +44,7 @@ Estado da conta (Cash, Cash/Shop Depository) é gravado direto no banco. Estado 
 - Operação só da conta (comprar no Cash Shop: debita Cash e põe no depósito) é uma transação de banco simples e não passa pelo personagem.
 
 ## Interação e alcance
-Código: `InteractionGuard` (thread do mundo). Dados: `GameData.Npcs` (`NpcDirectory`, lido de `npc_info_us`). Testes: `InteractionGuardTests`, e os testes de loja, Depository, tutorial e batalha posicionam o jogador.
+Código: `InteractionGuard` (thread do mundo). Dados: `GameData.Npcs` (`NpcDirectory`, lido de `npc_info_us`) e `ItemDrop.OwnerCharacterUid`. Testes: `InteractionGuardTests`, e os testes de loja, Depository, tutorial, batalha e coleta posicionam o jogador.
 
 Toda ação com alvo no mundo passa pelo `InteractionGuard`: o alvo existe, está no mapa do jogador e dentro da distância daquela interação. A distância é em casas, no maior eixo (`max(|dx|, |dy|)`). Recusa não muda nada e vai para o log como aviso, porque o cliente legítimo só manda essas ações de perto.
 
@@ -54,12 +54,14 @@ Toda ação com alvo no mundo passa pelo `InteractionGuard`: o alvo existe, est�
 | Digimon Center (`0x89`, `0x94`) | um NPC com janela `14` no mapa está perto | `CanUseDigimonCenter` |
 | Escolha de diálogo (`0x56`) | o NPC da escolha (`RegisterChoice(choiceId, npcId, …)`) está perto | `NpcScriptRegistry.Choose` |
 | Batalha e Taming Net | o grupo selvagem pode batalhar e está a até `Game:WildInteractionRange` casas | `BattleSystem.StartPve`, `Taming.UseNet` |
-| Drop | perto e, durante a janela de exclusividade, só o dono coleta | **PR #41: S5** |
+| Coleta de drop (`0x90`, `0x91`) | o item está a até `Game:DropPickupRange` casas e, nos primeiros `Zone.DropOwnerWindow` (40 s), só o dono coleta | `CanPickUp` nos 2 handlers |
 
 - Na partida o servidor recusa subir com uma loja do `NpcShop.xml` sem NPC dono, ou com uma escolha cujo NPC não existe no mapa do script.
 - Distâncias medidas nas capturas (`captures.db`, posição do jogador no último movimento antes da ação) ✅:
   - NPC, loja e Depository: até 3 casas em 21 amostras; escolhas de diálogo: até 3 em 30 amostras. Padrão `NpcInteractionRange = 5`.
   - Selvagem: 156 de 158 batalhas a até 5 casas e uma a 7 (o grupo também anda, então a margem é maior). Padrão `WildInteractionRange = 8`.
+  - Coleta: 26 de 27 a até 1 casa, uma a 3. Padrão `DropPickupRange = 4`. O pedido traz a origem como (y, x) do item; o servidor usa só o `uid`.
+- Janela do dono ✅/❓: o drop fica 60 s no chão e o oficial o anuncia de novo aos 40 s (`Zone.DropOwnerWindow`). O emulador libera a coleta para todos nesse momento; que o reenvio é o fim da exclusividade é inferência, sem captura com dois jogadores. Sem grupo (party) ainda, o dono é o personagem que venceu a batalha.
 - ❓ Cash Depository (`0xCA`): ainda sem evidência de NPC ou de distância; não tem regra de alcance.
 
 ## Limites de recurso (**PR #41: S6**)

@@ -172,8 +172,10 @@ public class TutorialTests
     {
         var zone = _zones.Find(79)!;
         var drop = zone.Drop(41, 64, 27);
+        _player.Character.X = 64;
+        _player.Character.Y = 27;
         _session.DrainOutgoing();
-        new ItemMoveHandler().Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, drop.X, drop.Y, 4, 6, drop.Uid, 41)));
+        new ItemMoveHandler(TestSupport.Guard()).Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, drop.Y, drop.X, 4, 6, drop.Uid, 41)));
         // ✅ o oficial tira do chão (0x13 com 108 zeros + x, y) antes do 0x91
         var pickFrames = _session.DrainOutgoing();
         Assert.Equal([(ushort)0x13, (ushort)0x91], pickFrames.Select(f => PacketHeader.Read(f).Opcode).ToArray());
@@ -183,7 +185,7 @@ public class TutorialTests
         var seed = bag[0]!;
         Assert.Equal(1u, seed.Amount);
 
-        new ItemMoveHandler().Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Inventory, ItemPlace.Inventory, 0, 0, 3, 5, seed.Uid, 41)));
+        new ItemMoveHandler(TestSupport.Guard()).Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Inventory, ItemPlace.Inventory, 0, 0, 3, 5, seed.Uid, 41)));
         Assert.Equal([(ushort)0x91], _session.SentOpcodes());
         Assert.Same(seed, bag[23]);
         Assert.Null(bag[0]);
@@ -198,6 +200,8 @@ public class TutorialTests
     {
         var zone = _zones.Find(79)!;
         var drop = zone.Drop(41, 64, 27);
+        _player.Character.X = 64;
+        _player.Character.Y = 27;
         _session.DrainOutgoing();
 
         // antes do DropLifetime o item continua no chão e sem spam de 0x13
@@ -253,10 +257,12 @@ public class TutorialTests
         var zone = _zones.Find(79)!;
         var d1 = zone.Drop(41, 64, 27);
         var d2 = zone.Drop(41, 64, 27);
+        _player.Character.X = 64;
+        _player.Character.Y = 27;
         _session.DrainOutgoing();
 
-        new ItemMoveHandler().Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d1.X, d1.Y, 4, 6, d1.Uid, 41)));
-        new ItemMoveHandler().Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d2.X, d2.Y, 4, 6, d2.Uid, 41)));
+        new ItemMoveHandler(TestSupport.Guard()).Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d1.Y, d1.X, 4, 6, d1.Uid, 41)));
+        new ItemMoveHandler(TestSupport.Guard()).Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d2.Y, d2.X, 4, 6, d2.Uid, 41)));
 
         var bag = _player.Character.Inventory.Main;
         Assert.Single(bag.Items);

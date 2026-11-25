@@ -94,6 +94,7 @@ public sealed class GameOptionsValidator : IValidateOptions<GameOptions>
         e.Range(o.EventPollSeconds, 5, 86_400, $"{s}:EventPollSeconds");
         e.Range(o.NpcInteractionRange, 1, 50, $"{s}:NpcInteractionRange");
         e.Range(o.WildInteractionRange, 1, 50, $"{s}:WildInteractionRange");
+        e.Range(o.DropPickupRange, 1, 50, $"{s}:DropPickupRange");
         e.Range(o.DefaultDepositorySlots, 0, Character.MaxDepositorySlots, $"{s}:DefaultDepositorySlots");
         e.Range(o.DigimonDepositoryFee, -1, 1_000_000_000, $"{s}:DigimonDepositoryFee");
         return e.Result();

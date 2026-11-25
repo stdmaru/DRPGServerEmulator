@@ -68,7 +68,7 @@ public class CardSlashTests
         var inv = player.Character.Inventory;
         var drill = inv.Battle.Add(74, 50)[0];    // slot 0 (row 0, col 0)
         var defense = inv.Battle.Add(5, 10)[0];   // slot 1 (row 0, col 1)
-        var handler = new CardMoveHandler();
+        var handler = new CardMoveHandler(TestSupport.Guard());
 
         // 3 → 2: equipar Golden Drill X no Card Slot 0
         handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 0, 0, drill.Uid, 74)));
@@ -115,7 +115,7 @@ public class CardSlashTests
     {
         var (player, session) = NewPlayerWithCards();
         var drill = player.Character.Inventory.Battle.Add(74, 10)[0];
-        var handler = new CardMoveHandler();
+        var handler = new CardMoveHandler(TestSupport.Guard());
 
         // row != 0 ou col >= 6 nos Card Slots são inválidos
         handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 1, 0, drill.Uid, 74)));

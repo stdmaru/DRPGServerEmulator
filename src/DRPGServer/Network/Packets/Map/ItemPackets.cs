@@ -247,8 +247,8 @@ public sealed class ItemDropPacket(ItemDrop drop, bool removed = false) : Server
 
 /// <summary>
 /// Cabeçalho comum do 0x91 e do 0xBD (20 bytes): ✅ u8 origem, u8 destino (<see cref="ItemPlace"/>), u16 0,
-/// i32 × 2 da origem (linha e coluna; x e y quando é o chão) e i32 × 2 do destino (o pedido de pegar do chão
-/// manda 4, 6 = "qualquer lugar"; a resposta traz a posição usada).
+/// i32 × 2 da origem (linha e coluna; do chão, ✅ y e x do item, nas 27 coletas capturadas) e i32 × 2 do destino
+/// (o pedido de pegar do chão manda 4, 6 = "qualquer lugar"; a resposta traz a posição usada).
 /// </summary>
 public readonly record struct ItemMoveHeader(ItemPlace From, ItemPlace To, int FromA, int FromB, int ToA, int ToB)
 {

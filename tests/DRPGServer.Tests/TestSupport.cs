@@ -72,8 +72,9 @@ internal static class TestSupport
     }
 
     /// <summary>Guarda de interação real sobre <paramref name="data"/> (padrão: o pacote sintético).</summary>
-    public static InteractionGuard Guard(GameData? data = null, IOptions<GameOptions>? options = null) =>
-        new(data ?? Data, options ?? GameOptions(), NullLogger<InteractionGuard>.Instance);
+    /// <remarks>Sem <paramref name="world"/>, um mundo parado (relógio em zero, como o das zonas dos testes).</remarks>
+    public static InteractionGuard Guard(GameData? data = null, IOptions<GameOptions>? options = null, GameWorld? world = null) =>
+        new(data ?? Data, world ?? NewWorld(), options ?? GameOptions(), NullLogger<InteractionGuard>.Instance);
 
     /// <summary>Taming com a guarda real.</summary>
     public static Taming NewTaming(DigimonUids uids, IOptions<GameOptions>? options = null, GameData? data = null)

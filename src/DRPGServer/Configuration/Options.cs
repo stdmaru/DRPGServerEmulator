@@ -100,6 +100,12 @@ public sealed class GameOptions
     /// </summary>
     public int WildInteractionRange { get; set; } = 8;
 
+    /// <summary>
+    /// Distância máxima (casas, maior eixo) até o item no chão para coletar.
+    /// ✅ 26 de 27 coletas capturadas vieram de até 1 casa (o cliente anda até o item), 1 de 3; 4 dá folga.
+    /// </summary>
+    public int DropPickupRange { get; set; } = 4;
+
     /// <summary>Slots iniciais liberados no Digimon Depository ao criar personagem (0..210). Padrão 10; 0 exige item (901/929).</summary>
     public byte DefaultDepositorySlots { get; set; } = 10;
 

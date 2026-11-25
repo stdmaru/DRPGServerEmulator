@@ -134,7 +134,7 @@ public class PersistenceTests
         new ItemMoveHeader(ItemPlace.Ground, ItemPlace.Inventory, 56, 56, 0, 0).Write(w);
         w.WriteU32(drop.Uid);
         w.WriteU32(drop.ItemId);
-        new ItemMoveHandler().Dispatch(session, new PacketReader(w.Payload.ToArray()));
+        new ItemMoveHandler(TestSupport.Guard()).Dispatch(session, new PacketReader(w.Payload.ToArray()));
         Assert.True(player.NeedsImmediateSave);
     }
 
