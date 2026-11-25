@@ -94,6 +94,9 @@ public enum MapOpcode : ushort
     KeepAlive = 0xC4,
     BattleItemReceive = 0xC8,      // S2C ✅ item na bolsa de batalha (registro de 76)
     InventoryItemReceive = 0xC9,
+    CashDepositoryAuth = 0xCA,     // ✅ Cash Depository: autenticar/abrir janela 0x46 (C2S 117 B → S2C 103 B)
+    CashDepositoryWithdraw = 0xDD, // ✅ Cash Depository: retirar card (1) ou item (2) (C2S 206 B → S2C 192 B)
+    CashDepositoryList = 0xDE,     // ✅ Cash Depository: listar 24 cards + 24 items (C2S 4434 B → S2C 4420 B)
     ExpEvent = 0xE6,
     Rename = 0xF0,                 // ✅ renomear: u8 resultado, u8 tipo (1 tamer, 2 digimon), u32 uid, nome[20]
     SetLeader = 0xF1,              // ✅ trocar o líder: u32 0, u32 personagem, u32 digimon
@@ -105,6 +108,9 @@ public enum MapOpcode : ushort
     Unknown121 = 0x121,
     InventorySort = 0x148,         // ✅ C2S botão de auto-organizar inventário (u32 0, u32 0, u16 bolsa, u16 1)
     Unknown152 = 0x152,
+    CashShopOpen = 0x159,          // ✅ Cash Shop: abrir loja e consultar saldo (C2S 78 B → S2C 64 B)
+    CashShopBuy = 0x160,           // ✅ Cash Shop: comprar produto (C2S 70 B → S2C 56 B)
+    CashShopHistory = 0x161,       // ✅ Cash Shop: histórico de compras (C2S 1006 B → S2C 992 B)
     PartySwap = 0x173,             // ✅ botão k troca as posições k + 1 e k + 2 do time
 }
 

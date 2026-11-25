@@ -100,6 +100,7 @@ public static class GameDataLoader
             Items = items,
             Cards = cards,
             NpcShops = npcShops,
+            CashShopProducts = ClientTables.CashShopProducts(pack),
             DigimonTitles = ClientTables.DigimonTitles(pack),
             Skills = ClientTables.Skills(pack),
             Evolutions = ClientTables.Evolutions(pack),

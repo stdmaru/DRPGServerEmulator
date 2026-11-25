@@ -226,6 +226,20 @@ public sealed record NpcShop(uint ShopId, NpcShopKind Kind, string Name, IReadOn
     }
 }
 
+/// <summary>Tipo de conteúdo de um produto do Cash Shop (<c>ingameshop_item_data_us.dat</c> col. 1).</summary>
+public enum CashShopItemKind : byte
+{
+    Card = 1,
+    Item = 2,
+}
+
+/// <summary>Um item ou card contido em um produto do Cash Shop (<c>ingameshop_item_data_us.dat</c>).</summary>
+public sealed record CashShopEntry(CashShopItemKind Kind, uint ItemId, uint Amount);
+
+/// <summary>Um produto vendável do Cash Shop (<c>ingameshop_itempage_us.dat</c> + <c>ingameshop_item_data_us.dat</c>).</summary>
+public sealed record CashShopProduct(
+    uint ProductId, string Name, uint ItemDataId, uint Price, byte Category, IReadOnlyList<CashShopEntry> Entries);
+
 /// <summary>Tabelas estáticas do jogo, carregadas uma vez na partida. Imutáveis.</summary>
 public sealed class GameData
 {
@@ -233,6 +247,7 @@ public sealed class GameData
     public required FrozenDictionary<uint, ItemInfo> Items { get; init; }
     public FrozenDictionary<uint, CardInfo> Cards { get; init; } = FrozenDictionary<uint, CardInfo>.Empty;
     public FrozenDictionary<uint, NpcShop> NpcShops { get; init; } = FrozenDictionary<uint, NpcShop>.Empty;
+    public FrozenDictionary<uint, CashShopProduct> CashShopProducts { get; init; } = FrozenDictionary<uint, CashShopProduct>.Empty;
     public FrozenDictionary<uint, DigimonTitleInfo> DigimonTitles { get; init; } = FrozenDictionary<uint, DigimonTitleInfo>.Empty;
     public FrozenDictionary<ushort, SkillInfo> Skills { get; init; } = FrozenDictionary<ushort, SkillInfo>.Empty;
     /// <summary>Espécie → próxima forma da linha evolutiva (<c>tree_us</c>).</summary>
@@ -252,6 +267,7 @@ public sealed class GameData
     public CardInfo? FindCard(uint id) => Cards.GetValueOrDefault(id);
     public NpcShop? FindNpcShop(uint shopId, NpcShopKind kind) =>
         NpcShops.TryGetValue(shopId, out var shop) && shop.Kind == kind ? shop : null;
+    public CashShopProduct? FindCashShopProduct(uint productId) => CashShopProducts.GetValueOrDefault(productId);
     public DigimonTitleInfo? FindDigimonTitle(uint id) => id == 0 ? null : DigimonTitles.GetValueOrDefault(id);
 
     /// <summary>Próxima forma da linha (null no fim da linha ou se a espécie não está na árvore).</summary>
