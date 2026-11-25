@@ -9,10 +9,21 @@ Especificação das lojas genéricas de NPC (compra e venda por Bits), baseada n
 Cada `<Shop>` possui:
 - `ID`: identificador enviado pelo cliente em `C2S 0x0050` (cards) ou `C2S 0x0052` (itens).
 - `Kind`: `Card` (`0x0050`/`0x0051`) ou `Item` (`0x0052`/`0x0053`).
-- Até 40 `<Entry ID="..." [Price="..."] />`. Quando `Price` é omitido, o servidor usa `BuyPrice` de `item_info_us.dat` / `card_info_us.dat`.
+- `Currency` *(opcional, padrão `Bits`)*: `Bits`, `Medals`, `Coins` ou `LadderPoints` (confirmado em `table\textattach_us.dat` strings `3545..3549` e `DigimonRPG.bin @ 0x00AEEC90..0x00AEF238` / `0x00B131EA..0x00B132E0`):
+  - `Bits` (`action=1`): preço em `ItemRecord +20` (`BuyPrice`), saldo em `double [player+0x12F0]`.
+  - `Medals` (`action=3`): preço em `ItemRecord +88` (`u16`), saldo em `WORD [player+0x4070]`.
+  - `Coins` (`action=4`, loja `5050`): preço em `ItemRecord +90` (`u16` = `Col16`), saldo em `WORD [player+0x4072]` (máx. 20.000).
+  - `LadderPoints` (`action=5`): preço em `ItemRecord +92` (`u32` = `Col17`), saldo em `DWORD [player+0x12B0]`.
+- `DeliverTo` *(opcional, padrão `Inventory`)*: `Inventory` (entrega na mochila + `S2C 0x00C9`) ou `ShopDepository` (deposita em `cash_depository_item` sem enviar `0x00C9`; usado pela loja `5050` de Coins, onde o cliente exibe `"The purchased item has been delivered to the Shop Depository"`, `DigimonRPG.bin @ 0x00AEEE49..0x00AEF199`).
+- Até 40 `<Entry ID="..." [Price="..."] />`. Quando `Price` é omitido, o servidor usa o campo de preço correspondente na tabela do cliente.
+
+### `Map 0x00CB` — Atualizar Moedas (`S2C`, 16 B) ✅
+- **Evidência**: `DigimonRPG.bin @ 0x00ABFAC2`.
+- `+0x00` (`double`): `Bits`; `+0x08` (`u32`): `Medals`; `+0x0C` (`u32`): `Coins`.
+- Na entrada do mapa (`S2C 0x02` `CharacterDataPacket`, `DigimonRPG.bin @ 0x00B5C028..0x00B5C126`), as 4 moedas são carregadas diretamente: `Bits` (`+0x40`), `LadderPoints` (`+0x5C`, `u32`), `Medals` (`+0x19A8`, `u16`) e `Coins` (`+0x19AA`, `u16`).
 
 Lojas capturadas incluídas inicialmente:
-- **Itens (`0x0052`)**: `1101` (Freyja/Digital Anvil), `5050` (Loja especial 1 Bit), `5101` (Digital Administration Bureau), `13602` (Símbolos e roupas Beginner), `40101` (Gekomon Village).
+- **Itens (`0x0052`)**: `1101` (Freyja/Digital Anvil), `5050` (Loja especial de **Coins**), `5101` (Digital Administration Bureau), `13602` (Símbolos e roupas Beginner), `40101` (Gekomon Village).
 - **Cards (`0x0050`)**: `5201` (Digital Administration Bureau), `40201` (Gekomon Village).
 
 ---
@@ -45,16 +56,17 @@ Lojas capturadas incluídas inicialmente:
 - Na compra (`action == 1`), seguido de `S2C 0x00C8` (`BattleItemReceivePacket`).
 
 ### `Map 0x0053` — Comprar / Vender Item ✅
-- **Evidência**: `captures.db` (conn 145/221) + `DigimonRPG.bin @ 0x00ABF47A / 0x00AEEC90`.
+- **Evidência**: `captures.db` (conn 145/221) + `DigimonRPG.bin @ 0x00ABF47A / 0x00ADD1CB / 0x00AEEC90`.
 - **Tamanho S2C**: `144` bytes (`C2S` 158 B).
-  - `+0x00` (`u32`): `action` (`1` = Comprar, `2` = Vender)
+  - Em `C2S`, o cliente sempre envia `action = 1` (Comprar, independente da moeda da loja) ou `2` (Vender). O servidor resolve a moeda pelo `shopId` e devolve no `S2C` o `action` correspondente (`1` = Bits, `3` = Medals, `4` = Coins, `5` = LadderPoints).
+  - `+0x00` (`u32`): `action` (`1` = Bits, `2` = Vender, `3` = Medals, `4` = Coins, `5` = LadderPoints)
   - `+0x04..+0x6F` (`108 B`): `ItemRecord` (zerado quando a venda esvazia o slot)
   - `+0x70` (`u32`): `quantity`
   - `+0x74` (`u32`): `0`
   - `+0x78` (`double`): Bits restantes do personagem
-  - `+0x80` (`u16`): `0`
+  - `+0x80` (`u16`): Coins restantes do personagem (quando `action == 4`)
   - `+0x82` (`u16`): `place` (`3` = aba Items)
   - `+0x84` (`i32`): `col` (`slot % 6`)
   - `+0x88` (`i32`): `row` (`slot / 6`)
   - `+0x8C` (`u32`): `shopId`
-- Na compra (`action == 1`), seguido de `S2C 0x00C9` (`ItemReceivePacket`).
+- Na compra, seguido de `S2C 0x00C9` (`ItemReceivePacket`) e, para `Medals`/`Coins`, `S2C 0x00CB` (`CurrencyUpdatePacket`).

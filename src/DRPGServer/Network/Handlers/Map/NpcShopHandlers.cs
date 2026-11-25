@@ -148,6 +148,9 @@ public sealed class ItemShopTradeHandler(GameData data) : PlayerHandler
 
         if (quantity is 0 or > MaxTradeQuantity) return;
 
+        // ✅ DigimonRPG.bin @ 0x00ADD1CB: em C2S 0x0053 o cliente sempre envia action=1 (Buy) para qualquer moeda
+        // (Bits, Medals, Coins ou LadderPoints) e action=2 (Sell). O servidor determina a moeda pela loja (shopId)
+        // e responde no S2C 0x0053 com action = (NpcShopAction)shop.Currency (1, 3, 4 ou 5).
         switch ((NpcShopAction)actionRaw)
         {
             case NpcShopAction.Buy:
@@ -168,27 +171,92 @@ public sealed class ItemShopTradeHandler(GameData data) : PlayerHandler
         // Itens não empilháveis (MaxStack == 1) comprados 1 por vez
         if (info.MaxStack <= 1 && quantity > 1) return;
 
-        uint unitPrice = entry.PriceOverride ?? info.BuyPrice;
-        double totalCost = (double)unitPrice * quantity;
-        if (player.Character.Bits < totalCost) return;
+        var character = player.Character;
+        uint unitPrice = shop.Currency switch
+        {
+            NpcShopCurrency.Bits => entry.PriceOverride ?? info.BuyPrice,
+            NpcShopCurrency.Medals => entry.PriceOverride ?? (info.Type == 7 ? 32000u : 9999u),
+            NpcShopCurrency.Coins => entry.PriceOverride ?? info.Col16,
+            NpcShopCurrency.LadderPoints => entry.PriceOverride ?? info.Col17,
+            _ => 0u,
+        };
+        if (unitPrice == 0) return;
 
-        var bag = player.Character.Inventory.Main;
+        ulong totalCostLong = (ulong)unitPrice * quantity;
+        if (totalCostLong > uint.MaxValue && shop.Currency != NpcShopCurrency.Bits) return;
+
+        if (shop.DeliverTo == NpcShopDelivery.ShopDepository)
+        {
+            if (!TrySpendCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong))
+                return;
+
+            player.SendToShopDepository(info.Id, quantity, expiresAt: 0, deposited =>
+            {
+                if (!deposited)
+                {
+                    RefundCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong);
+                    player.RequestImmediateSave();
+                    if (player.IsOnline)
+                        player.SendNotice("[Shop]", "Shop Depository cheio. Retire itens antes de comprar.");
+                    return;
+                }
+
+                player.RequestImmediateSave();
+                if (!player.IsOnline) return;
+
+                var preview = new InventoryItem { Uid = 0, ItemId = info.Id, Info = info, Amount = quantity };
+                player.Send(new ItemShopTradePacket(
+                    (NpcShopAction)(uint)shop.Currency, preview, quantity, character.Bits,
+                    ItemPlace.Inventory, 0, 0, shop.ShopId, character.Coins));
+                if (shop.Currency is NpcShopCurrency.Medals or NpcShopCurrency.Coins)
+                    player.Send(new CurrencyUpdatePacket(character));
+            });
+            return;
+        }
+
+        var bag = character.Inventory.Main;
         if (bag.Room(itemId) < quantity) return;
 
-        if (!player.Character.TrySpendBits(totalCost)) return;
+        if (!TrySpendCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong))
+            return;
+
         var added = bag.Add(itemId, quantity);
         if (added.Count == 0)
         {
-            player.Character.AddBits(totalCost);
+            RefundCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong);
             return;
         }
 
         player.RequestImmediateSave();
         var primary = added[0];
+        var responseAction = (NpcShopAction)(uint)shop.Currency;
         player.Send(new ItemShopTradePacket(
-            NpcShopAction.Buy, primary, quantity, player.Character.Bits,
-            ItemPlace.Inventory, primary.Column, primary.Row, shopId));
+            responseAction, primary, quantity, character.Bits,
+            ItemPlace.Inventory, primary.Column, primary.Row, shopId, character.Coins));
         player.Send(new ItemReceivePacket(added));
+        if (shop.Currency is NpcShopCurrency.Medals or NpcShopCurrency.Coins)
+            player.Send(new CurrencyUpdatePacket(character));
+    }
+
+    private static bool TrySpendCurrency(Character character, NpcShopCurrency currency, uint unitPrice, uint quantity, ulong totalCostLong) =>
+        currency switch
+        {
+            NpcShopCurrency.Bits => character.TrySpendBits((double)unitPrice * quantity),
+            NpcShopCurrency.Medals => character.TrySpendMedals((uint)totalCostLong),
+            NpcShopCurrency.Coins => character.TrySpendCoins((uint)totalCostLong),
+            NpcShopCurrency.LadderPoints => character.TrySpendLadderPoints((uint)totalCostLong),
+            _ => false,
+        };
+
+    private static void RefundCurrency(Character character, NpcShopCurrency currency, uint unitPrice, uint quantity, ulong totalCostLong)
+    {
+        switch (currency)
+        {
+            case NpcShopCurrency.Bits: character.AddBits((double)unitPrice * quantity); break;
+            case NpcShopCurrency.Medals: character.AddMedals((uint)totalCostLong); break;
+            case NpcShopCurrency.Coins: character.AddCoins((uint)totalCostLong); break;
+            case NpcShopCurrency.LadderPoints: character.AddLadderPoints((uint)totalCostLong); break;
+        }
     }
 
     private void HandleSell(Player player, uint shopId, ItemPlace place, int col, int row, uint uid, uint itemId, uint quantity)

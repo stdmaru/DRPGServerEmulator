@@ -57,6 +57,10 @@ public interface ICashStore
     Task<CashShopHistoryPage> GetHistoryAsync(uint accountUid, ushort year, ushort month, ushort page, CancellationToken ct);
     Task<CashDepositoryRow?> TakeDepositoryItemAsync(uint accountUid, CashShopItemKind kind, uint uid, CancellationToken ct);
     Task RestoreDepositoryItemAsync(uint accountUid, CashDepositoryRow row, CancellationToken ct);
+    Task<bool> DepositAsync(
+        uint accountUid,
+        IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries,
+        CancellationToken ct);
 }
 
 public sealed class CashRepository(Database database) : ICashStore
@@ -230,6 +234,64 @@ public sealed class CashRepository(Database database) : ICashStore
 
         await tx.CommitAsync(ct);
         return new CashPurchaseOutcome(CashPurchaseResult.Ok, new CashBalance(newCash, newBonus));
+    }
+
+    /// <summary>
+    /// Deposita itens/cards diretamente no Shop Depository da conta (<c>cash_depository_item</c>),
+    /// usado por lojas NPC com <c>DeliverTo="ShopDepository"</c> (ex.: loja 5050 de Coins).
+    /// Retorna <c>false</c> se não houver slots livres suficientes.
+    /// </summary>
+    public async Task<bool> DepositAsync(
+        uint accountUid,
+        IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries,
+        CancellationToken ct)
+    {
+        if (entries.Count == 0) return true;
+
+        await using var db = await database.OpenAsync(ct);
+        await using var tx = await db.BeginTransactionAsync(ct);
+
+        var existing = (await db.QueryAsync<DepositoryDbRow>(new CommandDefinition("""
+            SELECT kind, slot, uid, item_id, amount, expires_at
+            FROM cash_depository_item
+            WHERE account_uid = @accountUid
+            FOR UPDATE
+            """, new { accountUid }, tx, cancellationToken: ct))).ToList();
+
+        var usedCardSlots = existing.Where(r => r.Kind == (byte)CashShopItemKind.Card).Select(r => (int)r.Slot).ToHashSet();
+        var usedItemSlots = existing.Where(r => r.Kind == (byte)CashShopItemKind.Item).Select(r => (int)r.Slot).ToHashSet();
+        uint nextUid = existing.Count == 0 ? 1u : existing.Max(r => r.Uid) + 1u;
+
+        var toInsert = new List<CashDepositoryRow>(entries.Count);
+        foreach (var (kind, itemId, amount, expiresAt) in entries)
+        {
+            var used = kind == CashShopItemKind.Card ? usedCardSlots : usedItemSlots;
+            int freeSlot = FindFreeSlot(used);
+            if (freeSlot < 0)
+            {
+                await tx.RollbackAsync(CancellationToken.None);
+                return false;
+            }
+            used.Add(freeSlot);
+            toInsert.Add(new CashDepositoryRow(kind, (byte)freeSlot, nextUid++, itemId, amount, expiresAt));
+        }
+
+        await db.ExecuteAsync(new CommandDefinition("""
+            INSERT INTO cash_depository_item (account_uid, kind, slot, uid, item_id, amount, expires_at)
+            VALUES (@AccountUid, @Kind, @Slot, @Uid, @ItemId, @Amount, @ExpiresAt)
+            """, toInsert.Select(r => new
+        {
+            AccountUid = accountUid,
+            Kind = (byte)r.Kind,
+            r.Slot,
+            r.Uid,
+            r.ItemId,
+            r.Amount,
+            r.ExpiresAt,
+        }), tx, cancellationToken: ct));
+
+        await tx.CommitAsync(ct);
+        return true;
     }
 
     public async Task<CashShopHistoryPage> GetHistoryAsync(uint accountUid, ushort year, ushort month, ushort page, CancellationToken ct)

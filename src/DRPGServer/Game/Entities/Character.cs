@@ -64,6 +64,13 @@ public sealed class Character
     public short X { get; set; }
     public short Y { get; set; }
     public double Bits { get; private set; }
+    /// <summary>✅ Moeda Medals (WORD [player+0x4070], 0x0053 action 3 / S2C 0x00CB +0x08).</summary>
+    public ushort Medals { get; private set; }
+    /// <summary>✅ Moeda Coins / DR's Earned Coin (WORD [player+0x4072], máx. 20.000 em 0x00AE8094, 0x0053 action 4 / S2C 0x00CB +0x0C).</summary>
+    public ushort Coins { get; private set; }
+    /// <summary>✅ Moeda Ladder Points (DWORD [player+0x12B0], 0x0053 action 5).</summary>
+    public uint LadderPoints { get; private set; }
+    public const ushort MaxCoins = 20_000;
     public int TotalWins { get; set; }
     public int TotalBattles { get; set; }
 
@@ -92,6 +99,36 @@ public sealed class Character
         if (amount <= 0) return true;
         if (Bits < amount) return false;
         Bits -= amount;
+        return true;
+    }
+
+    public void SetMedals(ushort medals) => Medals = medals;
+    public void AddMedals(uint amount) => Medals = (ushort)Math.Min((uint)Medals + amount, ushort.MaxValue);
+    public bool TrySpendMedals(uint amount)
+    {
+        if (amount == 0) return true;
+        if (Medals < amount) return false;
+        Medals -= (ushort)amount;
+        return true;
+    }
+
+    public void SetCoins(ushort coins) => Coins = Math.Min(coins, MaxCoins);
+    public void AddCoins(uint amount) => Coins = (ushort)Math.Min((uint)Coins + amount, MaxCoins);
+    public bool TrySpendCoins(uint amount)
+    {
+        if (amount == 0) return true;
+        if (Coins < amount) return false;
+        Coins -= (ushort)amount;
+        return true;
+    }
+
+    public void SetLadderPoints(uint points) => LadderPoints = points;
+    public void AddLadderPoints(uint amount) => LadderPoints = (uint)Math.Min((ulong)LadderPoints + amount, uint.MaxValue);
+    public bool TrySpendLadderPoints(uint amount)
+    {
+        if (amount == 0) return true;
+        if (LadderPoints < amount) return false;
+        LadderPoints -= amount;
         return true;
     }
 

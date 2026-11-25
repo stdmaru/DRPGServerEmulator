@@ -85,6 +85,23 @@ public sealed class ChatCommands
             bool bonus = args.Length >= 2 && args[1].Equals("bonus", StringComparison.OrdinalIgnoreCase);
             _ = GrantCashAsync(p, cashShop, bonus ? 0u : amount, bonus ? amount : 0u);
         });
+
+        Add("currency", "/currency <bits|medals|coins|ladder> <valor>", Authority.GameMaster, (p, args) =>
+        {
+            if (args.Length < 2 || !uint.TryParse(args[1], out var amount)) return;
+            switch (args[0].ToLowerInvariant())
+            {
+                case "bits": p.Character.AddBits(amount); break;
+                case "medals": p.Character.AddMedals(amount); break;
+                case "coins": p.Character.AddCoins(amount); break;
+                case "ladder": p.Character.AddLadderPoints(amount); break;
+                default: return;
+            }
+            p.RequestImmediateSave();
+            p.Send(new CurrencyUpdatePacket(p.Character));
+            var hint = args[0].Equals("ladder", StringComparison.OrdinalIgnoreCase) ? " (relogue para atualizar Ladder na UI)" : "";
+            Reply(p, $"Moedas: Bits={p.Character.Bits:F0}, Medals={p.Character.Medals}, Coins={p.Character.Coins}, Ladder={p.Character.LadderPoints}.{hint}");
+        });
     }
 
     private async Task GrantCashAsync(Player requester, CashShopService cashShop, uint cashDelta, uint bonusDelta)
