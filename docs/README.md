@@ -66,3 +66,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [patch_client.py](ferramentas/patch-cliente.md): remove o XIGNCODE, corrige o loading e troca IPs e portas (`--server`) por assinatura. Fluxo para quando o oficial atualizar.
 - [extract_status.py](ferramentas/extract-status.md): extrai amostras de status dos pcaps.
 - [drpg_replay.py](ferramentas/replay.md): reproduz uma sessão capturada contra o emulador e compara as respostas com as do oficial.
+
+### Planos
+- [Card Slash](planos/card-slash.md): sistema de cards e Card Slash em batalha.
+- [Scripts de itens](planos/item-scripts.md): efeitos de uso/equipamento via mini-linguagem no XML, catálogo de efeitos e etapas.
