@@ -7,6 +7,7 @@ using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Battle;
 using DRPGServer.Game.Commands;
 using DRPGServer.Game.Npcs;
+using DRPGServer.Game.Shop;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
 using DRPGServer.Network.Handlers;
@@ -54,6 +55,7 @@ services.AddSingleton<DatabaseMigrator>();
 services.AddSingleton<AccountRepository>();
 services.AddSingleton<DRPGServer.Game.DigimonUids>();
 services.AddSingleton<CharacterRepository>();
+services.AddSingleton<ICashStore, CashRepository>();
 services.AddSingleton<ExpEventRepository>();
 services.AddSingleton(sp =>
 {
@@ -83,6 +85,7 @@ services.AddSingleton<NpcScriptBase, VillageOfBeginningNpcs>();
 services.AddSingleton<NpcScriptBase, DigitalBureauNpcs>();
 services.AddSingleton<NpcScriptRegistry>();
 services.AddSingleton<Taming>();
+services.AddSingleton<CashShopService>();
 services.AddSingleton<ChatCommands>();
 
 // rede

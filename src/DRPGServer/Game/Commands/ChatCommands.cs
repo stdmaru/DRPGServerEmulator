@@ -1,6 +1,7 @@
 using DRPGServer.Configuration;
 using DRPGServer.Game.Battle;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Shop;
 using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;
 using Microsoft.Extensions.Logging;
@@ -17,7 +18,7 @@ public sealed class ChatCommands
     private readonly ILogger<ChatCommands> _log;
 
     public ChatCommands(ZoneSystem zones, IOptions<GameOptions> options, ILogger<ChatCommands> log,
-        ExpEventService? expEvents = null)
+        ExpEventService? expEvents = null, CashShopService? cashShop = null)
     {
         _log = log;
         int maxLevel = options.Value.DigimonMaxLevel;
@@ -77,6 +78,28 @@ public sealed class ChatCommands
                 Reply(p, $"Titulo {titleId} ja desbloqueado ou lista cheia.");
             }
         });
+
+        Add("cash", "/cash <valor> [bonus]", Authority.GameMaster, (p, args) =>
+        {
+            if (cashShop is null || args.Length < 1 || !uint.TryParse(args[0], out var amount) || amount == 0) return;
+            bool bonus = args.Length >= 2 && args[1].Equals("bonus", StringComparison.OrdinalIgnoreCase);
+            _ = GrantCashAsync(p, cashShop, bonus ? 0u : amount, bonus ? amount : 0u);
+        });
+    }
+
+    private async Task GrantCashAsync(Player requester, CashShopService cashShop, uint cashDelta, uint bonusDelta)
+    {
+        try
+        {
+            var bal = await cashShop.GrantCashAsync(requester.Account.Uid, cashDelta, bonusDelta);
+            if (bal is not null)
+                Reply(requester, $"Cash atualizado: {bal.Value.Cash} + {bal.Value.BonusCash} bonus = {bal.Value.Total}.");
+        }
+        catch (Exception e)
+        {
+            _log.LogWarning(e, "Falha em /cash");
+            Reply(requester, "Erro ao creditar Cash.");
+        }
     }
 
     private async Task ReloadEventsAsync(Player requester, ExpEventService expEvents)
