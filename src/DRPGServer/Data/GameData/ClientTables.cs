@@ -25,6 +25,8 @@ public static class ClientTables
     public const string MapTable = @"table\map_us.dat";
     public const string SkillTable = @"table\digimon_skill_us.dat";
     public const string TreeTable = @"table\tree_us.dat";
+    public const string CashShopPageTable = @"table\ingameshop_itempage_us.dat";
+    public const string CashShopDataTable = @"table\ingameshop_item_data_us.dat";
 
     /// <summary>
     /// Espécies: <c>digimon_us</c> (0 id, 1 nome, 2 estágio, 3 atributo, 5 skill 1, 9 skill 2) e o crescimento
@@ -250,6 +252,42 @@ public static class ClientTables
             maps.TryAdd(id, new ClientMap(id, f[1], f[4], Short(f, 12), Short(f, 13), portals));
         }
         return maps.ToFrozenDictionary();
+    }
+
+    /// <summary>
+    /// ✅ Catálogo do Cash Shop: <c>ingameshop_itempage_us.dat</c> (0 productId, 1 nome, 2 itemDataId, 5 preço, 8 categoria)
+    /// combinado com <c>ingameshop_item_data_us.dat</c> (0 itemDataId, 1 tipo [1=Card, 2=Item], 3 itemId, 4 quantidade).
+    /// </summary>
+    public static FrozenDictionary<uint, CashShopProduct> CashShopProducts(ClientPack pack)
+    {
+        if (!pack.Contains(CashShopPageTable) || !pack.Contains(CashShopDataTable))
+            return FrozenDictionary<uint, CashShopProduct>.Empty;
+
+        var entriesByDataId = new Dictionary<uint, List<CashShopEntry>>();
+        foreach (var f in pack.ReadTable(CashShopDataTable))
+        {
+            if (f.Length < 5 || !uint.TryParse(f[0], CultureInfo.InvariantCulture, out var dataId) || dataId == 0) continue;
+            byte kindByte = Byte(f, 1);
+            if (kindByte is not (byte)CashShopItemKind.Card and not (byte)CashShopItemKind.Item) continue;
+            uint itemId = UInt(f, 3);
+            uint amount = Math.Max(1u, UInt(f, 4));
+            if (itemId == 0) continue;
+            if (!entriesByDataId.TryGetValue(dataId, out var list))
+                entriesByDataId[dataId] = list = [];
+            list.Add(new CashShopEntry((CashShopItemKind)kindByte, itemId, amount));
+        }
+
+        var products = new Dictionary<uint, CashShopProduct>();
+        foreach (var f in pack.ReadTable(CashShopPageTable))
+        {
+            if (f.Length < 9 || !uint.TryParse(f[0], CultureInfo.InvariantCulture, out var productId) || productId == 0) continue;
+            uint dataId = UInt(f, 2);
+            uint price = UInt(f, 5);
+            byte category = Byte(f, 8);
+            if (!entriesByDataId.TryGetValue(dataId, out var entries) || entries.Count == 0) continue;
+            products.TryAdd(productId, new CashShopProduct(productId, f[1], dataId, price, category, entries));
+        }
+        return products.ToFrozenDictionary();
     }
 
     private static Attributes Growth(string[] f) => new(Int(f, 15), Int(f, 16), Int(f, 17), Int(f, 18));
