@@ -3,17 +3,20 @@ using System.Collections.Frozen;
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Shop;
 using DRPGServer.Game.Stats;
+using DRPGServer.Game.World;
 using DRPGServer.Network;
 using DRPGServer.Network.Handlers;
 using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DRPGServer.Tests;
 
 public class NpcShopTests
 {
-    private static (GameData Data, Player Player, Session Session) MakeEnv(double bits = 5000, ICashStore? cashStore = null)
+    private static (GameData Data, Player Player, Session Session) MakeEnv(double bits = 5000)
     {
         var items = new Dictionary<uint, ItemInfo>(TestSupport.Data.Items)
         {
@@ -69,10 +72,15 @@ public class NpcShopTests
         };
         character.SetBits(bits);
         var session = TestSupport.NewSession();
-        var player = new Player(session, new AuthenticatedAccount(1, "user", Authority.None), character, cashStore);
+        var player = new Player(session, new AuthenticatedAccount(1, "user", Authority.None), character);
         session.Player = player;
         return (data, player, session);
     }
+
+    /// <summary>Handler 0x53 com um <see cref="CashShopService"/> sobre <paramref name="io"/> (sem I/O, um mundo parado basta).</summary>
+    private static ItemShopTradeHandler ItemTrade(GameData data, ICashStore? cashStore = null, WorldIo? io = null) =>
+        new(data, new CashShopService(data, cashStore ?? new FakeCashStore(),
+            io ?? new WorldIo(TestSupport.NewWorld(), NullLogger<WorldIo>.Instance), NullLogger<CashShopService>.Instance));
 
     private static PacketReader BuildItemTrade(NpcShopAction action, uint uid, uint itemId, uint quantity, ItemPlace place, int col, int row, uint shopId)
     {
@@ -148,7 +156,7 @@ public class NpcShopTests
     public void Item_and_card_shop_buy_and_sell_update_bits_and_inventory()
     {
         var (data, player, session) = MakeEnv(bits: 5000);
-        var itemTrade = new ItemShopTradeHandler(data);
+        var itemTrade = ItemTrade(data);
         var cardTrade = new CardShopTradeHandler(data);
 
         // 1. Comprar 3x Double Burger (600 cada = 1800 Bits) -> resta 3200 Bits
@@ -188,7 +196,7 @@ public class NpcShopTests
     public void Security_guards_reject_insufficient_bits_unlisted_items_and_forged_sell()
     {
         var (data, player, session) = MakeEnv(bits: 500);
-        var itemTrade = new ItemShopTradeHandler(data);
+        var itemTrade = ItemTrade(data);
 
         // Bits insuficientes (1x 600 > 500)
         itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 29, 1, ItemPlace.Inventory, 0, 0, 40101));
@@ -238,17 +246,19 @@ public class NpcShopTests
     }
 
     [Fact]
-    public void Special_currency_shops_use_coins_and_ladder_points_from_c2s_buy_action()
+    public async Task Special_currency_shops_use_coins_and_ladder_points_from_c2s_buy_action()
     {
         var cashStore = new FakeCashStore();
-        var (data, player, session) = MakeEnv(bits: 5000, cashStore: cashStore);
+        var (data, player, session) = MakeEnv(bits: 5000);
+        await using var world = new WorldHarness();
+        await world.StartAsync();
         player.Character.SetCoins(200);
         player.Character.SetLadderPoints(1500);
-        var itemTrade = new ItemShopTradeHandler(data);
+        var itemTrade = ItemTrade(data, cashStore, world.Io);
 
         // 1. Cliente sempre envia action=1 (Buy) em C2S 0x0053; loja 5050 (Coins + ShopDepository):
         // debita 150 Coins (Col16), deposita no Shop Depository (não na mochila), responde S2C action=4 + 0xCB (sem 0xC9)
-        itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
+        await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
         Assert.Equal(5000.0, player.Character.Bits);
         Assert.Equal((ushort)50, player.Character.Coins);
         Assert.Equal(0u, player.Character.Inventory.Main.Count(21008));
@@ -264,21 +274,21 @@ public class NpcShopTests
         Assert.Equal(50u, BinaryPrimitives.ReadUInt32LittleEndian(frames[1].AsSpan(PacketHeader.Length + 0x0C)));
 
         // 2. Com Coins insuficientes (50 < 150), bloqueia a compra
-        itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
+        await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
         Assert.Equal((ushort)50, player.Character.Coins);
         Assert.Empty(session.SentOpcodes());
 
         // 2b. Se o Shop Depository estiver cheio, reembolsa os Coins
-        player.Character.SetCoins(200);
+        await world.RunAsync(() => player.Character.SetCoins(200));
         cashStore.FailDeposit = true;
-        itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
+        await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
         Assert.Equal((ushort)200, player.Character.Coins);
         Assert.Single(cashStore.Deposited);
         Assert.Equal([(ushort)MapOpcode.ChatNotice], session.SentOpcodes());
         cashStore.FailDeposit = false;
 
         // 3. Loja de LadderPoints (5051): C2S action=1 debita 1000 (Col17), resta 500, S2C responde action=5
-        itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5051));
+        await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5051));
         Assert.Equal(500u, player.Character.LadderPoints);
         var ladderFrames = session.DrainOutgoing();
         Assert.Equal(2, ladderFrames.Count);

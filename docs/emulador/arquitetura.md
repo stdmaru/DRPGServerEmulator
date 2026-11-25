@@ -38,7 +38,7 @@ Cada camada só conhece a de baixo. Regra de negócio nunca fica em handler nem 
 ## Onde fica cada coisa
 | Domínio | Pasta | Peças |
 |---|---|---|
-| Mundo | `Game/World` | `GameWorld` (thread do mundo), `Zone`, `ZoneSystem`, `PlayerSystem`, `WorldIo` (**N3**), `IGameClock` (**N5**), `InteractionGuard` (**S4**) |
+| Mundo | `Game/World` | `GameWorld` (thread do mundo), `Zone`, `ZoneSystem`, `PlayerSystem`, `WorldIo`, `IGameClock` (**N5**), `InteractionGuard` (**S4**) |
 | Itens | `Game/Items` | `ItemService` (dar, tirar, trocar, depósito da conta; **G2**), `ItemGrant`/`ItemDuration` (**G1**), `EquipmentService` (**G5**), `ItemUseService` e efeitos de uso (**E4**) |
 | Economia | `Game/Economy` | `Wallet`/`CurrencyKind` (**G3**), `NpcShopService` (**G4**), `CashShopService`, `IAuditLog` (**S9**) |
 | Status | `Game/Stats` | `StatFormulas` (**o único lugar** com fórmulas de status), `ExpFormulas`, `StatModifiers` (**E1**) |
@@ -52,7 +52,7 @@ Antes de escrever uma função de jogo, procure o serviço do domínio. Se uma l
 ## Modelo de threads
 - Cada sessão tem um laço de recepção. **Login e channel** rodam no laço da sessão (handlers de sessão, async, podem ir ao banco).
 - **Jogo no mapa:** handlers de mundo são postados para a **thread do mundo** (`GameWorld`, tick de 50 ms). Estado do mundo (zonas, jogadores, batalhas) só se toca nela. Sistemas: `ZoneSystem`, `BattleSystem`, `PlayerSystem`.
-- **I/O a partir do mundo** passa sempre por `WorldIo` (**PR #41: N3**): a operação roda fora da thread, e a continuação volta para ela já sabendo se o jogador continua online. Exceção nunca fica sem observação. É proibido `_ = AlgoAsync()` e é proibido criar `Task` solta no código de jogo.
+- **I/O a partir do mundo** passa sempre por `WorldIo` ([handlers](handlers.md#io-a-partir-de-um-handler-de-mundo)): a operação roda fora da thread, e a continuação volta para ela já sabendo se o jogador continua online. Exceção nunca fica sem observação. É proibido `_ = AlgoAsync()` e é proibido criar `Task` solta no código de jogo.
 - **Persistência:** gravações vão para a `PersistenceQueue` (snapshot imutável, **coalescing por `CharacterUid`**), e o `PersistenceService` grava em segundo plano dentro de uma única transação MySQL:
   - **Gravação imediata (`player.RequestImmediateSave()`):** eventos críticos (coleta, descarte e uso de itens, captura, Depository, renomeação, fim de batalha, evolução permanente, NPCs, troca de mapa).
   - **Dirty + autosave (`player.MarkDirty()`):** ações frequentes de baixo risco (movimento, organização interna, pontos, ordem do time), gravadas a cada `AutosaveSeconds` (padrão 60 s).

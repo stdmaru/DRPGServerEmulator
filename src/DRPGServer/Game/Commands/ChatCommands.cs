@@ -17,7 +17,7 @@ public sealed class ChatCommands
     private readonly Dictionary<string, Command> _commands = new(StringComparer.OrdinalIgnoreCase);
     private readonly ILogger<ChatCommands> _log;
 
-    public ChatCommands(ZoneSystem zones, IOptions<GameOptions> options, ILogger<ChatCommands> log,
+    public ChatCommands(ZoneSystem zones, WorldIo io, IOptions<GameOptions> options, ILogger<ChatCommands> log,
         ExpEventService? expEvents = null, CashShopService? cashShop = null)
     {
         _log = log;
@@ -54,7 +54,12 @@ public sealed class ChatCommands
         Add("reloadevents", "/reloadevents", Authority.Administrator, (p, args) =>
         {
             if (expEvents is null) return;
-            _ = ReloadEventsAsync(p, expEvents);
+            io.Run(p, "gm.reloadevents",
+                work: ct => expEvents.ReloadAsync(forceNotify: true, ct),
+                then: active => Reply(p, active is null
+                    ? "Nenhum evento de EXP ativo."
+                    : $"EXP +{active.BonusPercent}% ate {active.EndsAt:yyyy-MM-dd}"),
+                failed: _ => Reply(p, "Erro ao recarregar eventos."));
         });
 
         Add("teleport", "/teleport x y [mapa]", Authority.GameMaster, (p, args) =>
@@ -83,7 +88,13 @@ public sealed class ChatCommands
         {
             if (cashShop is null || args.Length < 1 || !uint.TryParse(args[0], out var amount) || amount == 0) return;
             bool bonus = args.Length >= 2 && args[1].Equals("bonus", StringComparison.OrdinalIgnoreCase);
-            _ = GrantCashAsync(p, cashShop, bonus ? 0u : amount, bonus ? amount : 0u);
+            cashShop.GrantCash(p, bonus ? 0u : amount, bonus ? amount : 0u,
+                then: balance =>
+                {
+                    if (balance is { } bal)
+                        Reply(p, $"Cash atualizado: {bal.Cash} + {bal.BonusCash} bonus = {bal.Total}.");
+                },
+                failed: () => Reply(p, "Erro ao creditar Cash."));
         });
 
         Add("currency", "/currency <bits|medals|coins|ladder> <valor>", Authority.GameMaster, (p, args) =>
@@ -102,38 +113,6 @@ public sealed class ChatCommands
             var hint = args[0].Equals("ladder", StringComparison.OrdinalIgnoreCase) ? " (relogue para atualizar Ladder na UI)" : "";
             Reply(p, $"Moedas: Bits={p.Character.Bits:F0}, Medals={p.Character.Medals}, Coins={p.Character.Coins}, Ladder={p.Character.LadderPoints}.{hint}");
         });
-    }
-
-    private async Task GrantCashAsync(Player requester, CashShopService cashShop, uint cashDelta, uint bonusDelta)
-    {
-        try
-        {
-            var bal = await cashShop.GrantCashAsync(requester.Account.Uid, cashDelta, bonusDelta);
-            if (bal is not null)
-                Reply(requester, $"Cash atualizado: {bal.Value.Cash} + {bal.Value.BonusCash} bonus = {bal.Value.Total}.");
-        }
-        catch (Exception e)
-        {
-            _log.LogWarning(e, "Falha em /cash");
-            Reply(requester, "Erro ao creditar Cash.");
-        }
-    }
-
-    private async Task ReloadEventsAsync(Player requester, ExpEventService expEvents)
-    {
-        try
-        {
-            var active = await expEvents.ReloadAsync(forceNotify: true);
-            string msg = active is null
-                ? "Nenhum evento de EXP ativo."
-                : $"EXP +{active.BonusPercent}% ate {active.EndsAt:yyyy-MM-dd}";
-            Reply(requester, msg);
-        }
-        catch (Exception e)
-        {
-            _log.LogWarning(e, "Falha em /reloadevents");
-            Reply(requester, "Erro ao recarregar eventos.");
-        }
     }
 
     private void Add(string name, string usage, Authority required, Action<Player, string[]> run) =>

@@ -18,19 +18,17 @@ public sealed class PlayerSystem : IWorldSystem
     private readonly BattleSystem _battles;
     private readonly PersistenceQueue _persistence;
     private readonly CharacterRepository _characters;
-    private readonly ICashStore? _cashStore;
     private readonly GameOptions _options;
     private readonly ILogger<PlayerSystem> _log;
 
     public PlayerSystem(GameWorld world, ZoneSystem zones, BattleSystem battles, PersistenceQueue persistence,
-        CharacterRepository characters, IOptions<GameOptions> options, ILogger<PlayerSystem> log, ICashStore? cashStore = null)
+        CharacterRepository characters, IOptions<GameOptions> options, ILogger<PlayerSystem> log)
     {
         _world = world;
         _zones = zones;
         _battles = battles;
         _persistence = persistence;
         _characters = characters;
-        _cashStore = cashStore;
         _options = options.Value;
         _log = log;
         world.AddSystem(this);
@@ -60,7 +58,7 @@ public sealed class PlayerSystem : IWorldSystem
             character.Y = _options.StartPosY;
         }
 
-        var player = new Player(session, account, character, _cashStore, _world);
+        var player = new Player(session, account, character);
         player.MarkSaved(_world.Now);
         session.Player = player;
         _bySession[session.Id] = player;

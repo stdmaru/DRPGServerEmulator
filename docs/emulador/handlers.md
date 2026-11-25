@@ -69,19 +69,25 @@ public sealed class ItemMoveHandler(ItemService items) : PlayerHandler<ItemMoveR
   - `OnNotInWorld(session, request)`: pacote de jogo antes de o personagem entrar no mundo. Padrão: fecha a sessão. Ex.: `RenameHandler` responde "indisponível", porque o cliente manda o `0xF0` tipo 1 logo na entrada.
 - Opcode sem handler: log `Info` na primeira vez e `Debug` depois. Admin recebe um eco de debug no chat.
 
-## I/O a partir de um handler de mundo (**PR #41: N3**)
-Handler de mundo é síncrono. Quando o serviço precisa do banco, ele usa `WorldIo`:
+## I/O a partir de um handler de mundo
+Handler de mundo é síncrono e **nunca espera** o banco: o serviço valida na thread do mundo, agenda o I/O no
+`WorldIo` e retorna na hora. O tick segue enquanto o banco responde.
 
 ```csharp
-io.Run(player,
-    work: ct => store.GetBalanceAsync(player.Account.Uid, ct),     // fora da thread do mundo
-    then: balance => player.Send(new CashShopOpenPacket(...)),     // de volta na thread do mundo, só se online
-    failed: _ => player.Send(new CashShopOpenPacket(error: 1)));   // erro já registrado no log
+io.Run(player, "cash-shop.open",
+    work: ct => store.GetBalanceAsync(accountUid, ct),            // pool de threads, fora do mundo
+    then: balance => player.Send(new CashShopOpenPacket(...)),    // de volta na thread do mundo, só se online
+    failed: _ => player.Send(new CashShopOpenPacket(error: 1)));  // erro já registrado no log
 ```
 
+- `work` roda no pool de threads (`Task.Run`), inclusive a parte síncrona do driver. Ele não toca em estado de jogo: copie para variáveis locais o que precisar (uid da conta, quantidade) antes de agendar.
 - `then` e `failed` rodam na thread do mundo e só se o jogador continuar online.
-- O `WorldIo` registra a exceção com o contexto (jogador, operação). O serviço não escreve `try/catch` para isso.
-- Mudança de estado do personagem que depende do banco segue o fluxo de [transferência](seguranca.md#transferências-entre-conta-e-personagem), nunca um callback solto.
+- `discarded` recebe o resultado quando o jogador saiu antes de a continuação rodar. É onde se desfaz o que já foi feito na conta (ex.: `CashShopService.WithdrawDepository` devolve o item ao Cash Depository).
+- `io.Run(operation, work)` sem jogador serve para compensações e tarefas do servidor. A falha é registrada como erro, então o nome da operação diz o que ficou por fazer.
+- O `WorldIo` registra a exceção com o contexto (operação, jogador), inclusive a da continuação. O serviço não escreve `try/catch` para isso.
+- Na parada, o `WorldIo` para antes do mundo e espera o I/O pendente e as continuações dele (inclusive o I/O que elas iniciarem). Só depois o mundo salva os jogadores. Estourou o tempo de parada: o token do `work` é cancelado.
+- Nos testes, `WorldHarness` (`TestSupport`) sobe o mundo e o `WorldIo`. `RunAsync` roda na thread do mundo e espera o I/O.
+- Mudança de estado do personagem que depende do banco segue o fluxo de [transferência](seguranca.md#transferências-entre-conta-e-personagem) (**PR #41: S3**), nunca um callback solto.
 
 ## Respostas (S2C)
 - Um `ServerPacket` por S2C, em `Network/Packets/<Servidor>/`. O pacote só serializa o que recebe, sem regra.

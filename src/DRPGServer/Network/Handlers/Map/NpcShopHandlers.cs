@@ -1,5 +1,6 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Shop;
 using DRPGServer.Network.Packets.Map;
 
 namespace DRPGServer.Network.Handlers;
@@ -113,7 +114,7 @@ public sealed class CardShopTradeHandler(GameData data) : PlayerHandler<CardShop
 /// <summary>✅ Map 0x0053 (C2S 158 B): comprar (1) ou vender (2) item em loja de NPC.</summary>
 [PacketHandler(MapOpcode.ItemShopTrade)]
 [RequiresState(PlayerStates.Idle)]
-public sealed class ItemShopTradeHandler(GameData data) : PlayerHandler<ItemShopTradeRequest>
+public sealed class ItemShopTradeHandler(GameData data, CashShopService cashShop) : PlayerHandler<ItemShopTradeRequest>
 {
     private const uint MaxTradeQuantity = 999;
 
@@ -164,19 +165,18 @@ public sealed class ItemShopTradeHandler(GameData data) : PlayerHandler<ItemShop
             if (!TrySpendCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong))
                 return;
 
-            player.SendToShopDepository(info.Id, quantity, expiresAt: 0, deposited =>
+            // a continuação só roda com o jogador online (WorldIo)
+            cashShop.SendToShopDepository(player, info.Id, quantity, expiresAt: 0, deposited =>
             {
                 if (!deposited)
                 {
                     RefundCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong);
                     player.RequestImmediateSave();
-                    if (player.IsOnline)
-                        player.SendNotice("[Shop]", "Shop Depository cheio. Retire itens antes de comprar.");
+                    player.SendNotice("[Shop]", "Shop Depository cheio. Retire itens antes de comprar.");
                     return;
                 }
 
                 player.RequestImmediateSave();
-                if (!player.IsOnline) return;
 
                 var preview = new InventoryItem { Uid = 0, ItemId = info.Id, Info = info, Amount = quantity };
                 player.Send(new ItemShopTradePacket(

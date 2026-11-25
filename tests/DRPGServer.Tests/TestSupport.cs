@@ -98,3 +98,46 @@ internal static class HandlerDispatch
         return padded;
     }
 }
+
+/// <summary>
+/// Mundo com a thread rodando e o <see cref="WorldIo"/> dele, para testes com I/O. <see cref="SettleAsync"/> espera o
+/// I/O pendente e as continuações dele terminarem na thread do mundo.
+/// </summary>
+internal sealed class WorldHarness : IAsyncDisposable
+{
+    private static readonly TimeSpan SettleTimeout = TimeSpan.FromSeconds(10);
+
+    public GameWorld World { get; } = TestSupport.NewWorld();
+    public WorldIo Io { get; }
+
+    public WorldHarness() => Io = new WorldIo(World, NullLogger<WorldIo>.Instance);
+
+    public Task StartAsync() => World.StartAsync(CancellationToken.None);
+
+    public async Task StopAsync()
+    {
+        await Io.StopAsync(CancellationToken.None);
+        await World.StopAsync(CancellationToken.None);
+    }
+
+    public ValueTask DisposeAsync() => new(StopAsync());
+
+    public Task<T> InvokeAsync<T>(Func<T> work) => World.InvokeAsync(work);
+
+    /// <summary>Roda <paramref name="action"/> na thread do mundo e espera o I/O que ela iniciou.</summary>
+    public async Task RunAsync(Action action)
+    {
+        await World.InvokeAsync(() =>
+        {
+            action();
+            return true;
+        });
+        await SettleAsync();
+    }
+
+    public Task SettleAsync() => Io.DrainAsync(new CancellationTokenSource(SettleTimeout).Token);
+
+    /// <summary>Entrega o payload ao handler na thread do mundo e espera o I/O dele.</summary>
+    public Task DispatchAsync(IWorldPacketHandler handler, Session session, PacketReader packet) =>
+        RunAsync(() => handler.Dispatch(session, packet));
+}

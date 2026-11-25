@@ -8,59 +8,45 @@ using Microsoft.Extensions.Logging;
 namespace DRPGServer.Game.Shop;
 
 /// <summary>
-/// Regras de negócio do Cash Shop (<c>0x0159</c>/<c>0x0160</c>/<c>0x0161</c>) e do Cash Depository
-/// (<c>0x00CA</c>/<c>0x00DE</c>/<c>0x00DD</c>). Toda operação de banco roda fora da thread do mundo e
-/// sincroniza o resultado de volta via <see cref="GameWorld.Post"/>.
+/// Regras de negócio do Cash Shop (<c>0x0159</c>/<c>0x0160</c>/<c>0x0161</c>), do Cash Depository
+/// (<c>0x00CA</c>/<c>0x00DE</c>/<c>0x00DD</c>) e da entrega no Shop Depository da conta. Roda na thread do mundo; o
+/// banco é acessado só por <see cref="WorldIo"/>.
 /// </summary>
 public sealed class CashShopService(
     GameData data,
     ICashStore store,
-    GameWorld world,
+    WorldIo io,
     ILogger<CashShopService> log)
 {
     public const uint MaxPurchaseQuantity = 99;
 
     /// <summary>✅ Abre a loja de Cash e retorna o saldo atual da conta (<c>0x0159</c>).</summary>
-    public async Task OpenShopAsync(Player player, uint headerWord, CancellationToken ct = default)
+    public void OpenShop(Player player, uint headerWord)
     {
         uint accountUid = player.Account.Uid;
         string username = player.Account.Username;
-        try
-        {
-            var balance = await store.GetBalanceAsync(accountUid, ct);
-            world.Post(() =>
+        io.Run(player, "cash-shop.open",
+            work: ct => store.GetBalanceAsync(accountUid, ct),
+            then: balance =>
             {
-                if (!player.IsOnline) return;
                 if (balance is null)
                 {
                     player.Send(new CashShopOpenPacket(headerWord, errorCode: 1, accountUid, 0, 0, username));
                     return;
                 }
                 player.Send(new CashShopOpenPacket(headerWord, errorCode: 0, accountUid, balance.Value.Cash, balance.Value.BonusCash, username));
-            });
-        }
-        catch (Exception e)
-        {
-            log.LogWarning(e, "Falha ao abrir Cash Shop para conta {AccountUid}", accountUid);
-            world.Post(() =>
-            {
-                if (player.IsOnline)
-                    player.Send(new CashShopOpenPacket(headerWord, errorCode: 1, accountUid, 0, 0, username));
-            });
-        }
+            },
+            failed: _ => player.Send(new CashShopOpenPacket(headerWord, errorCode: 1, accountUid, 0, 0, username)));
     }
 
     /// <summary>
     /// ✅ Compra um produto do catálogo (<c>0x0160</c>): recalcula o preço server-side, debita o Cash da conta
     /// e deposita os itens/cards no Cash Depository da conta em uma transação atômica.
     /// </summary>
-    public async Task BuyProductAsync(Player player, uint headerWord, uint productId, uint quantity, CancellationToken ct = default)
+    public void BuyProduct(Player player, uint headerWord, uint productId, uint quantity)
     {
-        log.LogInformation("CashShopBuy recebido de {Player}: itemDataId={ProductId} qty={Qty} inBattle={InBattle}",
-            player, productId, quantity, player.InBattle);
+        log.LogInformation("CashShopBuy recebido de {Player}: itemDataId={ProductId} qty={Qty}", player, productId, quantity);
 
-        // Validações autoritativas na thread do mundo antes de tocar no banco
-        if (player.InBattle) return;
         if (quantity is 0 or > MaxPurchaseQuantity)
         {
             log.LogWarning("CashShopBuy rejeitado ({Player}): quantidade inválida {Qty}", player, quantity);
@@ -91,14 +77,12 @@ public sealed class CashShopService(
         }
 
         uint accountUid = player.Account.Uid;
-        try
-        {
-            var outcome = await store.PurchaseAsync(accountUid, product.ItemDataId, quantity, product.Price, totalPrice, expanded, ct);
-            log.LogInformation("CashShopBuy resultado ({Player}): result={Result} itemDataId={ItemDataId} totalPrice={Price} saldo={Cash}+{Bonus}",
-                player, outcome.Result, product.ItemDataId, totalPrice, outcome.Balance.Cash, outcome.Balance.BonusCash);
-            world.Post(() =>
+        io.Run(player, "cash-shop.buy",
+            work: ct => store.PurchaseAsync(accountUid, product.ItemDataId, quantity, product.Price, totalPrice, expanded, ct),
+            then: outcome =>
             {
-                if (!player.IsOnline) return;
+                log.LogInformation("CashShopBuy resultado ({Player}): result={Result} itemDataId={ItemDataId} totalPrice={Price} saldo={Cash}+{Bonus}",
+                    player, outcome.Result, product.ItemDataId, totalPrice, outcome.Balance.Cash, outcome.Balance.BonusCash);
                 switch (outcome.Result)
                 {
                     case CashPurchaseResult.Ok:
@@ -122,63 +106,37 @@ public sealed class CashShopService(
                         player.SendNotice("[Cash Shop]", "Não foi possível concluir a compra.");
                         break;
                 }
-            });
-        }
-        catch (Exception e)
-        {
-            log.LogWarning(e, "Falha na compra Cash Shop produto={ProductId} qtd={Qty} conta={AccountUid}", productId, quantity, accountUid);
-            world.Post(() =>
-            {
-                if (player.IsOnline)
-                    player.SendNotice("[Cash Shop]", "Erro interno ao processar compra.");
-            });
-        }
+            },
+            failed: _ => player.SendNotice("[Cash Shop]", "Erro interno ao processar compra."));
     }
 
     /// <summary>✅ Consulta o histórico de compras por ano/mês/página (<c>0x0161</c>).</summary>
-    public async Task GetHistoryAsync(Player player, uint headerWord, ushort year, ushort month, ushort page, CancellationToken ct = default)
+    public void GetHistory(Player player, uint headerWord, ushort year, ushort month, ushort page)
     {
         uint accountUid = player.Account.Uid;
         ushort clampedPage = Math.Max((ushort)1, page);
-        try
-        {
-            var history = await store.GetHistoryAsync(accountUid, year, month, clampedPage, ct);
-            world.Post(() =>
-            {
-                if (!player.IsOnline) return;
-                player.Send(new CashShopHistoryPacket(
-                    headerWord,
-                    errorCode: 0,
-                    year,
-                    month,
-                    Math.Min(clampedPage, history.TotalPages),
-                    history.TotalPages,
-                    accountUid,
-                    history.Entries));
-            });
-        }
-        catch (Exception e)
-        {
-            log.LogWarning(e, "Falha ao consultar histórico Cash Shop da conta {AccountUid}", accountUid);
-            world.Post(() =>
-            {
-                if (player.IsOnline)
-                    player.Send(new CashShopHistoryPacket(headerWord, errorCode: 0, year, month, clampedPage, 1, accountUid, []));
-            });
-        }
+        io.Run(player, "cash-shop.history",
+            work: ct => store.GetHistoryAsync(accountUid, year, month, clampedPage, ct),
+            then: history => player.Send(new CashShopHistoryPacket(
+                headerWord,
+                errorCode: 0,
+                year,
+                month,
+                Math.Min(clampedPage, history.TotalPages),
+                history.TotalPages,
+                accountUid,
+                history.Entries)),
+            failed: _ => player.Send(new CashShopHistoryPacket(headerWord, errorCode: 0, year, month, clampedPage, 1, accountUid, [])));
     }
 
     /// <summary>✅ Lista o Cash Depository da conta (<c>0x00DE</c>: 24 cards + 24 items).</summary>
-    public async Task ListDepositoryAsync(Player player, CancellationToken ct = default)
+    public void ListDepository(Player player)
     {
-        if (player.InBattle) return;
         uint accountUid = player.Account.Uid;
-        try
-        {
-            var rows = await store.ListDepositoryAsync(accountUid, ct);
-            world.Post(() =>
+        io.Run(player, "cash-depository.list",
+            work: ct => store.ListDepositoryAsync(accountUid, ct),
+            then: rows =>
             {
-                if (!player.IsOnline) return;
                 var cards = new InventoryItem?[CashRepository.DepositoryCapacityPerKind];
                 var items = new InventoryItem?[CashRepository.DepositoryCapacityPerKind];
                 foreach (var r in rows)
@@ -190,111 +148,132 @@ public sealed class CashShopService(
                 }
                 player.Send(new CashDepositoryListPacket(cards, items, success: true));
             });
-        }
-        catch (Exception e)
-        {
-            log.LogWarning(e, "Falha ao listar Cash Depository da conta {AccountUid}", accountUid);
-        }
     }
 
     /// <summary>
     /// ✅ Retira um Card (<c>kind=1</c>) ou Item (<c>kind=2</c>) do Cash Depository para a mochila do personagem (<c>0x00DD</c>).
-    /// Faz rollback no banco se a mochila não tiver espaço ou o jogador ficar indisponível.
+    /// Devolve ao depósito se a mochila não tiver espaço ou o jogador sair antes da entrega.
+    /// ❓ A entrega na mochila ainda não é atômica com o snapshot do personagem (PR #41: S3).
     /// </summary>
-    public async Task WithdrawDepositoryAsync(Player player, CashShopItemKind kind, uint uid, CancellationToken ct = default)
+    public void WithdrawDepository(Player player, CashShopItemKind kind, uint uid)
     {
-        if (player.InBattle || uid == 0 || kind is not CashShopItemKind.Card and not CashShopItemKind.Item)
+        if (uid == 0 || kind is not CashShopItemKind.Card and not CashShopItemKind.Item)
         {
             player.Send(new CashDepositoryWithdrawPacket(kind, null, CashDepositoryWithdrawResult.Failed));
             return;
         }
 
         uint accountUid = player.Account.Uid;
-        CashDepositoryRow? taken;
-        try
-        {
-            taken = await store.TakeDepositoryItemAsync(accountUid, kind, uid, ct);
-        }
-        catch (Exception e)
-        {
-            log.LogWarning(e, "Falha ao retirar uid={Uid} do Cash Depository da conta {AccountUid}", uid, accountUid);
-            world.Post(() =>
+        io.Run(player, "cash-depository.withdraw",
+            work: ct => store.TakeDepositoryItemAsync(accountUid, kind, uid, ct),
+            then: taken =>
             {
-                if (player.IsOnline)
-                    player.Send(new CashDepositoryWithdrawPacket(kind, null, CashDepositoryWithdrawResult.Failed));
-            });
-            return;
-        }
-
-        if (taken is null)
-        {
-            world.Post(() =>
-            {
-                if (player.IsOnline)
+                if (taken is null)
+                {
                     player.Send(new CashDepositoryWithdrawPacket(kind, null, CashDepositoryWithdrawResult.NotFound));
+                    return;
+                }
+                if (!Deliver(player, taken))
+                    Restore(accountUid, taken);
+            },
+            failed: _ => player.Send(new CashDepositoryWithdrawPacket(kind, null, CashDepositoryWithdrawResult.Failed)),
+            discarded: taken =>
+            {
+                if (taken is not null) Restore(accountUid, taken);
             });
+    }
+
+    private bool Deliver(Player player, CashDepositoryRow taken)
+    {
+        if (player.InBattle) return false;
+
+        var inv = player.Character.Inventory;
+        var bag = taken.Kind == CashShopItemKind.Card ? inv.Battle : inv.Main;
+        if (bag.Room(taken.ItemId) < taken.Amount)
+        {
+            player.Send(new CashDepositoryWithdrawPacket(taken.Kind, ToInventoryItem(taken), CashDepositoryWithdrawResult.InventoryFull));
+            return false;
+        }
+
+        long? durationOverride = null;
+        if (taken.Kind == CashShopItemKind.Item && taken.ExpiresAt > 0)
+        {
+            long remaining = taken.ExpiresAt - DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            durationOverride = Math.Max(1, remaining);
+        }
+
+        var added = bag.Add(taken.ItemId, taken.Amount, durationOverride);
+        if (added.Count == 0)
+        {
+            player.Send(new CashDepositoryWithdrawPacket(taken.Kind, ToInventoryItem(taken), CashDepositoryWithdrawResult.InventoryFull));
+            return false;
+        }
+
+        player.RequestImmediateSave();
+        player.Send(new CashDepositoryWithdrawPacket(taken.Kind, ToInventoryItem(taken), CashDepositoryWithdrawResult.Ok));
+        if (taken.Kind == CashShopItemKind.Card)
+            player.Send(new BattleItemReceivePacket(added));
+        else
+            player.Send(new ItemReceivePacket(added));
+        return true;
+    }
+
+    /// <summary>Devolve ao Cash Depository o que foi retirado e não entregue. Não é cancelado na parada.</summary>
+    private void Restore(uint accountUid, CashDepositoryRow taken) =>
+        io.Run($"cash-depository.restore conta={accountUid} uid={taken.Uid} item={taken.ItemId}x{taken.Amount} (ITEM FORA DO DEPÓSITO)",
+            _ => store.RestoreDepositoryItemAsync(accountUid, taken, CancellationToken.None));
+
+    /// <summary>
+    /// Deposita um item no <b>Shop Depository</b> (<c>cash_depository_item</c>) da conta do jogador. Reutilizável por
+    /// lojas NPC (ex.: loja 5050 de Coins), eventos, missões e comandos GM. <paramref name="then"/> roda na thread do
+    /// mundo com <c>true</c> se depositou ou <c>false</c> se o depósito está cheio ou indisponível, e só se o jogador
+    /// continua online. ❓ Não é atômico com o snapshot do personagem (PR #41: S3).
+    /// </summary>
+    public void SendToShopDepository(Player player, uint itemId, uint quantity, uint expiresAt, Action<bool> then) =>
+        SendBatchToShopDepository(player, Split(CashShopItemKind.Item, itemId, quantity, expiresAt,
+            player.Character.Inventory.MaxStackOf(itemId, isCard: false)), then);
+
+    /// <summary>Deposita um card no Shop Depository da conta (ver <see cref="SendToShopDepository"/>).</summary>
+    public void SendCardToShopDepository(Player player, uint cardId, uint quantity, Action<bool> then) =>
+        SendBatchToShopDepository(player, Split(CashShopItemKind.Card, cardId, quantity, 0,
+            player.Character.Inventory.MaxStackOf(cardId, isCard: true)), then);
+
+    /// <summary>Deposita um lote de itens e cards no Shop Depository da conta (ver <see cref="SendToShopDepository"/>).</summary>
+    public void SendBatchToShopDepository(Player player,
+        IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries, Action<bool> then)
+    {
+        if (entries.Count == 0)
+        {
+            then(false);
             return;
         }
+        uint accountUid = player.Account.Uid;
+        io.Run(player, "shop-depository.deposit",
+            work: ct => store.DepositAsync(accountUid, entries, ct),
+            then: then,
+            failed: _ => then(false));
+    }
 
-        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        world.Post(() =>
+    private static List<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> Split(
+        CashShopItemKind kind, uint itemId, uint quantity, uint expiresAt, uint maxStack)
+    {
+        maxStack = Math.Max(1u, maxStack);
+        var entries = new List<(CashShopItemKind, uint, uint, uint)>();
+        for (uint remaining = quantity; remaining > 0;)
         {
-            if (!player.IsOnline || player.InBattle)
-            {
-                tcs.SetResult(false);
-                return;
-            }
-
-            var inv = player.Character.Inventory;
-            var bag = taken.Kind == CashShopItemKind.Card ? inv.Battle : inv.Main;
-            if (bag.Room(taken.ItemId) < taken.Amount)
-            {
-                player.Send(new CashDepositoryWithdrawPacket(taken.Kind, ToInventoryItem(taken), CashDepositoryWithdrawResult.InventoryFull));
-                tcs.SetResult(false);
-                return;
-            }
-
-            long? durationOverride = null;
-            if (taken.Kind == CashShopItemKind.Item && taken.ExpiresAt > 0)
-            {
-                long remaining = taken.ExpiresAt - DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                durationOverride = Math.Max(1, remaining);
-            }
-
-            var added = bag.Add(taken.ItemId, taken.Amount, durationOverride);
-            if (added.Count == 0)
-            {
-                player.Send(new CashDepositoryWithdrawPacket(taken.Kind, ToInventoryItem(taken), CashDepositoryWithdrawResult.InventoryFull));
-                tcs.SetResult(false);
-                return;
-            }
-
-            player.RequestImmediateSave();
-            player.Send(new CashDepositoryWithdrawPacket(taken.Kind, ToInventoryItem(taken), CashDepositoryWithdrawResult.Ok));
-            if (taken.Kind == CashShopItemKind.Card)
-                player.Send(new BattleItemReceivePacket(added));
-            else
-                player.Send(new ItemReceivePacket(added));
-            tcs.SetResult(true);
-        });
-
-        bool delivered = await tcs.Task;
-        if (!delivered)
-        {
-            try
-            {
-                await store.RestoreDepositoryItemAsync(accountUid, taken, CancellationToken.None);
-            }
-            catch (Exception e)
-            {
-                log.LogError(e, "CRÍTICO: falha ao restaurar item uid={Uid} no Cash Depository da conta {AccountUid}", taken.Uid, accountUid);
-            }
+            uint chunk = Math.Min(remaining, maxStack);
+            entries.Add((kind, itemId, chunk, expiresAt));
+            remaining -= chunk;
         }
+        return entries;
     }
 
     /// <summary>Credita Cash (ou bônus) na conta — usado pelo comando GM <c>/cash</c>.</summary>
-    public async Task<CashBalance?> GrantCashAsync(uint accountUid, uint cashDelta, uint bonusCashDelta = 0, CancellationToken ct = default) =>
-        await store.AddCashAsync(accountUid, cashDelta, bonusCashDelta, ct);
+    public void GrantCash(Player requester, uint cashDelta, uint bonusCashDelta, Action<CashBalance?> then, Action failed) =>
+        io.Run(requester, "gm.cash",
+            work: ct => store.AddCashAsync(requester.Account.Uid, cashDelta, bonusCashDelta, ct),
+            then: then,
+            failed: _ => failed());
 
     private List<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> ExpandProductEntries(CashShopProduct product, uint quantity)
     {

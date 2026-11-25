@@ -11,7 +11,7 @@ namespace DRPGServer.Network.Handlers;
 public sealed class CashShopOpenHandler(CashShopService cashShop) : PlayerHandler<CashShopOpenRequest>
 {
     protected override void Handle(Player player, CashShopOpenRequest request) =>
-        _ = cashShop.OpenShopAsync(player, request.HeaderWord);
+        cashShop.OpenShop(player, request.HeaderWord);
 }
 
 /// <summary>✅ 0x160: comprar produto no Cash Shop. O preço vem sempre do catálogo.</summary>
@@ -20,7 +20,7 @@ public sealed class CashShopOpenHandler(CashShopService cashShop) : PlayerHandle
 public sealed class CashShopBuyHandler(CashShopService cashShop) : PlayerHandler<CashShopBuyRequest>
 {
     protected override void Handle(Player player, CashShopBuyRequest request) =>
-        _ = cashShop.BuyProductAsync(player, request.HeaderWord, request.ProductId, request.Quantity);
+        cashShop.BuyProduct(player, request.HeaderWord, request.ProductId, request.Quantity);
 }
 
 /// <summary>✅ 0x161: histórico de compras do Cash Shop.</summary>
@@ -29,7 +29,7 @@ public sealed class CashShopBuyHandler(CashShopService cashShop) : PlayerHandler
 public sealed class CashShopHistoryHandler(CashShopService cashShop) : PlayerHandler<CashShopHistoryRequest>
 {
     protected override void Handle(Player player, CashShopHistoryRequest request) =>
-        _ = cashShop.GetHistoryAsync(player, request.HeaderWord, request.Year, request.Month, request.Page);
+        cashShop.GetHistory(player, request.HeaderWord, request.Year, request.Month, request.Page);
 }
 
 /// <summary>✅ 0xCA: autenticar e abrir a janela do Cash Depository (<c>0x46</c>).</summary>
@@ -53,7 +53,7 @@ public sealed class CashDepositoryAuthHandler : PlayerHandler<CashDepositoryAuth
 public sealed class CashDepositoryListHandler(CashShopService cashShop) : PlayerHandler<CashDepositoryListRequest>
 {
     protected override void Handle(Player player, CashDepositoryListRequest request) =>
-        _ = cashShop.ListDepositoryAsync(player);
+        cashShop.ListDepository(player);
 }
 
 /// <summary>✅ 0xDD: retirar card (1) ou item (2) do Cash Depository para a mochila.</summary>
@@ -69,6 +69,6 @@ public sealed class CashDepositoryWithdrawHandler(CashShopService cashShop) : Pl
             player.Send(new CashDepositoryWithdrawPacket(CashShopItemKind.Item, null, CashDepositoryWithdrawResult.Failed));
             return;
         }
-        _ = cashShop.WithdrawDepositoryAsync(player, kind, uid);
+        cashShop.WithdrawDepository(player, kind, uid);
     }
 }

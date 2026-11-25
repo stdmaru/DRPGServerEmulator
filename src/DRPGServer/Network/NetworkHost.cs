@@ -19,6 +19,7 @@ public sealed class NetworkHost(
 {
     private readonly ILogger _log = loggers.CreateLogger<NetworkHost>();
     private readonly ConcurrentDictionary<long, Session> _sessions = new();
+    private readonly ConcurrentDictionary<long, Task> _running = new();
     private readonly ILookup<ServerRole, ISessionLifecycle> _lifecycles = lifecycles.ToLookup(l => l.Role);
 
     public IEnumerable<Session> Sessions => _sessions.Values;
@@ -54,12 +55,14 @@ public sealed class NetworkHost(
                 break;
             }
             socket.NoDelay = true;
-            _ = RunSessionAsync(new Session(socket, role, _log, trace), stopping);
+            var session = new Session(socket, role, _log, trace);
+            _running[session.Id] = RunSessionAsync(session, stopping);   // acompanhada: a parada espera o fim de cada sessão
         }
     }
 
     private async Task RunSessionAsync(Session session, CancellationToken stopping)
     {
+        await Task.Yield();     // devolve a Task antes de rodar: ela entra em _running antes do TryRemove do fim
         _sessions[session.Id] = session;
         _log.LogInformation("Conexão {Session}", session);
         try
@@ -81,6 +84,7 @@ public sealed class NetworkHost(
                 try { lifecycle.OnDisconnected(session); }
                 catch (Exception e) { _log.LogError(e, "Falha ao desconectar {Session}", session); }
             }
+            _running.TryRemove(session.Id, out _);
         }
     }
 
@@ -89,5 +93,7 @@ public sealed class NetworkHost(
         foreach (var session in _sessions.Values)
             session.Close("servidor desligando");
         await base.StopAsync(cancellationToken);
+        // a saída de cada sessão (OnDisconnected) posta o Leave no mundo, que ainda está de pé
+        await Task.WhenAll(_running.Values).WaitAsync(cancellationToken);
     }
 }

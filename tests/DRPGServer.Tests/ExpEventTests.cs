@@ -127,7 +127,7 @@ public class ExpEventTests
         var world = TestSupport.NewWorld();
         var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
         var expEvents = new ExpEventService(null, TestSupport.GameOptions(), NullLogger<ExpEventService>.Instance);
-        var commands = new ChatCommands(zones, TestSupport.GameOptions(), NullLogger<ChatCommands>.Instance, expEvents);
+        var commands = new ChatCommands(zones, new WorldIo(world, NullLogger<WorldIo>.Instance), TestSupport.GameOptions(), NullLogger<ChatCommands>.Instance, expEvents);
 
         var gm = new Player(TestSupport.NewSession(ServerRole.Map), new AuthenticatedAccount(1, "gm", Authority.GameMaster), Entities.Character());
         var admin = new Player(TestSupport.NewSession(ServerRole.Map), new AuthenticatedAccount(2, "adm", Authority.Administrator), Entities.Character());

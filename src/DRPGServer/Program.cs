@@ -66,11 +66,13 @@ services.AddSingleton(sp =>
     return GameDataLoader.Load(resources, ClientPack.Open(table), File.Exists(grids) ? MapGrid.Load(grids) : null);
 });
 
-// ordem importa: serviços param na ordem inversa (rede → mundo → persistência)
+// ordem importa: serviços param na ordem inversa (rede → I/O do mundo → mundo → persistência)
 services.AddSingleton<PersistenceQueue>();
 services.AddHostedService<PersistenceService>();
 services.AddSingleton<GameWorld>();
 services.AddHostedService(sp => sp.GetRequiredService<GameWorld>());
+services.AddSingleton<WorldIo>();
+services.AddHostedService(sp => sp.GetRequiredService<WorldIo>());   // para antes do mundo: espera o I/O pendente
 services.AddSingleton<NetworkHost>();
 services.AddHostedService(sp => sp.GetRequiredService<NetworkHost>());
 

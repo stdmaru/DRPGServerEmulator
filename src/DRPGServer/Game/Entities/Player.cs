@@ -30,9 +30,7 @@ public enum PlayerStates
 public sealed class Player(
     Session session,
     AuthenticatedAccount account,
-    Character character,
-    ICashStore? cashStore = null,
-    GameWorld? world = null)
+    Character character)
 {
     public Session Session { get; } = session;
     public AuthenticatedAccount Account { get; } = account;
@@ -152,98 +150,6 @@ public sealed class Player(
         if (added.Count > 0) Send(new BattleItemReceivePacket(added));
         if (refresh) RefreshInventory();
         return true;
-    }
-
-    /// <summary>
-    /// Deposita um item diretamente no <b>Shop Depository</b> (<c>cash_depository_item</c>) da conta do jogador,
-    /// fora da thread do mundo, invocando <paramref name="onComplete"/> de volta na thread do mundo com <c>true</c>
-    /// em caso de sucesso ou <c>false</c> se o depósito estiver cheio / indisponível.
-    /// Reutilizável por lojas NPC (ex.: loja 5050 de Coins), eventos, missões e comandos GM.
-    /// </summary>
-    public void SendToShopDepository(uint itemId, uint quantity = 1, uint expiresAt = 0, Action<bool>? onComplete = null)
-    {
-        if (quantity == 0)
-        {
-            onComplete?.Invoke(false);
-            return;
-        }
-
-        uint maxStack = Math.Max(1u, Character.Inventory.MaxStackOf(itemId, isCard: false));
-        var entries = new List<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)>();
-        uint remaining = quantity;
-        while (remaining > 0)
-        {
-            uint chunk = Math.Min(remaining, maxStack);
-            entries.Add((CashShopItemKind.Item, itemId, chunk, expiresAt));
-            remaining -= chunk;
-        }
-
-        SendBatchToShopDepository(entries, onComplete);
-    }
-
-    /// <summary>
-    /// Deposita um card diretamente no <b>Shop Depository</b> (<c>cash_depository_item</c>) da conta do jogador.
-    /// </summary>
-    public void SendCardToShopDepository(uint cardId, uint quantity = 1, Action<bool>? onComplete = null)
-    {
-        if (quantity == 0)
-        {
-            onComplete?.Invoke(false);
-            return;
-        }
-
-        uint maxStack = Math.Max(1u, Character.Inventory.MaxStackOf(cardId, isCard: true));
-        var entries = new List<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)>();
-        uint remaining = quantity;
-        while (remaining > 0)
-        {
-            uint chunk = Math.Min(remaining, maxStack);
-            entries.Add((CashShopItemKind.Card, cardId, chunk, 0u));
-            remaining -= chunk;
-        }
-
-        SendBatchToShopDepository(entries, onComplete);
-    }
-
-    /// <summary>
-    /// Deposita um lote de itens/cards no <b>Shop Depository</b> (<c>cash_depository_item</c>) da conta do jogador,
-    /// executando I/O fora da thread do mundo e devolvendo o resultado via <paramref name="onComplete"/> na thread do mundo.
-    /// </summary>
-    public void SendBatchToShopDepository(
-        IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries,
-        Action<bool>? onComplete = null)
-    {
-        if (cashStore is null || entries.Count == 0)
-        {
-            onComplete?.Invoke(false);
-            return;
-        }
-
-        _ = DepositAsync(cashStore, world, Account.Uid, entries, onComplete);
-    }
-
-    private static async Task DepositAsync(
-        ICashStore store,
-        GameWorld? world,
-        uint accountUid,
-        IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries,
-        Action<bool>? onComplete)
-    {
-        bool deposited = false;
-        try
-        {
-            deposited = await store.DepositAsync(accountUid, entries, CancellationToken.None);
-        }
-        catch
-        {
-            deposited = false;
-        }
-
-        if (onComplete is null) return;
-        if (world is not null)
-            world.Post(() => onComplete(deposited));
-        else
-            onComplete(deposited);
     }
 
     /// <summary>

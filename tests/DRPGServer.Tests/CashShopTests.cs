@@ -120,14 +120,18 @@ public class CashShopTests
             return Task.FromResult(new CashShopHistoryPage(slice, totalPages));
         }
 
-        public Task<CashDepositoryRow?> TakeDepositoryItemAsync(uint accountUid, CashShopItemKind kind, uint uid, CancellationToken ct)
+        /// <summary>Se definido, a retirada tira a linha e espera esta tarefa antes de responder (I/O lento).</summary>
+        public Task? HoldTake { get; set; }
+
+        public async Task<CashDepositoryRow?> TakeDepositoryItemAsync(uint accountUid, CashShopItemKind kind, uint uid, CancellationToken ct)
         {
-            if (!_depo.TryGetValue(accountUid, out var list)) return Task.FromResult<CashDepositoryRow?>(null);
+            if (!_depo.TryGetValue(accountUid, out var list)) return null;
             int idx = list.FindIndex(r => r.Kind == kind && r.Uid == uid);
-            if (idx < 0) return Task.FromResult<CashDepositoryRow?>(null);
+            if (idx < 0) return null;
             var row = list[idx];
             list.RemoveAt(idx);
-            return Task.FromResult<CashDepositoryRow?>(row);
+            if (HoldTake is { } hold) await hold;
+            return row;
         }
 
         public Task RestoreDepositoryItemAsync(uint accountUid, CashDepositoryRow row, CancellationToken ct)
@@ -137,7 +141,7 @@ public class CashShopTests
         }
     }
 
-    private static (GameData Data, Player Player, Session Session, GameWorld World, InMemoryCashStore Store, CashShopService Service) MakeEnv()
+    private static (GameData Data, Player Player, Session Session, WorldHarness World, InMemoryCashStore Store, CashShopService Service) MakeEnv()
     {
         var items = new Dictionary<uint, ItemInfo>(TestSupport.Data.Items)
         {
@@ -184,10 +188,10 @@ public class CashShopTests
         var player = new Player(session, new AuthenticatedAccount(42, "debelzak26", Authority.None), character);
         session.Player = player;
 
-        var world = TestSupport.NewWorld();
+        var world = new WorldHarness();
         var store = new InMemoryCashStore();
         store.Seed(42, cash: 100, bonusCash: 100);
-        var service = new CashShopService(data, store, world, NullLogger<CashShopService>.Instance);
+        var service = new CashShopService(data, store, world.Io, NullLogger<CashShopService>.Instance);
         return (data, player, session, world, store, service);
     }
 
@@ -231,17 +235,15 @@ public class CashShopTests
     public async Task Buy_list_and_withdraw_flow_updates_balance_depository_and_inventory()
     {
         var (_, player, session, world, store, service) = MakeEnv();
-        await world.StartAsync(CancellationToken.None);
+        await world.StartAsync();
         try
         {
             // 1. Abrir Cash Shop (0x0159): saldo 100 + 100
-            await service.OpenShopAsync(player, 0x010101B4);
-            await world.InvokeAsync(() => 0);
+            await world.RunAsync(() => service.OpenShop(player, 0x010101B4));
             Assert.Equal([(ushort)MapOpcode.CashShopOpen], session.SentOpcodes());
 
             // 2. Comprar Starter Pack (ItemDataId=1, 160 cash): debita 100 de bonus + 60 de cash -> resta 40 + 0
-            await service.BuyProductAsync(player, 0x0100FDBC, 1, 1);
-            await world.InvokeAsync(() => 0);
+            await world.RunAsync(() => service.BuyProduct(player, 0x0100FDBC, 1, 1));
             var buyFrames = session.DrainOutgoing();
             Assert.Single(buyFrames);
             Assert.Equal((ushort)MapOpcode.CashShopBuy, PacketHeader.Read(buyFrames[0]).Opcode);
@@ -251,8 +253,7 @@ public class CashShopTests
 
             // 2.5. Consultar histórico de compras (0x0161): deve listar a compra recém-feita
             var now = DateTimeOffset.UtcNow;
-            await service.GetHistoryAsync(player, 0, (ushort)now.Year, (ushort)now.Month, 1);
-            await world.InvokeAsync(() => 0);
+            await world.RunAsync(() => service.GetHistory(player, 0, (ushort)now.Year, (ushort)now.Month, 1));
             var histFrames = session.DrainOutgoing();
             Assert.Single(histFrames);
             Assert.Equal((ushort)MapOpcode.CashShopHistory, PacketHeader.Read(histFrames[0]).Opcode);
@@ -265,8 +266,7 @@ public class CashShopTests
             Assert.Equal(0L, BinaryPrimitives.ReadInt64LittleEndian(histPayload.Slice(0x40)));          // bonusCashAfter
 
             // 3. Listar Cash Depository (0x00DE): deve conter 1 card (#74 x50) e 1 item (#718 x1)
-            await service.ListDepositoryAsync(player);
-            await world.InvokeAsync(() => 0);
+            await world.RunAsync(() => service.ListDepository(player));
             Assert.Equal([(ushort)MapOpcode.CashDepositoryList], session.SentOpcodes());
             var rows = await store.ListDepositoryAsync(42, CancellationToken.None);
             Assert.Equal(2, rows.Count);
@@ -274,13 +274,11 @@ public class CashShopTests
             var itemRow = rows.Single(r => r.Kind == CashShopItemKind.Item);
 
             // 4. Retirar Card (0x00DD -> 0x00DD + 0x00C8) e Item (0x00DD -> 0x00DD + 0x00C9)
-            await service.WithdrawDepositoryAsync(player, CashShopItemKind.Card, cardRow.Uid);
-            await world.InvokeAsync(() => 0);
+            await world.RunAsync(() => service.WithdrawDepository(player, CashShopItemKind.Card, cardRow.Uid));
             Assert.Equal([(ushort)MapOpcode.CashDepositoryWithdraw, (ushort)MapOpcode.BattleItemReceive], session.SentOpcodes());
             Assert.Equal(50u, player.Character.Inventory.Battle.Count(74));
 
-            await service.WithdrawDepositoryAsync(player, CashShopItemKind.Item, itemRow.Uid);
-            await world.InvokeAsync(() => 0);
+            await world.RunAsync(() => service.WithdrawDepository(player, CashShopItemKind.Item, itemRow.Uid));
             Assert.Equal([(ushort)MapOpcode.CashDepositoryWithdraw, (ushort)MapOpcode.InventoryItemReceive], session.SentOpcodes());
             var aura = player.Character.Inventory.Main.Find(718)!;
             Assert.True(aura.IsTimed); // duração padrão de 30 dias inicia ao retirar
@@ -288,7 +286,7 @@ public class CashShopTests
         }
         finally
         {
-            await world.StopAsync(CancellationToken.None);
+            await world.StopAsync();
         }
     }
 
@@ -296,19 +294,17 @@ public class CashShopTests
     public async Task Security_guards_reject_insufficient_cash_full_inventory_and_invalid_auth()
     {
         var (_, player, session, world, store, service) = MakeEnv();
-        await world.StartAsync(CancellationToken.None);
+        await world.StartAsync();
         try
         {
             // 1. Saldo insuficiente (2 * 160 = 320 > 200): não debita nem deposita
-            await service.BuyProductAsync(player, 0, 1, 2);
-            await world.InvokeAsync(() => 0);
+            await world.RunAsync(() => service.BuyProduct(player, 0, 1, 2));
             Assert.Equal(200, (await store.GetBalanceAsync(42, CancellationToken.None))!.Value.Total);
             Assert.Empty(await store.ListDepositoryAsync(42, CancellationToken.None));
             Assert.Equal([(ushort)MapOpcode.ChatNotice], session.SentOpcodes());
 
             // 2. Compra válida (160) seguida de tentativa de retirada com mochila cheia: restaura no depósito!
-            await service.BuyProductAsync(player, 0, 1, 1);
-            await world.InvokeAsync(() => 0);
+            await world.RunAsync(() => service.BuyProduct(player, 0, 1, 1));
             session.SentOpcodes();
             var itemRow = (await store.ListDepositoryAsync(42, CancellationToken.None)).Single(r => r.Kind == CashShopItemKind.Item);
 
@@ -320,8 +316,7 @@ public class CashShopTests
                 return 0;
             });
 
-            await service.WithdrawDepositoryAsync(player, CashShopItemKind.Item, itemRow.Uid);
-            await world.InvokeAsync(() => 0);
+            await world.RunAsync(() => service.WithdrawDepository(player, CashShopItemKind.Item, itemRow.Uid));
             var frames = session.DrainOutgoing();
             Assert.Single(frames);
             Assert.Equal((ushort)MapOpcode.CashDepositoryWithdraw, PacketHeader.Read(frames[0]).Opcode);
@@ -337,14 +332,47 @@ public class CashShopTests
             w.WriteU8(0);
             w.WriteU8(1);
             var authHandler = new CashDepositoryAuthHandler();
-            authHandler.Dispatch(session, new PacketReader(w.ToFrame(0).AsSpan(PacketHeader.Length).ToArray()));
+            await world.DispatchAsync(authHandler, session, new PacketReader(w.ToFrame(0).AsSpan(PacketHeader.Length).ToArray()));
             var authFrames = session.DrainOutgoing();
             Assert.Single(authFrames);
             Assert.Equal(0, authFrames[0][PacketHeader.Length + 101]); // result = 0
         }
         finally
         {
-            await world.StopAsync(CancellationToken.None);
+            await world.StopAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Withdraw_returns_item_to_depository_when_player_leaves_during_io()
+    {
+        var (_, player, session, world, store, service) = MakeEnv();
+        await world.StartAsync();
+        try
+        {
+            await world.RunAsync(() => service.BuyProduct(player, 0, 1, 1));
+            session.DrainOutgoing();
+            var itemRow = (await store.ListDepositoryAsync(42, CancellationToken.None)).Single(r => r.Kind == CashShopItemKind.Item);
+
+            var release = new TaskCompletionSource();
+            store.HoldTake = release.Task;
+            await world.InvokeAsync(() =>
+            {
+                service.WithdrawDepository(player, CashShopItemKind.Item, itemRow.Uid);
+                return true;
+            });
+            Assert.DoesNotContain(await store.ListDepositoryAsync(42, CancellationToken.None), r => r.Uid == itemRow.Uid);
+
+            session.Close("teste: saiu durante a retirada");
+            release.SetResult();
+            await world.SettleAsync();
+
+            Assert.Contains(await store.ListDepositoryAsync(42, CancellationToken.None), r => r.Uid == itemRow.Uid);
+            Assert.Equal(0u, player.Character.Inventory.Main.Count(718));
+        }
+        finally
+        {
+            await world.StopAsync();
         }
     }
 
