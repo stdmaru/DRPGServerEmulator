@@ -80,6 +80,17 @@ public sealed class CashRepository(Database database) : ICashStore
         public uint ExpiresAt { get; set; }
     }
 
+    private sealed class HistoryDbRow
+    {
+        public ulong Id { get; set; }
+        public uint ItemDataId { get; set; }
+        public uint Quantity { get; set; }
+        public uint UnitPrice { get; set; }
+        public uint CashAfter { get; set; }
+        public uint BonusCashAfter { get; set; }
+        public uint PurchasedAt { get; set; }
+    }
+
     public async Task<CashBalance?> GetBalanceAsync(uint accountUid, CancellationToken ct)
     {
         await using var db = await database.OpenAsync(ct);
@@ -240,17 +251,18 @@ public sealed class CashRepository(Database database) : ICashStore
         int clampedPage = Math.Clamp((int)page, 1, totalPages);
         int offset = (clampedPage - 1) * HistoryPageSize;
 
-        var rows = await db.QueryAsync<CashShopHistoryEntry>(new CommandDefinition("""
-            SELECT id AS OrderId, item_data_id AS ItemDataId, quantity AS Quantity,
-                   unit_price AS UnitPrice, cash_after AS CashAfter,
-                   bonus_cash_after AS BonusCashAfter, purchased_at AS PurchasedAt
+        var rows = await db.QueryAsync<HistoryDbRow>(new CommandDefinition("""
+            SELECT id, item_data_id, quantity, unit_price, cash_after, bonus_cash_after, purchased_at
             FROM cash_shop_history
             WHERE account_uid = @accountUid AND purchased_at >= @startTs AND purchased_at < @endTs
             ORDER BY id DESC
             LIMIT @limit OFFSET @offset
             """, new { accountUid, startTs, endTs, limit = HistoryPageSize, offset }, cancellationToken: ct));
 
-        return new CashShopHistoryPage(rows.ToList(), totalPages);
+        return new CashShopHistoryPage(
+            rows.Select(r => new CashShopHistoryEntry(
+                (long)r.Id, r.ItemDataId, r.Quantity, r.UnitPrice, r.CashAfter, r.BonusCashAfter, r.PurchasedAt)).ToList(),
+            totalPages);
     }
 
     public async Task<CashDepositoryRow?> TakeDepositoryItemAsync(uint accountUid, CashShopItemKind kind, uint uid, CancellationToken ct)
