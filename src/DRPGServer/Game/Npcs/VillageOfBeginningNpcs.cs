@@ -30,6 +30,10 @@ public sealed class VillageOfBeginningNpcs : NpcScriptBase
     public const byte FinalMap = 1;
     public const short FinalX = 58, FinalY = 82;
 
+    /// <summary>✅ NPCs do mapa 79 que oferecem as escolhas (<c>npc_info_us</c>; posição de cada escolha nas capturas).</summary>
+    public const ushort PatamonNpc = 123, YukimiBotamonNpc = 124, MochimonNpc = 125, PyocomonNpc = 126,
+        TunomonNpc = 127, ElecmonNpc = 128;
+
     public const uint TunomonChoice = 5;
     public const uint FinalChoicePerfect = 7;
     public const uint FinalChoice = 8;
@@ -43,14 +47,15 @@ public sealed class VillageOfBeginningNpcs : NpcScriptBase
         _zones = zones;
 
         // ✅ Escolhas 1–4: um manual cada (22004 a 22007)
-        RegisterChoice(1, p => GiveItemOnce(p, 1, 22004));
-        RegisterChoice(2, p => GiveItemOnce(p, 2, 22005));
-        RegisterChoice(3, p => GiveItemOnce(p, 3, 22006));
-        RegisterChoice(4, p => GiveItemOnce(p, 4, 22007));
+        RegisterChoice(1, PatamonNpc, p => GiveItemOnce(p, 1, 22004));
+        RegisterChoice(2, YukimiBotamonNpc, p => GiveItemOnce(p, 2, 22005));
+        RegisterChoice(3, MochimonNpc, p => GiveItemOnce(p, 3, 22006));
+        RegisterChoice(4, PyocomonNpc, p => GiveItemOnce(p, 4, 22007));
 
-        RegisterChoice(TunomonChoice, p => ExchangeItemsOnce(p, TunomonChoice, YuramonSeed, SeedsForTunomon, (TunomonCard, 1)));
-        RegisterChoice(FinalChoicePerfect, p => FinishTutorial(p, FinalChoicePerfect, GoldenDrillAtEndPerfect));
-        RegisterChoice(FinalChoice, p => FinishTutorial(p, FinalChoice, GoldenDrillAtEndNormal));
+        RegisterChoice(TunomonChoice, TunomonNpc,
+            p => ExchangeItemsOnce(p, TunomonChoice, YuramonSeed, SeedsForTunomon, (TunomonCard, 1)));
+        RegisterChoice(FinalChoicePerfect, ElecmonNpc, p => FinishTutorial(p, FinalChoicePerfect, GoldenDrillAtEndPerfect));
+        RegisterChoice(FinalChoice, ElecmonNpc, p => FinishTutorial(p, FinalChoice, GoldenDrillAtEndNormal));
     }
 
     private bool FinishTutorial(Player player, uint choiceId, uint drillAmount)

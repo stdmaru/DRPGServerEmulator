@@ -27,6 +27,7 @@ public static class ClientTables
     public const string TreeTable = @"table\tree_us.dat";
     public const string CashShopPageTable = @"table\ingameshop_itempage_us.dat";
     public const string CashShopDataTable = @"table\ingameshop_item_data_us.dat";
+    public const string NpcTable = @"table\npc_info_us.dat";
 
     /// <summary>
     /// Espécies: <c>digimon_us</c> (0 id, 1 nome, 2 estágio, 3 atributo, 5 skill 1, 9 skill 2) e o crescimento
@@ -252,6 +253,22 @@ public static class ClientTables
             maps.TryAdd(id, new ClientMap(id, f[1], f[4], Short(f, 12), Short(f, 13), portals));
         }
         return maps.ToFrozenDictionary();
+    }
+
+    /// <summary>✅ NPCs: <c>npc_info_us</c> (0 mapa, 1 id, 2 nome, 4/5 posição, 10 janela, 12 loja). Ver <see cref="NpcInfo"/>.</summary>
+    public static NpcDirectory Npcs(ClientPack pack)
+    {
+        var npcs = new List<NpcInfo>();
+        foreach (var f in pack.ReadTable(NpcTable))
+        {
+            if (f.Length < 13 || !byte.TryParse(f[0], CultureInfo.InvariantCulture, out var map)
+                || !ushort.TryParse(f[1], CultureInfo.InvariantCulture, out var id))
+                continue;
+            ushort.TryParse(f[10], CultureInfo.InvariantCulture, out var window);
+            uint.TryParse(f[12], CultureInfo.InvariantCulture, out var shop);
+            npcs.Add(new NpcInfo(map, id, f[2], Short(f, 4), Short(f, 5), (NpcWindow)window, shop));
+        }
+        return new NpcDirectory(npcs);
     }
 
     /// <summary>

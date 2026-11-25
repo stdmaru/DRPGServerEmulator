@@ -365,7 +365,7 @@ public class EquipmentTests
         session.Player = player;
         zone.Enter(player);
 
-        var battle = battles.StartPve(player, zone.WildDigimons.First().Serial)!;
+        var battle = battles.StartPve(player, player.StandBy(zone.WildDigimons.First()))!;
         Assert.True(leader.EvolveTo(evolvedSpecies));
         Assert.True(leader.IsEvolved);
 
@@ -408,7 +408,7 @@ public class EquipmentTests
         session.Player = player;
         zone.Enter(player);
 
-        var battle = battles.StartPve(player, zone.WildDigimons.First().Serial)!;
+        var battle = battles.StartPve(player, player.StandBy(zone.WildDigimons.First()))!;
         Assert.Equal(2, battle.TeamA.Count);
         Assert.Contains(battle.TeamA, c => c.Digimon == leader);
         Assert.Contains(battle.TeamA, c => c.Digimon == partner);

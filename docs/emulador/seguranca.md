@@ -43,12 +43,24 @@ Estado da conta (Cash, Cash/Shop Depository) é gravado direto no banco. Estado 
 - A API é do `ItemService`: `SendToAccountStorage(player, entries, undo, done)` (quem chama já aplicou o custo e passa como desfazê-lo) e `TakeFromAccountStorage(player, row, done)`. Loja NPC (Shop Depository) e Cash Depository já usam. Correio e troca vão usar a mesma API; `Wallet` entra com os serviços de domínio (**PR #41: G**).
 - Operação só da conta (comprar no Cash Shop: debita Cash e põe no depósito) é uma transação de banco simples e não passa pelo personagem.
 
-## Interação e alcance (**PR #41: S4, S5**)
-- Toda ação com alvo no mundo passa pelo `InteractionGuard`: o alvo existe, está no mesmo mapa e está dentro da distância daquela interação.
-  - NPC (loja, Depository, escolhas): a loja ou escolha pertence a um NPC, e o jogador está perto dele.
-  - Selvagem (batalha, Taming Net): perto do grupo e o grupo pode batalhar.
-  - Drop: perto e, durante a janela de exclusividade, só o dono coleta.
-- As distâncias saem das capturas (✅). Enquanto não houver evidência, o valor é configurável e marcado ❓.
+## Interação e alcance
+Código: `InteractionGuard` (thread do mundo). Dados: `GameData.Npcs` (`NpcDirectory`, lido de `npc_info_us`). Testes: `InteractionGuardTests`, e os testes de loja, Depository, tutorial e batalha posicionam o jogador.
+
+Toda ação com alvo no mundo passa pelo `InteractionGuard`: o alvo existe, está no mapa do jogador e dentro da distância daquela interação. A distância é em casas, no maior eixo (`max(|dx|, |dy|)`). Recusa não muda nada e vai para o log como aviso, porque o cliente legítimo só manda essas ações de perto.
+
+| Interação | Regra | Onde |
+|---|---|---|
+| Loja de NPC (`0x50`–`0x53`) | a loja pertence a um NPC do mapa (coluna 12 de `npc_info_us`) e ele está a até `Game:NpcInteractionRange` casas | `CanUseShop` nos 4 handlers |
+| Digimon Center (`0x89`, `0x94`) | um NPC com janela `14` no mapa está perto | `CanUseDigimonCenter` |
+| Escolha de diálogo (`0x56`) | o NPC da escolha (`RegisterChoice(choiceId, npcId, …)`) está perto | `NpcScriptRegistry.Choose` |
+| Batalha e Taming Net | o grupo selvagem pode batalhar e está a até `Game:WildInteractionRange` casas | `BattleSystem.StartPve`, `Taming.UseNet` |
+| Drop | perto e, durante a janela de exclusividade, só o dono coleta | **PR #41: S5** |
+
+- Na partida o servidor recusa subir com uma loja do `NpcShop.xml` sem NPC dono, ou com uma escolha cujo NPC não existe no mapa do script.
+- Distâncias medidas nas capturas (`captures.db`, posição do jogador no último movimento antes da ação) ✅:
+  - NPC, loja e Depository: até 3 casas em 21 amostras; escolhas de diálogo: até 3 em 30 amostras. Padrão `NpcInteractionRange = 5`.
+  - Selvagem: 156 de 158 batalhas a até 5 casas e uma a 7 (o grupo também anda, então a margem é maior). Padrão `WildInteractionRange = 8`.
+- ❓ Cash Depository (`0xCA`): ainda sem evidência de NPC ou de distância; não tem regra de alcance.
 
 ## Limites de recurso (**PR #41: S6**)
 Configurados em `Network`, com log de cada conexão cortada:

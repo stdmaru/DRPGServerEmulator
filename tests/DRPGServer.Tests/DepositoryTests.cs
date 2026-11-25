@@ -13,6 +13,9 @@ namespace DRPGServer.Tests;
 
 public class DepositoryTests
 {
+    /// <summary>Digimon Center do mapa 79 no pacote de teste.</summary>
+    private const ushort DigimonCenterNpc = 129;
+
     private static byte[] BuildActionRequest(ushort npcId, DepositoryAction action, uint partyUid = 0, uint depUid = 0)
     {
         var buf = new byte[750];
@@ -27,13 +30,13 @@ public class DepositoryTests
     [Fact]
     public void Open_fails_when_zero_slots_and_succeeds_when_slots_available()
     {
-        var character = Entities.Character();
+        var character = Entities.Character().AtNpc(79, DigimonCenterNpc);
         character.DepositorySlots = 0;
         var session = TestSupport.NewSession(ServerRole.Map);
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
         session.Player = player;
 
-        var handler = new DepositoryActionHandler(TestSupport.GameOptions());
+        var handler = new DepositoryActionHandler(TestSupport.GameOptions(), TestSupport.Guard());
         handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Open)));
 
         var frames = session.DrainOutgoing();
@@ -55,7 +58,7 @@ public class DepositoryTests
     [Fact]
     public void Deposit_withdraw_and_swap_round_trip_with_official_bits_fee()
     {
-        var character = Entities.Character();
+        var character = Entities.Character().AtNpc(79, DigimonCenterNpc);
         character.DepositorySlots = 15; // 2 páginas (10 na pág 1, 5 na pág 2)
         character.SetBits(500);
 
@@ -65,7 +68,7 @@ public class DepositoryTests
         var session = TestSupport.NewSession(ServerRole.Map);
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
         session.Player = player;
-        var handler = new DepositoryActionHandler(TestSupport.GameOptions(o => o.DigimonDepositoryFee = 1000));
+        var handler = new DepositoryActionHandler(TestSupport.GameOptions(o => o.DigimonDepositoryFee = 1000), TestSupport.Guard());
 
         // Sem Bits suficientes (lv 5 custa 1000 Bits) -> DepositNotEnoughBits (5)
         handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: 42)));
@@ -159,12 +162,12 @@ public class DepositoryTests
     [Fact]
     public void Expand_consumes_item_901_or_929_and_enforces_max_ten_slots()
     {
-        var character = Entities.Character();
+        var character = Entities.Character().AtNpc(79, DigimonCenterNpc);
         character.DepositorySlots = 0;
         var session = TestSupport.NewSession(ServerRole.Map);
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
         session.Player = player;
-        var handler = new DepositoryExpandHandler();
+        var handler = new DepositoryExpandHandler(TestSupport.Guard());
 
         // Sem item no inventário -> MissingItem (1)
         handler.Dispatch(session, new PacketReader(new byte[15]));
@@ -204,7 +207,7 @@ public class DepositoryTests
         var channelSession = TestSupport.NewSession(ServerRole.Channel);
         accounts.SignIn(account, channelSession);
 
-        var character = Entities.Character();
+        var character = Entities.Character().AtNpc(79, DigimonCenterNpc);
         character.DepositorySlots = 10;
         var stored = new Digimon(TestSupport.Data, TestSupport.Data.FindSpecies(50)!, 21) { Uid = 99, Name = "Rookiemon" };
         stored.UnlockStage(); // libera Champion (80)

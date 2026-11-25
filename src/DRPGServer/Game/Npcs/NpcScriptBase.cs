@@ -14,16 +14,20 @@ public abstract class NpcScriptBase
     /// <summary>✅ S2C 0x56 = 99 (0x63): resposta oficial de falha/fechar janela 0x38 (DigimonRPG.bin @ 0x00AC5A05, S56/S62).</summary>
     public const uint CloseWindowError = 99;
 
-    private readonly Dictionary<uint, Func<Player, bool>> _choices = [];
+    /// <summary>Uma escolha: o NPC que a oferece (✅ capturas: <c>npc_info_us</c> do mapa) e o que ela faz.</summary>
+    internal readonly record struct Choice(ushort NpcId, Func<Player, bool> Handler);
+
+    private readonly Dictionary<uint, Choice> _choices = [];
 
     /// <summary>Mapa ao qual estes NPCs pertencem (validado pelo <see cref="NpcScriptRegistry"/>).</summary>
     public abstract byte MapId { get; }
 
-    internal IReadOnlyDictionary<uint, Func<Player, bool>> Choices => _choices;
+    internal IReadOnlyDictionary<uint, Choice> Choices => _choices;
 
-    protected void RegisterChoice(uint choiceId, Func<Player, bool> handler)
+    /// <param name="npcId">NPC do <see cref="MapId"/> que oferece a escolha: o jogador precisa estar perto dele.</param>
+    protected void RegisterChoice(uint choiceId, ushort npcId, Func<Player, bool> handler)
     {
-        if (!_choices.TryAdd(choiceId, handler))
+        if (!_choices.TryAdd(choiceId, new Choice(npcId, handler)))
             throw new InvalidOperationException($"{GetType().Name}: escolha 0x56 #{choiceId} duplicada.");
     }
 

@@ -30,7 +30,7 @@ public class CaptureTests
     }
 
     private Taming NewTaming(double chance = 0.10) =>
-        new(TestSupport.Data, _uids, TestSupport.GameOptions(o => o.CaptureChance = chance));
+        TestSupport.NewTaming(_uids, TestSupport.GameOptions(o => o.CaptureChance = chance));
 
     private static Digimon NewDigimon(ushort species, ushort level, uint uid) =>
         new(TestSupport.Data, TestSupport.Data.Species[species], level) { Uid = uid };
@@ -83,7 +83,7 @@ public class CaptureTests
         var net = player.Character.Inventory.Main.Add(InTrainingNet, 2)[0];
         var wild = Wild;
 
-        UseItem(player, NewTaming(), net, wild.Serial);
+        UseItem(player, NewTaming(), net, player.StandBy(wild));
 
         // ✅ 0xEF (bloco do novo) e 0x41 (rede consumida)
         Assert.Equal([(ushort)0xEF, (ushort)0x41], player.Session.SentOpcodes());
@@ -103,7 +103,7 @@ public class CaptureTests
         var player = Join(NewDigimon(50, 15, 1));
         var net = player.Character.Inventory.Main.Add(RookieNet, 1)[0];
 
-        UseItem(player, NewTaming(), net, Wild.Serial);
+        UseItem(player, NewTaming(), net, player.StandBy(Wild));
 
         Assert.Equal([(ushort)0xC3], player.Session.SentOpcodes());
         Assert.Single(player.Character.Digimons);
@@ -116,7 +116,7 @@ public class CaptureTests
         var player = Join(Enumerable.Range(1, Character.PartySize).Select(i => NewDigimon(50, 15, (uint)i)).ToArray());
         var net = player.Character.Inventory.Main.Add(InTrainingNet, 1)[0];
 
-        UseItem(player, NewTaming(), net, Wild.Serial);
+        UseItem(player, NewTaming(), net, player.StandBy(Wild));
 
         Assert.Equal([(ushort)0xC3], player.Session.SentOpcodes());
         Assert.Equal(1u, player.Character.Inventory.Main.Count(InTrainingNet));
@@ -129,10 +129,10 @@ public class CaptureTests
         var net = player.Character.Inventory.Main.Add(InTrainingNet, 1)[0];
         var battles = TestSupport.NewBattles(_world, TestSupport.Data, TestSupport.GameOptions());
         var wild = Wild;
-        Assert.NotNull(battles.StartPve(player, wild.Serial));
+        Assert.NotNull(battles.StartPve(player, player.StandBy(wild)));
         player.Session.DrainOutgoing();
 
-        UseItem(player, NewTaming(), net, _zones.Find(79)!.WildDigimons.First().Serial);
+        UseItem(player, NewTaming(), net, player.StandBy(_zones.Find(79)!.WildDigimons.First()));
 
         Assert.Equal([(ushort)0xC3], player.Session.SentOpcodes());
         Assert.Single(player.Character.Digimons);
@@ -183,7 +183,7 @@ public class CaptureTests
     {
         var player = Join(party);
         var battles = TestSupport.NewBattles(_world, TestSupport.Data, TestSupport.GameOptions(o => o.CaptureChance = chance), taming: NewTaming(chance));
-        var battle = battles.StartPve(player, Wild.Serial)!;
+        var battle = battles.StartPve(player, player.StandBy(Wild))!;
         battle.SendTeams(player);
         battle.ClientReady(player);
         player.Session.DrainOutgoing();

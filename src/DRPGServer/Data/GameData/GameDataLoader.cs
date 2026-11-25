@@ -93,6 +93,12 @@ public static class GameDataLoader
 
         var cards = ClientTables.Cards(pack);
         var npcShops = LoadNpcShops(root);
+        var npcs = ClientTables.Npcs(pack);
+        // toda loja tem dono: o InteractionGuard confere que o jogador está perto dele
+        var orphanShops = npcShops.Keys.Where(id => npcs.OwnersOf(id).Count == 0).ToList();
+        if (orphanShops.Count > 0)
+            throw new InvalidDataException(
+                $"NpcShop.xml: loja(s) {string.Join(", ", orphanShops)} sem NPC dono em npc_info_us (coluna 12)");
 
         return new GameData
         {
@@ -100,6 +106,7 @@ public static class GameDataLoader
             Items = items,
             Cards = cards,
             NpcShops = npcShops,
+            Npcs = npcs,
             CashShopProducts = ClientTables.CashShopProducts(pack),
             DigimonTitles = ClientTables.DigimonTitles(pack),
             Skills = ClientTables.Skills(pack),

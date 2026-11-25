@@ -17,7 +17,7 @@ namespace DRPGServer.Game.World;
 /// Nas duas é preciso posição livre no time. ✅ O digimon novo se chama "InputName", tem uma renomeação grátis e
 /// começa no nível de entrada do estágio (in-training L1, rookie L11, mesmo com o selvagem L31).
 /// </summary>
-public sealed class Taming(GameData data, DigimonUids uids, IOptions<GameOptions> options)
+public sealed class Taming(GameData data, DigimonUids uids, IOptions<GameOptions> options, InteractionGuard guard)
 {
     /// <summary>✅ Tentativas de captura comum por batalha (o cliente não pede a quarta).</summary>
     public const int AttemptsPerBattle = 3;
@@ -56,7 +56,7 @@ public sealed class Taming(GameData data, DigimonUids uids, IOptions<GameOptions
     {
         if (data.FindTamingNet(item.ItemId) is not { } net) return false;
         var c = player.Character;
-        if (player.InBattle || wild is not { CanBattle: true } || wild.Leader.Species.Stage != net.Stage
+        if (player.InBattle || wild is null || !guard.CanEngage(player, wild) || wild.Leader.Species.Stage != net.Stage
             || !HasFreeSlot(c) || item.Amount == 0)
         {
             player.Send(new ItemUseFailedPacket());

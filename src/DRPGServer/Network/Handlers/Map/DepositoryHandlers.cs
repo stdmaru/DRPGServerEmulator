@@ -1,5 +1,6 @@
 using DRPGServer.Configuration;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;
 using Microsoft.Extensions.Options;
 
@@ -11,10 +12,11 @@ namespace DRPGServer.Network.Handlers;
 /// </summary>
 [PacketHandler(MapOpcode.DepositoryAction)]
 [RequiresState(PlayerStates.Idle)]
-public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : PlayerHandler<DepositoryActionRequest>
+public sealed class DepositoryActionHandler(IOptions<GameOptions> options, InteractionGuard guard) : PlayerHandler<DepositoryActionRequest>
 {
     protected override void Handle(Player player, DepositoryActionRequest request)
     {
+        if (!guard.CanUseDigimonCenter(player)) return;
         var (page, action, partyDigimonUid, depositoryDigimonUid) = request;
         var character = player.Character;
         ushort clampedPage = Math.Clamp(page, (ushort)1, character.DepositoryTotalPages);
@@ -75,13 +77,14 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
 /// </summary>
 [PacketHandler(MapOpcode.DepositoryExpand)]
 [RequiresState(PlayerStates.Idle)]
-public sealed class DepositoryExpandHandler : PlayerHandler<DepositoryExpandRequest>
+public sealed class DepositoryExpandHandler(InteractionGuard guard) : PlayerHandler<DepositoryExpandRequest>
 {
     public const uint ExpansionItemId = 901;        // 0x385
     public const uint EventExpansionItemId = 929;   // 0x3A1
 
     protected override void Handle(Player player, DepositoryExpandRequest request)
     {
+        if (!guard.CanUseDigimonCenter(player)) return;   // ✅ enviado de dentro da janela do Depository
         var character = player.Character;
         if (character.DepositorySlots >= Character.MaxDepositorySlots)
         {

@@ -101,6 +101,7 @@ services.AddSingleton<CharacterFactory>();
 services.AddSingleton<ICharacterLoader, CharacterLoader>();
 services.AddSingleton<WorldEntry>();
 services.AddSingleton<CharacterTransfers>();
+services.AddSingleton<InteractionGuard>();
 services.AddSingleton<ItemService>();
 services.AddSingleton<NpcScriptBase, VillageOfBeginningNpcs>();
 services.AddSingleton<NpcScriptBase, DigitalBureauNpcs>();

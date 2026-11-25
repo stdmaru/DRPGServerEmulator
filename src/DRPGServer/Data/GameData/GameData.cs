@@ -263,12 +263,51 @@ public sealed record CashShopProduct(
     uint ProductId, string Name, uint ItemDataId, uint Price, byte Category, IReadOnlyList<CashShopEntry> Entries);
 
 /// <summary>Tabelas estáticas do jogo, carregadas uma vez na partida. Imutáveis.</summary>
+/// <summary>✅ Janela que o NPC abre (<c>npc_info_us</c> coluna 10). Só as que o servidor confere estão aqui.</summary>
+public enum NpcWindow : ushort
+{
+    CardShop = 12,
+    ItemShop = 13,
+    /// <summary>Digimon Center: recuperação, Digimon Depository, Card/Item Depository (<c>npc_function_us</c>).</summary>
+    DigimonCenter = 14,
+}
+
+/// <summary>
+/// ✅ Um NPC do mapa (<c>npc_info_us</c>: 0 mapa, 1 id, 2 nome, 4/5 posição, 10 janela, 12 loja). A posição está nas
+/// mesmas casas do movimento do jogador.
+/// </summary>
+public sealed record NpcInfo(byte MapId, ushort NpcId, string Name, short X, short Y, NpcWindow Window, uint ShopId);
+
+/// <summary>NPCs por mapa, por id e por loja (o dono da loja é o NPC cuja coluna 12 tem o id dela).</summary>
+public sealed class NpcDirectory
+{
+    public static readonly NpcDirectory Empty = new([]);
+
+    private readonly FrozenDictionary<(byte, ushort), NpcInfo> _byId;
+    private readonly FrozenDictionary<byte, NpcInfo[]> _byMap;
+    private readonly FrozenDictionary<uint, NpcInfo[]> _byShop;
+
+    public NpcDirectory(IEnumerable<NpcInfo> npcs)
+    {
+        var list = npcs.ToList();
+        _byId = list.DistinctBy(n => (n.MapId, n.NpcId)).ToFrozenDictionary(n => (n.MapId, n.NpcId));
+        _byMap = list.GroupBy(n => n.MapId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
+        _byShop = list.Where(n => n.ShopId != 0).GroupBy(n => n.ShopId).ToFrozenDictionary(g => g.Key, g => g.ToArray());
+    }
+
+    public int Count => _byId.Count;
+    public NpcInfo? Find(byte mapId, ushort npcId) => _byId.GetValueOrDefault((mapId, npcId));
+    public IReadOnlyList<NpcInfo> On(byte mapId) => _byMap.GetValueOrDefault(mapId) ?? [];
+    public IReadOnlyList<NpcInfo> OwnersOf(uint shopId) => _byShop.GetValueOrDefault(shopId) ?? [];
+}
+
 public sealed class GameData
 {
     public required FrozenDictionary<ushort, DigimonSpecies> Species { get; init; }
     public required FrozenDictionary<uint, ItemInfo> Items { get; init; }
     public FrozenDictionary<uint, CardInfo> Cards { get; init; } = FrozenDictionary<uint, CardInfo>.Empty;
     public FrozenDictionary<uint, NpcShop> NpcShops { get; init; } = FrozenDictionary<uint, NpcShop>.Empty;
+    public NpcDirectory Npcs { get; init; } = NpcDirectory.Empty;
     public FrozenDictionary<uint, CashShopProduct> CashShopProducts { get; init; } = FrozenDictionary<uint, CashShopProduct>.Empty;
     public FrozenDictionary<uint, DigimonTitleInfo> DigimonTitles { get; init; } = FrozenDictionary<uint, DigimonTitleInfo>.Empty;
     public FrozenDictionary<ushort, SkillInfo> Skills { get; init; } = FrozenDictionary<ushort, SkillInfo>.Empty;

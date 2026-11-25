@@ -39,7 +39,7 @@ public class BattleTests
     private Battle Open()
     {
         var wild = _zones.Find(79)!.WildDigimons.First();
-        var battle = _battles.StartPve(_player, wild.Serial)!;
+        var battle = _battles.StartPve(_player, _player.StandBy(wild))!;
         Assert.Equal([(ushort)0x62], _session.SentOpcodes());
         battle.SendTeams(_player);
         battle.ClientReady(_player);
@@ -56,7 +56,7 @@ public class BattleTests
         Assert.Same(battle, _player.Battle);
         Assert.NotEqual(WildState.InBattle, wild.State);
         Assert.DoesNotContain(battle.TeamB, c => wild.Members.Any(m => m.Digimon == c.Digimon));
-        Assert.Null(_battles.StartPve(_player, wild.Serial));   // já em batalha
+        Assert.Null(_battles.StartPve(_player, _player.StandBy(wild)));   // já em batalha
     }
 
     [Fact]
@@ -277,7 +277,7 @@ public class BattleTests
         session.DrainOutgoing();
 
         var wild = zone.WildDigimons.First();
-        var battle = battles.StartPve(player, wild.Serial)!;
+        var battle = battles.StartPve(player, player.StandBy(wild))!;
         battle.SendTeams(player);
         battle.ClientReady(player);
         session.DrainOutgoing();

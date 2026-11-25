@@ -12,6 +12,8 @@ public sealed class DigitalBureauNpcs : NpcScriptBase
 {
     public const byte BureauMapId = 1;
     public const uint NyangIntroLetterChoice = 10;
+    /// <summary>✅ Nyang (<c>npc_info_us</c> 1:33, (66, 86)).</summary>
+    public const ushort NyangNpc = 33;
 
     public const uint TeleportXItemId = 907;
     public const uint BeginnerCrestItemId = 107;
@@ -21,7 +23,7 @@ public sealed class DigitalBureauNpcs : NpcScriptBase
 
     public DigitalBureauNpcs()
     {
-        RegisterChoice(NyangIntroLetterChoice, DeliverIntroLetter);
+        RegisterChoice(NyangIntroLetterChoice, NyangNpc, DeliverIntroLetter);
     }
 
     private static bool DeliverIntroLetter(Player player)

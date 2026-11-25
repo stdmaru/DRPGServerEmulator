@@ -7,6 +7,7 @@ using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Battle;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Items;
+using DRPGServer.Game.Npcs;
 using DRPGServer.Game.Shop;
 using DRPGServer.Game.World;
 using DRPGServer.Game;
@@ -66,7 +67,40 @@ internal static class TestSupport
         data ??= Data;
         options ??= GameOptions();
         return new BattleSystem(world, data, options, NullLogger<BattleSystem>.Instance,
-            taming ?? new Taming(data, new DigimonUids(), options), expEvents ?? NewExpEvents(options));
+            taming ?? new Taming(data, new DigimonUids(), options, Guard(data, options)), expEvents ?? NewExpEvents(options),
+            Guard(data, options));
+    }
+
+    /// <summary>Guarda de interação real sobre <paramref name="data"/> (padrão: o pacote sintético).</summary>
+    public static InteractionGuard Guard(GameData? data = null, IOptions<GameOptions>? options = null) =>
+        new(data ?? Data, options ?? GameOptions(), NullLogger<InteractionGuard>.Instance);
+
+    /// <summary>Taming com a guarda real.</summary>
+    public static Taming NewTaming(DigimonUids uids, IOptions<GameOptions>? options = null, GameData? data = null)
+    {
+        options ??= GameOptions();
+        return new Taming(data ?? Data, uids, options, Guard(data, options));
+    }
+
+    /// <summary>Roteador de escolhas sobre <paramref name="scripts"/>, com os NPCs do pacote sintético.</summary>
+    public static NpcScriptRegistry NewNpcRegistry(params NpcScriptBase[] scripts) => new(scripts, Data, Guard());
+
+    /// <summary>Põe o jogador na casa do selvagem (alcance de batalha e de Taming Net) e devolve o serial dele.</summary>
+    public static Serial StandBy(this Player player, WildDigimon wild)
+    {
+        player.Character.X = wild.X;
+        player.Character.Y = wild.Y;
+        return wild.Serial;
+    }
+
+    /// <summary>Põe o personagem ao lado do NPC <paramref name="npcId"/> do mapa <paramref name="mapId"/>.</summary>
+    public static Character AtNpc(this Character character, byte mapId, ushort npcId)
+    {
+        var npc = Data.Npcs.Find(mapId, npcId) ?? throw new ArgumentException($"NPC {mapId}:{npcId} não está no pacote de teste");
+        character.MapId = mapId;
+        character.X = npc.X;
+        character.Y = (short)(npc.Y + 1);
+        return character;
     }
 
     /// <summary>

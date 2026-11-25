@@ -16,11 +16,13 @@ public sealed class BattleSystem : IWorldSystem
     private readonly GameData _data;
     private readonly GameOptions _options;
     private readonly ExpEventService _expEvents;
+    private readonly InteractionGuard _guard;
     private readonly ILogger<BattleSystem> _log;
 
     public BattleSystem(GameWorld world, GameData data, IOptions<GameOptions> options, ILogger<BattleSystem> log,
-        Taming taming, ExpEventService expEvents)
+        Taming taming, ExpEventService expEvents, InteractionGuard guard)
     {
+        _guard = guard;
         _world = world;
         _data = data;
         _options = options.Value;
@@ -43,7 +45,7 @@ public sealed class BattleSystem : IWorldSystem
     public Battle? StartPve(Player player, Serial wildSerial)
     {
         if (player.InBattle || player.Zone is not { } zone) return null;
-        if (zone.FindWild(wildSerial) is not { CanBattle: true } wild) return null;
+        if (zone.FindWild(wildSerial) is not { } wild || !_guard.CanEngage(player, wild)) return null;
 
         bool exclusive = wild.Spawn.Exclusive;
         Func<WildMember, Digimon> enemyOf = exclusive

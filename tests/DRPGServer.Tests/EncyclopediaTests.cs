@@ -89,7 +89,7 @@ public class EncyclopediaTests
         var character = Entities.Character();
         var uids = new DigimonUids();
         uids.Seed(50);
-        var taming = new Taming(TestSupport.Data, uids, TestSupport.GameOptions());
+        var taming = TestSupport.NewTaming(uids);
         var tamed = taming.Tame(character, TestSupport.Data.FindSpecies(14)!)!;
 
         // Evolução na árvore de teste: In-Training (14) -> Rookie (50) -> Champion (80)

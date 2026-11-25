@@ -307,14 +307,21 @@ public class TutorialTests
 
     // ---------- NPCs ----------
 
-    private DRPGServer.Game.Npcs.NpcScriptRegistry Npcs => new([new DRPGServer.Game.Npcs.VillageOfBeginningNpcs(_zones)]);
+    private DRPGServer.Game.Npcs.NpcScriptRegistry Npcs => TestSupport.NewNpcRegistry(new DRPGServer.Game.Npcs.VillageOfBeginningNpcs(_zones));
+
+    /// <summary>Escolha <paramref name="choice"/> falando com o NPC <paramref name="npcId"/> do mapa 79, de perto.</summary>
+    private bool Talk(uint choice, ushort npcId)
+    {
+        _player.Character.AtNpc(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TutorialMapId, npcId);
+        return Npcs.Choose(_player, choice);
+    }
 
     [Fact]
     public void Manuals_are_given_once()
     {
-        Assert.True(Npcs.Choose(_player, 1));
+        Assert.True(Talk(1, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.PatamonNpc));
         Assert.Equal([(ushort)0x56, (ushort)0xC9, (ushort)0xFC], _session.SentOpcodes());
-        Assert.False(Npcs.Choose(_player, 1));
+        Assert.False(Talk(1, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.PatamonNpc));
         Assert.Empty(_session.SentOpcodes());
         Assert.Equal(1u, _player.Character.Inventory.Main.Count(22004));
         Assert.True(_player.Character.HasFlag(1));
@@ -324,15 +331,15 @@ public class TutorialTests
     public void Tunomon_takes_five_seeds_and_the_end_of_the_tutorial_needs_it()
     {
         var c = _player.Character;
-        Assert.False(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice));
-        Assert.False(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice));   // sem sementes
+        Assert.False(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.ElecmonNpc));
+        Assert.False(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonNpc));   // sem sementes
         c.Inventory.Main.Add(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.YuramonSeed, 8);
-        Assert.True(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice));
+        Assert.True(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonNpc));
         Assert.Equal([(ushort)0x56, (ushort)0xC9, (ushort)0xFC], _session.SentOpcodes());
         Assert.Equal(3u, c.Inventory.Main.Count(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.YuramonSeed));
         Assert.Equal(1u, c.Inventory.Main.Count(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonCard));
 
-        Assert.True(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice));
+        Assert.True(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.ElecmonNpc));
         var sent = _session.SentOpcodes();
         Assert.Equal([(ushort)0xB0, (ushort)0x56, (ushort)0xC8, (ushort)0xC9, (ushort)0xFC], sent.Take(5));
         Assert.Equal(7, sent.Count(o => o == 0x7E));
@@ -346,16 +353,16 @@ public class TutorialTests
     {
         var c = _player.Character;
         c.Inventory.Main.Add(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.YuramonSeed, 5);
-        Assert.True(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice));
+        Assert.True(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonNpc));
         _session.DrainOutgoing();
 
-        Assert.True(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoicePerfect));
+        Assert.True(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoicePerfect, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.ElecmonNpc));
         Assert.Equal(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalMap, c.MapId);
         Assert.Equal(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.GoldenDrillAtEndPerfect,
             c.Inventory.Battle.Count(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.GoldenDrillX));
 
         // Não pode reivindicar a escolha 8 após já ter concluído pela escolha 7
-        Assert.False(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice));
+        Assert.False(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.ElecmonNpc));
     }
 
     // ---------- recompensas ----------
@@ -367,7 +374,7 @@ public class TutorialTests
         var second = NewDigimon(50, 5, 2);
         var player = Join(NewCharacter(first, second));
         var wild = _zones.Find(79)!.WildDigimons.First();
-        var battle = _battles.StartPve(player, wild.Serial)!;
+        var battle = _battles.StartPve(player, player.StandBy(wild))!;
         battle.SendTeams(player);
         battle.ClientReady(player);
         battle.RequestAction(player, BattleIcon.Summon, first.Serial, second.Serial);

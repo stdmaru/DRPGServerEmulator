@@ -87,6 +87,19 @@ public sealed class GameOptions
     /// <summary>Intervalo (segundos) para consultar a tabela <c>exp_event</c> no banco de dados. Padrão: 60 s.</summary>
     public int EventPollSeconds { get; set; } = 60;
 
+    /// <summary>
+    /// Distância máxima (casas, maior eixo) entre o jogador e o NPC para usar loja, Digimon Center e escolhas.
+    /// ✅ Nas capturas, todo uso veio de até 3 casas (21 lojas/Depository, 30 escolhas); 5 dá folga.
+    /// </summary>
+    public int NpcInteractionRange { get; set; } = 5;
+
+    /// <summary>
+    /// Distância máxima (casas, maior eixo) até o selvagem para começar batalha ou usar Taming Net.
+    /// ✅ 156 de 158 inícios de batalha capturados vieram de até 5 casas, 1 de 7 (o selvagem andando); 8 dá folga.
+    /// ❓ Taming Net no campo sem captura: usa o mesmo valor.
+    /// </summary>
+    public int WildInteractionRange { get; set; } = 8;
+
     /// <summary>Slots iniciais liberados no Digimon Depository ao criar personagem (0..210). Padrão 10; 0 exige item (901/929).</summary>
     public byte DefaultDepositorySlots { get; set; } = 10;
 

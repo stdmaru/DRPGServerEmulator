@@ -22,6 +22,8 @@ Cada `<Shop>` possui:
 - `+0x00` (`double`): `Bits`; `+0x08` (`u32`): `Medals`; `+0x0C` (`u32`): `Coins`.
 - Na entrada do mapa (`S2C 0x02` `CharacterDataPacket`, `DigimonRPG.bin @ 0x00B5C028..0x00B5C126`), as 4 moedas são carregadas diretamente: `Bits` (`+0x40`), `LadderPoints` (`+0x5C`, `u32`), `Medals` (`+0x19A8`, `u16`) e `Coins` (`+0x19AA`, `u16`).
 
+Cada loja precisa de um NPC dono em `npc_info_us` (coluna `10` = janela `12` cards / `13` itens, coluna `12` = `shopId`); o servidor não sobe sem ele. Os 4 handlers só atendem com o jogador perto do dono ([seguranca.md](../emulador/seguranca.md#interação-e-alcance)). Donos ✅: `1101` Valkyrimon (1:286), `5050` Prince Mamemon (5:139), `5101` Kaori (5:3), `5201` Hyori (5:2), `13602` Mimi's Dad (13:65), `40101` Gekomon (40:12), `40201` Gekomon (40:11).
+
 Lojas capturadas incluídas inicialmente:
 - **Itens (`0x0052`)**: `1101` (Freyja/Digital Anvil), `5050` (Loja especial de **Coins**), `5101` (Digital Administration Bureau), `13602` (Símbolos e roupas Beginner), `40101` (Gekomon Village).
 - **Cards (`0x0050`)**: `5201` (Digital Administration Bureau), `40201` (Gekomon Village).

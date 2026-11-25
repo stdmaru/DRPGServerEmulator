@@ -120,7 +120,7 @@ public class PacketSizeTests
         var session = TestSupport.NewSession();
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), Entities.Character());
         zones.Find(79)!.Enter(player);
-        var battle = battles.StartPve(player, zones.Find(79)!.WildDigimons.First().Serial)!;
+        var battle = battles.StartPve(player, player.StandBy(zones.Find(79)!.WildDigimons.First()))!;
         Assert.Equal(6960, new BattleCreatePacket   /* ✅ v322: 10 blocos de 696 (sessão 56) */(battle).EncodePayload().Length);
     }
 

@@ -229,7 +229,7 @@ public class CardSlashTests
         zones.Find(79)!.Enter(player);
 
         var wild = zones.Find(79)!.WildDigimons.First();
-        var battle = battles.StartPve(player, wild.Serial)!;
+        var battle = battles.StartPve(player, player.StandBy(wild))!;
         battle.SendTeams(player);
         battle.ClientReady(player);
         session.DrainOutgoing();

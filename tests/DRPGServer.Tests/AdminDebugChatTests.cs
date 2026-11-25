@@ -54,7 +54,7 @@ public class AdminDebugChatTests
     public void NpcScriptRegistry_echoes_unregistered_and_wrong_map_choices_to_admin_only()
     {
         var script = new TestNpcScript(mapId: 40, choiceId: 1234);
-        var registry = new NpcScriptRegistry([script]);
+        var registry = TestSupport.NewNpcRegistry(script);
 
         var (admin, adminSession) = NewPlayer(Authority.Administrator, mapId: 79);
         var (normal, normalSession) = NewPlayer(Authority.None, mapId: 79);
@@ -76,7 +76,7 @@ public class AdminDebugChatTests
         var wrongMapFrame = Assert.Single(adminSession.DrainOutgoing());
         var (_, msg2) = DecodeChat(wrongMapFrame);
         Assert.Contains("1234", msg2);
-        Assert.Contains("map 40", msg2);
+        Assert.Contains("NPC 40:12", msg2);
     }
 
     private sealed class TestNpcScript : NpcScriptBase
@@ -84,7 +84,7 @@ public class AdminDebugChatTests
         public TestNpcScript(byte mapId, uint choiceId)
         {
             MapId = mapId;
-            RegisterChoice(choiceId, _ => true);
+            RegisterChoice(choiceId, 12, _ => true);   // NPC 40:12 do pacote de teste
         }
 
         public override byte MapId { get; }

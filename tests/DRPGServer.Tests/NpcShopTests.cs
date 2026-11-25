@@ -61,6 +61,13 @@ public class NpcShopTests
             Portals = TestSupport.Data.Portals,
             Spawns = TestSupport.Data.Spawns,
             ZoneIds = TestSupport.Data.ZoneIds,
+            // donos das lojas de teste, todos ao lado do jogador (mapa 1, (30, 30))
+            Npcs = new NpcDirectory([
+                new NpcInfo(1, 1, "Item Shop", 31, 30, NpcWindow.ItemShop, 40101),
+                new NpcInfo(1, 2, "Coins Shop", 29, 30, NpcWindow.ItemShop, 5050),
+                new NpcInfo(1, 3, "Ladder Shop", 30, 31, NpcWindow.ItemShop, 5051),
+                new NpcInfo(1, 4, "Card Shop", 30, 29, NpcWindow.CardShop, 5201),
+            ]),
         };
 
         var inv = new Inventory(data.FindItem, 999, data.FindCard, TestSupport.Clock);
@@ -79,7 +86,7 @@ public class NpcShopTests
 
     /// <summary>Handler 0x53. Sem <paramref name="world"/>, um mundo parado basta (compras que não usam o depósito da conta).</summary>
     private static ItemShopTradeHandler ItemTrade(GameData data, InMemoryCashStore? store = null, WorldHarness? world = null) =>
-        new(data, new ItemService((world ?? new WorldHarness()).Transfers, store ?? new InMemoryCashStore(), TestSupport.Clock));
+        new(data, new ItemService((world ?? new WorldHarness()).Transfers, store ?? new InMemoryCashStore(), TestSupport.Clock), TestSupport.Guard(data));
 
     private static PacketReader BuildItemTrade(NpcShopAction action, uint uid, uint itemId, uint quantity, ItemPlace place, int col, int row, uint shopId)
     {
@@ -156,7 +163,7 @@ public class NpcShopTests
     {
         var (data, player, session) = MakeEnv(bits: 5000);
         var itemTrade = ItemTrade(data);
-        var cardTrade = new CardShopTradeHandler(data);
+        var cardTrade = new CardShopTradeHandler(data, TestSupport.Guard(data));
 
         // 1. Comprar 3x Double Burger (600 cada = 1800 Bits) -> resta 3200 Bits
         itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 29, 3, ItemPlace.Inventory, 0, 0, 40101));
