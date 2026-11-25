@@ -179,9 +179,9 @@ public sealed class CashRepository(Database database) : ICashStore
             toInsert.Add(new CashDepositoryRow(kind, (byte)freeSlot, nextUid++, itemId, amount, expiresAt));
         }
 
-        // Debita primeiro do Cash principal e o restante do Bonus Cash
-        uint takeFromCash = Math.Min(bal.Cash, totalPrice);
-        uint takeFromBonus = totalPrice - takeFromCash;
+        // Debita primeiro do Bonus Cash e o restante do Cash principal
+        uint takeFromBonus = Math.Min(bal.BonusCash, totalPrice);
+        uint takeFromCash = totalPrice - takeFromBonus;
         uint newCash = bal.Cash - takeFromCash;
         uint newBonus = bal.BonusCash - takeFromBonus;
 

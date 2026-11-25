@@ -74,8 +74,8 @@ public class CashShopTests
                 toAdd.Add(new CashDepositoryRow(kind, (byte)slot, _nextUid++, itemId, amount, expiresAt));
             }
 
-            uint fromCash = Math.Min(bal.Cash, totalPrice);
-            uint fromBonus = totalPrice - fromCash;
+            uint fromBonus = Math.Min(bal.BonusCash, totalPrice);
+            uint fromCash = totalPrice - fromBonus;
             var after = new CashBalance(bal.Cash - fromCash, bal.BonusCash - fromBonus);
             _balances[accountUid] = after;
             list.AddRange(toAdd);
@@ -217,15 +217,15 @@ public class CashShopTests
             await world.InvokeAsync(() => 0);
             Assert.Equal([(ushort)MapOpcode.CashShopOpen], session.SentOpcodes());
 
-            // 2. Comprar Starter Pack (ItemDataId=1, 160 cash): debita 100 de cash + 60 de bonus -> resta 0 + 40
+            // 2. Comprar Starter Pack (ItemDataId=1, 160 cash): debita 100 de bonus + 60 de cash -> resta 40 + 0
             await service.BuyProductAsync(player, 0x0100FDBC, 1, 1);
             await world.InvokeAsync(() => 0);
             var buyFrames = session.DrainOutgoing();
             Assert.Single(buyFrames);
             Assert.Equal((ushort)MapOpcode.CashShopBuy, PacketHeader.Read(buyFrames[0]).Opcode);
             var buyPayload = buyFrames[0].AsSpan(PacketHeader.Length);
-            Assert.Equal(0L, BinaryPrimitives.ReadInt64LittleEndian(buyPayload.Slice(0x28)));
-            Assert.Equal(40L, BinaryPrimitives.ReadInt64LittleEndian(buyPayload.Slice(0x30)));
+            Assert.Equal(40L, BinaryPrimitives.ReadInt64LittleEndian(buyPayload.Slice(0x28)));
+            Assert.Equal(0L, BinaryPrimitives.ReadInt64LittleEndian(buyPayload.Slice(0x30)));
 
             // 2.5. Consultar histórico de compras (0x0161): deve listar a compra recém-feita
             var now = DateTimeOffset.UtcNow;
@@ -239,8 +239,8 @@ public class CashShopTests
             Assert.Equal(1u, BinaryPrimitives.ReadUInt32LittleEndian(histPayload.Slice(0x28)));         // itemDataId
             Assert.Equal(1u, BinaryPrimitives.ReadUInt32LittleEndian(histPayload.Slice(0x2C)));         // quantity
             Assert.Equal(160L, BinaryPrimitives.ReadInt64LittleEndian(histPayload.Slice(0x30)));        // unitPrice
-            Assert.Equal(0L, BinaryPrimitives.ReadInt64LittleEndian(histPayload.Slice(0x38)));          // cashAfter
-            Assert.Equal(40L, BinaryPrimitives.ReadInt64LittleEndian(histPayload.Slice(0x40)));         // bonusCashAfter
+            Assert.Equal(40L, BinaryPrimitives.ReadInt64LittleEndian(histPayload.Slice(0x38)));         // cashAfter
+            Assert.Equal(0L, BinaryPrimitives.ReadInt64LittleEndian(histPayload.Slice(0x40)));          // bonusCashAfter
 
             // 3. Listar Cash Depository (0x00DE): deve conter 1 card (#74 x50) e 1 item (#718 x1)
             await service.ListDepositoryAsync(player);
