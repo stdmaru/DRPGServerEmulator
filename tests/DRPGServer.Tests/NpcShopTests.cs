@@ -13,7 +13,7 @@ namespace DRPGServer.Tests;
 
 public class NpcShopTests
 {
-    private static (GameData Data, Player Player, Session Session) MakeEnv(double bits = 5000)
+    private static (GameData Data, Player Player, Session Session) MakeEnv(double bits = 5000, ICashStore? cashStore = null)
     {
         var items = new Dictionary<uint, ItemInfo>(TestSupport.Data.Items)
         {
@@ -69,7 +69,7 @@ public class NpcShopTests
         };
         character.SetBits(bits);
         var session = TestSupport.NewSession();
-        var player = new Player(session, new AuthenticatedAccount(1, "user", Authority.None), character);
+        var player = new Player(session, new AuthenticatedAccount(1, "user", Authority.None), character, cashStore);
         session.Player = player;
         return (data, player, session);
     }
@@ -240,11 +240,11 @@ public class NpcShopTests
     [Fact]
     public void Special_currency_shops_use_coins_and_ladder_points_from_c2s_buy_action()
     {
-        var (data, player, session) = MakeEnv(bits: 5000);
+        var cashStore = new FakeCashStore();
+        var (data, player, session) = MakeEnv(bits: 5000, cashStore: cashStore);
         player.Character.SetCoins(200);
         player.Character.SetLadderPoints(1500);
-        var cashStore = new FakeCashStore();
-        var itemTrade = new ItemShopTradeHandler(data, cashStore);
+        var itemTrade = new ItemShopTradeHandler(data);
 
         // 1. Cliente sempre envia action=1 (Buy) em C2S 0x0053; loja 5050 (Coins + ShopDepository):
         // debita 150 Coins (Col16), deposita no Shop Depository (não na mochila), responde S2C action=4 + 0xCB (sem 0xC9)

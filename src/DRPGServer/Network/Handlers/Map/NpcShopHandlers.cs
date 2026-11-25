@@ -1,10 +1,7 @@
 using DRPGServer.Data.GameData;
-using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Entities;
-using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
-using Microsoft.Extensions.Logging;
 
 namespace DRPGServer.Network.Handlers;
 
@@ -130,11 +127,7 @@ public sealed class CardShopTradeHandler(GameData data) : PlayerHandler
 
 /// <summary>✅ Map 0x0053 (C2S 158 B): comprar (1) ou vender (2) item em loja de NPC.</summary>
 [PacketHandler(MapOpcode.ItemShopTrade)]
-public sealed class ItemShopTradeHandler(
-    GameData data,
-    ICashStore? cashStore = null,
-    GameWorld? world = null,
-    ILogger<ItemShopTradeHandler>? log = null) : PlayerHandler
+public sealed class ItemShopTradeHandler(GameData data) : PlayerHandler
 {
     private const uint MaxTradeQuantity = 999;
 
@@ -194,7 +187,30 @@ public sealed class ItemShopTradeHandler(
 
         if (shop.DeliverTo == NpcShopDelivery.ShopDepository)
         {
-            HandleBuyToShopDepository(player, shop, info, quantity, unitPrice, totalCostLong);
+            if (!TrySpendCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong))
+                return;
+
+            player.SendToShopDepository(info.Id, quantity, expiresAt: 0, deposited =>
+            {
+                if (!deposited)
+                {
+                    RefundCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong);
+                    player.RequestImmediateSave();
+                    if (player.IsOnline)
+                        player.SendNotice("[Shop]", "Shop Depository cheio. Retire itens antes de comprar.");
+                    return;
+                }
+
+                player.RequestImmediateSave();
+                if (!player.IsOnline) return;
+
+                var preview = new InventoryItem { Uid = 0, ItemId = info.Id, Info = info, Amount = quantity };
+                player.Send(new ItemShopTradePacket(
+                    (NpcShopAction)(uint)shop.Currency, preview, quantity, character.Bits,
+                    ItemPlace.Inventory, 0, 0, shop.ShopId, character.Coins));
+                if (shop.Currency is NpcShopCurrency.Medals or NpcShopCurrency.Coins)
+                    player.Send(new CurrencyUpdatePacket(character));
+            });
             return;
         }
 
@@ -220,94 +236,6 @@ public sealed class ItemShopTradeHandler(
         player.Send(new ItemReceivePacket(added));
         if (shop.Currency is NpcShopCurrency.Medals or NpcShopCurrency.Coins)
             player.Send(new CurrencyUpdatePacket(character));
-    }
-
-    /// <summary>
-    /// ✅ Lojas com <c>DeliverTo="ShopDepository"</c> (ex.: loja 5050 de Coins, <c>DigimonRPG.bin @ 0x00AEEE49..0x00AEF199</c>):
-    /// debita a moeda na thread do mundo, deposita em <c>cash_depository_item</c> e envia <c>S2C 0x0053</c> sem adicionar
-    /// à mochila nem enviar <c>0x00C9</c> (o cliente exibe "The purchased item has been delivered to the Shop Depository").
-    /// </summary>
-    private void HandleBuyToShopDepository(
-        Player player, NpcShop shop, ItemInfo info, uint quantity, uint unitPrice, ulong totalCostLong)
-    {
-        if (cashStore is null) return;
-
-        var character = player.Character;
-        if (!TrySpendCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong))
-            return;
-
-        uint expiresAt = info.IsTimed
-            ? (uint)Math.Clamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds() + info.DurationSeconds, 1, uint.MaxValue)
-            : 0u;
-        uint maxStack = info.IsTimed ? 1u : Math.Max(1u, info.MaxStack);
-        var entries = new List<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)>();
-        uint remaining = quantity;
-        while (remaining > 0)
-        {
-            uint chunk = Math.Min(remaining, maxStack);
-            entries.Add((CashShopItemKind.Item, info.Id, chunk, expiresAt));
-            remaining -= chunk;
-        }
-
-        _ = DeliverToShopDepositoryAsync(player, shop, info, quantity, unitPrice, totalCostLong, expiresAt, entries);
-    }
-
-    private async Task DeliverToShopDepositoryAsync(
-        Player player,
-        NpcShop shop,
-        ItemInfo info,
-        uint quantity,
-        uint unitPrice,
-        ulong totalCostLong,
-        uint expiresAt,
-        IReadOnlyList<(CashShopItemKind Kind, uint ItemId, uint Amount, uint ExpiresAt)> entries)
-    {
-        bool deposited = false;
-        try
-        {
-            deposited = await cashStore!.DepositAsync(player.Account.Uid, entries, CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            log?.LogWarning(ex, "Falha ao depositar item {ItemId} da loja {ShopId} no Shop Depository da conta {AccountUid}",
-                info.Id, shop.ShopId, player.Account.Uid);
-        }
-
-        void ApplyResult()
-        {
-            var character = player.Character;
-            if (!deposited)
-            {
-                RefundCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong);
-                player.RequestImmediateSave();
-                if (player.IsOnline)
-                    player.SendNotice("[Shop]", "Shop Depository cheio. Retire itens antes de comprar.");
-                return;
-            }
-
-            player.RequestImmediateSave();
-            if (!player.IsOnline) return;
-
-            var preview = new InventoryItem
-            {
-                Uid = 0,
-                ItemId = info.Id,
-                Info = info,
-                Amount = quantity,
-                ExpiresAt = expiresAt,
-            };
-            var responseAction = (NpcShopAction)(uint)shop.Currency;
-            player.Send(new ItemShopTradePacket(
-                responseAction, preview, quantity, character.Bits,
-                ItemPlace.Inventory, 0, 0, shop.ShopId, character.Coins));
-            if (shop.Currency is NpcShopCurrency.Medals or NpcShopCurrency.Coins)
-                player.Send(new CurrencyUpdatePacket(character));
-        }
-
-        if (world is not null)
-            world.Post(ApplyResult);
-        else
-            ApplyResult();
     }
 
     private static bool TrySpendCurrency(Character character, NpcShopCurrency currency, uint unitPrice, uint quantity, ulong totalCostLong) =>
