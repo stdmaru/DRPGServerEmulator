@@ -38,7 +38,7 @@ Cada camada só conhece a de baixo. Regra de negócio nunca fica em handler nem 
 ## Onde fica cada coisa
 | Domínio | Pasta | Peças |
 |---|---|---|
-| Mundo | `Game/World` | `GameWorld` (thread do mundo), `Zone`, `ZoneSystem`, `PlayerSystem`, `WorldIo`, `IGameClock` (**N5**), `InteractionGuard` (**S4**) |
+| Mundo | `Game/World` | `GameWorld` (thread do mundo), `Zone`, `ZoneSystem`, `PlayerSystem`, `WorldIo`, `IGameClock`, `InteractionGuard` (**S4**) |
 | Itens | `Game/Items` | `ItemService` (dar, tirar, trocar, depósito da conta; **G2**), `ItemGrant`/`ItemDuration` (**G1**), `EquipmentService` (**G5**), `ItemUseService` e efeitos de uso (**E4**) |
 | Economia | `Game/Economy` | `Wallet`/`CurrencyKind` (**G3**), `NpcShopService` (**G4**), `CashShopService`, `IAuditLog` (**S9**) |
 | Status | `Game/Stats` | `StatFormulas` (**o único lugar** com fórmulas de status), `ExpFormulas`, `StatModifiers` (**E1**) |
@@ -59,7 +59,7 @@ Antes de escrever uma função de jogo, procure o serviço do domínio. Se uma l
   - **Transferência conta ↔ personagem:** job **não coalescível** que grava o snapshot e a mudança da conta na mesma transação (**PR #41: S3**, ver [segurança](seguranca.md#transferências-entre-conta-e-personagem)).
   - **Falha:** retry com backoff e depois dead-letter. Uma gravação nunca é descartada em silêncio (**PR #41: S7**).
 - Ordem dos serviços: persistência → mundo → rede. Na parada, a rede fecha primeiro e a persistência grava o resto por último.
-- Tempo: o mundo usa `GameWorld.Now` (monotônico), e o tempo de calendário (expiração de itens, histórico) vem de `IGameClock`. Ninguém chama `DateTimeOffset.UtcNow` direto (**PR #41: N5**).
+- Tempo: o mundo usa `GameWorld.Now` (monotônico), e o tempo de calendário (expiração de itens, histórico) vem de `IGameClock`. Ninguém chama `DateTimeOffset.UtcNow` direto: entidades recebem o relógio (o `Inventory` guarda o dele) e pacotes recebem o horário pronto (ex.: `CharacterDataPacket(character, serverUnixTime)`). Prazos de infraestrutura (espera do banco, folga de ticket) usam `TimeProvider`. Nos testes, `GameClock` sobre `ManualTime` controla o calendário.
 
 ## Dependências
 - Todas as dependências são **obrigatórias** e vêm pelo construtor (DI). Não existe parâmetro `= null` para "funcionar sem" um serviço. Os testes usam fakes (`tests/DRPGServer.Tests/TestSupport.cs`), nunca um caminho alternativo no código de produção. O container de DI valida o grafo inteiro na partida (`ValidateOnBuild`), também em produção.

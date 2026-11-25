@@ -127,10 +127,10 @@ public class ExpEventTests
     {
         await using var world = new WorldHarness();
         await world.StartAsync();
-        var zones = new ZoneSystem(TestSupport.Data, world.World, NullLogger<ZoneSystem>.Instance);
+        var zones = new ZoneSystem(TestSupport.Data, world.World, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
         var store = new FakeExpEventStore();
         var expEvents = TestSupport.NewExpEvents(store: store);
-        var cashShop = new CashShopService(TestSupport.Data, new InMemoryCashStore(), world.Io, NullLogger<CashShopService>.Instance);
+        var cashShop = new CashShopService(TestSupport.Data, new InMemoryCashStore(), world.Io, TestSupport.Clock, NullLogger<CashShopService>.Instance);
         var commands = new ChatCommands(zones, world.Io, TestSupport.GameOptions(), NullLogger<ChatCommands>.Instance, expEvents, cashShop);
 
         var gmSession = TestSupport.NewSession(ServerRole.Map);

@@ -12,11 +12,11 @@ public sealed class ZoneSystem : IWorldSystem
     private readonly ILogger<ZoneSystem> _log;
     private readonly GameWorld _world;
 
-    public ZoneSystem(GameData data, GameWorld world, ILogger<ZoneSystem> log)
+    public ZoneSystem(GameData data, GameWorld world, IGameClock clock, ILogger<ZoneSystem> log)
     {
         _log = log;
         _world = world;
-        _zones = data.ZoneIds.ToDictionary(id => id, id => new Zone(id, data, world));
+        _zones = data.ZoneIds.ToDictionary(id => id, id => new Zone(id, data, world, clock));
         _log.LogInformation("{Count} zonas, {Wild} grupos selvagens", _zones.Count, _zones.Values.Sum(z => z.WildDigimons.Count()));
         world.AddSystem(this);
     }

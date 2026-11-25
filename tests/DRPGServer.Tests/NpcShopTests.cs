@@ -63,7 +63,7 @@ public class NpcShopTests
             ZoneIds = TestSupport.Data.ZoneIds,
         };
 
-        var inv = new Inventory(data.FindItem, 999, data.FindCard);
+        var inv = new Inventory(data.FindItem, 999, data.FindCard, TestSupport.Clock);
         var species = data.Species.Values.First(s => s.Stage == StatFormulas.InTraining);
         var leader = new Digimon(data, species, 10);
         var character = new Character(leader, inv)
@@ -79,8 +79,7 @@ public class NpcShopTests
 
     /// <summary>Handler 0x53 com um <see cref="CashShopService"/> sobre <paramref name="io"/> (sem I/O, um mundo parado basta).</summary>
     private static ItemShopTradeHandler ItemTrade(GameData data, ICashStore? cashStore = null, WorldIo? io = null) =>
-        new(data, new CashShopService(data, cashStore ?? new FakeCashStore(),
-            io ?? new WorldIo(TestSupport.NewWorld(), NullLogger<WorldIo>.Instance), NullLogger<CashShopService>.Instance));
+        new(data, new CashShopService(data, cashStore ?? new FakeCashStore(), io ?? new WorldIo(TestSupport.NewWorld(), NullLogger<WorldIo>.Instance), TestSupport.Clock, NullLogger<CashShopService>.Instance));
 
     private static PacketReader BuildItemTrade(NpcShopAction action, uint uid, uint itemId, uint quantity, ItemPlace place, int col, int row, uint shopId)
     {
@@ -125,7 +124,7 @@ public class NpcShopTests
         var itemShop = data.FindNpcShop(40101, NpcShopKind.Item)!;
         var cardShop = data.FindNpcShop(5201, NpcShopKind.Card)!;
 
-        var p52 = new ItemShopListPacket(itemShop, data).EncodePayload();
+        var p52 = new ItemShopListPacket(itemShop, data, TestSupport.Clock.UnixNow).EncodePayload();
         Assert.Equal(4320, p52.Length);
         Assert.Equal(29u, BinaryPrimitives.ReadUInt32LittleEndian(p52.AsSpan(4)));
         Assert.Equal(600u, BinaryPrimitives.ReadUInt32LittleEndian(p52.AsSpan(20)));
@@ -298,7 +297,7 @@ public class NpcShopTests
         // 4. CharacterDataPacket (S2C 0x02) inclui LadderPoints (+0x5C), Medals (+0x19A8) e Coins (+0x19AA)
         player.Character.SetMedals(77);
         player.Character.SetCoins(50);
-        var charPayload = new CharacterDataPacket(player.Character).Encode().AsSpan(PacketHeader.Length);
+        var charPayload = new CharacterDataPacket(player.Character, TestSupport.Clock.UnixNow).Encode().AsSpan(PacketHeader.Length);
         Assert.Equal(7600, charPayload.Length);
         Assert.Equal(500u, BinaryPrimitives.ReadUInt32LittleEndian(charPayload.Slice(0x5C)));
         Assert.Equal((ushort)77, BinaryPrimitives.ReadUInt16LittleEndian(charPayload.Slice(0x19A8)));

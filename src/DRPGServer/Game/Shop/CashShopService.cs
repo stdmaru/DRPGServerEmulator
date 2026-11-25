@@ -16,6 +16,7 @@ public sealed class CashShopService(
     GameData data,
     ICashStore store,
     WorldIo io,
+    IGameClock clock,
     ILogger<CashShopService> log)
 {
     public const uint MaxPurchaseQuantity = 99;
@@ -198,7 +199,7 @@ public sealed class CashShopService(
         long? durationOverride = null;
         if (taken.Kind == CashShopItemKind.Item && taken.ExpiresAt > 0)
         {
-            long remaining = taken.ExpiresAt - DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            long remaining = taken.ExpiresAt - clock.UnixNow;
             durationOverride = Math.Max(1, remaining);
         }
 

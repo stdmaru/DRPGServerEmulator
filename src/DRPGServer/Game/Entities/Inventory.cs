@@ -1,4 +1,5 @@
 using DRPGServer.Data.GameData;
+using DRPGServer.Game.World;
 
 namespace DRPGServer.Game.Entities;
 
@@ -76,7 +77,6 @@ public sealed class InventoryItem
 
     public bool IsTimed => ExpiresAt > 0;
     public bool IsExpired(long unixNow) => ExpiresAt > 0 && unixNow >= ExpiresAt;
-    public bool IsExpired() => IsExpired(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
     /// <summary>A grade tem 6 colunas (✅ 0x91/0x90: linha 3, coluna 5 é a última posição).</summary>
     public int Row => Slot / Inventory.Columns;
@@ -162,7 +162,7 @@ public sealed class Bag
             effectiveDuration = _owner.FindInfo(itemId)?.DurationSeconds ?? 0u;
 
         if (effectiveDuration == 0) return 0;
-        long expires = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + effectiveDuration;
+        long expires = _owner.Clock.UnixNow + effectiveDuration;
         return (uint)Math.Clamp(expires, 1, uint.MaxValue);
     }
 
@@ -333,8 +333,10 @@ public sealed class Inventory
     /// <param name="lookup">Linha do item em <c>item_info_us</c>.</param>
     /// <param name="maxStackCap">Teto de pilha (configuração).</param>
     /// <param name="cardLookup">Linha do card em <c>card_info_us</c>.</param>
-    public Inventory(Func<uint, ItemInfo?> lookup, uint maxStackCap, Func<uint, CardInfo?> cardLookup)
+    /// <param name="clock">Calendário para a expiração dos itens de período.</param>
+    public Inventory(Func<uint, ItemInfo?> lookup, uint maxStackCap, Func<uint, CardInfo?> cardLookup, IGameClock clock)
     {
+        Clock = clock;
         _lookup = lookup;
         _cardLookup = cardLookup;
         _maxStackCap = Math.Max(1, maxStackCap);
@@ -343,6 +345,11 @@ public sealed class Inventory
         CardSlots = new Bag(this, BagKind.EquippedCards, CardSlotCount);
         Equipment = new Bag(this, BagKind.Equipment, EquipmentSlots.BagCapacity);
     }
+
+    public IGameClock Clock { get; }
+
+    /// <summary>True se o item é de período e já venceu agora.</summary>
+    public bool IsExpired(InventoryItem item) => item.IsExpired(Clock.UnixNow);
 
     public Bag Main { get; }
     /// <summary>✅ Aba Cards (24 slots, registros de 76 bytes no 0x03/0xFC; recebe pelo 0xC8; move pelo 0x90).</summary>

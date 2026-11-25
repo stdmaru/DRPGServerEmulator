@@ -76,6 +76,7 @@ public sealed class ItemMoveHandler : PlayerHandler<ItemMoveRequest>
     {
         var (header, uid, itemId) = request;
         var bag = player.Character.Inventory.Main;
+        long now = player.Character.Inventory.Clock.UnixNow;
         var equipment = player.Character.Inventory.Equipment;
 
         if (header.From == ItemPlace.Ground && header.To == ItemPlace.Inventory)
@@ -91,7 +92,7 @@ public sealed class ItemMoveHandler : PlayerHandler<ItemMoveRequest>
         if (header.From == ItemPlace.Inventory && header.To == ItemPlace.Inventory)
         {
             int from = SlotOf(header.FromA, header.FromB), to = SlotOf(header.ToA, header.ToB);
-            if (bag[from] is not { } item || item.Uid != uid || item.ItemId != itemId || item.IsExpired()) return;
+            if (bag[from] is not { } item || item.Uid != uid || item.ItemId != itemId || item.IsExpired(now)) return;
             if (bag.Move(from, to, out var displaced))
             {
                 player.MarkDirty();
@@ -106,7 +107,7 @@ public sealed class ItemMoveHandler : PlayerHandler<ItemMoveRequest>
             if (header.ToA != 0 || header.ToB != 0) return;
             int fromSlot = SlotOf(header.FromA, header.FromB);
             if (bag[fromSlot] is not { } item || item.Uid != uid || item.ItemId != itemId) return;
-            if (!EquipmentSlots.CanEquip(header.To, item, player.Character.Level)) return;
+            if (!EquipmentSlots.CanEquip(header.To, item, player.Character.Level, now)) return;
 
             if (!bag.MoveTo(fromSlot, equipment, (int)header.To, out var displaced)) return;
             ApplyEquipmentChange(player, header, item, displaced);
@@ -122,7 +123,7 @@ public sealed class ItemMoveHandler : PlayerHandler<ItemMoveRequest>
             if (equipment[(int)header.From] is not { } item || item.Uid != uid || item.ItemId != itemId) return;
 
             // Se o slot de destino no inventário já está ocupado, só permite troca se o item deslocado puder ir para o slot de equipamento
-            if (bag[toSlot] is { } existing && !EquipmentSlots.CanEquip(header.From, existing, player.Character.Level))
+            if (bag[toSlot] is { } existing && !EquipmentSlots.CanEquip(header.From, existing, player.Character.Level, now))
                 return;
 
             if (!equipment.MoveTo((int)header.From, bag, toSlot, out var displaced)) return;
@@ -135,8 +136,8 @@ public sealed class ItemMoveHandler : PlayerHandler<ItemMoveRequest>
         {
             if (header.From == header.To || header.FromA != 0 || header.FromB != 0 || header.ToA != 0 || header.ToB != 0) return;
             if (equipment[(int)header.From] is not { } item || item.Uid != uid || item.ItemId != itemId) return;
-            if (!EquipmentSlots.CanEquip(header.To, item, player.Character.Level)) return;
-            if (equipment[(int)header.To] is { } existing && !EquipmentSlots.CanEquip(header.From, existing, player.Character.Level))
+            if (!EquipmentSlots.CanEquip(header.To, item, player.Character.Level, now)) return;
+            if (equipment[(int)header.To] is { } existing && !EquipmentSlots.CanEquip(header.From, existing, player.Character.Level, now))
                 return;
 
             if (!equipment.Move((int)header.From, (int)header.To, out var displaced)) return;

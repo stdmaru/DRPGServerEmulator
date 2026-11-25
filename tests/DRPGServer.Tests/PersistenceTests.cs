@@ -69,7 +69,7 @@ public class PersistenceTests
     public void PlayerSystem_saves_immediately_on_critical_events_and_periodically_only_when_dirty()
     {
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
         var battles = TestSupport.NewBattles(world, TestSupport.Data, TestSupport.GameOptions());
         var queue = new PersistenceQueue();
         var options = TestSupport.GameOptions(o => o.AutosaveSeconds = 60);
@@ -95,7 +95,7 @@ public class PersistenceTests
         Assert.Equal(TimeSpan.FromSeconds(60), player1.LastSavedAt);
 
         // RequestImmediateSave (Tier 1): salva imediatamente no próximo tick (50 ms) sem esperar AutosaveSeconds
-        var char2 = new Character(Entities.Digimon(), new Inventory(TestSupport.Data.FindItem, 999, _ => null))
+        var char2 = new Character(Entities.Digimon(), new Inventory(TestSupport.Data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 2, AccountUid = 2, Slot = 0, Name = "Tester2", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };
@@ -112,7 +112,7 @@ public class PersistenceTests
     public void Handlers_distinguish_immediate_save_from_dirty_save()
     {
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
         var session = TestSupport.NewSession(ServerRole.Map);
         var character = Entities.Character();
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
@@ -147,7 +147,7 @@ public class PersistenceTests
         leader.SpendVp(30);
         ally.TakeDamage(ally.Stats.MaxHp); // nocauteado (HP = 0)
 
-        var character = new Character(leader, new Inventory(TestSupport.Data.FindItem, 999, _ => null))
+        var character = new Character(leader, new Inventory(TestSupport.Data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 42, AccountUid = 1, Slot = 0, Name = "Hero", TamerId = 1, Level = 10, MapId = 79, X = 50, Y = 50,
         };
@@ -158,7 +158,7 @@ public class PersistenceTests
         Assert.Equal((leader.Hp, leader.Vp, leader.Evp), (snap.Digimons[0].Hp, snap.Digimons[0].Vp, snap.Digimons[0].Evp));
         Assert.Equal(0, snap.Digimons[1].Hp);
 
-        var factory = new CharacterFactory(TestSupport.Data, TestSupport.GameOptions());
+        var factory = new CharacterFactory(TestSupport.Data, TestSupport.GameOptions(), TestSupport.Clock);
         var record = new CharacterRecord(
             new CharacterRow { Uid = 42, AccountUid = 1, Slot = 0, Name = "Hero", TamerId = 1, Level = 10, MapId = 79, PosX = 50, PosY = 50, DepositorySlots = 10 },
             [

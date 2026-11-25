@@ -63,7 +63,7 @@ public interface ICashStore
         CancellationToken ct);
 }
 
-public sealed class CashRepository(Database database) : ICashStore
+public sealed class CashRepository(Database database, Game.World.IGameClock clock) : ICashStore
 {
     public const int DepositoryCapacityPerKind = 24;
     public const int HistoryPageSize = 20;
@@ -229,7 +229,7 @@ public sealed class CashRepository(Database database) : ICashStore
             UnitPrice = unitPrice,
             CashAfter = newCash,
             BonusCashAfter = newBonus,
-            PurchasedAt = (uint)Math.Clamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds(), 0, uint.MaxValue),
+            PurchasedAt = (uint)Math.Clamp(clock.UnixNow, 0, uint.MaxValue),
         }, tx, cancellationToken: ct));
 
         await tx.CommitAsync(ct);

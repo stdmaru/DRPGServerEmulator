@@ -64,7 +64,7 @@ public sealed class JoinCharacterHandler(
     /// <summary>Sequência que o oficial manda na entrada (capturas v242/v322).</summary>
     private void SendWorldState(Player player)
     {
-        player.Send(new CharacterDataPacket(player.Character));
+        player.Send(new CharacterDataPacket(player.Character, player.Character.Inventory.Clock.UnixNow));
         player.Send(new InventoryDataPacket(player.Character.Inventory));
         if (player.Character.Medals > 0 || player.Character.Coins > 0)
             player.Send(new CurrencyUpdatePacket(player.Character));

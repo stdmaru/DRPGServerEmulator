@@ -34,7 +34,7 @@ public class PacketSizeTests
             (new CharacterCreatePacket(0, new CharacterCreateHeader(3, 0x4F, 0x3E, 0x38), 1, "a", 10, "b"), 64),
             (new CharacterListPacket([null, null, null, null], new Random(1)), 500),
             (new UserCheckPacket("user"), 22),
-            (new CharacterDataPacket(character), 7600),                // ✅ v322 (sessão 52)
+            (new CharacterDataPacket(character, TestSupport.Clock.UnixNow), 7600),                // ✅ v322 (sessão 52)
             (new InventoryDataPacket(TestSupport.EmptyInventory(999)), 4416),
             (new Unknown05Packet(), 164),
             (new HelloPacket(0x0E), 16),
@@ -115,7 +115,7 @@ public class PacketSizeTests
     public void Battle_create_has_ten_status_blocks()
     {
         var world = TestSupport.NewWorld();
-        var zones = new DRPGServer.Game.World.ZoneSystem(TestSupport.Data, world, Microsoft.Extensions.Logging.Abstractions.NullLogger<DRPGServer.Game.World.ZoneSystem>.Instance);
+        var zones = new DRPGServer.Game.World.ZoneSystem(TestSupport.Data, world, TestSupport.Clock, Microsoft.Extensions.Logging.Abstractions.NullLogger<DRPGServer.Game.World.ZoneSystem>.Instance);
         var battles = TestSupport.NewBattles(world, TestSupport.Data, TestSupport.GameOptions());
         var session = TestSupport.NewSession();
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), Entities.Character());
@@ -184,7 +184,7 @@ public class PacketSizeTests
         var character = Entities.Character();
         var card0 = character.Inventory.CardSlots.Add(74, 50)[0];
         var card1 = character.Inventory.CardSlots.Add(19, 2)[0];
-        var payload = new CharacterDataPacket(character).EncodePayload();
+        var payload = new CharacterDataPacket(character, TestSupport.Clock.UnixNow).EncodePayload();
 
         Assert.Equal(7600, payload.Length);
         var slot0 = payload.AsSpan(784, CardRecord.Length);

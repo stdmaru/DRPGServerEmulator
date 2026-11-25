@@ -54,6 +54,7 @@ services.Configure<ServersOptions>(builder.Configuration.GetSection(ServersOptio
 services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.Section));
 services.Configure<GameOptions>(builder.Configuration.GetSection(GameOptions.Section));
 services.AddSingleton(TimeProvider.System);
+services.AddSingleton<IGameClock, GameClock>();
 
 // dados
 services.AddSingleton<Database>();

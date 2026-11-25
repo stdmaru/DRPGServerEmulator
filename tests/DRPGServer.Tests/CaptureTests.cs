@@ -26,7 +26,7 @@ public class CaptureTests
     public CaptureTests()
     {
         _uids.Seed(100);
-        _zones = new ZoneSystem(TestSupport.Data, _world, NullLogger<ZoneSystem>.Instance);
+        _zones = new ZoneSystem(TestSupport.Data, _world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
     }
 
     private Taming NewTaming(double chance = 0.10) =>
@@ -37,7 +37,7 @@ public class CaptureTests
 
     private Player Join(params Digimon[] party)
     {
-        var c = new Character(party[0], new Inventory(TestSupport.Data.FindItem, 999, _ => null))
+        var c = new Character(party[0], new Inventory(TestSupport.Data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };

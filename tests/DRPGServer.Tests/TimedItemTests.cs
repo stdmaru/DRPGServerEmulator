@@ -43,7 +43,7 @@ public class TimedItemTests
 
     private static (Player Player, Session Session) MakePlayer()
     {
-        var inv = new Inventory(id => TestItems.GetValueOrDefault(id), 99, _ => null);
+        var inv = new Inventory(id => TestItems.GetValueOrDefault(id), 99, _ => null, TestSupport.Clock);
         var species = TestSupport.Data.Species.Values.First(s => s.Stage == StatFormulas.InTraining);
         var leader = new Digimon(TestSupport.Data, species, 10);
         var character = new Character(leader, inv)
@@ -54,6 +54,32 @@ public class TimedItemTests
         var player = new Player(session, new AuthenticatedAccount(1, "user", Authority.None), character);
         session.Player = player;
         return (player, session);
+    }
+
+    [Fact]
+    public void Timed_item_expiry_follows_the_game_clock()
+    {
+        var time = new ManualTime(DateTimeOffset.FromUnixTimeSeconds(1_800_000_000));
+        IGameClock clock = new GameClock(time);
+        var inv = new Inventory(id => TestItems.GetValueOrDefault(id), 99, _ => null, clock);
+
+        var aura = inv.Main.Add(718, 1).Single();
+        Assert.Equal(1_800_000_000u + Aura718.DurationSeconds, aura.ExpiresAt);
+        Assert.False(inv.IsExpired(aura));
+
+        time.Now = time.Now.AddSeconds(Aura718.DurationSeconds - 1);
+        Assert.False(inv.IsExpired(aura));
+        time.Now = time.Now.AddSeconds(1);
+        Assert.True(inv.IsExpired(aura));
+        Assert.False(EquipmentSlots.CanEquip(ItemPlace.Aura, aura, 10, clock.UnixNow));
+    }
+
+    [Fact]
+    public void Character_data_writes_the_given_server_time()
+    {
+        var (player, _) = MakePlayer();
+        var payload = new CharacterDataPacket(player.Character, 1_800_000_123).EncodePayload();
+        Assert.Equal(1_800_000_123u, BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0x19B0)));
     }
 
     [Fact]
@@ -119,7 +145,7 @@ public class TimedItemTests
 
         // S2C 0x02 (7600 B): offset 0x19B0 (6576) contém o Unix timestamp UTC atual do servidor
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var p02 = new CharacterDataPacket(player.Character).EncodePayload();
+        var p02 = new CharacterDataPacket(player.Character, TestSupport.Clock.UnixNow).EncodePayload();
         Assert.Equal(7600, p02.Length);
         uint serverTime = BinaryPrimitives.ReadUInt32LittleEndian(p02.AsSpan(0x19B0));
         Assert.InRange(serverTime, (uint)(now - 5), (uint)(now + 5));
@@ -136,7 +162,7 @@ public class TimedItemTests
         // 1. Guarda de segurança: item já expirado não pode ser equipado
         var expiredBagItem = inv.Create(718, 0, 1, expiresAt: pastTs);
         inv.Main.Place(expiredBagItem);
-        Assert.False(EquipmentSlots.CanEquip(ItemPlace.Aura, expiredBagItem, player.Character.Level));
+        Assert.False(EquipmentSlots.CanEquip(ItemPlace.Aura, expiredBagItem, player.Character.Level, TestSupport.Clock.UnixNow));
 
         // 2. Expiração em tempo real no tick da zona: remove item vencido equipado e recalcula status
         var expiredEquip = inv.Create(1, (int)ItemPlace.Crest1, 1, expiresAt: pastTs);
@@ -145,7 +171,7 @@ public class TimedItemTests
         int boostedAtk = player.Leader.Stats.Atk;
 
         var world = TestSupport.NewWorld();
-        var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var zone = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance).Find(79)!;
         zone.Enter(player);
         session.SentOpcodes(); // limpa entrada
 
@@ -181,7 +207,7 @@ public class TimedItemTests
             ZoneIds = TestSupport.Data.ZoneIds,
         };
         var species = TestSupport.Data.Species.Values.First(s => s.Stage == StatFormulas.InTraining);
-        var factory = new CharacterFactory(data, Options.Create(new GameOptions()));
+        var factory = new CharacterFactory(data, Options.Create(new GameOptions()), TestSupport.Clock);
         var record = new CharacterRecord(
             new CharacterRow { Uid = 10, AccountUid = 1, Slot = 0, Name = "Tamer", TamerId = 1, Level = 10, MapId = 79, PosX = 30, PosY = 30 },
             [new DigimonRow { Uid = 100, Slot = 0, DigimonId = species.Id, Name = species.Name, Level = 10 }],

@@ -27,7 +27,7 @@ public class ItemTeleportTests
     public void ItemTeleportHandler_moves_player_consumes_907_and_sends_official_sequence()
     {
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
         var character = new Character(Entities.Digimon(), TestSupport.EmptyInventory(999))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Teleporter", TamerId = 1, MapId = 79, X = 56, Y = 56,
@@ -66,7 +66,7 @@ public class ItemTeleportTests
         var grid = new DRPGServer.Data.GameData.MapGrid(10, 10, new byte[(10 * 10 + 7) / 8]);
         var data = Grids.DataWithGrid(1, grid);
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(data, world, NullLogger<ZoneSystem>.Instance);
+        var zones = new ZoneSystem(data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
         var character = new Character(Entities.Digimon(), TestSupport.EmptyInventory(999))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Teleporter", TamerId = 1, MapId = 1, X = 56, Y = 56,

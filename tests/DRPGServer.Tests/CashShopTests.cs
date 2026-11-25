@@ -52,7 +52,7 @@ public class CashShopTests
             ZoneIds = TestSupport.Data.ZoneIds,
         };
 
-        var inv = new Inventory(data.FindItem, 999, data.FindCard);
+        var inv = new Inventory(data.FindItem, 999, data.FindCard, TestSupport.Clock);
         var species = data.Species.Values.First(s => s.Stage == StatFormulas.InTraining);
         var leader = new Digimon(data, species, 10);
         var character = new Character(leader, inv)
@@ -66,7 +66,7 @@ public class CashShopTests
         var world = new WorldHarness();
         var store = new InMemoryCashStore();
         store.Seed(42, cash: 100, bonusCash: 100);
-        var service = new CashShopService(data, store, world.Io, NullLogger<CashShopService>.Instance);
+        var service = new CashShopService(data, store, world.Io, TestSupport.Clock, NullLogger<CashShopService>.Instance);
         return (data, player, session, world, store, service);
     }
 

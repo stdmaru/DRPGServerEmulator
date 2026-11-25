@@ -64,9 +64,9 @@ public class DigimonTitleTests
     {
         var data = DataWithTitles();
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(data, world, NullLogger<ZoneSystem>.Instance);
+        var zones = new ZoneSystem(data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
         var digimon = new Digimon(data, data.Species[50], 15) { Uid = 42, Name = "V-mon" };
-        var character = new Character(digimon, new Inventory(data.FindItem, 999, _ => null))
+        var character = new Character(digimon, new Inventory(data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "TitleTester", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };
@@ -166,7 +166,7 @@ public class DigimonTitleTests
         Assert.True(digimon.EquipTitle(DigimonTitles.EndlessJourney));
 
         // Round-trip de persistência via CharacterSnapshot + CharacterFactory
-        var character = new Character(digimon, new Inventory(data.FindItem, 999, _ => null))
+        var character = new Character(digimon, new Inventory(data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 5, AccountUid = 1, Slot = 0, Name = "Saver", TamerId = 1, MapId = 79,
         };
@@ -181,7 +181,7 @@ public class DigimonTitleTests
             Uid = 77, Slot = 0, DigimonId = 50, Name = "Imperial", Level = 120,
             TotalWins = 10, TotalBattles = 11, TitleId = snap.Digimons[0].TitleId,
         };
-        var loaded = new CharacterFactory(data, TestSupport.GameOptions()).Build(
+        var loaded = new CharacterFactory(data, TestSupport.GameOptions(), TestSupport.Clock).Build(
             new CharacterRecord(row, [dRow], [], [], [], snap.Titles))!;
 
         Assert.Equal(DigimonTitles.EndlessJourney, loaded.Leader.TitleId);
@@ -196,7 +196,7 @@ public class DigimonTitleTests
         var digimon = new Digimon(data, data.Species[50], 10) { Uid = 88, Name = "V-mon" };
         digimon.TotalBattles = 1;
         digimon.TotalWins = 1;
-        var character = new Character(digimon, new Inventory(data.FindItem, 999, _ => null))
+        var character = new Character(digimon, new Inventory(data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "NotifyTester", TamerId = 1, MapId = 79,
         };

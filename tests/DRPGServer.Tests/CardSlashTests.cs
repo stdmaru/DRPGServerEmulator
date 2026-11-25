@@ -50,7 +50,7 @@ public class CardSlashTests
 
     private static (Player Player, Session Session) NewPlayerWithCards()
     {
-        var inventory = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id));
+        var inventory = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id), TestSupport.Clock);
         var character = new Character(Entities.Digimon(), inventory)
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "CardTester", TamerId = 1, MapId = 79,
@@ -127,7 +127,7 @@ public class CardSlashTests
     [Fact]
     public void CardRecord_matches_captured_76_byte_layout()
     {
-        var inv = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id));
+        var inv = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id), TestSupport.Clock);
         var defense = inv.CardSlots.Add(5, 3)[0];
         var w = new PacketWriter();
         CardRecord.Write(w, defense);
@@ -175,7 +175,7 @@ public class CardSlashTests
             Spawns = TestSupport.Data.Spawns,
             ZoneIds = TestSupport.Data.ZoneIds,
         };
-        var inv = new Inventory(data.FindItem, 999, data.FindCard);
+        var inv = new Inventory(data.FindItem, 999, data.FindCard, TestSupport.Clock);
         var drill = inv.CardSlots.Add(74, 50)[0];
         var def = inv.Battle.Add(5, 12)[0];
         var digimon = new Digimon(data, data.Species[10], 1) { Uid = 100 };
@@ -190,7 +190,7 @@ public class CardSlashTests
 
         var row = new CharacterRow { Uid = 7, AccountUid = 1, Slot = 0, Name = "RoundTrip", TamerId = 1, Level = 1, MapId = 79 };
         var dRow = new DigimonRow { Uid = 100, Slot = 0, DigimonId = 10, Name = "A", Level = 1 };
-        var loaded = new CharacterFactory(data, TestSupport.GameOptions()).Build(
+        var loaded = new CharacterFactory(data, TestSupport.GameOptions(), TestSupport.Clock).Build(
             new CharacterRecord(row, [dRow], [], snap.Items, []))!;
 
         Assert.Equal((74u, 50u, drill.Uid), (loaded.Inventory.CardSlots[0]!.ItemId, loaded.Inventory.CardSlots[0]!.Amount, loaded.Inventory.CardSlots[0]!.Uid));
@@ -213,10 +213,10 @@ public class CardSlashTests
         Func<Inventory, Action>? setupInventory = null)
     {
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
         var battles = TestSupport.NewBattles(world, TestSupport.Data, TestSupport.GameOptions());
 
-        var inv = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id));
+        var inv = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id), TestSupport.Clock);
         setupInventory?.Invoke(inv)();
         var leader = new Digimon(TestSupport.Data, TestSupport.Data.Species[10], 1) { Uid = 10, Name = "Guilmon" };
         var character = new Character(leader, inv)

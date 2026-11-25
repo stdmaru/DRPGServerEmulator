@@ -6,7 +6,7 @@ using DRPGServer.Network.Protocol;
 namespace DRPGServer.Network.Packets.Map;
 
 /// <summary>0x02: dados completos do personagem e do digimon líder. Obrigatório para carregar o mapa.</summary>
-public sealed class CharacterDataPacket(Character character) : ServerPacket
+public sealed class CharacterDataPacket(Character character, long serverUnixTime) : ServerPacket
 {
     public override ushort Opcode => (ushort)MapOpcode.CharacterData;
 
@@ -59,10 +59,10 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
         w.WriteI16(c.Y);
         // 4724..7599 (2876 B): ✅ 23 slots de equipamento do Tamer (DigimonRPG.bin @ 0x00B5BF21..0x00B5C150)
         // + Medals (0x19A8), Coins (0x19AA) e serverTime UTC (0x19B0)
-        WriteEquipmentTail(w, c);
+        WriteEquipmentTail(w, c, serverUnixTime);
     }
 
-    private static void WriteEquipmentTail(PacketWriter w, Character character)
+    private static void WriteEquipmentTail(PacketWriter w, Character character, long serverUnixTime)
     {
         const int tailLength = 2876;
         // ✅ DigimonRPG.bin @ 0x00B5C028 / 0x00B5C044 / 0x00ABE028 & captures.db (conn=238/428):
@@ -83,7 +83,7 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
                 w.WriteU16(character.Medals);
                 w.WriteU16(character.Coins);
                 w.WriteZeros(4); // 0x19AC..0x19AF
-                w.WriteU32((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                w.WriteU32((uint)serverUnixTime);
                 cursor = currenciesTailOffset + 12; // 1856 = 0x19B4 - 4724
                 wroteCurrenciesAndTime = true;
             }

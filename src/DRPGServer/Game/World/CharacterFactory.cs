@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace DRPGServer.Game.World;
 
 /// <summary>Monta as entidades a partir das linhas do banco.</summary>
-public sealed class CharacterFactory(GameData data, IOptions<GameOptions> options)
+public sealed class CharacterFactory(GameData data, IOptions<GameOptions> options, IGameClock clock)
 {
     /// <summary>Monta o personagem. Null se o líder não tem espécie válida.</summary>
     public Character? Build(CharacterRecord record)
@@ -16,8 +16,8 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
         var row = record.Character;
 
         // 1. Monta o inventário e equipamentos primeiro para que os Digimons da party já nasçam com os bônus certos
-        long unixNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var inventory = new Inventory(data.FindItem, (uint)options.Value.MaxStackPerItem, data.FindCard);
+        long unixNow = clock.UnixNow;
+        var inventory = new Inventory(data.FindItem, (uint)options.Value.MaxStackPerItem, data.FindCard, clock);
         foreach (var i in record.Items)
         {
             if (i.Amount == 0) continue;
@@ -35,7 +35,7 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
                 : data.FindItem(i.ItemId) is not null;
             if (!valid) continue;
             var created = inventory.Create(i.ItemId, i.Slot, i.Amount, i.Uid, isCard, i.ExpiresAt);
-            if (bagKind == BagKind.Equipment && !EquipmentSlots.CanEquip((ItemPlace)i.Slot, created, row.Level))
+            if (bagKind == BagKind.Equipment && !EquipmentSlots.CanEquip((ItemPlace)i.Slot, created, row.Level, unixNow))
                 continue;
             inventory.BagOf(bagKind).Place(created);
         }

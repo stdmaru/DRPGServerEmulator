@@ -27,7 +27,7 @@ public sealed class ItemShopListHandler(GameData data) : PlayerHandler<NpcShopLi
     {
         if (data.FindNpcShop(request.ShopId, NpcShopKind.Item) is not { } shop) return;
 
-        player.Send(new ItemShopListPacket(shop, data));
+        player.Send(new ItemShopListPacket(shop, data, player.Character.Inventory.Clock.UnixNow));
     }
 }
 
@@ -242,7 +242,7 @@ public sealed class ItemShopTradeHandler(GameData data, CashShopService cashShop
         if (slot < 0 || slot >= bag.Capacity) return;
 
         var item = bag[slot];
-        if (item is null || item.Uid != uid || item.ItemId != itemId || item.IsExpired()) return;
+        if (item is null || item.Uid != uid || item.ItemId != itemId || player.Character.Inventory.IsExpired(item)) return;
         if (item.Amount < quantity) return;
         if (data.FindItem(itemId) is not { } info) return;
 

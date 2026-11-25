@@ -69,13 +69,13 @@ public sealed class CardShopListPacket(NpcShop shop, GameData data) : ServerPack
 /// ✅ Map 0x0052 (4320 B = 40 × 108 B): lista de itens de uma loja de NPC.
 /// Confirmado em <c>captures.db</c> (conn 145/150/158/221) e <c>DigimonRPG.bin @ 0x00ABF416</c>.
 /// </summary>
-public sealed class ItemShopListPacket(NpcShop shop, GameData data) : ServerPacket
+public sealed class ItemShopListPacket(NpcShop shop, GameData data, long unixNow) : ServerPacket
 {
     public override ushort Opcode => (ushort)MapOpcode.ItemShopList;
 
     protected override void Write(PacketWriter w)
     {
-        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        long now = unixNow;
         int written = 0;
         foreach (var entry in shop.Entries)
         {

@@ -33,7 +33,7 @@ public class NpcTests
     public void Registry_enforces_map_guard_for_choices()
     {
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
         var registry = new NpcScriptRegistry([new VillageOfBeginningNpcs(zones), new DigitalBureauNpcs()]);
 
         var session = TestSupport.NewSession(ServerRole.Map);

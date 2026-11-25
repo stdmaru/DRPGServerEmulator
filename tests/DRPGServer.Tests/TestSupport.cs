@@ -36,8 +36,11 @@ internal static class TestSupport
 
     public static GameWorld NewWorld() => new(NullLogger<GameWorld>.Instance);
 
+    /// <summary>Relógio real; testes de expiração usam um <see cref="GameClock"/> sobre <see cref="ManualTime"/>.</summary>
+    public static IGameClock Clock { get; } = new GameClock(TimeProvider.System);
+
     /// <summary>Inventário sem tabelas: toda pilha vai até <paramref name="maxStack"/>.</summary>
-    public static Inventory EmptyInventory(uint maxStack) => new(_ => null, maxStack, _ => null);
+    public static Inventory EmptyInventory(uint maxStack) => new(_ => null, maxStack, _ => null, Clock);
 
     /// <summary>Serviço de eventos de EXP sobre um <see cref="FakeExpEventStore"/> (sem evento até um <c>Apply</c>).</summary>
     public static ExpEventService NewExpEvents(IOptions<GameOptions>? options = null, FakeExpEventStore? store = null) =>
@@ -70,7 +73,7 @@ internal static class Entities
         new(TestSupport.Data, TestSupport.Data.Species[species], level) { Uid = 7, Name = "Guilmon" };
 
     public static DRPGServer.Game.Entities.Character Character(byte map = 79) =>
-        new(Digimon(), new DRPGServer.Game.Entities.Inventory(TestSupport.Data.FindItem, 999, _ => null))
+        new(Digimon(), new DRPGServer.Game.Entities.Inventory(TestSupport.Data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = map, X = 56, Y = 56,
         };

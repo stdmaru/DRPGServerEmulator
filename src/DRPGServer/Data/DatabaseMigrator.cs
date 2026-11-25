@@ -15,7 +15,7 @@ public sealed record Migration(int Version, string Name, string Path, string Che
 /// Aplica os sql/upgrade/NNNN_*.sql que ainda não estão em <c>schema_version</c>.
 /// Roda na partida, antes de abrir os servidores. Ver sql/upgrade/README.md.
 /// </summary>
-public sealed partial class DatabaseMigrator(Database database, IOptions<DatabaseOptions> options, ILogger<DatabaseMigrator> log)
+public sealed partial class DatabaseMigrator(Database database, IOptions<DatabaseOptions> options, TimeProvider time, ILogger<DatabaseMigrator> log)
 {
     [GeneratedRegex(@"^(\d{4})_(.+)\.sql$")]
     private static partial Regex FileName();
@@ -89,7 +89,7 @@ public sealed partial class DatabaseMigrator(Database database, IOptions<Databas
 
     private async Task WaitForServerAsync(TimeSpan timeout, CancellationToken ct)
     {
-        var deadline = DateTime.UtcNow + timeout;
+        long started = time.GetTimestamp();
         for (int attempt = 1; ; attempt++)
         {
             try
@@ -98,7 +98,7 @@ public sealed partial class DatabaseMigrator(Database database, IOptions<Databas
                 await connection.OpenAsync(ct);
                 return;
             }
-            catch (MySqlException e) when (DateTime.UtcNow < deadline)
+            catch (MySqlException e) when (time.GetElapsedTime(started) < timeout)
             {
                 if (attempt == 1 || attempt % 10 == 0)
                     log.LogWarning("Banco ainda não responde ({Message}); tentando de novo", e.Message);

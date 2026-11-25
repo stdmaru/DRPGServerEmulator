@@ -33,17 +33,19 @@ public sealed class Zone
 
     private readonly GameData _data;
     private readonly GameWorld _world;
+    private readonly IGameClock _clock;
     private readonly List<Player> _players = [];
     private readonly Dictionary<Serial, WildDigimon> _wild = [];
     private readonly Dictionary<uint, ItemDrop> _drops = [];
     private TimeSpan _wildTimer, _recoveryTimer, _cleanTimer;
     private uint _nextDropUid = 10_000;
 
-    public Zone(byte mapId, GameData data, GameWorld world)
+    public Zone(byte mapId, GameData data, GameWorld world, IGameClock clock)
     {
         MapId = mapId;
         _data = data;
         _world = world;
+        _clock = clock;
         Portals = data.PortalsOf(mapId);
         Grid = data.GridOf(mapId);
         SpawnAll();
@@ -138,7 +140,7 @@ public sealed class Zone
     /// </summary>
     private void AutoRecovery(TimeSpan now)
     {
-        long unixNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        long unixNow = _clock.UnixNow;
         foreach (var player in _players)
         {
             if (player.InBattle || now < player.NextRecoveryAt) continue;

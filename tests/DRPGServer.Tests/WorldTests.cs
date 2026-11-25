@@ -48,7 +48,7 @@ public class ZoneTickTests
     {
         // ✅ v322: a cada ~5,2 s o oficial manda 0xC4 e, se algo está abaixo do máximo, 0xB2 com HP +5, VP +3, EVP +10
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
         var session = TestSupport.NewSession();
         // nível 10: MaxEVP = L × (L − 1) = 90 (no nível 1 é 0)
         var character = new Character(Entities.Digimon(level: 10), TestSupport.EmptyInventory(999))
@@ -78,7 +78,7 @@ public class ZoneTickTests
     public void Auto_recovery_skips_knocked_out_party_digimons()
     {
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
         var session = TestSupport.NewSession();
         var character = Entities.Character();
         var fallen = Entities.Digimon(level: 5);
@@ -157,7 +157,7 @@ public class MovementTests
     {
         // parede de 3 colunas em x = 59..61: x = 60 fica a 2 células da área livre
         var data = Grids.DataWithGrid(79, WallOf3(100, 100));
-        _zones = new ZoneSystem(data, _world, NullLogger<ZoneSystem>.Instance);
+        _zones = new ZoneSystem(data, _world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
         _player = new Player(_session, new AuthenticatedAccount(1, "u", Authority.None), Entities.Character());
         _zones.Find(79)!.Enter(_player);
         _session.DrainOutgoing();
@@ -220,7 +220,7 @@ public class WildRoamingTests
     public void Wild_roams_only_around_home_on_walkable_cells()
     {
         var world = TestSupport.NewWorld();
-        var zone = new ZoneSystem(Grids.DataWithGrid(79, Grid), world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var zone = new ZoneSystem(Grids.DataWithGrid(79, Grid), world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance).Find(79)!;
         var wilds = zone.WildDigimons.ToList();
         Assert.Equal([(27, 65), (29, 66), (31, 67)], wilds.Select(w => ((int)w.HomeX, (int)w.HomeY)));
         var moved = false;
@@ -242,7 +242,7 @@ public class WildRoamingTests
     public void Move_is_two_ticks_moving_then_idle_and_every_tick_is_sent()
     {
         var world = TestSupport.NewWorld();
-        var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var zone = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance).Find(79)!;
         var session = TestSupport.NewSession();
         var character = Entities.Character();
         character.X = 29;
@@ -263,7 +263,7 @@ public class WildRoamingTests
     public void Wild_updates_are_filtered_by_player_view_range()
     {
         var world = TestSupport.NewWorld();
-        var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var zone = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance).Find(79)!;
 
         // Jogador longe dos Yuramon em (27..31, 65..67): não recebe 0x11 na entrada nem no tick
         var farSession = TestSupport.NewSession();
@@ -297,7 +297,7 @@ public class WildRoamingTests
     public void Defeated_group_shows_dead_then_leaves_then_respawns_at_home()
     {
         var world = TestSupport.NewWorld();
-        var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var zone = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance).Find(79)!;
         var w = zone.WildDigimons.First();
         Assert.Equal(Direction.South, w.Facing); // começa em direção cardeal (sem animação Dead no cliente)
         zone.Kill(w);
@@ -316,7 +316,7 @@ public class WildRoamingTests
     public void Wild_battle_facing_snaps_to_diagonal_3_or_7()
     {
         var world = TestSupport.NewWorld();
-        var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var zone = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance).Find(79)!;
         var w = zone.WildDigimons.First();
 
         // Jogador à esquerda/noroeste -> NorthWest (3)
