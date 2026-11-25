@@ -202,6 +202,30 @@ public sealed record SpawnArea(
     IReadOnlyList<SpawnOption> Options, IReadOnlyList<(short X, short Y)> Points, bool Exclusive = false,
     byte Grade = Game.Stats.WildFormulas.GradeBeginner);
 
+/// <summary>Tipo de loja genérica de NPC (<c>0x0050</c> = Card, <c>0x0052</c> = Item).</summary>
+public enum NpcShopKind : byte
+{
+    Card = 1,
+    Item = 2,
+}
+
+/// <summary>Um item ou card vendido por uma loja de NPC (<c>Resources/Item/NpcShop.xml</c>).</summary>
+public sealed record NpcShopEntry(uint ItemId, uint? PriceOverride = null);
+
+/// <summary>Uma loja genérica de NPC (até 40 itens ou cards).</summary>
+public sealed record NpcShop(uint ShopId, NpcShopKind Kind, string Name, IReadOnlyList<NpcShopEntry> Entries)
+{
+    public const int MaxSlots = 40;
+
+    public NpcShopEntry? FindEntry(uint itemId)
+    {
+        foreach (var e in Entries)
+            if (e.ItemId == itemId)
+                return e;
+        return null;
+    }
+}
+
 /// <summary>Tipo de conteúdo de um produto do Cash Shop (<c>ingameshop_item_data_us.dat</c> col. 1).</summary>
 public enum CashShopItemKind : byte
 {
@@ -222,6 +246,7 @@ public sealed class GameData
     public required FrozenDictionary<ushort, DigimonSpecies> Species { get; init; }
     public required FrozenDictionary<uint, ItemInfo> Items { get; init; }
     public FrozenDictionary<uint, CardInfo> Cards { get; init; } = FrozenDictionary<uint, CardInfo>.Empty;
+    public FrozenDictionary<uint, NpcShop> NpcShops { get; init; } = FrozenDictionary<uint, NpcShop>.Empty;
     public FrozenDictionary<uint, CashShopProduct> CashShopProducts { get; init; } = FrozenDictionary<uint, CashShopProduct>.Empty;
     public FrozenDictionary<uint, DigimonTitleInfo> DigimonTitles { get; init; } = FrozenDictionary<uint, DigimonTitleInfo>.Empty;
     public FrozenDictionary<ushort, SkillInfo> Skills { get; init; } = FrozenDictionary<ushort, SkillInfo>.Empty;
@@ -240,6 +265,8 @@ public sealed class GameData
     public SkillInfo? FindSkill(ushort id) => id == 0 ? null : Skills.GetValueOrDefault(id);
     public ItemInfo? FindItem(uint id) => Items.GetValueOrDefault(id);
     public CardInfo? FindCard(uint id) => Cards.GetValueOrDefault(id);
+    public NpcShop? FindNpcShop(uint shopId, NpcShopKind kind) =>
+        NpcShops.TryGetValue(shopId, out var shop) && shop.Kind == kind ? shop : null;
     public CashShopProduct? FindCashShopProduct(uint productId) => CashShopProducts.GetValueOrDefault(productId);
     public DigimonTitleInfo? FindDigimonTitle(uint id) => id == 0 ? null : DigimonTitles.GetValueOrDefault(id);
 
