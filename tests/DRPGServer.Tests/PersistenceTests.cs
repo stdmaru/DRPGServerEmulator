@@ -76,7 +76,7 @@ public class PersistenceTests
         var players = new PlayerSystem(world, zones, battles, queue, new RecordingSnapshotStore(), options, NullLogger<PlayerSystem>.Instance);
 
         var session1 = TestSupport.NewSession(ServerRole.Map);
-        var player1 = players.Enter(session1, new AuthenticatedAccount(1, "u1", Authority.None), Entities.Character())!;
+        var player1 = players.EnterNow(session1, new AuthenticatedAccount(1, "u1", Authority.None), Entities.Character());
 
         // Jogador limpo não dispara gravação mesmo após 120 s
         players.Update(TimeSpan.FromSeconds(120), TimeSpan.FromSeconds(120));
@@ -99,7 +99,7 @@ public class PersistenceTests
         {
             Uid = 2, AccountUid = 2, Slot = 0, Name = "Tester2", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };
-        var player2 = players.Enter(TestSupport.NewSession(ServerRole.Map), new AuthenticatedAccount(2, "u2", Authority.None), char2)!;
+        var player2 = players.EnterNow(TestSupport.NewSession(ServerRole.Map), new AuthenticatedAccount(2, "u2", Authority.None), char2);
         player2.RequestImmediateSave();
         players.Update(TimeSpan.FromSeconds(60.05), TimeSpan.FromMilliseconds(50));
         Assert.True(queue.Reader.TryRead(out _));

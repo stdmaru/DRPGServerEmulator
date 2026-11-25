@@ -31,8 +31,14 @@ public sealed class GameWorld(ILogger<GameWorld> log) : IHostedService
     /// <summary>Agenda trabalho na thread do mundo. Seguro de qualquer thread.</summary>
     public void Post(Action work)
     {
-        if (!_queue.IsAddingCompleted)
+        try
+        {
             _queue.TryAdd(work);
+        }
+        catch (InvalidOperationException) when (_queue.IsAddingCompleted)
+        {
+            // o mundo já parou: não há mais estado de jogo para tocar
+        }
     }
 
     /// <summary>Roda na thread do mundo e devolve o resultado para quem está fora dela.</summary>

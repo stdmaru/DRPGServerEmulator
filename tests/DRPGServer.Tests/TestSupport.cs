@@ -66,6 +66,18 @@ internal static class TestSupport
             taming ?? new Taming(data, new DigimonUids(), options), expEvents ?? NewExpEvents(options));
     }
 
+    /// <summary>
+    /// Entrada no mundo de uma conta sem save pendente, pelos dois passos do <see cref="PlayerSystem"/> (na thread do
+    /// mundo, ou sem a thread rodando).
+    /// </summary>
+    public static Player EnterNow(this PlayerSystem players, Session session, AuthenticatedAccount account, Character character)
+    {
+        var start = players.BeginEntry(session, account);
+        Assert.True(start.Accepted);
+        Assert.True(start.Ready.IsCompleted, "a conta tem save pendente: use WorldEntry");
+        return players.CompleteEntry(session, account, character) ?? throw new InvalidOperationException("entrada descartada");
+    }
+
     /// <summary>Opcodes enviados (na ordem) e esvazia a fila.</summary>
     public static List<ushort> SentOpcodes(this Session session) =>
         session.DrainOutgoing().Select(f => PacketHeader.Read(f).Opcode).ToList();

@@ -20,11 +20,16 @@ Código: `Network/AccountRegistry.cs`. Testes: `AccountRegistryTests`.
 - Recusa vai para o log com o motivo (`ClaimRejection`: sem ticket, vencido, outro IP, já usado) e fecha a conexão.
 - `auth_key` é guardada como hash PBKDF2-SHA256 com sal, e a comparação é em tempo constante (**PR #41: S8**).
 
-## Entrada e saída do mundo (**PR #41: S2**)
+## Entrada e saída do mundo
+Código: `PlayerSystem` (estado da conta, thread do mundo) e `WorldEntry` (o fluxo do `0x01`). Testes: `WorldEntryTests`.
+
 Cada conta tem um estado no `PlayerSystem`: `Offline → Loading → Online → Saving → Offline`.
-- **Entrar:** só a partir de `Offline`. Uma entrada com a conta em outro estado tira do mundo o jogador antigo, espera o save dele chegar ao banco e só então carrega. Duas entradas concorrentes da mesma conta: a segunda é recusada.
-- **Sair:** o jogador sai do mundo, o snapshot vai para a fila e a conta fica em `Saving` até a gravação confirmar. Uma transferência pendente adia o snapshot final até ela terminar.
-- Nunca se carrega do banco um personagem cujo último estado ainda está só em memória.
+- **Entrar** (`WorldEntry.EnterAsync`): `BeginEntry` na thread do mundo põe a conta em `Loading`. Se a conta está `Online`, o jogador antigo sai do mundo (o save dele vai para a fila) e a sessão dele fecha. A entrada espera o último save da conta chegar ao banco, carrega o personagem fora da thread do mundo e `CompleteEntry` o coloca no mundo (`Online`).
+- Duas entradas concorrentes da mesma conta: a segunda é recusada e a sessão dela fecha. Se a sessão da primeira já fechou, a segunda assume, e a carga da primeira é descartada.
+- **Sair** (`Leave`): o jogador sai do mundo, o snapshot vai para a fila e a conta fica em `Saving` até o flush depois dele. Uma entrada que fecha no meio da carga também deixa a conta em `Saving` até o save que ela esperava.
+- O estado é por **conta**, não por personagem: o depósito da conta é compartilhado.
+- Nunca se carrega do banco um personagem cujo último estado ainda está só em memória ou na fila.
+- Uma transferência pendente adia o snapshot final até ela terminar (**PR #41: S3**). Um save que falha de vez ainda libera a conta (**PR #41: S7**).
 
 ## Transferências entre conta e personagem (**PR #41: S3**)
 Estado da conta (Cash, Cash/Shop Depository) é gravado direto no banco. Estado do personagem é gravado por snapshot. Mover algo entre os dois é uma **transferência**:

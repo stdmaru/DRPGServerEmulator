@@ -1,6 +1,4 @@
 using System.Security.Cryptography;
-using DRPGServer.Data.Persistence;
-using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Commands;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.World;
@@ -23,13 +21,13 @@ public sealed class JoinHandshakeHandler : SessionHandler<JoinHandshakeRequest>
 }
 
 /// <summary>
-/// 0x01: entrar no mapa com um personagem. Confere a conta no registro (login feito no channel),
-/// carrega o personagem do banco fora da thread do mundo e só então o coloca no mundo.
+/// 0x01: entrar no mapa com um personagem. Confere o ticket da conta (login feito no channel) e entra pelo
+/// <see cref="WorldEntry"/>, que espera o último save da conta antes de carregar.
 /// </summary>
 [PacketHandler(MapOpcode.JoinCharacter)]
 public sealed class JoinCharacterHandler(
-    AccountRegistry accounts, CharacterRepository characters, CharacterFactory factory, PersistenceQueue persistence,
-    GameWorld world, PlayerSystem players, ExpEventService expEvents, ILogger<JoinCharacterHandler> log) : SessionHandler<JoinCharacterRequest>
+    AccountRegistry accounts, WorldEntry entry, ExpEventService expEvents, ILogger<JoinCharacterHandler> log)
+    : SessionHandler<JoinCharacterRequest>
 {
     protected override async ValueTask HandleAsync(Session session, JoinCharacterRequest request, CancellationToken ct)
     {
@@ -44,21 +42,8 @@ public sealed class JoinCharacterHandler(
             return;
         }
 
-        await persistence.FlushAsync();            // garante que o último logout já foi gravado
-        var row = await characters.FindAsync(account.Uid, nickname, ct);
-        var character = row is null ? null : factory.Build(row);
-        if (character is null)
-        {
-            log.LogWarning("{Session}: personagem {Nickname} não encontrado ou inválido", session, nickname);
-            session.Close("personagem inválido");
-            return;
-        }
-
-        world.Post(() =>
-        {
-            if (players.Enter(session, account, character) is { } player)
-                SendWorldState(player);
-        });
+        if (!await entry.EnterAsync(session, account, nickname, SendWorldState, ct))
+            session.Close("entrada no mapa recusada");
     }
 
     /// <summary>Sequência que o oficial manda na entrada (capturas v242/v322).</summary>

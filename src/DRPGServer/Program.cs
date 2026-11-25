@@ -97,6 +97,8 @@ services.AddSingleton<ZoneSystem>();
 services.AddSingleton<BattleSystem>();
 services.AddSingleton<PlayerSystem>();
 services.AddSingleton<CharacterFactory>();
+services.AddSingleton<ICharacterLoader, CharacterLoader>();
+services.AddSingleton<WorldEntry>();
 services.AddSingleton<NpcScriptBase, VillageOfBeginningNpcs>();
 services.AddSingleton<NpcScriptBase, DigitalBureauNpcs>();
 services.AddSingleton<NpcScriptRegistry>();
