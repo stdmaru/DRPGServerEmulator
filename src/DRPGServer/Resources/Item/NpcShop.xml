@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Lojas genéricas de NPC (0x0050 = Cards, 0x0052 = Items) extraídas das capturas oficiais v322 (captures.db).
+  Cada <Shop> suporta até 40 <Entry>. O atributo Price é opcional e sobrescreve o BuyPrice de item_info_us/card_info_us.
+-->
+<NpcShops>
+  <!-- ✅ Capturado em captures.db (conn=150) -->
+  <Shop ID="1101" Kind="Item" Name="Especial (Freyja / Digital Anvil)">
+    <Entry ID="23428" /> <!-- Freyja's Blessing (10.000.000 Bits) -->
+    <Entry ID="23427" /> <!-- Digital Anvil (10.000.000 Bits) -->
+  </Shop>
+
+  <!-- ✅ Capturado em captures.db (loja especial de evento / 1 Bit) -->
+  <Shop ID="5050" Kind="Item" Name="Loja Especial (1 Bit)">
+    <Entry ID="21008" Price="1" /> <!-- Exchange Ticket : Super Ultimate X (Virus) -->
+    <Entry ID="21009" Price="1" /> <!-- Exchange Ticket : Super Ultimate X (Vaccine) -->
+    <Entry ID="21010" Price="1" /> <!-- Exchange Ticket : Super Ultimate X (Data) -->
+    <Entry ID="22037" Price="1" /> <!-- Shining Digimental of Miracles X -->
+    <Entry ID="24271" Price="1" /> <!-- Black Digitron X -->
+    <Entry ID="22066" Price="1" /> <!-- Special Taming Net X -->
+    <Entry ID="2000040" Price="1" /> <!-- Omegamon Zwart DⅠ Evolution Card X -->
+    <Entry ID="2000042" Price="1" /> <!-- Omegamon Zwart DⅡ Evolution Card X -->
+    <Entry ID="2000044" Price="1" /> <!-- Omegamon Zwart DⅢ Evolution Card X -->
+    <Entry ID="24623" Price="1" /> <!-- Will of Fusion X -->
+    <Entry ID="23333" Price="1" /> <!-- Torn Lady Devimon Evolution Card X -->
+    <Entry ID="2000251" Price="1" /> <!-- Lotusmon Evolution Card 1 X -->
+    <Entry ID="2000152" Price="1" /> <!-- Meicoomon Evolution Card 1 X -->
+    <Entry ID="2000153" Price="1" /> <!-- Meicrackmon : Vicious Mode Evolution Card 1 X -->
+    <Entry ID="2000151" Price="1" /> <!-- Aegisdramon Evolution Card X -->
+    <Entry ID="2000159" Price="1" /> <!-- Raguelmon Evolution Card 1 X -->
+    <Entry ID="2000161" Price="1" /> <!-- Ofanimon : Falldown Mode Evolution Card 1 X -->
+    <Entry ID="24562" Price="1" /> <!-- Imperfect Spirit X -->
+    <Entry ID="24182" Price="1" /> <!-- Will of White Lopmon X -->
+    <Entry ID="24190" Price="1" /> <!-- Power of General X -->
+    <Entry ID="24261" Price="1" /> <!-- Over Storage X -->
+    <Entry ID="24331" Price="1" /> <!-- Faded Digivice X -->
+    <Entry ID="24418" Price="1" /> <!-- Darkness Loader X -->
+    <Entry ID="22018" Price="1" /> <!-- Evil Ring X -->
+    <Entry ID="24621" Price="1" /> <!-- Ofanimon Evolution Return X -->
+    <Entry ID="9710" Price="1" /> <!-- Groovy Mirror Ball X -->
+    <Entry ID="9513" Price="1" /> <!-- Groovy Equalizer X -->
+    <Entry ID="25005" Price="1" /> <!-- Key - Omega X -->
+    <Entry ID="25032" Price="1" /> <!-- Key - Alpha X -->
+    <Entry ID="25069" Price="1" /> <!-- Key - Chrondigizoid X -->
+    <Entry ID="25227" Price="1" /> <!-- Key - Dragon Emperor X -->
+  </Shop>
+
+  <!-- ✅ Capturado em captures.db (Digital Administration Bureau — Itens) -->
+  <Shop ID="5101" Kind="Item" Name="Digital Administration Bureau — Itens">
+    <Entry ID="25" /> <!-- Bread (100 Bits) -->
+    <Entry ID="26" /> <!-- French Fries (200 Bits) -->
+    <Entry ID="27" /> <!-- Hamburger (300 Bits) -->
+    <Entry ID="31" /> <!-- Vitamin A (100 Bits) -->
+    <Entry ID="32" /> <!-- Vitamin B (200 Bits) -->
+    <Entry ID="20" /> <!-- Digital Administration Bureau (1.000 Bits) -->
+    <Entry ID="21" /> <!-- Theme Park (1.000 Bits) -->
+    <Entry ID="22" /> <!-- Tuchidarumon Village (1.000 Bits) -->
+    <Entry ID="23961" /> <!-- Ground Zero (10.000.000 Bits) -->
+    <Entry ID="24580" /> <!-- Beginner's Magnamon's Crest (1 Day) (10.000 Bits) -->
+    <Entry ID="24581" /> <!-- Beginner's Shining Digimental of Miracles (1 Day) (10.000 Bits) -->
+    <Entry ID="24582" /> <!-- Beginner's Digimental of the Deep Sea [1 Day] (10.000 Bits) -->
+    <Entry ID="24583" /> <!-- Beginner's Digimental of Pride (1Day) (10.000 Bits) -->
+    <Entry ID="24584" /> <!-- Beginner's Shimmering Yggdrasil Earrings(1 Day) (10.000 Bits) -->
+    <Entry ID="24585" /> <!-- Beginner's Shimmering Yggdrasil Necklace(1 Day) (10.000 Bits) -->
+    <Entry ID="24586" /> <!-- Beginner's Shimmering Yggdrasil Ring(1 Day) (10.000 Bits) -->
+    <Entry ID="24587" /> <!-- Beginner's Imperfect Spirit of Fire (B) (1 Day) (10.000 Bits) -->
+    <Entry ID="24588" /> <!-- Beginner's Imperfect Spirit of Earth (B) (1 Day) (10.000 Bits) -->
+    <Entry ID="24589" /> <!-- Beginner's Imperfect Spirit of Water (B) (1 Day) (10.000 Bits) -->
+    <Entry ID="24591" /> <!-- Beginner's D-ark of Attack(1Day) (10.000 Bits) -->
+    <Entry ID="24592" /> <!-- Beginner's D-ark of Stamina(1Day) (10.000 Bits) -->
+    <Entry ID="24593" /> <!-- Beginner's D-ark of Defense(1Day) (10.000 Bits) -->
+  </Shop>
+
+  <!-- ✅ Capturado em captures.db (conn=158 — Símbolos e Roupas Invisíveis Beginner) -->
+  <Shop ID="13602" Kind="Item" Name="Símbolos e Roupas Beginner">
+    <Entry ID="982" /> <!-- Symbol of STR (80.000 Bits) -->
+    <Entry ID="983" /> <!-- Symbol of AGI (60.000 Bits) -->
+    <Entry ID="984" /> <!-- Symbol of CON (60.000 Bits) -->
+    <Entry ID="985" /> <!-- Symbol of INT (40.000 Bits) -->
+    <Entry ID="986" /> <!-- Symbol of EXP (120.000 Bits) -->
+    <Entry ID="24590" /> <!-- Beginner's Naked Emperor's Clothes (10.000 Bits) -->
+    <Entry ID="24594" /> <!-- Beginner's Invisible Cap [1Days] (10.000 Bits) -->
+    <Entry ID="24595" /> <!-- Beginner's Invisible Jacket [1Days] (10.000 Bits) -->
+    <Entry ID="24596" /> <!-- Beginner's Invisible T-shirt [1Days] (10.000 Bits) -->
+    <Entry ID="24597" /> <!-- Beginner's Invisible Pants [1Days] (10.000 Bits) -->
+    <Entry ID="24598" /> <!-- Beginner's Invisible Shoes [1Days] (10.000 Bits) -->
+  </Shop>
+
+  <!-- ✅ Capturado em captures.db (conn=145/221 — Gekomon Village — Itens) -->
+  <Shop ID="40101" Kind="Item" Name="Gekomon Village — Itens">
+    <Entry ID="28" /> <!-- Meat (400 Bits) -->
+    <Entry ID="29" /> <!-- Double Burger (600 Bits) -->
+    <Entry ID="33" /> <!-- Vitamin C (300 Bits) -->
+    <Entry ID="34" /> <!-- Vitamin D (400 Bits) -->
+    <Entry ID="35" /> <!-- Vitamin E (600 Bits) -->
+    <Entry ID="37" /> <!-- Protein B (1.000 Bits) -->
+    <Entry ID="38" /> <!-- Protein C (2.000 Bits) -->
+    <Entry ID="20" /> <!-- Digital Administration Bureau (1.000 Bits) -->
+    <Entry ID="21" /> <!-- Theme Park (1.000 Bits) -->
+    <Entry ID="22" /> <!-- Tuchidarumon Village (1.000 Bits) -->
+    <Entry ID="23" /> <!-- Gekomon Village (1.000 Bits) -->
+    <Entry ID="24" /> <!-- Time Village (1.000 Bits) -->
+    <Entry ID="402" /> <!-- Teleport : Darkness Dungeon 1F (4.000 Bits) -->
+    <Entry ID="39" /> <!-- Medicine of Ressurection (5.000 Bits) -->
+    <Entry ID="577" /> <!-- Babamon Village (2.000 Bits) -->
+    <Entry ID="23462" /> <!-- Coordinate Data (N) (2.000.000 Bits) -->
+    <Entry ID="23482" /> <!-- Coordinate Data (S) (2.000.000 Bits) -->
+    <Entry ID="23483" /> <!-- Coordinate Data (W) (2.000.000 Bits) -->
+  </Shop>
+
+  <!-- ✅ Capturado em captures.db (conn=226/234 — Digital Administration Bureau — Cards) -->
+  <Shop ID="5201" Kind="Card" Name="Digital Administration Bureau — Cards">
+    <Entry ID="3" /> <!-- Offense Plug-In A (200 Bits) -->
+    <Entry ID="2" /> <!-- High Speed Plug-In B (500 Bits) -->
+    <Entry ID="5" /> <!-- Defense Plug-In C (150 Bits) -->
+    <Entry ID="1" /> <!-- Strength Plug-In P (200 Bits) -->
+    <Entry ID="19" /> <!-- Recovery Floppy L (150 Bits) -->
+    <Entry ID="27" /> <!-- Vitality Floppy L (150 Bits) -->
+    <Entry ID="77" /> <!-- Power Control (10.000 Bits) -->
+    <Entry ID="302" /> <!-- Data Corruption (500 Bits) -->
+  </Shop>
+
+  <!-- ✅ Capturado em captures.db (conn=221 — Gekomon Village — Cards) -->
+  <Shop ID="40201" Kind="Card" Name="Gekomon Village — Cards">
+    <Entry ID="17" /> <!-- Brave Shield (500 Bits) -->
+    <Entry ID="5" /> <!-- Defense Plug-In C (150 Bits) -->
+    <Entry ID="4" /> <!-- Offense Plug-In N (700 Bits) -->
+    <Entry ID="7" /> <!-- Boost Chip (500 Bits) -->
+    <Entry ID="20" /> <!-- Recovery Floppy M (350 Bits) -->
+    <Entry ID="28" /> <!-- Vitality Floppy M (300 Bits) -->
+    <Entry ID="8" /> <!-- Supreme Training Manual (500 Bits) -->
+    <Entry ID="9" /> <!-- Light Training Manual (500 Bits) -->
+    <Entry ID="10" /> <!-- Dark Training Manual (500 Bits) -->
+    <Entry ID="302" /> <!-- Data Corruption (500 Bits) -->
+  </Shop>
+</NpcShops>

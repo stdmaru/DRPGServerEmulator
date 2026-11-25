@@ -47,6 +47,10 @@ public enum MapOpcode : ushort
     BattleActionReq = 0x35,
     JoinHandshakeReq = 0x49,
     SystemMessage = 0x4F,          // ✅ S2C (257 B): aviso de sistema cinza no chat (u8 tipo + char[256]; ex.: "You gained the Title of [First Win].")
+    CardShopList = 0x50,           // ✅ Loja de Cards de NPC: abrir lista de até 40 cards (C2S 18 B → S2C 3040 B)
+    CardShopTrade = 0x51,          // ✅ Loja de Cards de NPC: comprar (1) / vender (2) card (C2S 126 B → S2C 112 B)
+    ItemShopList = 0x52,           // ✅ Loja de Itens de NPC: abrir lista de até 40 itens (C2S 18 B → S2C 4320 B)
+    ItemShopTrade = 0x53,          // ✅ Loja de Itens de NPC: comprar (1) / vender (2) item (C2S 158 B → S2C 144 B)
     NpcDialogChoice = 0x56,
     BattleStartReq = 0x61,
     BattleStartRes = 0x62,

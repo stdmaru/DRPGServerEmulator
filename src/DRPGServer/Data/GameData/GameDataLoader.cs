@@ -91,11 +91,15 @@ public static class GameDataLoader
 
         var zoneIds = maps.Keys.Order().ToList();
 
+        var cards = ClientTables.Cards(pack);
+        var npcShops = LoadNpcShops(root);
+
         return new GameData
         {
             Species = species,
             Items = items,
-            Cards = ClientTables.Cards(pack),
+            Cards = cards,
+            NpcShops = npcShops,
             DigimonTitles = ClientTables.DigimonTitles(pack),
             Skills = ClientTables.Skills(pack),
             Evolutions = ClientTables.Evolutions(pack),
@@ -188,6 +192,36 @@ public static class GameDataLoader
                 throw new GameDataException($"EquipmentEffects.xml: ItemID {id} duplicado");
         }
         return effects.ToFrozenDictionary();
+    }
+
+    private static FrozenDictionary<uint, NpcShop> LoadNpcShops(string root)
+    {
+        var path = Path.Combine(root, "Item/NpcShop.xml");
+        if (!File.Exists(path)) return FrozenDictionary<uint, NpcShop>.Empty;
+
+        var shops = new Dictionary<uint, NpcShop>();
+        foreach (var s in Elements(root, "Item/NpcShop.xml", "NpcShops", "Shop"))
+        {
+            uint id = U32(s, "ID");
+            string kindStr = Attr(s, "Kind");
+            var kind = kindStr switch
+            {
+                "Card" => NpcShopKind.Card,
+                "Item" => NpcShopKind.Item,
+                _ => throw new GameDataException($"NpcShop {id}: Kind '{kindStr}' inválido (esperado 'Card' ou 'Item')"),
+            };
+            string name = (string?)s.Attribute("Name") ?? "";
+            var entries = s.Elements("Entry")
+                .Select(e => new NpcShopEntry(
+                    U32(e, "ID"),
+                    e.Attribute("Price") is not null ? U32(e, "Price") : null))
+                .ToList();
+            if (entries.Count > NpcShop.MaxSlots)
+                throw new GameDataException($"NpcShop {id}: {entries.Count} itens excede o máximo de {NpcShop.MaxSlots}");
+            if (!shops.TryAdd(id, new NpcShop(id, kind, name, entries)))
+                throw new GameDataException($"NpcShop {id} duplicado");
+        }
+        return shops.ToFrozenDictionary();
     }
 
     private static FrozenDictionary<uint, ItemInfo> ApplyEquipmentEffects(
