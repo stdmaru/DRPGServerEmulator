@@ -46,30 +46,33 @@ public sealed class ItemService(CharacterTransfers transfers, IAccountTransferSt
 {
     /// <summary>
     /// Entrega itens na aba Items: um <c>0xC9</c> com as posições alteradas (e <c>0xFC</c> se <paramref name="refresh"/>).
-    /// <paramref name="beforeNotify"/> roda depois da entrega e antes dos pacotes. Falso, sem mudar nada, se faltar
-    /// espaço ou a entrega for inválida (quantidade zero, prazo em item empilhável).
+    /// <paramref name="beforeNotify"/> recebe as posições alteradas depois da entrega e antes dos pacotes (resposta que
+    /// o cliente espera antes do recebimento). Falso, sem mudar nada, se faltar espaço ou a entrega for inválida
+    /// (quantidade zero, prazo em item empilhável).
     /// </summary>
     public bool GiveItems(Player player, IReadOnlyList<ItemGrant> items, EconomyReason reason, bool refresh = true,
-        Action? beforeNotify = null)
+        Action<IReadOnlyList<InventoryItem>>? beforeNotify = null)
     {
         var bag = player.Character.Inventory.Main;
         if (!IsValid(player, items, cards: false) || !bag.CanFit(Amounts(items))) return false;
 
         var added = Put(bag, items);
         player.Character.Economy.RecordItems(reason, Amounts(items), cards: false);
-        beforeNotify?.Invoke();
+        beforeNotify?.Invoke(added);
         Notify(player, added, cards: false, refresh);
         return true;
     }
 
     /// <summary>Como <see cref="GiveItems"/>, na aba Cards (<c>0xC8</c>). Cards não têm prazo.</summary>
-    public bool GiveCards(Player player, IReadOnlyList<ItemGrant> cards, EconomyReason reason, bool refresh = true)
+    public bool GiveCards(Player player, IReadOnlyList<ItemGrant> cards, EconomyReason reason, bool refresh = true,
+        Action<IReadOnlyList<InventoryItem>>? beforeNotify = null)
     {
         var bag = player.Character.Inventory.Battle;
         if (!IsValid(player, cards, cards: true) || !bag.CanFit(Amounts(cards))) return false;
 
         var added = Put(bag, cards);
         player.Character.Economy.RecordItems(reason, Amounts(cards), cards: true);
+        beforeNotify?.Invoke(added);
         Notify(player, added, cards: true, refresh);
         return true;
     }
@@ -80,7 +83,7 @@ public sealed class ItemService(CharacterTransfers transfers, IAccountTransferSt
     /// final das posições. <paramref name="beforeNotify"/> como em <see cref="GiveItems"/>.
     /// </summary>
     public bool Exchange(Player player, uint takeItemId, uint takeAmount, IReadOnlyList<ItemGrant> give, EconomyReason reason,
-        bool refresh = true, Action? beforeNotify = null)
+        bool refresh = true, Action<IReadOnlyList<InventoryItem>>? beforeNotify = null)
     {
         var bag = player.Character.Inventory.Main;
         if (takeAmount == 0 || bag.Count(takeItemId) < takeAmount || !IsValid(player, give, cards: false)) return false;
@@ -94,11 +97,28 @@ public sealed class ItemService(CharacterTransfers transfers, IAccountTransferSt
         var added = Put(bag, give);
         player.Character.Economy.RecordItems(reason, [(takeItemId, takeAmount)], cards: false, sign: -1);
         player.Character.Economy.RecordItems(reason, Amounts(give), cards: false);
-        beforeNotify?.Invoke();
 
         // posição esvaziada e ocupada de novo na mesma troca: vale o último estado
-        Notify(player, removed.Concat(added).GroupBy(i => i.Slot).Select(g => g.Last()).ToList(), cards: false, refresh);
+        var changed = removed.Concat(added).GroupBy(i => i.Slot).Select(g => g.Last()).ToList();
+        beforeNotify?.Invoke(changed);
+        Notify(player, changed, cards: false, refresh);
         return true;
+    }
+
+    /// <summary>
+    /// Tira <paramref name="amount"/> da posição <paramref name="slot"/> de <paramref name="bag"/> (venda, entrega a
+    /// NPC). A posição precisa ter o item <paramref name="uid"/>/<paramref name="itemId"/>, sem vencer, com a quantidade.
+    /// Devolve a pilha que sobrou (quantidade zero se acabou) ou null sem mudar nada. Não manda pacote: a resposta é de
+    /// quem chama.
+    /// </summary>
+    public InventoryItem? TakeAt(Player player, Bag bag, int slot, uint uid, uint itemId, uint amount, EconomyReason reason)
+    {
+        var inventory = player.Character.Inventory;
+        if (amount == 0 || bag[slot] is not { } item || item.Uid != uid || item.ItemId != itemId) return null;
+        if (inventory.IsExpired(item) || !bag.Consume(item, amount)) return null;
+
+        player.Character.Economy.RecordItems(reason, [(itemId, amount)], cards: bag.IsCardBag, sign: -1);
+        return item;
     }
 
     private static bool IsValid(Player player, IReadOnlyList<ItemGrant> grants, bool cards)

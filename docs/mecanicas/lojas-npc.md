@@ -72,3 +72,8 @@ Lojas capturadas incluídas inicialmente:
   - `+0x88` (`i32`): `row` (`slot / 6`)
   - `+0x8C` (`u32`): `shopId`
 - Na compra, seguido de `S2C 0x00C9` (`ItemReceivePacket`) e, para `Medals`/`Coins`, `S2C 0x00CB` (`CurrencyUpdatePacket`).
+
+## 3. No emulador
+- `Game/Shop/NpcShopService.cs` faz compra e venda igual para cards (`0x51`) e itens (`0x53`). Os handlers só leem o pedido, conferem a distância do dono (`InteractionGuard.CanUseShop`) e chamam o serviço.
+- **Preço:** o `Price` da loja, se houver. Senão, pela moeda da loja: Bits `BuyPrice`, Coins `Col16`, Ladder `Col17`. Card só tem preço em Bits. ❓ Medals sem `Price` ainda usa um valor fixo por tipo (`32000` para o tipo 7, `9999` nos outros).
+- **Pagamento** pela `Wallet` (moeda da loja), **entrega** pelo `ItemService` (mochila, ou Shop Depository como transferência atômica) e **venda** por `ItemService.TakeAt`, sempre em Bits pelo `SellPrice`. Pedido inválido (quantidade 0 ou acima de 999, item fora da loja, sem saldo, sem espaço, item vencido ou de outra posição) é ignorado sem resposta.

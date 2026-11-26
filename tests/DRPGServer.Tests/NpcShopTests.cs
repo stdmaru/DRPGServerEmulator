@@ -5,6 +5,7 @@ using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Items;
+using DRPGServer.Game.Shop;
 using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
@@ -87,7 +88,12 @@ public class NpcShopTests
 
     /// <summary>Handler 0x53. Sem <paramref name="world"/>, um mundo parado basta (compras que não usam o depósito da conta).</summary>
     private static ItemShopTradeHandler ItemTrade(GameData data, InMemoryCashStore? store = null, WorldHarness? world = null) =>
-        new(data, new ItemService((world ?? new WorldHarness()).Transfers, store ?? new InMemoryCashStore(), TestSupport.Clock), TestSupport.Guard(data));
+        new(Shops(data, store, world), TestSupport.Guard(data));
+
+    private static CardShopTradeHandler CardTrade(GameData data) => new(Shops(data), TestSupport.Guard(data));
+
+    private static NpcShopService Shops(GameData data, InMemoryCashStore? store = null, WorldHarness? world = null) =>
+        new(data, new ItemService((world ?? new WorldHarness()).Transfers, store ?? new InMemoryCashStore(), TestSupport.Clock));
 
     private static PacketReader BuildItemTrade(NpcShopAction action, uint uid, uint itemId, uint quantity, ItemPlace place, int col, int row, uint shopId)
     {
@@ -164,7 +170,7 @@ public class NpcShopTests
     {
         var (data, player, session) = MakeEnv(bits: 5000);
         var itemTrade = ItemTrade(data);
-        var cardTrade = new CardShopTradeHandler(data, TestSupport.Guard(data));
+        var cardTrade = CardTrade(data);
 
         // 1. Comprar 3x Double Burger (600 cada = 1800 Bits) -> resta 3200 Bits
         itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 29, 3, ItemPlace.Inventory, 0, 0, 40101));
@@ -308,11 +314,32 @@ public class NpcShopTests
         entries.Select(e => (e.Asset, e.AssetId, e.Amount, e.BalanceAfter, e.Action, e.CharacterUid)).ToList();
 
     [Fact]
+    public void Expired_item_is_not_sold_and_full_bag_is_not_charged()
+    {
+        var (data, player, session) = MakeEnv(bits: 5000);
+        var itemTrade = ItemTrade(data);
+        itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 29, 1, ItemPlace.Inventory, 0, 0, 40101));
+        var burger = player.Character.Inventory.Main.Find(29)!;
+        burger.ExpiresAt = 1;
+        double bits = player.Character.Wallet.Bits;
+        session.SentOpcodes();
+
+        itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Sell, burger.Uid, 29, 1, ItemPlace.Inventory, burger.Column, burger.Row, 40101));
+        Assert.Equal((1u, bits), (burger.Amount, player.Character.Wallet.Bits));
+
+        var bag = player.Character.Inventory.Main;
+        while (bag.HasFreeSlot) bag.Add(1, 1);
+        itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 24580, 1, ItemPlace.Inventory, 0, 0, 40101));
+        Assert.Equal(bits, player.Character.Wallet.Bits);
+        Assert.Empty(session.SentOpcodes());
+    }
+
+    [Fact]
     public void Shop_trades_are_audited_with_balance_after()
     {
         var (data, player, session) = MakeEnv(bits: 5000);
         var itemTrade = ItemTrade(data);
-        var cardTrade = new CardShopTradeHandler(data, TestSupport.Guard(data));
+        var cardTrade = CardTrade(data);
 
         itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 29, 3, ItemPlace.Inventory, 0, 0, 40101));
         var burger = player.Character.Inventory.Main.Find(29)!;

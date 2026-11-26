@@ -44,12 +44,12 @@ public abstract class NpcScriptBase(ItemService items)
     /// <summary>Entrega itens na aba Items uma única vez (usa o próprio <paramref name="choiceId"/> como flag).</summary>
     protected bool GiveItemsOnce(Player player, uint choiceId, params ItemGrant[] give) =>
         !HasDone(player, choiceId)
-        && Items.GiveItems(player, give, ChoiceReason(choiceId), beforeNotify: () => Done(player, choiceId));
+        && Items.GiveItems(player, give, ChoiceReason(choiceId), beforeNotify: _ => Done(player, choiceId));
 
     /// <summary>Troca atômica de itens uma única vez (<see cref="ItemService.Exchange"/>).</summary>
     protected bool ExchangeItemsOnce(Player player, uint choiceId, uint takeItemId, uint takeAmount, params ItemGrant[] give) =>
         !HasDone(player, choiceId)
-        && Items.Exchange(player, takeItemId, takeAmount, give, ChoiceReason(choiceId), beforeNotify: () => Done(player, choiceId));
+        && Items.Exchange(player, takeItemId, takeAmount, give, ChoiceReason(choiceId), beforeNotify: _ => Done(player, choiceId));
 
     private static void Done(Player player, uint choiceId)
     {
