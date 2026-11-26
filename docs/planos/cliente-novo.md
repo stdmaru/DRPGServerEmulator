@@ -114,7 +114,7 @@ Exemplo real: `Patch_240.zip` contém `DigimonRPG.bin`, `patch_240.hf/.pf` (59 M
 
 **Hospedagem:** um nginx (ou apache) pequeno no `docker-compose`, servindo estático um diretório montado por bind mount (`work/web/Patch` → raiz do site). Os patches nunca vão para o git ([legal](../projeto/legal.md)).
 
-**Por que é o primeiro marco:** o launcher precisa ler **e gravar** `.hf/.pf`, e esse código (`DRPG.Shared/Formats/Pack`) é o mesmo que o cliente usa para ler os assets. Também precisa dos sprites e da renderização. O cliente (Loading → Login do jogo) passa a ser o marco 2.
+**Por que é o primeiro marco:** o launcher precisa ler **e gravar** `.hf/.pf`, e esse código (`DRPG.Shared/Formats/Pack`) é o mesmo que o cliente usa para ler os assets. Também precisa dos sprites e da renderização. O cliente passa a ser o marco 2: carga → seleção de mundo → **seleção de personagens** ([cenas](../cliente/cenas.md)).
 
 **Arte:** os sprites antigos que continuam no `resource.hf`, lidos 1:1: `gui\dr2_in_000_*`, `dr2_in_001_*` e `dr2_in_003_*`, com as variantes `_eng.spr`. Os `dr_title_*` são da janela de títulos do jogo, não do login. Layout medido nos sprites e decidido em [tela de login do launcher](../cliente/tela-login-launcher.md) (não há código original).
 
