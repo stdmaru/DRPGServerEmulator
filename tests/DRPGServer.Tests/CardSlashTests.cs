@@ -27,21 +27,21 @@ public class CardSlashTests
         [81] = new(81, "Haste") { Trigger = CardTrigger.Attack },
         [5] = new(5, "Defense Plug-In C")
         {
-            Type = 1, SubType = 2, BuyPrice = 500, SellPrice = 250, Flag19 = 1,
+            Type = 1, SubType = 2, BuyPrice = 500, SellPrice = 250, UnknownCol19 = 1,
             MaxStack = 999, Trigger = CardTrigger.Defense, Restriction = 0,
-            Col26 = 32000, Col27 = 1, Col28 = 1_000_000, Col29 = 1, Col30 = 1,
+            CoinPrice = 32000, UnknownCol27 = 1, LadderPrice = 1_000_000, UnknownCol29 = 1, UnknownCol30 = 1,
         },
         [19] = new(19, "Recovery Floppy L")
         {
-            Type = 2, SubType = 1, BuyPrice = 500, SellPrice = 250, Flag19 = 1,
+            Type = 2, SubType = 1, BuyPrice = 500, SellPrice = 250, UnknownCol19 = 1,
             MaxStack = 999, Trigger = CardTrigger.Attack, Restriction = 0,
-            Col26 = 32000, Col27 = 1, Col28 = 1_000_000, Col29 = 1, Col30 = 1,
+            CoinPrice = 32000, UnknownCol27 = 1, LadderPrice = 1_000_000, UnknownCol29 = 1, UnknownCol30 = 1,
         },
         [74] = new(74, "Golden Drill X")
         {
-            Type = 4, SubType = 1, BuyPrice = 1, SellPrice = 0, Flag19 = 0,
+            Type = 4, SubType = 1, BuyPrice = 1, SellPrice = 0, UnknownCol19 = 0,
             MaxStack = 999, Trigger = CardTrigger.Attack, Restriction = 1,
-            Col26 = 32000, Col27 = 1, Col28 = 1_000_000, Col29 = 1, Col30 = 0,
+            CoinPrice = 32000, UnknownCol27 = 1, LadderPrice = 1_000_000, UnknownCol29 = 1, UnknownCol30 = 0,
         },
     }.ToFrozenDictionary(kv => kv.Key, kv => kv.Value with { Effects = RealEffects.GetValueOrDefault(kv.Key) ?? [] });
 
@@ -145,7 +145,7 @@ public class CardSlashTests
         Assert.Equal(5u, BitConverter.ToUInt32(buf[4..]));
         Assert.Equal((byte)1, buf[8]);                           // Type
         Assert.Equal((byte)2, buf[9]);                           // SubType
-        Assert.Equal((byte)1, buf[10]);                          // Flag19
+        Assert.Equal((byte)1, buf[10]);                          // UnknownCol19
         Assert.Equal((byte)CardTrigger.Defense, buf[11]);        // Trigger = Defense (2)
         Assert.Equal((byte)0, buf[12]);                          // Restriction
         Assert.Equal((ushort)3, BitConverter.ToUInt16(buf[14..]));// Amount

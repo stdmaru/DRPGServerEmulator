@@ -15,7 +15,7 @@ Tudo vira o `GameData` imutável (`FrozenDictionary`) na partida.
 
 ## Regras
 1. **Texto de UI nunca define dado de jogo.** Descrição, resumo e nome não são lidos para extrair atributo, efeito, preço ou regra, nem em runtime nem na carga. Se o dado só existe como texto no cliente, uma **ferramenta offline** gera o XML estruturado, uma pessoa revisa e o XML é commitado. O servidor só lê o XML (**PR #41: E2**).
-2. **Coluna do cliente tem nome.** `ClientTables` traduz índice de coluna para propriedade com nome de domínio (`CoinPrice`, não `Col16`). Coluna ainda sem significado conhecido fica `UnknownColNN`, com o que já se sabe no comentário (**PR #41: L1**).
+2. **Coluna do cliente tem nome.** `ClientTables` traduz índice de coluna para propriedade com nome de domínio (`CoinPrice`, não `Col16`). Coluna ainda sem significado conhecido fica `UnknownColNN` (`NN` = índice da coluna, a partir de 0), com o que já se sabe no comentário. Ex.: `ItemInfo.UnknownCol23`, `CardInfo.UnknownCol30`.
 3. **Fail-fast.** Referência quebrada (item, espécie, mapa ou drop inexistente), valor fora do intervalo, atributo XML desconhecido ou duplicado derrubam a partida com uma mensagem que diz arquivo, elemento e valor.
 4. **Sem números mágicos no código.** Preço, chance, duração e limite de jogo vêm da tabela ou do XML. O que é constante confirmada do protocolo (✅) fica como `const` com nome e evidência.
 5. **Gerador versionado.** Ferramenta que gera um XML de `Resources/` fica em `tools/` no repositório, com página na seção Ferramentas do [índice](../README.md), e o XML diz no comentário de topo qual ferramenta e qual tabela o geraram.

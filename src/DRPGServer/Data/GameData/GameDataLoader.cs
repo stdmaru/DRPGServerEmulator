@@ -227,7 +227,7 @@ public static class GameDataLoader
             ?? throw new GameDataException($"{where}: <Unlock Condition=\"{condition}\"> com valor \"{value}\" inválido");
     }
 
-    private static FrozenDictionary<uint, NpcShop> LoadNpcShops(string root)
+    internal static FrozenDictionary<uint, NpcShop> LoadNpcShops(string root)
     {
         var path = Path.Combine(root, "Item/NpcShop.xml");
         if (!File.Exists(path)) return FrozenDictionary<uint, NpcShop>.Empty;
@@ -263,6 +263,8 @@ public static class GameDataLoader
                     U32(e, "ID"),
                     e.Attribute("Price") is not null ? U32(e, "Price") : null))
                 .ToList();
+            if (currency == CurrencyKind.Medals && entries.FirstOrDefault(e => e.PriceOverride is null) is { } unpriced)
+                throw new GameDataException($"NpcShop {id}: loja de Medals sem Price no item {unpriced.ItemId} (a tabela do cliente não tem preço em Medals)");
             if (entries.Count > NpcShop.MaxSlots)
                 throw new GameDataException($"NpcShop {id}: {entries.Count} itens excede o máximo de {NpcShop.MaxSlots}");
             if (!shops.TryAdd(id, new NpcShop(id, kind, name, entries, currency, deliverTo)))

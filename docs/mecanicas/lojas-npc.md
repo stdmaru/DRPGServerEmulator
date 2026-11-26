@@ -11,9 +11,9 @@ Cada `<Shop>` possui:
 - `Kind`: `Card` (`0x0050`/`0x0051`) ou `Item` (`0x0052`/`0x0053`).
 - `Currency` *(opcional, padrão `Bits`)*: `Bits`, `Medals`, `Coins` ou `LadderPoints` (confirmado em `table\textattach_us.dat` strings `3545..3549` e `DigimonRPG.bin @ 0x00AEEC90..0x00AEF238` / `0x00B131EA..0x00B132E0`):
   - `Bits` (`action=1`): preço em `ItemRecord +20` (`BuyPrice`), saldo em `double [player+0x12F0]`.
-  - `Medals` (`action=3`): preço em `ItemRecord +88` (`u16`), saldo em `WORD [player+0x4070]`.
-  - `Coins` (`action=4`, loja `5050`): preço em `ItemRecord +90` (`u16` = `Col16`), saldo em `WORD [player+0x4072]` (máx. 20.000).
-  - `LadderPoints` (`action=5`): preço em `ItemRecord +92` (`u32` = `Col17`), saldo em `DWORD [player+0x12B0]`.
+  - `Medals` (`action=3`): saldo em `WORD [player+0x4070]`. ❓ O cliente lê o preço de `ItemRecord +88` (`u16`), mas a tabela não tem coluna de preço em Medals: nas capturas, `+88` vale 9999 ou 32000 sem seguir o tipo (coluna 13 = 6 bate com 32000 em quase todos).
+  - `Coins` (`action=4`, loja `5050`): preço em `ItemRecord +90` (`u16` = `CoinPrice`, coluna 15), saldo em `WORD [player+0x4072]` (máx. 20.000).
+  - `LadderPoints` (`action=5`): preço em `ItemRecord +92` (`u32` = `LadderPrice`, coluna 16), saldo em `DWORD [player+0x12B0]`.
 - `DeliverTo` *(opcional, padrão `Inventory`)*: `Inventory` (entrega na mochila + `S2C 0x00C9`) ou `ShopDepository` (deposita em `cash_depository_item` sem enviar `0x00C9`; usado pela loja `5050` de Coins, onde o cliente exibe `"The purchased item has been delivered to the Shop Depository"`, `DigimonRPG.bin @ 0x00AEEE49..0x00AEF199`).
 - Até 40 `<Entry ID="..." [Price="..."] />`. Quando `Price` é omitido, o servidor usa o campo de preço correspondente na tabela do cliente.
 
@@ -75,5 +75,5 @@ Lojas capturadas incluídas inicialmente:
 
 ## 3. No emulador
 - `Game/Shop/NpcShopService.cs` faz compra e venda igual para cards (`0x51`) e itens (`0x53`). Os handlers só leem o pedido, conferem a distância do dono (`InteractionGuard.CanUseShop`) e chamam o serviço.
-- **Preço:** o `Price` da loja, se houver. Senão, pela moeda da loja: Bits `BuyPrice`, Coins `Col16`, Ladder `Col17`. Card só tem preço em Bits. ❓ Medals sem `Price` ainda usa um valor fixo por tipo (`32000` para o tipo 7, `9999` nos outros).
+- **Preço:** o `Price` da loja, se houver. Senão, pela moeda da loja: Bits `BuyPrice`, Coins `CoinPrice`, Ladder `LadderPrice`. Card só tem preço em Bits. Loja de Medals precisa de `Price` em toda entrada (a carga recusa sem ele), porque a tabela não tem preço em Medals.
 - **Pagamento** pela `Wallet` (moeda da loja), **entrega** pelo `ItemService` (mochila, ou Shop Depository como transferência atômica) e **venda** por `ItemService.TakeAt`, sempre em Bits pelo `SellPrice`. Pedido inválido (quantidade 0 ou acima de 999, item fora da loja, sem saldo, sem espaço, item vencido ou de outra posição) é ignorado sem resposta.

@@ -71,11 +71,11 @@ public static class ClientTables
                 items.TryAdd(id, new ItemInfo(id, f[1])
                 {
                     Type = Byte(f, 2), SubType = Byte(f, 3),
-                    Col16 = UShort(f, 15), Col17 = UInt(f, 16), BuyPrice = UInt(f, 17), SellPrice = UInt(f, 18),
-                    Level = UInt(f, 20), Flag24 = Byte(f, 23), Flag25 = Byte(f, 24),
+                    CoinPrice = UShort(f, 15), LadderPrice = UInt(f, 16), BuyPrice = UInt(f, 17), SellPrice = UInt(f, 18),
+                    Level = UInt(f, 20), UnknownCol23 = Byte(f, 23), UnknownCol24 = Byte(f, 24),
                     MaxStack = col26 is >= 1 and <= 999 ? col26 : 1u,
                     DurationSeconds = col26 > 999 ? col26 : 0u,
-                    Flag33 = Byte(f, 32),
+                    UnknownCol32 = Byte(f, 32),
                 });
             }
         return items.ToFrozenDictionary();
@@ -102,15 +102,15 @@ public static class ClientTables
                     SubType = Byte(f, 3),
                     BuyPrice = UInt(f, 12),
                     SellPrice = UInt(f, 13),
-                    Flag19 = Byte(f, 19),
+                    UnknownCol19 = Byte(f, 19),
                     MaxStack = col21 is >= 1 and <= 999 ? col21 : 999u,
                     Trigger = trigger == (byte)CardTrigger.Defense ? CardTrigger.Defense : CardTrigger.Attack,
                     Restriction = Byte(f, 24),
-                    Col26 = UShort(f, 26),
-                    Col27 = Byte(f, 27),
-                    Col28 = UInt(f, 28),
-                    Col29 = Byte(f, 29),
-                    Col30 = Byte(f, 30),
+                    CoinPrice = UShort(f, 26),
+                    UnknownCol27 = Byte(f, 27),
+                    LadderPrice = UInt(f, 28),
+                    UnknownCol29 = Byte(f, 29),
+                    UnknownCol30 = Byte(f, 30),
                     Description = description,
                 });
             }

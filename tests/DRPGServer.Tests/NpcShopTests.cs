@@ -24,7 +24,7 @@ public class NpcShopTests
         {
             [29] = new ItemInfo(29, "Double Burger") { Type = 4, SubType = 1, MaxStack = 999, BuyPrice = 600, SellPrice = 60 },
             [24580] = new ItemInfo(24580, "Beginner Crest (1 Day)") { Type = 1, SubType = 1, MaxStack = 1, DurationSeconds = 86400, BuyPrice = 10000, SellPrice = 0 },
-            [21008] = new ItemInfo(21008, "Exchange Ticket") { Type = 12, SubType = 3, MaxStack = 1, BuyPrice = 1, Col16 = 150, Col17 = 1000 },
+            [21008] = new ItemInfo(21008, "Exchange Ticket") { Type = 12, SubType = 3, MaxStack = 1, BuyPrice = 1, CoinPrice = 150, LadderPrice = 1000 },
         };
         var cards = new Dictionary<uint, CardInfo>
         {
@@ -247,7 +247,7 @@ public class NpcShopTests
         var itemTrade = ItemTrade(data, cashStore, world);
 
         // 1. Cliente sempre envia action=1 (Buy) em C2S 0x0053; loja 5050 (Coins + ShopDepository):
-        // debita 150 Coins (Col16), deposita no Shop Depository (não na mochila), responde S2C action=4 + 0xCB (sem 0xC9)
+        // debita 150 Coins (CoinPrice), deposita no Shop Depository (não na mochila), responde S2C action=4 + 0xCB (sem 0xC9)
         await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
         Assert.Equal(5000.0, player.Character.Wallet.Bits);
         Assert.Equal((ushort)50, player.Character.Wallet.Coins);
@@ -290,7 +290,7 @@ public class NpcShopTests
         Assert.Equal([(ushort)MapOpcode.ChatNotice], session.SentOpcodes());
         cashStore.FailTransfers = false;
 
-        // 3. Loja de LadderPoints (5051): C2S action=1 debita 1000 (Col17), resta 500, S2C responde action=5
+        // 3. Loja de LadderPoints (5051): C2S action=1 debita 1000 (LadderPrice), resta 500, S2C responde action=5
         await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5051));
         Assert.Equal(500u, player.Character.Wallet.LadderPoints);
         var ladderFrames = session.DrainOutgoing();
@@ -410,6 +410,28 @@ public class NpcShopTests
                 else
                     Assert.NotNull(data.FindItem(e.ItemId));
             }
+        }
+    }
+
+    [Theory]
+    [InlineData("""<Entry ID="21008" />""", true)]               // Medals sem Price: a tabela não tem preço em Medals
+    [InlineData("""<Entry ID="21008" Price="50" />""", false)]
+    public void Medals_shop_needs_a_price_on_every_entry(string entry, bool rejected)
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"shops-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Path.Combine(root, "Item"));
+        File.WriteAllText(Path.Combine(root, "Item", "NpcShop.xml"),
+            $"""<NpcShops><Shop ID="9" Kind="Item" Currency="Medals">{entry}</Shop></NpcShops>""");
+        try
+        {
+            if (rejected)
+                Assert.Throws<GameDataException>(() => GameDataLoader.LoadNpcShops(root));
+            else
+                Assert.Equal(50u, GameDataLoader.LoadNpcShops(root)[9].Entries[0].PriceOverride);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
         }
     }
 }

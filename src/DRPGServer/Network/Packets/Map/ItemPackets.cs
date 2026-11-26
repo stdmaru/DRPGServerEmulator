@@ -48,16 +48,23 @@ public static class ItemRecord
         w.WriteU32(Unknown28(itemId));           // 28 ❓
         w.WriteU32(info.Level);                  // 32
         WriteEffectTriplets(w, info.Modifiers);      // 36..87 (52 B): até 4 triplas (id, statCode, value) + 4 zeros
-        w.WriteU16(info.Type == 7 ? (ushort)32000 : (ushort)9999); // 88 ❓
-        w.WriteU16(info.Col16);                  // 90
-        w.WriteU32(info.Col17);                  // 92
-        w.WriteU8(info.Flag24);                  // 96
-        w.WriteU8(info.Flag25);
+        w.WriteU16(Unknown88(info));                // 88 ❓
+        w.WriteU16(info.CoinPrice);                  // 90
+        w.WriteU32(info.LadderPrice);                  // 92
+        w.WriteU8(info.UnknownCol23);                  // 96
+        w.WriteU8(info.UnknownCol24);
         w.WriteU8(0);
-        w.WriteU8(info.Flag33);
+        w.WriteU8(info.UnknownCol32);
         w.WriteU32(uid + itemId);                // 100 checagem
         w.WriteU32(0);                           // 104
     }
+
+    /// <summary>
+    /// ❓ <c>+88</c> (<c>u16</c>): 9999 ou 32000 nas capturas, sem coluna da tabela que explique. Não segue o tipo: há
+    /// tipo 7 com 9999 (Taming Net #10022) e com 32000 (#23798); a coluna 13 = 6 bate com 32000 em quase todos.
+    /// Mantido o valor antigo por tipo até achar a fonte. Não é preço: a loja de Medals usa o <c>Price</c> do XML.
+    /// </summary>
+    private static ushort Unknown88(ItemInfo info) => info.Type == 7 ? (ushort)32000 : (ushort)9999;
 
     /// <summary>
     /// ✅ Capturas v322 (<c>conn=234/238/428</c>): offsets +36..83 guardam até 4 triplas <c>(effectId, statCode, value)</c>:
@@ -132,7 +139,7 @@ public static class CardRecord
         w.WriteU32(item.ItemId);                        // 4
         w.WriteU8(card.Type);                           // 8
         w.WriteU8(card.SubType);                        // 9
-        w.WriteU8(card.Flag19);                         // 10
+        w.WriteU8(card.UnknownCol19);                         // 10
         w.WriteU8((byte)card.Trigger);                  // 11
         w.WriteU8(card.Restriction);                    // 12
         w.WriteU8(0);                                   // 13
@@ -145,12 +152,12 @@ public static class CardRecord
         w.WriteU32(value);                              // 36
         w.WriteZeros(24);                               // 40..63
         w.WriteU16(9999);                               // 64
-        w.WriteU16(card.Col26);                         // 66
-        w.WriteU32(card.Col28);                         // 68
-        w.WriteU8(card.Col30 != 0 ? card.Col27 : (byte)0); // 72
-        w.WriteU8(card.Col30 != 0 ? card.Col29 : (byte)0); // 73
+        w.WriteU16(card.CoinPrice);                         // 66
+        w.WriteU32(card.LadderPrice);                         // 68
+        w.WriteU8(card.UnknownCol30 != 0 ? card.UnknownCol27 : (byte)0); // 72
+        w.WriteU8(card.UnknownCol30 != 0 ? card.UnknownCol29 : (byte)0); // 73
         w.WriteU8(0);                                   // 74
-        w.WriteU8(card.Col30);                          // 75
+        w.WriteU8(card.UnknownCol30);                          // 75
     }
 
     private static CardInfo FallbackCard(InventoryItem item)
@@ -162,15 +169,15 @@ public static class CardRecord
             {
                 Type = 4,
                 SubType = 1,
-                Flag19 = 0,
+                UnknownCol19 = 0,
                 Trigger = CardTrigger.Attack,
                 Restriction = 1,
                 MaxStack = 999,
                 BuyPrice = 1,
                 SellPrice = 0,
-                Col26 = 32000,
-                Col28 = 1_000_000,
-                Col30 = 0,
+                CoinPrice = 32000,
+                LadderPrice = 1_000_000,
+                UnknownCol30 = 0,
             };
         }
         var info = item.Info;
@@ -181,8 +188,8 @@ public static class CardRecord
             MaxStack = info?.MaxStack ?? 999,
             BuyPrice = info?.BuyPrice ?? 0,
             SellPrice = info?.SellPrice ?? 0,
-            Col26 = info?.Col16 ?? 32000,
-            Col28 = info?.Col17 ?? 1_000_000,
+            CoinPrice = info?.CoinPrice ?? 32000,
+            LadderPrice = info?.LadderPrice ?? 1_000_000,
         };
     }
 }

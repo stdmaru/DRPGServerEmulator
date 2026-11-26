@@ -11,8 +11,8 @@ public enum NpcShopAction : uint
     Buy = 1,             // Bits (0xDD9)
     Sell = 2,            // Venda por Bits (0xDDD)
     BuyMedals = 3,       // Medals (0xDDA, ItemRecord +88)
-    BuyCoins = 4,        // Coins / DR's Earned Coin (0xDDB, ItemRecord +90 = Col16)
-    BuyLadderPoints = 5, // Ladder Points (0xDDC, ItemRecord +92 = Col17)
+    BuyCoins = 4,        // Coins / DR's Earned Coin (0xDDB, ItemRecord +90 = CoinPrice)
+    BuyLadderPoints = 5, // Ladder Points (0xDDC, ItemRecord +92 = LadderPrice)
 }
 
 public static class NpcShopActions
@@ -99,8 +99,8 @@ public sealed class ItemShopListPacket(NpcShop shop, GameData data, long unixNow
             {
                 info = shop.Currency switch
                 {
-                    CurrencyKind.Coins => info with { Col16 = (ushort)Math.Min(price, ushort.MaxValue) },
-                    CurrencyKind.LadderPoints => info with { Col17 = price },
+                    CurrencyKind.Coins => info with { CoinPrice = (ushort)Math.Min(price, ushort.MaxValue) },
+                    CurrencyKind.LadderPoints => info with { LadderPrice = price },
                     _ => info with { BuyPrice = price },
                 };
             }

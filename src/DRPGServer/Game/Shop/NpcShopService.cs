@@ -104,8 +104,8 @@ public sealed class NpcShopService(GameData data, ItemService items)
     }
 
     /// <summary>
-    /// Preço unitário na moeda da loja (0 = não vende). Card só tem preço em Bits.
-    /// ❓ O preço em Medals sem <c>Price</c> na loja ainda é fixo por tipo (PR #41: L1).
+    /// Preço unitário na moeda da loja (0 = não vende). Card só tem preço em Bits. A tabela do cliente não tem preço em
+    /// Medals: loja de Medals traz o <c>Price</c> de cada entrada (a carga recusa entrada sem ele).
     /// </summary>
     private static long PriceOf(NpcShop shop, NpcShopEntry entry, Goods goods)
     {
@@ -115,9 +115,8 @@ public sealed class NpcShopService(GameData data, ItemService items)
         return shop.Currency switch
         {
             CurrencyKind.Bits => info.BuyPrice,
-            CurrencyKind.Medals => info.Type == 7 ? 32000u : 9999u,
-            CurrencyKind.Coins => info.Col16,
-            CurrencyKind.LadderPoints => info.Col17,
+            CurrencyKind.Coins => info.CoinPrice,
+            CurrencyKind.LadderPoints => info.LadderPrice,
             _ => 0,
         };
     }

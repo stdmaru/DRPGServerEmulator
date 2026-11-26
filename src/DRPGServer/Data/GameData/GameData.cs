@@ -19,18 +19,26 @@ public sealed record ItemInfo(uint Id, string Name)
 {
     public byte Type { get; init; }
     public byte SubType { get; init; }
-    public ushort Col16 { get; init; }
-    public uint Col17 { get; init; }
+    /// <summary>✅ Preço em Coins (coluna 15; <c>32000</c> = não vende por Coins). Vai em <c>ItemRecord +90</c>.</summary>
+    public ushort CoinPrice { get; init; }
+    /// <summary>✅ Preço em Ladder Points (coluna 16; <c>1000000</c> = não vende por Ladder). Vai em <c>ItemRecord +92</c>.</summary>
+    public uint LadderPrice { get; init; }
+    /// <summary>✅ Preço em Bits (coluna 17).</summary>
     public uint BuyPrice { get; init; }
+    /// <summary>✅ Venda ao NPC em Bits (coluna 18).</summary>
     public uint SellPrice { get; init; }
+    /// <summary>✅ Nível mínimo do Tamer (coluna 20).</summary>
     public uint Level { get; init; } = 1;
-    public byte Flag24 { get; init; }
-    public byte Flag25 { get; init; }
+    /// <summary>❓ Coluna 23 (0 ou 1), repetida em <c>ItemRecord +96</c>.</summary>
+    public byte UnknownCol23 { get; init; }
+    /// <summary>❓ Coluna 24 (0 ou 1), repetida em <c>ItemRecord +97</c>.</summary>
+    public byte UnknownCol24 { get; init; }
     public uint MaxStack { get; init; } = 1;
     /// <summary>✅ Duração padrão em segundos (col. 26 &gt; 999 em <c>item_info_us.dat</c>; 0 = permanente).</summary>
     public uint DurationSeconds { get; init; }
     public bool IsTimed => DurationSeconds > 0;
-    public byte Flag33 { get; init; }
+    /// <summary>❓ Coluna 32 (0 ou 1), repetida em <c>ItemRecord +99</c>.</summary>
+    public byte UnknownCol32 { get; init; }
     public string Description { get; init; } = "";
     /// <summary>Bônus do item equipado (<c>Resources/Item/EquipmentEffects.xml</c>).</summary>
     public StatModifiers Modifiers { get; init; } = StatModifiers.None;
@@ -52,15 +60,21 @@ public sealed record CardInfo(uint Id, string Name)
     public byte SubType { get; init; }
     public uint BuyPrice { get; init; }
     public uint SellPrice { get; init; }
-    public byte Flag19 { get; init; }
+    /// <summary>❓ Coluna 19, repetida em <c>CardRecord +10</c>.</summary>
+    public byte UnknownCol19 { get; init; }
     public uint MaxStack { get; init; } = 999;
     public CardTrigger Trigger { get; init; } = CardTrigger.Attack;
     public byte Restriction { get; init; }
-    public ushort Col26 { get; init; } = 32000;
-    public byte Col27 { get; init; } = 1;
-    public uint Col28 { get; init; } = 1_000_000;
-    public byte Col29 { get; init; } = 1;
-    public byte Col30 { get; init; }
+    /// <summary>❓ Coluna 26, em <c>CardRecord +66</c>. Mesmo sentinela do <see cref="ItemInfo.CoinPrice"/> (<c>32000</c>); card ainda não é vendido por Coins.</summary>
+    public ushort CoinPrice { get; init; } = 32000;
+    /// <summary>❓ Coluna 27, em <c>CardRecord +72</c> só quando <see cref="UnknownCol30"/> ≠ 0.</summary>
+    public byte UnknownCol27 { get; init; } = 1;
+    /// <summary>❓ Coluna 28, em <c>CardRecord +68</c>. Mesmo sentinela do <see cref="ItemInfo.LadderPrice"/> (<c>1000000</c>).</summary>
+    public uint LadderPrice { get; init; } = 1_000_000;
+    /// <summary>❓ Coluna 29, em <c>CardRecord +73</c> só quando <see cref="UnknownCol30"/> ≠ 0.</summary>
+    public byte UnknownCol29 { get; init; } = 1;
+    /// <summary>❓ Coluna 30, em <c>CardRecord +75</c>; liga as colunas 27 e 29 no registro.</summary>
+    public byte UnknownCol30 { get; init; }
     public string Description { get; init; } = "";
     /// <summary>Efeitos ao ativar em batalha (<c>Resources/Card/CardEffects.xml</c>). Vazio = ativa e consome sem efeito.</summary>
     public IReadOnlyList<ICardEffect> Effects { get; init; } = [];
