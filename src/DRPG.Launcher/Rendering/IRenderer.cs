@@ -27,10 +27,6 @@ public interface IRenderer : IDisposable
     /// <summary>Draws the columns <paramref name="sourceX"/> .. <paramref name="sourceX"/> + <paramref name="width"/>
     /// of the texture at (x, y): progress bars (left part) and text fields (the tail of a long text).</summary>
     void DrawPart(ITexture texture, int x, int y, int sourceX, int width);
-
-    /// <summary>Draws the rectangle (<paramref name="sourceX"/>, <paramref name="sourceY"/>, width, height) of the
-    /// texture at (x, y): one area of a sprite, such as a field of the login panel in its grey copy.</summary>
-    void DrawRegion(ITexture texture, int x, int y, int sourceX, int sourceY, int width, int height);
     void EndFrame();
 
     /// <summary>Copies the last frame (frame coordinates) to an RGBA8888 buffer, for screenshots and tests.</summary>

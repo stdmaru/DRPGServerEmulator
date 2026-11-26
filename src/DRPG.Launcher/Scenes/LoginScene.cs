@@ -27,7 +27,7 @@ public sealed class LoginScene : IDisposable
     public const int MaxPasswordLength = 64;
 
     private readonly ITexture _background, _panel, _status, _check;
-    private readonly ITexture _panelDisabled, _checkDisabled;
+    private readonly ITexture _fieldsDisabled, _checkDisabled;
     private readonly ITexture[] _mascotA, _mascotB;
     private readonly ITexture? _rememberLabel, _rememberLabelDisabled;
     private readonly Button _ok, _cancel;
@@ -49,7 +49,8 @@ public sealed class LoginScene : IDisposable
         _mascotB = sprites.Gui("dr2_in_003_002");
         _status = sprites.Gui("dr_friend_016")[0];
         _check = sprites.Gui("dr2_sub_001_001")[0];
-        _panelDisabled = sprites.GuiDisabled("dr2_in_003_000")[0];
+        // the ID and password fields and the checkbox square, seeded at their centres (panel coordinates)
+        _fieldsDisabled = sprites.GuiDisabledRegions("dr2_in_003_000", (211, 91), (211, 137), (30, 170));
         _checkDisabled = sprites.GuiDisabled("dr2_sub_001_001")[0];
         _rememberLabel = font?.Render(renderer, RememberLabel, TextColor);
         _rememberLabelDisabled = font?.Render(renderer, RememberLabel, TextField.DisabledTextColor);
@@ -166,11 +167,7 @@ public sealed class LoginScene : IDisposable
         r.Draw(_mascotB[(int)(nowMs / MascotBFrameMs % (ulong)_mascotB.Length)], PanelX + 270, PanelY - 2);
         bool enabled = Interactive;
         if (!enabled)
-        {
-            DrawDisabledArea(r, _id.Bounds);
-            DrawDisabledArea(r, _password.Bounds);
-            DrawDisabledArea(r, (CheckX, CheckY, CheckSize, CheckSize));
-        }
+            r.Draw(_fieldsDisabled, PanelX, PanelY);
         if (_remember.Remember)
             r.Draw(enabled ? _check : _checkDisabled, CheckX, CheckY);
         if ((enabled ? _rememberLabel : _rememberLabelDisabled) is { } label)
@@ -180,14 +177,6 @@ public sealed class LoginScene : IDisposable
         _password.Draw(r, _font, nowMs, enabled);
         _ok.Draw(r, enabled);
         _cancel.Draw(r, enabled: true);
-    }
-
-    /// <summary>The grey panel over one control's area (with a 3 px margin, so the bar's rim turns grey too).</summary>
-    private void DrawDisabledArea(IRenderer r, (int X, int Y, int Width, int Height) area)
-    {
-        const int Margin = 3;
-        int x = area.X - Margin, y = area.Y - Margin;
-        r.DrawRegion(_panelDisabled, x, y, x - PanelX, y - PanelY, area.Width + 2 * Margin, area.Height + 2 * Margin);
     }
 
     /// <summary>The square or its label.</summary>

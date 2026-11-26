@@ -81,7 +81,7 @@ public sealed unsafe class SdlRenderer : IRenderer
     public void DrawPart(ITexture texture, int x, int y, int sourceX, int width) =>
         DrawRegion(texture, x, y, sourceX, 0, width, texture.Height);
 
-    public void DrawRegion(ITexture texture, int x, int y, int sourceX, int sourceY, int width, int height)
+    private void DrawRegion(ITexture texture, int x, int y, int sourceX, int sourceY, int width, int height)
     {
         var t = (Texture)texture;
         sourceX = Math.Clamp(sourceX, 0, t.Width);

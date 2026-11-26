@@ -33,6 +33,66 @@ public sealed class SpriteStore(PackArchive pack, IRenderer renderer) : IDisposa
     /// <summary>Grey copy of <see cref="Gui"/>, for disabled controls (the sprites have no disabled frame).</summary>
     public ITexture[] GuiDisabled(string name) => Load(GuiPath(name), disabled: true);
 
+    /// <summary>
+    /// Grey copy of only some areas of frame 0 of <c>gui\&lt;name&gt;</c>, transparent elsewhere: each area is the
+    /// pixels of one colour connected to a seed (<see cref="KeepRegions"/>). Drawn over the normal sprite, it greys a
+    /// field without losing its rounded shape.
+    /// </summary>
+    public ITexture GuiDisabledRegions(string name, params (int X, int Y)[] seeds)
+    {
+        var sprite = SpriteFile.Parse(pack.ReadEntry(GuiPath(name)));
+        var info = sprite.Frames[0];
+        var pixels = sprite.Decode(sprite.Image, 0);
+        KeepRegions(pixels, info.Width, info.Height, seeds);
+        Disable(pixels);
+        return renderer.CreateTexture(info.Width, info.Height, pixels);
+    }
+
+    /// <summary>Per-channel difference still counted as the seed's colour (anti-aliased edges of the field).</summary>
+    internal const int RegionTolerance = 24;
+
+    /// <summary>
+    /// Flood fill (4-connected) from each seed over pixels within <see cref="RegionTolerance"/> of the seed's colour;
+    /// every other pixel becomes transparent. Seeds outside the image or on transparent pixels select nothing.
+    /// </summary>
+    internal static void KeepRegions(Span<uint> rgba, int width, int height, ReadOnlySpan<(int X, int Y)> seeds)
+    {
+        var keep = new bool[rgba.Length];
+        var pending = new Stack<int>();
+        foreach (var (sx, sy) in seeds)
+        {
+            if (sx < 0 || sy < 0 || sx >= width || sy >= height)
+                continue;
+            uint seed = rgba[sy * width + sx];
+            if (seed >> 24 == 0)
+                continue;
+            pending.Push(sy * width + sx);
+            while (pending.Count > 0)
+            {
+                int i = pending.Pop();
+                if (keep[i] || rgba[i] >> 24 == 0 || !Close(rgba[i], seed))
+                    continue;
+                keep[i] = true;
+                int x = i % width, y = i / width;
+                if (x > 0) pending.Push(i - 1);
+                if (x < width - 1) pending.Push(i + 1);
+                if (y > 0) pending.Push(i - width);
+                if (y < height - 1) pending.Push(i + width);
+            }
+        }
+        for (int i = 0; i < rgba.Length; i++)
+            if (!keep[i])
+                rgba[i] = 0;
+    }
+
+    private static bool Close(uint a, uint b)
+    {
+        for (int shift = 0; shift < 24; shift += 8)
+            if (Math.Abs((int)((a >> shift) & 0xFF) - (int)((b >> shift) & 0xFF)) > RegionTolerance)
+                return false;
+        return true;
+    }
+
     private string GuiPath(string name)
     {
         var english = $"gui\\{name}_eng.spr";

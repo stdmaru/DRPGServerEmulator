@@ -24,7 +24,6 @@ public sealed class TextField(int x, int y, int width, int height, int maxLength
 
     public bool Contains(int px, int py) => px >= x && py >= y && px < x + width && py < y + height;
 
-    public (int X, int Y, int Width, int Height) Bounds => (x, y, width, height);
 
     /// <summary>Appends what is accepted of <paramref name="input"/>; returns false when anything was dropped.</summary>
     public bool Type(string input)
