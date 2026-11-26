@@ -1,6 +1,6 @@
 # Plano: cliente novo (source port)
 
-> **Em andamento.** O PR #41 foi mergeado em 2026-11-26. O marco 1 (Loading → Login) está no PR `feat/client-m1-login-screen`.
+> **Em andamento.** O PR #41 foi mergeado em 2026-11-26. O marco 1 (launcher) está no PR #42 (`feat/client-m1-login-screen`).
 
 Objetivo: um cliente novo que lê os assets da instalação oficial (`resource.pf`, `table.pf`), fala o protocolo **v322** e se comporta como o original, com resolução livre, fontes TTF e nada preso a tecnologia legada. É o "nível 4" de [qualidade de vida](../cliente/qualidade-de-vida.md). O fã-cliente [Reboot](../cliente/reboot-analise.md) prova que o caminho funciona; **nada dele é usado** (licença).
 
@@ -13,7 +13,7 @@ Ver [decisões](../projeto/decisoes.md) de 2026-11-25.
 
 ## Requisitos do dono (fase inicial, até segunda ordem)
 Definidos em 2026-11-26 ([decisões](../projeto/decisoes.md)).
-1. **Substituto direto do binário.** Basta copiar o executável para a pasta da instalação oficial e ele funciona. Lê os arquivos como estão (`resource.hf/pf`, `table.hf/pf`, `Language/`, `Sound/`, `Fonts/`, `option.ini`, `VersionInfo.ini`) e **não altera nenhum deles**. Aceita a mesma linha de comando do `DigimonRPG.bin` (`<usuário> <hash>`, ver [servidores](../protocolo/servidores.md)).
+1. **Substituto direto do binário.** Basta copiar o executável para a pasta da instalação oficial e ele funciona. Lê os arquivos como estão (`resource.hf/pf`, `table.hf/pf`, `Language/`, `Sound/`, `Fonts/`, `option.ini`, `VersionInfo.ini`) e **não altera nenhum deles**. Só o launcher muda arquivos, e só aplicando patch. Aceita a mesma linha de comando do `DigimonRPG.bin` (`<usuário> <hash>`, ver [servidores](../protocolo/servidores.md)).
 2. **Visual e comportamento idênticos ao original**, ou o mais perto possível: as mesmas telas, posições, tempos, sons e fluxo. Qualquer diferença visível só entra **quando o dono pedir explicitamente** e fica registrada nas decisões.
 3. **Diferenças aceitas desde já:**
    - **técnicas, não visuais:** 64 bits, áudio e vídeo modernos, SDL3, NativeAOT, multiplataforma;
@@ -70,14 +70,15 @@ DRPG.Client   loop SDL3 + SDL_GPU
 
 ## Marcos (cada um jogável contra o emulador)
 0. **Monorepo** ([arquitetura](../arquitetura/README.md#repositório)): `DRPG.Shared` (protocolo, pacotes de mão dupla, `ClientPack`), `DRPG.Client`, `DRPG.Architecture.Tests`, `.editorconfig`, analyzers e `BannedSymbols.txt` ([garantias](../arquitetura/padroes-de-codigo.md#como-as-regras-são-garantidas)). A renomeação `DRPGServer` → `DRPG.Server` pode ficar para um PR próprio. O cliente segue a [arquitetura do cliente](../arquitetura/cliente.md).
-1. **Loading → Login** (PR `feat/client-m1-login-screen`): o executável na pasta do jogo abre a janela, mostra a tela de loading e depois a tela de login, idênticas ao original, lendo `.spr` direto do `resource.pf`. Ainda sem rede. Valida SDL_GPU + NativeAOT em Windows e Linux. Pronto quando a captura de tela bate com a do original lado a lado.
-2. Login de verdade → servidor → channel → mapa; andar, ver jogadores e selvagens. Primeira medição de desempenho.
-3. HUD e chat com TTF; resolução, tela cheia e escala de UI.
-4. Batalha PvE completa.
-5. Janelas uma a uma (inventário, loja, depósito, evolução, party, quests), comparando com o original.
-6. Efeitos de skill, cenas de evolução, sons, vídeos.
+1. **Launcher** ([acima](#launcher-login--auto-patcher-marco-1)): leitura e gravação de `.hf/.pf` no `DRPG.Shared`, patch a partir do `DR_Configuration.json`, mesclagem no `resource`, tela de login antiga, login com chave de 5 h e início do jogo. Valida SDL_GPU + NativeAOT em Windows e Linux.
+2. **Cliente: Loading → Login do jogo**: o executável na pasta do jogo abre a janela e mostra o loading e a tela seguinte, idênticos ao original, lendo `.spr` direto do `resource.pf`.
+3. Servidor → channel → mapa; andar, ver jogadores e selvagens. Primeira medição de desempenho.
+4. HUD e chat com TTF; resolução, tela cheia e escala de UI.
+5. Batalha PvE completa.
+6. Janelas uma a uma (inventário, loja, depósito, evolução, party, quests), comparando com o original.
+7. Efeitos de skill, cenas de evolução, sons, vídeos.
 
-O visualizador de assets (`.spr`/`.ani`/`.til`/`.obj`/`.map` → PNG) entra em `DRPG.Tools` junto com cada leitor de formato, a partir do marco 1.
+O visualizador de assets (`.spr`/`.ani`/`.til`/`.obj`/`.map` → PNG) entra em `DRPG.Tools` junto com cada leitor de formato, a partir do marco 1 (o leitor `.spr` nasce com o launcher).
 
 ## Como garantir que é "o mesmo jogo"
 1. Original rodando ao lado ([Wine](../cliente/wine.md)): cada tela comparada por screenshot e pcap.
@@ -91,13 +92,41 @@ O visualizador de assets (`.spr`/`.ani`/`.til`/`.obj`/`.map` → PNG) entra em `
 - Dapper usa reflexão: não importa no servidor (não precisa de AOT), mas `DRPG.Shared` deve ser compatível com AOT (sem reflexão).
 - [Legal](../projeto/legal.md): o cliente não leva arte; lê a instalação oficial do usuário.
 
-## Launcher (login + auto-patcher)
-Decisão de 2026-11-26. **Não existe** tela de login com ID e senha no binário v322 (confirmado pelo dono). A autenticação é só pela linha de comando: `0x00aa24b0` exige `<usuário> <hash>` e fecha o jogo com qualquer outra coisa ([dump de RE](../ferramentas/dump-re.md)). A tela de login fica num **launcher próprio**, que imita a tela de login antiga do jogo.
-- **Arte:** os sprites antigos que continuam no `resource.hf`, lidos 1:1: `gui\dr2_in_000_*` a `gui\dr2_in_003_*` (34 arquivos) e `gui\dr_title_000..007.spr` (10). Os dois grupos incluem as variantes `_eng.spr`. Layout, posições e comportamento vêm dos sprites e da memória do dono. ❓ Não há código original para consultar.
-- **Funções:** (1) login com ID e senha, (2) auto-patcher, (3) inicia o jogo com `<usuário> <hash>`. Com esse contrato, o launcher abre **tanto o cliente novo quanto o `DigimonRPG.bin` original**.
-- **Projeto:** `src/DRPG.Launcher` (NativeAOT), com as mesmas camadas `Platform/`, `Rendering/` (`IRenderer`) e `Assets/` do cliente. Elas saem para uma biblioteca comum (❓ `DRPG.Engine`) quando o segundo executável precisar delas.
-- **Segurança:** a senha nunca vai em texto puro na linha de comando nem para o log. O patcher só aplica arquivos assinados e com hash conferido. Os arquivos originais só mudam por patch explícito.
-- ❓ **Em aberto (decisão do dono):** de onde vem o `<hash>` (token de sessão emitido pelo servidor ou hash da senha), qual servidor autentica (o login atual do emulador ou um endpoint HTTP), formato do manifesto de patch e servidor de arquivos, e se o launcher entra no marco 1 ou num marco próprio.
+## Launcher (login + auto-patcher), marco 1
+Decisões de 2026-11-26. **Não existe** tela de login com ID e senha no binário v322 (confirmado pelo dono). O jogo só aceita a linha de comando `<usuário> <chave>` (`0x00aa24b0`, [dump de RE](../ferramentas/dump-re.md)). O login fica num **launcher próprio**, que imita a tela de login antiga.
+
+**Fluxo**
+1. Lê o `DR_Configuration.json` do servidor de patch (o mesmo entrypoint do launcher oficial, abaixo). Se `ServerInfo.Maintenance` for verdadeiro, mostra `Message` e não deixa entrar.
+2. Atualiza os arquivos: compara a versão local (`VersionInfo.ini`, `version=`) com `PatchInfo.PatchVersion` e baixa cada `Patch_<n>.zip` que falta, em ordem, a partir de `max(local + 1, MinPatchVersion)`.
+3. Aplica cada patch: os arquivos soltos do zip (`table.hf/pf`, `Language/*`, `DigimonRPG.bin`…) substituem os locais, e o `patch_<n>.hf/.pf` é **mesclado no `resource.hf/.pf`**, como o launcher oficial faz. Depois grava a versão nova.
+4. O jogador entra com **ID e senha**. Com o login aceito, o servidor gera a **chave do usuário, válida por até 5 h**.
+5. Inicia o jogo (`LanuncherInfo.RunExeFileName`, o nosso cliente ou o `DigimonRPG.bin` original) com `<usuário> <chave>`.
+
+**Entrypoint de patch** (`work/web/Patch/DR_Configuration.json`, formato do oficial; o erro de grafia `LanuncherInfo` é do original e é mantido):
+| Campo | Uso |
+|---|---|
+| `ServerInfo.Maintenance`, `Message.Title/Msg` | bloqueio por manutenção |
+| `LanuncherInfo.DownloadPath`, `CurrentVersion`, `FileName`, `LauncherFileName`, `RunExeFileName` | autoatualização do launcher e o executável que ele abre |
+| `PatchInfo.DownloadUrl`, `MinPatchVersion`, `PatchVersion`, `DownloadFileHeader` (`Patch_%d.zip`), `PatchFileHeader` (`Patch_%d`) | lista de patches |
+| `MainUrl.HomePageUrl`, `MainPageUrl` | links e notícias da tela |
+
+Exemplo real: `Patch_240.zip` contém `DigimonRPG.bin`, `patch_240.hf/.pf` (59 MB), `table.hf/.pf` e `Language/*.bin`.
+
+**Hospedagem:** um nginx (ou apache) pequeno no `docker-compose`, servindo estático um diretório montado por bind mount (`work/web/Patch` → raiz do site). Os patches nunca vão para o git ([legal](../projeto/legal.md)).
+
+**Por que é o primeiro marco:** o launcher precisa ler **e gravar** `.hf/.pf`, e esse código (`DRPG.Shared/Formats/Pack`) é o mesmo que o cliente usa para ler os assets. Também precisa dos sprites e da renderização. O cliente (Loading → Login do jogo) passa a ser o marco 2.
+
+**Arte:** os sprites antigos que continuam no `resource.hf`, lidos 1:1: `gui\dr2_in_000_*` a `gui\dr2_in_003_*` (34) e `gui\dr_title_000..007.spr` (10), com as variantes `_eng.spr`. Layout e comportamento vêm dos sprites e da memória do dono (não há código original).
+
+**Projeto:** `src/DRPG.Launcher` (NativeAOT), com as camadas `Platform/`, `Rendering/` (`IRenderer`) e `Assets/`, que depois o cliente reaproveita. ❓ Elas vão para uma biblioteca comum (`DRPG.Engine`) quando o cliente nascer.
+
+**Segurança**
+- A senha nunca vai para disco, log ou linha de comando. Só a chave temporária vai para o jogo.
+- Download por HTTPS em produção. Cada arquivo é conferido por hash antes de ser aplicado (❓ manifesto com SHA-256 por patch: o JSON oficial não tem).
+- Mesclagem transacional: o patch é aplicado numa cópia (ou com journal) e só troca o `resource.*` no fim. Queda no meio não corrompe a instalação.
+- Caminhos dentro do zip e do `.hf` são validados (sem `..`, sem absolutos).
+
+❓ **Em aberto:** qual servidor recebe ID/senha e emite a chave (endpoint HTTP no web ou o login server do emulador); o formato exato do `.hf` de patch e as regras de mesclagem (substitui por nome? remove?), a confirmar com o `drpg_pack.py` e o `Patch_240`.
 
 ## Distribuição e assinatura (falso positivo de antivírus)
 O medo é o Defender acusar `Trojan:Win32/Wacatac` e apagar o executável, o que é comum em builds .NET. Essa detecção é uma heurística do **Defender** (aprendizado de máquina) que coloca o arquivo em quarentena. O **SmartScreen** só avisa sobre "aplicativo não reconhecido" e não apaga nada.
