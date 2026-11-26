@@ -260,7 +260,7 @@ public sealed class Battle
             && CardStateOf(attackerOwner).TryActivate(attackerOwner, CardTrigger.Attack, out var atkActivated))
         {
             activatedCards[actor] = atkActivated;
-            atkCtx = CardEffectRegistry.EvaluateAttack(atkActivated);
+            atkCtx = CardEffectEvaluator.EvaluateAttack(atkActivated);
             ApplyPreAttackCardEffects(actor, acting, atkCtx);
         }
 
@@ -272,7 +272,7 @@ public sealed class Battle
             && CardStateOf(defenderOwner).TryActivate(defenderOwner, CardTrigger.Defense, out var defActivated))
         {
             activatedCards[target] = defActivated;
-            defCtx = CardEffectRegistry.EvaluateDefense(defActivated);
+            defCtx = CardEffectEvaluator.EvaluateDefense(defActivated);
         }
 
         var atkEquip = actor.Owner?.Character.EquipmentModifiers ?? StatModifiers.None;

@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using DRPGServer.Game.Battle.Cards;
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
@@ -58,6 +59,10 @@ public sealed record CardInfo(uint Id, string Name)
     public byte Col29 { get; init; } = 1;
     public byte Col30 { get; init; }
     public string Description { get; init; } = "";
+    /// <summary>Efeitos ao ativar em batalha (<c>Resources/Card/CardEffects.xml</c>). Vazio = ativa e consome sem efeito.</summary>
+    public IReadOnlyList<ICardEffect> Effects { get; init; } = [];
+
+    public bool Has<T>() where T : ICardEffect => Effects.Any(e => e is T);
 }
 
 /// <summary>Título de Digimon (<c>Resources/Digimon/DigimonTitles.xml</c>, gerado de <c>digimon_title_us.dat</c>).</summary>

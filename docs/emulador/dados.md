@@ -60,6 +60,7 @@ Comportamento (curar, teleportar, capturar, dar item, atacar todos) é um **efei
 ```
 
 - Cada `Type` é uma classe C# de efeito com parâmetros tipados (`Amount`, `Percent`, `MapId`…). O loader liga atributo XML a parâmetro e recusa atributo que o efeito não declara.
+- **Cards (`Resources/Card/CardEffects.xml`, mantido à mão):** `CardEffectTypes` liga cada `Type` a uma fábrica que lê os parâmetros por `EffectParams` (`PositiveInt`, `Enum<T>`, `RequireOneOf`; atributo não lido é erro). O efeito é `ICardAttackEffect`, `ICardDefenseEffect` ou os dois (`Br`) e tem que valer no gatilho do card (coluna 23), senão a carga cai. `CardInfo.Effects` guarda a lista; `CardEffectEvaluator` junta os efeitos ativados no turno; `Haste` e `SlotReturn` são lidos por `CardBattleState` pelo tipo (`CardInfo.Has<T>()`). Card sem entrada no XML ativa e consome sem efeito.
 - Cada efeito tem `Validate` (pode aplicar agora? alvo certo, espaço, estado) e `Apply`. O serviço chama `Validate` de **todos** os efeitos antes de aplicar qualquer um, e só então consome o item.
 - Efeito que não cabe em parâmetros simples continua sendo uma classe de efeito com nome próprio, registrada pelo **tipo**, nunca pelo id do item.
 - ❓ **Formato dos efeitos de uso de item em aberto**: elementos estruturados (acima) × scripts no estilo rAthena (plano do PR de item scripts). A decisão fica para depois da refatoração da fundação. Seja qual for o formato, os efeitos são validados na carga e nunca vêm de texto de UI.

@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Globalization;
 using System.Xml.Linq;
+using DRPGServer.Game.Battle.Cards;
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
@@ -94,7 +95,7 @@ public static class GameDataLoader
 
         var zoneIds = maps.Keys.Order().ToList();
 
-        var cards = ClientTables.Cards(pack);
+        var cards = ApplyCardEffects(ClientTables.Cards(pack), LoadCardEffects(Path.Combine(root, "Card/CardEffects.xml")));
         var npcShops = LoadNpcShops(root);
         var npcs = ClientTables.Npcs(pack);
         // toda loja tem dono: o InteractionGuard confere que o jogador está perto dele
@@ -277,6 +278,57 @@ public static class GameDataLoader
                 throw new GameDataException($"NpcShop {id} duplicado");
         }
         return shops.ToFrozenDictionary();
+    }
+
+    public static FrozenDictionary<uint, IReadOnlyList<ICardEffect>> LoadCardEffects(string path)
+    {
+        if (!File.Exists(path)) throw new GameDataException($"tabela {path} não encontrada");
+        var doc = XDocument.Load(path);
+        var top = doc.Element("CardEffects") ?? throw new GameDataException($"{path}: falta a raiz <CardEffects>");
+        var effects = new Dictionary<uint, IReadOnlyList<ICardEffect>>();
+        foreach (var e in top.Elements("Card"))
+        {
+            uint id = U32(e, "ID");
+            string where = $"CardEffects.xml: card {id}";
+            foreach (var attr in e.Attributes())
+            {
+                if (attr.Name.LocalName is not ("ID" or "Name"))
+                    throw new GameDataException($"{where}: atributo {attr.Name} desconhecido");
+            }
+            var list = new List<ICardEffect>();
+            foreach (var child in e.Elements())
+            {
+                if (child.Name.LocalName != "Effect")
+                    throw new GameDataException($"{where}: elemento <{child.Name}> desconhecido");
+                list.Add(CardEffectTypes.Create(new EffectParams(child, where)));
+            }
+            if (list.Count == 0) throw new GameDataException($"{where} sem <Effect>");
+            if (!effects.TryAdd(id, list)) throw new GameDataException($"{where} duplicado");
+        }
+        return effects.ToFrozenDictionary();
+    }
+
+    /// <summary>Liga os efeitos aos cards da tabela. Efeito que não vale no gatilho do card derruba a carga.</summary>
+    private static FrozenDictionary<uint, CardInfo> ApplyCardEffects(
+        FrozenDictionary<uint, CardInfo> cards, FrozenDictionary<uint, IReadOnlyList<ICardEffect>> effects)
+    {
+        var merged = new Dictionary<uint, CardInfo>(cards.Count);
+        foreach (var (id, info) in cards)
+        {
+            if (!effects.TryGetValue(id, out var list))
+            {
+                merged[id] = info;
+                continue;
+            }
+            foreach (var effect in list)
+            {
+                bool fits = info.Trigger == CardTrigger.Defense ? effect is ICardDefenseEffect : effect is ICardAttackEffect;
+                if (!fits)
+                    throw new GameDataException($"CardEffects.xml: card {id} ({info.Trigger}) com efeito {effect.GetType().Name} que não vale nesse gatilho");
+            }
+            merged[id] = info with { Effects = list };
+        }
+        return merged.ToFrozenDictionary();
     }
 
     private static FrozenDictionary<uint, ItemInfo> ApplyEquipmentEffects(

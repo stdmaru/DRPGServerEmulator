@@ -118,7 +118,7 @@ Dados: 67 batalhas v322 em `captures.db` (sessões 53, 54, 56 e 58; 362 golpes, 
   - `1` (**Ataque**): ativa no turno de ataque do jogador (`side = 2`), gravando `+40/+44/+48` (`CardId` dos slots `0..2`) e `+52/+56/+60` (quantidade restante após consumir 1) na entrada do **atacante** (`0x67`, `s0..s4`).
   - `2` (**Defesa**, `conn=446`): ativa quando o inimigo ataca (`side = 1`), gravando nos mesmos offsets `+40..63` na entrada do **defensor** (`0x67`, `s5..s9`), mesmo se o golpe inimigo errar.
 - **Sincronização:** o cliente toca a animação do Card Slash (+0,5–1,0 s) antes de enviar `C2S 0x69`, logo o servidor não precisa de delay artificial extra.
-- **Efeitos (`Game/Battle/Cards/CardEffects.cs`):** cobre os cards padrão de PvE/loja (`+X%` dano, recuperação de HP/VP/EVP individual e em grupo, AoE 100%, mudança de atributo, sacrifício, roubo de vida, `Slot Return`, `Haste`, `+X%` DEF, `−X%` dano recebido e reflexão `Reverse Sevens`).
+- **Efeitos (`Resources/Card/CardEffects.xml`, tipos em `Game/Battle/Cards/CardEffectTypes.cs`, ver [dados](../emulador/dados.md#efeitos-pr-41-e3-e4)):** cobre os cards padrão de PvE/loja (`+X%` dano, recuperação de HP/VP/EVP individual e em grupo, AoE 100%, mudança de atributo, sacrifício, roubo de vida, `Slot Return`, `Haste`, `+X%` DEF, `−X%` dano recebido e reflexão `Reverse Sevens`).
 
 ## ❓ Em aberto
 - Fator de atributo no dano, itens em batalha, precisão do multiplicador de skill.

@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Efeitos de card em batalha. Mantido à mão: o texto do card não é lido; cada <Effect Type> é uma classe em -->
+<!-- Game/Battle/Cards/CardEffectTypes.cs. Efeito tem que valer no gatilho do card (col. 23 de card_info_us: ataque ou defesa). -->
+<CardEffects>
+  <Card ID="1" Name="Strength Plug-In P">
+    <Effect Type="Br" Percent="20" />
+  </Card>
+  <Card ID="2" Name="High Speed Plug-In B">
+    <Effect Type="Br" Percent="20" />
+  </Card>
+  <Card ID="3" Name="Offense Plug-In A">
+    <Effect Type="Damage" Percent="20" />
+  </Card>
+  <Card ID="4" Name="Offense Plug-In N">
+    <Effect Type="Damage" Percent="60" />
+  </Card>
+  <Card ID="5" Name="Defense Plug-In C">
+    <Effect Type="Defense" Percent="20" />
+  </Card>
+  <Card ID="6" Name="Evolution Plug-in E">
+    <Effect Type="EvolveNext" />
+  </Card>
+  <Card ID="7" Name="Boost Chip">
+    <Effect Type="Damage" Percent="50" />
+  </Card>
+  <Card ID="8" Name="Supreme Training Manual">
+    <Effect Type="AttackerAttribute" Attribute="Data" />
+  </Card>
+  <Card ID="9" Name="Light Training Manual">
+    <Effect Type="AttackerAttribute" Attribute="Vaccine" />
+  </Card>
+  <Card ID="10" Name="Dark Training Manual">
+    <Effect Type="AttackerAttribute" Attribute="Virus" />
+  </Card>
+  <Card ID="11" Name="Speed Sevens">
+    <Effect Type="Br" Percent="100" />
+  </Card>
+  <Card ID="12" Name="Iron Claw">
+    <Effect Type="Damage" Percent="30" />
+  </Card>
+  <Card ID="13" Name="Evil Spiral">
+    <Effect Type="TargetAttribute" Attribute="Virus" />
+  </Card>
+  <Card ID="15" Name="Holy Orb">
+    <Effect Type="DamageReduction" Percent="50" />
+  </Card>
+  <Card ID="16" Name="Small Spear">
+    <Effect Type="Damage" Percent="40" />
+  </Card>
+  <Card ID="17" Name="Brave Shield">
+    <Effect Type="DamageReduction" Percent="20" />
+  </Card>
+  <Card ID="18" Name="Berserk Sword">
+    <Effect Type="Damage" Percent="100" />
+  </Card>
+  <Card ID="19" Name="Recovery Floppy L">
+    <Effect Type="HealHp" Amount="50" />
+  </Card>
+  <Card ID="20" Name="Recovery Floppy M">
+    <Effect Type="HealHp" Amount="100" />
+  </Card>
+  <Card ID="21" Name="Recovery Floppy S">
+    <Effect Type="HealHp" Amount="150" />
+  </Card>
+  <Card ID="22" Name="Recovery Floppy D">
+    <Effect Type="HealHp" Amount="200" />
+  </Card>
+  <Card ID="23" Name="Recovery Floppy LX">
+    <Effect Type="PartyHealHp" Amount="50" />
+  </Card>
+  <Card ID="24" Name="Recovery Floppy MX">
+    <Effect Type="PartyHealHp" Amount="100" />
+  </Card>
+  <Card ID="25" Name="Recovery Floppy SX">
+    <Effect Type="PartyHealHp" Amount="150" />
+  </Card>
+  <Card ID="26" Name="Recovery Floppy DX">
+    <Effect Type="PartyHealHp" Amount="200" />
+  </Card>
+  <Card ID="27" Name="Vitality Floppy L">
+    <Effect Type="HealVp" Amount="50" />
+  </Card>
+  <Card ID="28" Name="Vitality Floppy M">
+    <Effect Type="HealVp" Amount="100" />
+  </Card>
+  <Card ID="29" Name="Vitality Floppy S">
+    <Effect Type="HealVp" Amount="150" />
+  </Card>
+  <Card ID="30" Name="Vitality Floppy D">
+    <Effect Type="HealVp" Amount="200" />
+  </Card>
+  <Card ID="31" Name="Data Explosion_V2">
+    <Effect Type="SelfHpCost" Percent="50" />
+    <Effect Type="Damage" Percent="110" />
+  </Card>
+  <Card ID="33" Name="Miracle Ruby">
+    <Effect Type="Lifesteal" Percent="50" />
+  </Card>
+  <Card ID="34" Name="Golden Banana">
+    <Effect Type="PartyHealEvp" Percent="30" />
+  </Card>
+  <Card ID="37" Name="Digimon Graveyard">
+    <Effect Type="HalveEnemyHp" />
+  </Card>
+  <Card ID="38" Name="Reverse Sevens">
+    <Effect Type="Reflect" />
+  </Card>
+  <Card ID="39" Name="Spiked Club">
+    <Effect Type="Damage" Percent="50" />
+  </Card>
+  <Card ID="41" Name="Slot Return">
+    <Effect Type="SlotReturn" />
+  </Card>
+  <Card ID="42" Name="The Wicked God's Advent">
+    <Effect Type="AllTargets" />
+  </Card>
+  <Card ID="43" Name="Offense Plug-In K">
+    <Effect Type="Damage" Percent="60" />
+  </Card>
+  <Card ID="44" Name="Offense Plug-In V">
+    <Effect Type="Damage" Percent="80" />
+  </Card>
+  <Card ID="45" Name="Defense Plug-In F">
+    <Effect Type="Defense" Percent="40" />
+  </Card>
+  <Card ID="46" Name="Defense Plug-In G">
+    <Effect Type="Defense" Percent="60" />
+  </Card>
+  <Card ID="47" Name="High Speed Plug-In H">
+    <Effect Type="Br" Percent="60" />
+  </Card>
+  <Card ID="48" Name="High Speed Plug-In T">
+    <Effect Type="Br" Percent="80" />
+  </Card>
+  <Card ID="49" Name="Strength Plug-In W">
+    <Effect Type="Br" Percent="80" />
+  </Card>
+  <Card ID="50" Name="Power Charger">
+    <Effect Type="Damage" Percent="50" />
+  </Card>
+  <Card ID="51" Name="Max Charger">
+    <Effect Type="HealEvp" Percent="100" />
+  </Card>
+  <Card ID="52" Name="Jumper ROM">
+    <Effect Type="KeepGauge" Percent="50" />
+  </Card>
+  <Card ID="53" Name="Strength Plug-In O">
+    <Effect Type="Br" Percent="100" />
+  </Card>
+  <Card ID="54" Name="Thor Hammer X">
+    <Effect Type="Damage" Percent="80" />
+  </Card>
+  <Card ID="55" Name="Battle Tomahawk">
+    <Effect Type="Damage" Percent="100" />
+  </Card>
+  <Card ID="56" Name="Aegis">
+    <Effect Type="DamageReduction" Percent="60" />
+  </Card>
+  <Card ID="57" Name="The Bone That Calls Death">
+    <Effect Type="Br" Percent="100" />
+  </Card>
+  <Card ID="58" Name="Obelisk">
+    <Effect Type="AllTargets" />
+  </Card>
+  <Card ID="59" Name="Vajra">
+    <Effect Type="AllTargets" />
+  </Card>
+  <Card ID="60" Name="Shishioumaru">
+    <Effect Type="Damage" Percent="120" />
+  </Card>
+  <Card ID="62" Name="Evolution Plug-In E2">
+    <Effect Type="EvolveMax" />
+  </Card>
+  <Card ID="63" Name="White Wings">
+    <Effect Type="DamageReduction" Percent="100" />
+  </Card>
+  <Card ID="64" Name="Golden Drill">
+    <Effect Type="AllTargets" />
+    <Effect Type="GuaranteedHit" />
+  </Card>
+  <Card ID="65" Name="Accelerator">
+    <Effect Type="HealHp" Percent="100" />
+    <Effect Type="HealVp" Percent="100" />
+    <Effect Type="HealEvp" Percent="100" />
+  </Card>
+  <Card ID="66" Name="Excalibur">
+    <Effect Type="Damage" Percent="120" />
+  </Card>
+  <Card ID="67" Name="Holy Sevens">
+    <Effect Type="DamageReduction" Percent="80" />
+  </Card>
+  <Card ID="68" Name="Tutorial Card">
+    <Effect Type="Damage" Percent="50" />
+  </Card>
+  <Card ID="69" Name="Restoration Program M">
+    <Effect Type="HealHp" Amount="100" />
+    <Effect Type="HealVp" Amount="30" />
+  </Card>
+  <Card ID="70" Name="Restoration Program D">
+    <Effect Type="HealHp" Amount="200" />
+    <Effect Type="HealVp" Amount="100" />
+  </Card>
+  <Card ID="71" Name="Bao Chui X">
+    <Effect Type="Damage" Percent="70" />
+  </Card>
+  <Card ID="72" Name="Taegeukgi">
+    <Effect Type="Damage" Percent="80" />
+  </Card>
+  <Card ID="73" Name="Steel Drill">
+    <Effect Type="AllTargets" />
+    <Effect Type="GuaranteedHit" />
+  </Card>
+  <Card ID="74" Name="Golden Drill X">
+    <Effect Type="AllTargets" />
+    <Effect Type="GuaranteedHit" />
+  </Card>
+  <Card ID="77" Name="Power Control">
+    <Effect Type="LeaveOneHp" />
+  </Card>
+  <Card ID="78" Name="CSAT Toilet Paper">
+    <Effect Type="DamageReduction" Percent="100" />
+  </Card>
+  <Card ID="79" Name="CSAT Fork">
+    <Effect Type="Damage" Percent="120" />
+  </Card>
+  <Card ID="80" Name="CSAT Mirror">
+    <Effect Type="HealHp" Percent="100" />
+    <Effect Type="HealVp" Percent="100" />
+    <Effect Type="HealEvp" Percent="100" />
+  </Card>
+  <Card ID="81" Name="Haste">
+    <Effect Type="Haste" />
+  </Card>
+  <Card ID="82" Name="Golden Drill D">
+    <Effect Type="AllTargets" />
+    <Effect Type="GuaranteedHit" />
+  </Card>
+  <Card ID="83" Name="Fenrir Sword">
+    <Effect Type="AllTargets" />
+    <Effect Type="GuaranteedHit" />
+  </Card>
+  <Card ID="84" Name="White Wings (for Providing)">
+    <Effect Type="DamageReduction" Percent="100" />
+  </Card>
+  <Card ID="89" Name="Recovery Floppy R">
+    <Effect Type="HealHp" Amount="300" />
+  </Card>
+  <Card ID="95" Name="Darkness Zone">
+    <Effect Type="CurrentHpDamage" Percent="10" />
+  </Card>
+  <Card ID="98" Name="Thor Hammer">
+    <Effect Type="Damage" Percent="80" />
+  </Card>
+  <Card ID="114" Name="Death-X Evolution">
+    <Effect Type="DamageReduction" Percent="60" />
+  </Card>
+  <Card ID="119" Name="Haste X">
+    <Effect Type="Haste" />
+  </Card>
+  <Card ID="120" Name="Accelerator X">
+    <Effect Type="HealHp" Percent="100" />
+    <Effect Type="HealVp" Percent="100" />
+    <Effect Type="HealEvp" Percent="100" />
+  </Card>
+  <Card ID="121" Name="Excalibur X">
+    <Effect Type="Damage" Percent="120" />
+  </Card>
+  <Card ID="122" Name="Holy Sevens X">
+    <Effect Type="DamageReduction" Percent="80" />
+  </Card>
+  <Card ID="124" Name="Fenrir Sword S">
+    <Effect Type="AllTargets" />
+    <Effect Type="GuaranteedHit" />
+    <Effect Type="Damage" Percent="30" />
+  </Card>
+  <Card ID="125" Name="Fenrir Sword SS">
+    <Effect Type="AllTargets" />
+    <Effect Type="GuaranteedHit" />
+    <Effect Type="Damage" Percent="50" />
+  </Card>
+  <Card ID="126" Name="Ulforce Saber">
+    <Effect Type="PartyHealHp" Percent="20" />
+    <Effect Type="PartyHealVp" Percent="20" />
+  </Card>
+  <Card ID="128" Name="Offense Plug-In A (E)">
+    <Effect Type="Damage" Percent="20" />
+  </Card>
+  <Card ID="129" Name="Fenrir Sword (E)">
+    <Effect Type="AllTargets" />
+    <Effect Type="GuaranteedHit" />
+  </Card>
+  <Card ID="134" Name="Data Explosion_V2 X">
+    <Effect Type="SelfHpCost" Percent="50" />
+    <Effect Type="Damage" Percent="110" />
+  </Card>
+  <Card ID="135" Name="Berserk Sword X">
+    <Effect Type="Damage" Percent="100" />
+  </Card>
+  <Card ID="136" Name="Data Explosion">
+    <Effect Type="SelfHpCost" Percent="50" />
+    <Effect Type="Damage" Percent="110" />
+  </Card>
+  <Card ID="302" Name="Data Corruption">
+    <Effect Type="SelfHpCost" Percent="5" />
+  </Card>
+  <Card ID="10000" Name="Silver Robe">
+    <Effect Type="DamageReduction" Percent="35" />
+  </Card>
+  <Card ID="10002" Name="Haste (for Ladder)">
+    <Effect Type="Haste" />
+  </Card>
+  <Card ID="10003" Name="Holy Orb (For Ladder)">
+    <Effect Type="DamageReduction" Percent="50" />
+  </Card>
+</CardEffects>

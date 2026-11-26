@@ -4,7 +4,7 @@ using DRPGServer.Game.Entities;
 namespace DRPGServer.Game.Battle.Cards;
 
 /// <summary>Card ativado em um dos 3 slots de batalha durante um turno (escrito nos offsets 40..63 do 0x67).</summary>
-public readonly record struct ActivatedCard(uint CardId, uint RemainingAmount);
+public readonly record struct ActivatedCard(uint CardId, uint RemainingAmount, IReadOnlyList<ICardEffect> Effects);
 
 /// <summary>
 /// Cards ativados por um combatente em um único turno, preservando exatamente os índices dos slots 0, 1 e 2
@@ -33,6 +33,15 @@ public sealed class ActivatedCards
         for (int i = 0; i < SlotCount; i++)
             if (_slots[i] is { } card)
                 yield return card.CardId;
+    }
+
+    /// <summary>Efeitos de todos os cards ativados, na ordem dos slots.</summary>
+    public IEnumerable<ICardEffect> Effects()
+    {
+        for (int i = 0; i < SlotCount; i++)
+            if (_slots[i] is { } card)
+                foreach (var effect in card.Effects)
+                    yield return effect;
     }
 }
 
@@ -108,8 +117,8 @@ public sealed class CardBattleState(int maxCardSlashes = CardBattleState.MaxCard
             var cardTrigger = card.CardInfo?.Trigger ?? CardTrigger.Attack;
             if (cardTrigger != trigger) continue;
 
-            // Haste (#81, #119, #10002): não pode ser usado em turnos consecutivos
-            bool isHaste = CardEffectRegistry.IsHasteCard(card.ItemId);
+            // Haste: não ativa em ataques seguidos
+            bool isHaste = card.CardInfo?.Has<HasteEffect>() == true;
             if (isHaste && UsedHasteLastAttack) continue;
 
             if (!slotReturnActive)
@@ -118,10 +127,10 @@ public sealed class CardBattleState(int maxCardSlashes = CardBattleState.MaxCard
                 AnyConsumed = true;
             }
 
-            activated[i] = new ActivatedCard(card.ItemId, card.Amount);
+            activated[i] = new ActivatedCard(card.ItemId, card.Amount, card.CardInfo?.Effects ?? []);
             anyActivated = true;
 
-            if (card.ItemId == CardEffectRegistry.SlotReturnCardId)
+            if (card.CardInfo?.Has<SlotReturnEffect>() == true)
                 slotReturnActive = true;
             if (isHaste)
                 usedHasteThisTurn = true;

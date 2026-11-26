@@ -16,8 +16,15 @@ namespace DRPGServer.Tests;
 
 public class CardSlashTests
 {
+    private static readonly FrozenDictionary<uint, IReadOnlyList<ICardEffect>> RealEffects =
+        GameDataLoader.LoadCardEffects(Path.Combine(AppContext.BaseDirectory, "Resources", "Card", "CardEffects.xml"));
+
+    private static ActivatedCard Activated(uint cardId, uint remaining) => new(cardId, remaining, RealEffects[cardId]);
+
     private static readonly FrozenDictionary<uint, CardInfo> SampleCards = new Dictionary<uint, CardInfo>
     {
+        [41] = new(41, "Slot Return") { Trigger = CardTrigger.Attack },
+        [81] = new(81, "Haste") { Trigger = CardTrigger.Attack },
         [5] = new(5, "Defense Plug-In C")
         {
             Type = 1, SubType = 2, BuyPrice = 500, SellPrice = 250, Flag19 = 1,
@@ -36,7 +43,7 @@ public class CardSlashTests
             MaxStack = 999, Trigger = CardTrigger.Attack, Restriction = 1,
             Col26 = 32000, Col27 = 1, Col28 = 1_000_000, Col29 = 1, Col30 = 0,
         },
-    }.ToFrozenDictionary();
+    }.ToFrozenDictionary(kv => kv.Key, kv => kv.Value with { Effects = RealEffects.GetValueOrDefault(kv.Key) ?? [] });
 
     private static byte[] CardMovePayload(ItemPlace from, ItemPlace to, int fromA, int fromB, int toA, int toB, uint uid, uint cardId)
     {
@@ -370,29 +377,29 @@ public class CardSlashTests
     }
 
     [Fact]
-    public void CardEffectRegistry_evaluates_attack_defense_slot_return_and_haste()
+    public void Card_effects_evaluate_attack_defense_slot_return_and_haste()
     {
         // Ataque combinado: Offense Plug-In A (+20%) + Boost Chip (+50%) + Golden Drill X (AoE)
         var atk = new ActivatedCards();
-        atk[0] = new ActivatedCard(3, 9);
-        atk[1] = new ActivatedCard(7, 4);
-        atk[2] = new ActivatedCard(74, 49);
-        var atkCtx = CardEffectRegistry.EvaluateAttack(atk);
+        atk[0] = Activated(3, 9);
+        atk[1] = Activated(7, 4);
+        atk[2] = Activated(74, 49);
+        var atkCtx = CardEffectEvaluator.EvaluateAttack(atk);
         Assert.Equal(1.70, atkCtx.DamageMultiplier, 6);
         Assert.True(atkCtx.ForceAllTargets);
 
         // Defesa: Defense Plug-In C (+20% DEF) + Holy Orb (-50% dano)
         var def = new ActivatedCards();
-        def[0] = new ActivatedCard(5, 2);
-        def[1] = new ActivatedCard(15, 1);
-        var defCtx = CardEffectRegistry.EvaluateDefense(def);
+        def[0] = Activated(5, 2);
+        def[1] = Activated(15, 1);
+        var defCtx = CardEffectEvaluator.EvaluateDefense(def);
         Assert.Equal(1.20, defCtx.DefenseMultiplier, 6);
         Assert.Equal(0.50, defCtx.IncomingDamageMultiplier, 6);
 
         // White Wings (-100% dano) reduz dano final para 0 mesmo em acerto
         var wings = new ActivatedCards();
-        wings[0] = new ActivatedCard(63, 1);
-        var wingsCtx = CardEffectRegistry.EvaluateDefense(wings);
+        wings[0] = Activated(63, 1);
+        var wingsCtx = CardEffectEvaluator.EvaluateDefense(wings);
         var hit = BattleFormulas.Attack(Entities.Digimon(50, 20), Entities.Digimon(10, 1), new Random(1),
             damageMultiplier: wingsCtx.IncomingDamageMultiplier);
         Assert.True(hit.Landed);
@@ -420,5 +427,45 @@ public class CardSlashTests
         Assert.Equal(4u, haste.Amount);
         Assert.True(hasteState.TryActivate(player, CardTrigger.Attack, out _));
         Assert.Equal(3u, haste.Amount);
+    }
+
+    [Fact]
+    public void CardEffects_xml_maps_every_card_to_typed_effects()
+    {
+        Assert.True(RealEffects.Count > 90);
+        Assert.Equal([new AllTargetsEffect(), new GuaranteedHitEffect(), new DamageEffect(50)], RealEffects[125]); // Fenrir Sword SS
+        Assert.Equal([new HealHpEffect(100, 0), new HealVpEffect(30, 0)], RealEffects[69]);                      // Restoration Program M
+        Assert.Equal([new AttackerAttributeEffect(DigimonAttribute.Data)], RealEffects[8]);                      // Supreme Training Manual
+        Assert.Equal([new DamageReductionEffect(35)], RealEffects[10000]);                                        // Silver Robe
+        Assert.Equal([new HasteEffect()], RealEffects[119]);
+        Assert.Equal([new SlotReturnEffect()], RealEffects[41]);
+    }
+
+    [Theory]
+    [InlineData("""<Effect Type="Explode" />""")]                               // tipo desconhecido
+    [InlineData("""<Effect Type="Damage" />""")]                                // falta parâmetro
+    [InlineData("""<Effect Type="Damage" Percent="0" />""")]                    // zero
+    [InlineData("""<Effect Type="Damage" Percent="-5" />""")]                   // negativo
+    [InlineData("""<Effect Type="Damage" Percent="20" Amount="1" />""")]        // parâmetro que o efeito não declara
+    [InlineData("""<Effect Type="HealHp" Amount="1" Percent="1" />""")]         // as duas formas
+    [InlineData("""<Effect Type="HealHp" />""")]                                // nenhuma forma
+    [InlineData("""<Effect Type="DamageReduction" Percent="150" />""")]         // acima de 100%
+    [InlineData("""<Effect Type="AttackerAttribute" Attribute="Fire" />""")]    // enum desconhecido
+    [InlineData("""<Effect Type="AttackerAttribute" Attribute="2" />""")]       // número no lugar do nome
+    [InlineData("""<Effect Type="AllTargets" Count="2" />""")]                  // efeito sem parâmetro com parâmetro
+    [InlineData("""<Bonus Type="Damage" Percent="20" />""")]                    // elemento estranho
+    [InlineData("")]                                                             // card sem efeito
+    public void CardEffects_xml_rejects_malformed_effects(string effect)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"cards-{Guid.NewGuid():N}.xml");
+        File.WriteAllText(path, $"""<CardEffects><Card ID="3" Name="x">{effect}</Card></CardEffects>""");
+        try
+        {
+            Assert.Throws<GameDataException>(() => GameDataLoader.LoadCardEffects(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 }
