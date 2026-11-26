@@ -32,7 +32,8 @@ internal static class Program
         Console.WriteLine($"renderer: {renderer.BackendName}");
         using var sprites = new SpriteStore(PackArchive.Open(install.ResourcePath), renderer);
         using IFont? font = OpenUiFont();
-        var login = new LoginScene(sprites, RememberedLogin.Load(Path.Combine(install.Directory, "option.ini")), font, renderer);
+        var remembered = RememberedLogin.Load(Path.Combine(install.Directory, "option.ini"));
+        using var login = new LoginScene(sprites, remembered, font, renderer);
         var patchView = new PatchView(sprites);
 
         if (screenshot is not null)
@@ -40,7 +41,7 @@ internal static class Program
             double? fraction = screenshotPatch is null ? null : double.Parse(screenshotPatch, System.Globalization.CultureInfo.InvariantCulture);
             renderer.BeginFrame();
             var stage = fraction is null ? LauncherStage.Connecting : LauncherStage.Patching;
-            DrawFrame(renderer, login, patchView, stage, fraction ?? 0, 0, showStatus: true);
+            DrawFrame(renderer, login, patchView, stage, fraction ?? 0, 0, "Connecting to server...");
             var pixels = renderer.Capture();
             renderer.EndFrame();
             Screenshot.WritePpm(screenshot, pixels, IRenderer.FrameWidth, IRenderer.FrameHeight);
@@ -71,10 +72,26 @@ internal static class Program
         flow.Start(stop.Token);
 
         var events = new List<InputEvent>();
+        var previousStage = LauncherStage.Patching;
         while (!login.CloseRequested)
         {
             var state = flow.Snapshot;
             login.Interactive = state.Stage is LauncherStage.Ready or LauncherStage.Failed;
+            if (previousStage == LauncherStage.LoggingIn && state.Stage != LauncherStage.LoggingIn)
+                login.ClearPassword(); // refused or failed: typed again; on success it is not needed any more
+            previousStage = state.Stage;
+
+            if (state.Stage == LauncherStage.LoggedIn && flow.GameLogin is { } game)
+            {
+                remembered.LoggedIn(login.Login);
+                var error = GameStarter.Start(install.Directory, flow.Configuration!.LauncherInfo.RunExeFileName,
+                    settings.Runner, game.GameUsername, game.GameKey);
+                if (error is null)
+                    return Quit(stop);
+                Console.Error.WriteLine(error);
+                flow.GameStartFailed(error);
+                continue;
+            }
 
             platform.Poll(events);
             foreach (var e in events)
@@ -88,25 +105,26 @@ internal static class Program
                 login.SubmitRequested = false;
                 if (state.Stage == LauncherStage.Failed)
                     flow.Retry();
-                // Ready: the login itself comes with the text fields (next step).
+                else if (state.Stage == LauncherStage.Ready)
+                    flow.Login(login.Login, login.Password, stop.Token);
             }
 
             renderer.BeginFrame();
-            DrawFrame(renderer, login, patchView, state.Stage, state.Progress?.Fraction ?? 0, SdlPlatform.TicksMs, state.Status.Length > 0);
+            DrawFrame(renderer, login, patchView, state.Stage, state.Progress?.Fraction ?? 0, SdlPlatform.TicksMs, state.Status);
             renderer.EndFrame();
         }
         return Quit(stop);
     }
 
-    private static void DrawFrame(IRenderer r, LoginScene login, PatchView patch, LauncherStage stage, double fraction, ulong nowMs, bool showStatus)
+    private static void DrawFrame(IRenderer r, LoginScene login, PatchView patch, LauncherStage stage, double fraction, ulong nowMs, string status)
     {
         login.DrawBackground(r);
         if (stage == LauncherStage.Patching)
             patch.Draw(r, fraction);
         else
             login.DrawPanel(r, nowMs);
-        if (showStatus)
-            login.DrawStatusBox(r);
+        if (status.Length > 0)
+            login.DrawStatusBox(r, status);
     }
 
     /// <summary>Text is optional: without a usable font the launcher still works, only without labels.</summary>
@@ -120,7 +138,7 @@ internal static class Program
         }
         try
         {
-            var font = new SdlTtfFont(path, FontLocator.UiPixelHeight);
+            var font = new SdlTtfFont(path, FontLocator.UiPixelSize);
             Console.WriteLine($"font: {path}");
             return font;
         }

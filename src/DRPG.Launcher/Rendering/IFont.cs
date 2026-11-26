@@ -3,6 +3,8 @@ namespace DRPG.Launcher.Rendering;
 /// <summary>A TTF face at one size that turns a line of text into a texture (RGBA8888, R in the low byte).</summary>
 public interface IFont : IDisposable
 {
+    int LineHeight { get; }
+
     ITexture Render(IRenderer renderer, string text, uint rgba);
 }
 
@@ -13,7 +15,8 @@ public interface IFont : IDisposable
 /// </summary>
 public static class FontLocator
 {
-    public const int UiPixelHeight = 12;
+    /// <summary>❓ Em size in pixels; tuned by eye against the original screenshots, not measured.</summary>
+    public const int UiPixelSize = 12;
 
     private static readonly string[] Preferred =
     [

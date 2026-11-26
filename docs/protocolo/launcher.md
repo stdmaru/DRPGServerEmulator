@@ -39,7 +39,9 @@ O `DR_Configuration.json`, baixado por HTTPS, ganha o campo:
 
 Chave recebida com outra impressão digital: o launcher não libera os campos e mostra erro.
 
-**Modo de desenvolvimento:** `drpg-launcher.ini` → `[Development] AllowInsecure=true`. O launcher aceita o JSON por HTTP e pula a impressão digital, com aviso visível na tela. A opção só existe no launcher: o servidor não tem como saber se a checagem foi feita, então não há opção do lado dele. A cifra do corpo continua ligada.
+**Modo de desenvolvimento:** `drpg-launcher.ini` → `[Development] AllowInsecure=true`. O launcher aceita o JSON por HTTP e pula a impressão digital, com aviso no console. A opção só existe no launcher: o servidor não tem como saber se a checagem foi feita, então não há opção do lado dele. A cifra do corpo continua ligada.
+
+**`drpg-launcher.ini`** (ao lado do launcher; modelo em `drpg-launcher.ini.example`): `[Patch] ConfigUrl` (HTTPS), `[Development] AllowInsecure`, `[Game] Runner` (programa que roda o `RunExeFileName`, por exemplo `wine` no Linux). Com login aceito, o launcher roda `RunExeFileName <usuário do jogo> <chave>` na pasta do jogo e fecha.
 
 ## Servidor
 - `LauncherLogin:Enabled` (desligado → HelloReply com status `Disabled`), `GameKeyValidHours` (5), `MinLauncherVersion`, limites por IP e por login (token bucket).

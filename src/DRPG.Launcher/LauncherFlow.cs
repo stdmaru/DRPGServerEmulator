@@ -1,5 +1,6 @@
 using DRPG.Launcher.Login;
 using DRPG.Launcher.Patching;
+using DRPG.Shared.Protocol.Launcher;
 
 namespace DRPG.Launcher;
 
@@ -7,7 +8,9 @@ public enum LauncherStage
 {
     Patching,    // Loading box with the patch bar
     Connecting,  // login panel shown but frozen, "Connecting to server..."
-    Ready,       // login panel usable
+    Ready,       // login panel usable; the status box shows the last login error, if any
+    LoggingIn,   // panel frozen, "Logging in..."
+    LoggedIn,    // game key received: the launcher starts the game (see GameLogin)
     Failed,      // message in the status box; OK retries the failed step
 }
 
@@ -28,6 +31,9 @@ public sealed class LauncherFlow(LauncherSettings settings, Patcher patcher, Fun
     private Task _running = Task.CompletedTask;
 
     public LoginClient? Client { get; private set; }
+
+    /// <summary>The game username and key, set on <see cref="LauncherStage.LoggedIn"/>.</summary>
+    public LauncherLoginResult? GameLogin { get; private set; }
     public PatchConfiguration? Configuration => _configuration;
 
     public State Snapshot
@@ -46,11 +52,34 @@ public sealed class LauncherFlow(LauncherSettings settings, Patcher patcher, Fun
             _running = Guard(retry);
     }
 
+    /// <summary>Sends ID and password (Ready only). Empty fields are refused here without asking the server.</summary>
+    public void Login(string login, string password, CancellationToken ct)
+    {
+        if (Snapshot.Stage != LauncherStage.Ready || IsBusy || Client is null)
+            return;
+        if (login.Length == 0 || password.Length == 0)
+        {
+            Set(LauncherStage.Ready, "Enter your ID and password.");
+            return;
+        }
+        // an unexpected error retries the handshake, never a login with a password kept in a closure
+        _running = Guard(() => LoginAsync(login, password, ct), () => ConnectAsync(ct));
+    }
+
+    /// <summary>The game could not be started: back to the panel with the reason.</summary>
+    public void GameStartFailed(string message)
+    {
+        if (Snapshot.Stage != LauncherStage.LoggedIn)
+            return;
+        GameLogin = null;
+        Set(LauncherStage.Ready, message);
+    }
+
     /// <summary>
     /// Runs a background step so that nothing can leave the screen stuck: an unexpected exception becomes a Failed
-    /// state with its message, retrying the same step.
+    /// state with its message, retrying <paramref name="retry"/> (the same step by default).
     /// </summary>
-    private async Task Guard(Func<Task> step)
+    private async Task Guard(Func<Task> step, Func<Task>? retry = null)
     {
         try
         {
@@ -62,7 +91,7 @@ public sealed class LauncherFlow(LauncherSettings settings, Patcher patcher, Fun
         }
         catch (Exception e)
         {
-            Fail($"Unexpected error: {e.Message}", step);
+            Fail($"Unexpected error: {e.Message}", retry ?? step);
         }
     }
 
@@ -116,6 +145,39 @@ public sealed class LauncherFlow(LauncherSettings settings, Patcher patcher, Fun
                 break;
             default:
                 Fail("Could not connect to the server.", () => ConnectAsync(ct));
+                break;
+        }
+    }
+
+    private async Task LoginAsync(string login, string password, CancellationToken ct)
+    {
+        Set(LauncherStage.LoggingIn, "Logging in...");
+        var result = await Client!.LoginAsync(login, password, ct);
+        if (result is null)
+        {
+            Fail("Could not connect to the server.", () => ConnectAsync(ct));
+            return;
+        }
+        switch (result.Status)
+        {
+            case LauncherLoginStatus.Ok:
+                GameLogin = result;
+                Set(LauncherStage.LoggedIn, "Starting the game...");
+                break;
+            case LauncherLoginStatus.InvalidCredentials:
+                Set(LauncherStage.Ready, "Wrong ID or password.");
+                break;
+            case LauncherLoginStatus.TooManyAttempts:
+                Set(LauncherStage.Ready, "Too many attempts. Try again later.");
+                break;
+            case LauncherLoginStatus.AccountUnavailable:
+                Set(LauncherStage.Ready, "This account cannot play.");
+                break;
+            case LauncherLoginStatus.OutdatedLauncher:
+                Fail("Launcher is outdated. Please update.", null);
+                break;
+            default:
+                Set(LauncherStage.Ready, "Server error. Try again later.");
                 break;
         }
     }

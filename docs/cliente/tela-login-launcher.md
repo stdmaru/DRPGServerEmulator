@@ -42,8 +42,15 @@ A caixinha funciona (pedido do dono): clique na caixa ou no texto ao lado altern
 
 Guardado no `option.ini` do jogo, numa seção nossa: `[DRPGLauncher] Remember=1`, `Login=<id>`. Só o ID, nunca a senha; desmarcar apaga o ID. O ID só é gravado depois de um login bem-sucedido e só se for ASCII imprimível sem `;[]=` (até 64). ❓ O launcher oficial escreve `[Member] id=1`, de significado desconhecido; não é tocado. O jogo grava o `option.ini` chave por chave (`0x00b429f0`, `WritePrivateProfileString`), então a seção nossa sobrevive.
 
+### Campos e login
+- Campos na parte escura das barras: ID em painel + (138, 83), PASSWORD em painel + (138, 129), 146×18. Texto branco, 3 px de margem; texto maior que o campo mostra o final. Senha como `*`.
+- Só ASCII imprimível (sem espaço no ID), até 64 caracteres. Clique escolhe o campo, Tab alterna, Backspace apaga, Enter ou OK enviam, Esc ou CANCEL fecham. ❓ Teclas e limites do original não confirmados.
+- Foco inicial no ID, ou na senha quando há ID lembrado.
+- OK com campo vazio: "Enter your ID and password." sem falar com o servidor. Durante o envio o painel congela com "Logging in...". Recusa ("Wrong ID or password.", "Too many attempts...", "This account cannot play.", "Server error...") volta ao painel com a mensagem e limpa a senha. Servidor fora: falha com OK para novo handshake.
+- Sucesso: grava o ID (se marcado), inicia `LanuncherInfo.RunExeFileName` da pasta do jogo com `<usuário do jogo> <chave>` (`GameStarter`; `[Game] Runner=wine` no Linux) e fecha o launcher. Nome do executável, usuário (até 20, ASCII sem espaço) e chave (40 hex) são conferidos antes; erro volta ao painel com a mensagem.
+
 ### Fonte
-O original usa GDI "굴림체" (GulimChe, cp949) com célula de 12 px para a UI e `Fonts\123RF_123RF_TTF.ttf` (face "123RF", 16 px) em outro lugar (v322 `0x00b563f0`). Gulim não pode ser distribuída, então o launcher usa a do sistema quando existe e, senão, a primeira que achar entre NanumGothic, Noto Sans CJK, DejaVu Sans, Liberation Sans, Arial e Segoe UI (`FontLocator`). Texto por SDL3_ttf (`SdlTtfFont`), altura de linha igual à célula do GDI. Sem fonte nenhuma o launcher funciona sem os textos. ❓ Aparência fiel depende da Gulim.
+O original usa GDI "굴림체" (GulimChe, cp949) com célula de 12 px para a UI e `Fonts\123RF_123RF_TTF.ttf` (face "123RF", 16 px) em outro lugar (v322 `0x00b563f0`). Gulim não pode ser distribuída, então o launcher usa a do sistema quando existe e, senão, a primeira que achar entre NanumGothic, Noto Sans CJK, DejaVu Sans, Liberation Sans, Arial e Segoe UI (`FontLocator`). Texto por SDL3_ttf (`SdlTtfFont`), em de 12 px (a altura de célula do GDI deixava as fontes substitutas pequenas demais). Sem fonte nenhuma o launcher funciona sem os textos. ❓ Aparência fiel depende da Gulim.
 - OK em painel + (148, 170), CANCEL em painel + (206, 170).
 - Sem botão sair: o **CANCEL** fecha o launcher (confirmado pelo dono). `dr2_in_000_001`/`_006` não são usados.
 - Texto dos campos em branco, a 4 px da borda esquerda; a senha aparece como `*` com cursor `_`.
@@ -60,7 +67,7 @@ Na captura, uma caixa pequena centrada **abaixo do painel**, ~182×24 na captura
 
 Sprite da caixa: **`gui\dr_friend_016.spr`** (244×21, cantos redondos, borda clara), escolhido pelo dono em 2026-11-26. Nenhum sprite é igual ao da captura (pode ter sido desenhada por código). Fica centrado em x = 400, a partir de y = 392: em (278, 392). O texto vai em branco, a 8 px da borda esquerda.
 
-**Implementado** em `DRPG.Launcher/Scenes/LoginScene.cs` (fundo, painel, mascotes animados, OK/CANCEL com 3 estados, caixa de status, lembrar ID). Falta o texto dos campos e da caixa de status. Para conferir sem janela: `SDL_VIDEO_DRIVER=offscreen dotnet run --project src/DRPG.Launcher -- --game-dir <instalação> --screenshot tela.ppm`. Um pacote mínimo só com os sprites da tela pode ficar em `.local/client-mini` (fora do git), montado com `work/tools/drpg_pack.py pack`.
+**Implementado** em `DRPG.Launcher/Scenes/LoginScene.cs` (fundo, painel, mascotes animados, OK/CANCEL com 3 estados, caixa de status, lembrar ID). Campos ID e PASSWORD com digitação, foco e cursor; texto na caixa de status. Para conferir sem janela: `SDL_VIDEO_DRIVER=offscreen dotnet run --project src/DRPG.Launcher -- --game-dir <instalação> --screenshot tela.ppm`. Um pacote mínimo só com os sprites da tela pode ficar em `.local/client-mini` (fora do git), montado com `work/tools/drpg_pack.py pack`.
 
 ## Fluxo do launcher
 Definido pelo dono em 2026-11-26:

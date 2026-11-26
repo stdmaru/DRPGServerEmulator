@@ -24,8 +24,9 @@ public interface IRenderer : IDisposable
     void BeginFrame();
     void Draw(ITexture texture, int x, int y);
 
-    /// <summary>Draws only the left <paramref name="width"/> pixels of the texture (progress bars).</summary>
-    void DrawLeft(ITexture texture, int x, int y, int width);
+    /// <summary>Draws the columns <paramref name="sourceX"/> .. <paramref name="sourceX"/> + <paramref name="width"/>
+    /// of the texture at (x, y): progress bars (left part) and text fields (the tail of a long text).</summary>
+    void DrawPart(ITexture texture, int x, int y, int sourceX, int width);
     void EndFrame();
 
     /// <summary>Copies the last frame (frame coordinates) to an RGBA8888 buffer, for screenshots and tests.</summary>

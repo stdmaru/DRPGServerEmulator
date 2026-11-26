@@ -88,6 +88,54 @@ public sealed class LauncherFlowTests : IDisposable
         await server;
     }
 
+    [Fact]
+    public async Task Empty_fields_are_refused_without_asking_the_server()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var server = AnswerHello(listener);
+        var flow = Flow(((IPEndPoint)listener.LocalEndpoint).Port);
+        flow.Start(default);
+        await WaitFor(flow, LauncherStage.Ready);
+        await server;
+
+        flow.Login("player", "", default);
+
+        var state = flow.Snapshot;
+        Assert.Equal(LauncherStage.Ready, state.Stage);
+        Assert.Equal("Enter your ID and password.", state.Status);
+        Assert.False(flow.IsBusy);
+    }
+
+    [Fact]
+    public async Task Server_gone_during_login_fails_and_offers_a_new_handshake()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var server = AnswerHello(listener);
+        var flow = Flow(port);
+        flow.Start(default);
+        await WaitFor(flow, LauncherStage.Ready);
+        await server;
+        listener.Stop(); // the handshake socket closes and nobody listens any more
+
+        flow.Login("player", "secret", default);
+
+        var failed = await WaitFor(flow, LauncherStage.Failed);
+        Assert.Equal(LauncherStage.Failed, failed.Stage);
+        Assert.Contains("Could not connect", failed.Status);
+        Assert.Null(flow.GameLogin);
+    }
+
+    [Fact]
+    public void Login_before_ready_is_ignored()
+    {
+        var flow = Flow(1);
+        flow.Login("player", "secret", default);
+        Assert.Equal(LauncherStage.Patching, flow.Snapshot.Stage);
+    }
+
     private Task AnswerHello(TcpListener listener) => Task.Run(async () =>
     {
         using var socket = await listener.AcceptTcpClientAsync();

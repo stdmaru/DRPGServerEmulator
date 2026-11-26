@@ -18,6 +18,6 @@ public sealed class PatchView(SpriteStore sprites)
     public void Draw(IRenderer r, double fraction)
     {
         r.Draw(_box, BoxX, BoxY);
-        r.DrawLeft(_bar, BarX, BarY, (int)(_bar.Width * Math.Clamp(fraction, 0, 1)));
+        r.DrawPart(_bar, BarX, BarY, 0, (int)(_bar.Width * Math.Clamp(fraction, 0, 1)));
     }
 }

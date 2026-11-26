@@ -10,9 +10,9 @@ public sealed unsafe class SdlTtfFont : IFont
     private static bool _initialized;
     private TTF_Font* _font;
 
-    /// <summary>Opens <paramref name="path"/> sized so a line is <paramref name="pixelHeight"/> tall, like a GDI
-    /// <c>CreateFont</c> with a positive height (cell height, not em size).</summary>
-    public SdlTtfFont(string path, int pixelHeight)
+    /// <summary>Opens <paramref name="path"/> with an em of <paramref name="pixelSize"/> pixels. Not GDI's cell
+    /// height: fallback faces such as Noto CJK have tall line gaps and came out too small that way.</summary>
+    public SdlTtfFont(string path, int pixelSize)
     {
         if (!_initialized)
         {
@@ -20,13 +20,12 @@ public sealed unsafe class SdlTtfFont : IFont
                 throw new InvalidOperationException($"TTF_Init: {SDL_GetError()}");
             _initialized = true;
         }
-        _font = TTF_OpenFont(path, pixelHeight);
+        _font = TTF_OpenFont(path, pixelSize); // points at 72 dpi = pixels
         if (_font == null)
             throw new InvalidOperationException($"TTF_OpenFont({path}): {SDL_GetError()}");
-        int height = TTF_GetFontHeight(_font);
-        if (height > 0 && height != pixelHeight)
-            TTF_SetFontSize(_font, (float)pixelHeight * pixelHeight / height);
     }
+
+    public int LineHeight => TTF_GetFontHeight(_font);
 
     public ITexture Render(IRenderer renderer, string text, uint rgba)
     {
