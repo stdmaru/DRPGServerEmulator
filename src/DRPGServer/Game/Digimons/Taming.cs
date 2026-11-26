@@ -5,7 +5,7 @@ using DRPGServer.Game.Stats;
 using DRPGServer.Network.Packets.Map;
 using Microsoft.Extensions.Options;
 
-namespace DRPGServer.Game.World;
+namespace DRPGServer.Game.Digimons;
 
 /// <summary>
 /// Captura de digimons (docs/mecanicas/captura.md). Duas formas:

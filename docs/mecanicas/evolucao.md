@@ -46,7 +46,7 @@ Cada digimon tem **um uid** e cada forma (espécie da linha evolutiva) tem **sta
 
 ## No emulador
 `Game/Entities/Digimon.cs`: `DigimonForm` (atributos e níveis de skill), `BaseForm`/`Current`, `UnlockedStage`, `BecomeRookie`,
-`UnlockStage`, `EvolveTo`, `Devolve`, `FormAtStage`. `Game/World/Progression.cs` manda `0x70`/`0x80` depois do level-up.
+`UnlockStage`, `EvolveTo`, `Devolve`, `FormAtStage`. `Game/Digimons/Progression.cs` manda `0x70`/`0x80` depois do level-up.
 Banco: `digimon.digimon_id` = forma-base, `digimon.unlocked_stage`, tabela `digimon_form` (migração `0003`).
 
 ## ❓ Em aberto

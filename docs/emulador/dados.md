@@ -66,7 +66,7 @@ Comportamento (curar, teleportar, capturar, dar item, atacar todos) é um **efei
 - **Uso de item (`Resources/Item/ItemEffects.xml`, mantido à mão):** `ItemUseEffectTypes` liga `Type` a fábrica (mesmo `EffectParams` dos cards); `ItemInfo.UseEffects` guarda a lista. Cada efeito (`IItemUseEffect`) declara a entrada (`OnTarget` = `0x41` no selvagem, `AtPosition` = `0x85` numa posição; um item não mistura as duas), `CanApply` sem efeito colateral e `Apply`. `ItemUseService` valida todos e só depois consome; a ordem consumo × resposta é a de cada entrada (✅ `0x85` ecoa a quantidade de antes e o `0xC9` a de depois, conn=125/469; `0x41` consome antes de sortear a rede). Hoje: `TeleportInMap` (900, 907) e `TamingNet` (`Stage` pelo nome, `Chance` 1..100). Item citado que não existe no `item_info_us` derruba a carga.
 - ❓ **Formato definitivo dos efeitos de uso de item em aberto**: elementos estruturados (acima) × scripts no estilo rAthena (plano do PR de item scripts). A decisão fica para depois da refatoração da fundação; a base acima é o ponto de entrada. Seja qual for o formato, os efeitos são validados na carga e nunca vêm de texto de UI.
 
-## Regras de desbloqueio (`Game/World/TitleUnlocks.cs`)
+## Regras de desbloqueio (`Game/Digimons/TitleUnlocks.cs`)
 Condições de jogo (títulos por vitórias, derrotas, nível e estágio) também são dados tipados, em `Resources/Digimon/DigimonTitles.xml`:
 
 ```xml

@@ -62,7 +62,7 @@ Evidência: amostras em `work/packets/item_packet/` (Taming Net) e sessão 56 (c
   oficial não capturadas. A renomeação paga (item) ainda não existe.
 
 ## No emulador
-- `Game/World/Taming.cs` (regras e criação), `Game/Items/ItemUseEffects.cs` (`TamingNetEffect`: validação e captura da rede,
+- `Game/Digimons/Taming.cs` (regras e criação), `Game/Items/ItemUseEffects.cs` (`TamingNetEffect`: validação e captura da rede,
   chamado por `ItemUseService.UseOnTarget`), `Battle.Capture` (captura comum), handlers `ItemUseHandler` (`0x41`) e
   `RenameHandler` (`0xF0`).
 - O uid do digimon novo vem de `Game/DigimonUids.cs`: um contador em memória, iniciado no maior uid do banco na partida.

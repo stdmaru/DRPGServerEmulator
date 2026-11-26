@@ -1,7 +1,7 @@
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Stats;
 
-namespace DRPGServer.Game.World;
+namespace DRPGServer.Game.Digimons;
 
 /// <summary>Condição de desbloqueio automático de título (<c>&lt;Unlock Condition=... Value=... /&gt;</c>).</summary>
 public enum TitleUnlockCondition : byte

@@ -1,3 +1,4 @@
+using DRPGServer.Game.Digimons;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;

@@ -2,7 +2,7 @@ using DRPGServer.Game.Entities;
 using DRPGServer.Game.Stats;
 using DRPGServer.Network.Packets.Map;
 
-namespace DRPGServer.Game.World;
+namespace DRPGServer.Game.Digimons;
 
 /// <summary>
 /// O que acontece depois que o digimon sobe de nível (docs/mecanicas/evolucao.md):

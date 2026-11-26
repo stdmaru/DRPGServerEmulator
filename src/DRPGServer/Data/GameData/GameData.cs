@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using DRPGServer.Game.Battle.Cards;
+using DRPGServer.Game.Digimons;
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Items;
 using DRPGServer.Game.Stats;

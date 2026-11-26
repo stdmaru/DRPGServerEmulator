@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game;
+using DRPGServer.Game.Digimons;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;

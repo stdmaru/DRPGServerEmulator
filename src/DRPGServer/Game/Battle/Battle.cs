@@ -1,5 +1,6 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Battle.Cards;
+using DRPGServer.Game.Digimons;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Stats;
 using DRPGServer.Network.Packets.Map;
@@ -528,7 +529,7 @@ public sealed class Battle
 
     private bool CanCapture(Combatant actor, Combatant target) =>
         actor.Owner is { } owner && target.IsWild && !target.Digimon.IsKnockedOut
-        && CaptureAttempts(owner) < World.Taming.AttemptsPerBattle && World.Taming.CanBattleCapture(owner.Character, target.Digimon);
+        && CaptureAttempts(owner) < Taming.AttemptsPerBattle && Taming.CanBattleCapture(owner.Character, target.Digimon);
 
     /// <summary>
     /// ✅ Captura comum (DigimonRPG.bin @ 0x00AF9A30 / 0x00AF9B37): 0x68 → 0xB3 → 0x35 3, depois a animação (0x69).
@@ -699,7 +700,7 @@ public sealed class Battle
                 {
                     c.Digimon.TotalBattles++;
                     if (result == BattleResult.Win) c.Digimon.TotalWins++;
-                    World.DigimonTitles.CheckAndNotify(player, c.Digimon);
+                    DigimonTitles.CheckAndNotify(player, c.Digimon);
                 }
                 // ✅ Vitória e derrota por nocaute (conn=408) mandam 0xB1 e 0x84 por digimon; fuga manda só 0x65/0x6A/0x6D
                 if (sendSummary)

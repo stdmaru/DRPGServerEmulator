@@ -1,7 +1,7 @@
 using DRPGServer.Game.Entities;
 using DRPGServer.Network.Packets.Map;
 
-namespace DRPGServer.Game.World;
+namespace DRPGServer.Game.Digimons;
 
 /// <summary>
 /// Desbloqueio automático de títulos de Digimon pelas regras de <c>Resources/Digimon/DigimonTitles.xml</c>.

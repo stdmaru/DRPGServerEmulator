@@ -43,7 +43,7 @@ Cada camada só conhece a de baixo. Regra de negócio nunca fica em handler nem 
 | Economia | `Game/Economy` | `Wallet`/`CurrencyKind` (gastar, creditar, tetos e auditoria das moedas do personagem), `EconomyLedger`, `IAuditLog` |
 | Lojas | `Game/Shop` | `NpcShopService` (compra e venda de cards e itens nas lojas de NPC), `CashShopService` |
 | Status | `Game/Stats` | `StatFormulas` (**o único lugar** com fórmulas de status), `ExpFormulas`, `StatModifiers` (**E1**) |
-| Digimon | `Game/Digimons` | títulos, captura (`Taming`), progressão |
+| Digimon | `Game/Digimons` | `DigimonTitles`/`TitleUnlocks` (títulos), `Taming` (captura), `Progression` (level-up) (**L5**) |
 | Batalha | `Game/Battle`, `Game/Battle/Cards` | `Battle` (máquina de estados), `BattleSystem`, `BattleFormulas`, efeitos de card (**E3**) |
 | NPC | `Game/Npcs` | scripts por mapa (`NpcScriptBase`) e `NpcScriptRegistry` |
 | GM | `Game/Commands` | comandos de chat (`/help`) |

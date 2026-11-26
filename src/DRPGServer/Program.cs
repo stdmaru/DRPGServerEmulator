@@ -6,6 +6,7 @@ using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Accounts;
 using DRPGServer.Game.Battle;
 using DRPGServer.Game.Commands;
+using DRPGServer.Game.Digimons;
 using DRPGServer.Game.Items;
 using DRPGServer.Game.Npcs;
 using DRPGServer.Game.Shop;

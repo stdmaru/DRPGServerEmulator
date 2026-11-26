@@ -1,5 +1,6 @@
 using DRPGServer.Configuration;
 using DRPGServer.Data.GameData;
+using DRPGServer.Game.Digimons;
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Stats;
