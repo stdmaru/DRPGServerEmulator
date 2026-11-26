@@ -69,3 +69,4 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [patch_client.py](ferramentas/patch-cliente.md): remove o XIGNCODE, corrige o loading e troca IPs e portas (`--server`) por assinatura. Fluxo para quando o oficial atualizar.
 - [extract_status.py](ferramentas/extract-status.md): extrai amostras de status dos pcaps.
 - [drpg_replay.py](ferramentas/replay.md): reproduz uma sessão capturada contra o emulador e compara as respostas com as do oficial.
+- [extract_equipment_effects.py](ferramentas/extract-equipment-effects.md): gera o `EquipmentEffects.xml` (bônus de equipamento em `<Modifier>`) a partir do `item_info_us.dat`.

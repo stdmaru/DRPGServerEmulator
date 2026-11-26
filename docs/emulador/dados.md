@@ -40,7 +40,8 @@ Bônus de equipamento, título, card e buff são todos `StatModifier`: um tipo d
 - `StatModifiers` é o conjunto agregado de uma ou mais fontes: `Of` junta os modificadores de uma fonte, `Combine` junta fontes, e a leitura é `Flat(kind)`, `Percent(kind)`, `Has(kind)` e `Attributes`.
 - Fontes: `ItemInfo.Modifiers` (equipamento), `DigimonTitleInfo.Modifiers` (título). `Inventory.EquipmentModifiers()` junta o que o tamer veste; `Character.SyncEquipmentModifiers` repassa a cada Digimon; `Digimon.Modifiers` junta equipamento e título equipado e fica em cache até `SetEquipmentModifiers`, `EquipTitle` ou `LoadTitles`.
 - Cálculo em `Digimon`: atributos somam antes de `StatFormulas.Combat`; HP/VP planos somam depois; ATK/DEF/BR = `(base + plano) × (1 + %)`, arredondado para baixo. Os modificadores de batalha e de zona (`Damage`, `CardSlashLimit`, `HpRecovery`…) são lidos de `Character.EquipmentModifiers` por quem os usa.
-- ❓ Até a conversão do E5, `EquipmentEffects.xml` ainda usa um atributo por bônus (`Atk="75"`, `AtkPercent="3"`); `GameDataLoader.EquipmentAttributes` liga cada atributo ao par (tipo, forma). Os títulos ainda saem de `ClientTables` até o E2.
+- `ModifierXml.Read` lê os `<Modifier>` de qualquer fonte e derruba a carga em tipo desconhecido (nome exato do enum, nunca número), forma não aceita, `Value` e `Percent` juntos ou ausentes, valor que não é inteiro positivo, atributo a mais ou elemento estranho.
+- `EquipmentEffects.xml` é gerado por [`tools/extract_equipment_effects.py`](../ferramentas/extract-equipment-effects.md). ❓ Os títulos ainda saem de `ClientTables` até o E2.
 
 ## Efeitos (**PR #41: E3, E4**)
 Comportamento (curar, teleportar, capturar, dar item, atacar todos) é um **efeito tipado**, nunca um `switch` por id de item ou card:

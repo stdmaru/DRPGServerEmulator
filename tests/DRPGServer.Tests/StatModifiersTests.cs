@@ -1,3 +1,5 @@
+using System.Xml.Linq;
+using DRPGServer.Data.GameData;
 using DRPGServer.Game.Stats;
 
 namespace DRPGServer.Tests;
@@ -56,5 +58,33 @@ public sealed class StatModifiersTests
         ]);
 
         Assert.Equal(new Attributes(1, 2, 3, 4), m.Attributes);
+    }
+
+    [Fact]
+    public void ModifierXml_reads_value_and_percent()
+    {
+        var e = XElement.Parse("""<Equipment><Modifier Kind="Atk" Value="15" /><Modifier Kind="Def" Percent="3" /></Equipment>""");
+
+        var m = ModifierXml.Read(e, "teste");
+
+        Assert.Equal(15, m.Flat(StatModifierKind.Atk));
+        Assert.Equal(3, m.Percent(StatModifierKind.Def));
+    }
+
+    [Theory]
+    [InlineData("""<Modifier Kind="Speed" Value="1" />""")]           // tipo desconhecido
+    [InlineData("""<Modifier Kind="3" Value="1" />""")]               // número no lugar do nome
+    [InlineData("""<Modifier Kind="Str" Percent="1" />""")]           // forma não aceita
+    [InlineData("""<Modifier Kind="Atk" Value="1" Percent="1" />""")] // as duas formas
+    [InlineData("""<Modifier Kind="Atk" />""")]                       // sem valor
+    [InlineData("""<Modifier Kind="Atk" Value="x" />""")]             // valor não numérico
+    [InlineData("""<Modifier Kind="Atk" Value="0" />""")]             // zero
+    [InlineData("""<Modifier Kind="Atk" Value="1" Extra="1" />""")]   // atributo a mais
+    [InlineData("""<Bonus Kind="Atk" Value="1" />""")]                // elemento estranho
+    public void ModifierXml_rejects_malformed_modifiers(string modifier)
+    {
+        var e = XElement.Parse($"<Equipment>{modifier}</Equipment>");
+
+        Assert.Throws<GameDataException>(() => ModifierXml.Read(e, "teste"));
     }
 }

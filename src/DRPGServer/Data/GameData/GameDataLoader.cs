@@ -172,54 +172,19 @@ public static class GameDataLoader
         foreach (var e in top.Elements("Equipment"))
         {
             uint id = U32(e, "ItemID");
-            var modifiers = new List<StatModifier>();
             foreach (var attr in e.Attributes())
             {
-                if (attr.Name.LocalName is "ItemID" or "Name") continue;
-                if (!EquipmentAttributes.TryGetValue(attr.Name.LocalName, out var target))
-                    throw new GameDataException($"EquipmentEffects.xml: ItemID {id}: atributo {attr.Name} desconhecido");
-                int value = target.Kind == StatModifierKind.MaintainEvolution
-                    ? ((bool)attr ? 1 : 0)
-                    : int.Parse(attr.Value, CultureInfo.InvariantCulture);
-                modifiers.Add(new StatModifier(target.Kind, value, target.Form));
+                if (attr.Name.LocalName is not ("ItemID" or "Name"))
+                    throw new GameDataException($"EquipmentEffects.xml: ItemID {id}: atributo {attr.Name} desconhecido (use <Modifier>)");
             }
-            if (!effects.TryAdd(id, StatModifiers.Of(modifiers)))
+            var modifiers = ModifierXml.Read(e, $"EquipmentEffects.xml: ItemID {id}");
+            if (modifiers.IsEmpty)
+                throw new GameDataException($"EquipmentEffects.xml: ItemID {id} sem <Modifier>");
+            if (!effects.TryAdd(id, modifiers))
                 throw new GameDataException($"EquipmentEffects.xml: ItemID {id} duplicado");
         }
         return effects.ToFrozenDictionary();
     }
-
-    private static readonly Dictionary<string, (StatModifierKind Kind, StatModifierForm Form)> EquipmentAttributes = new()
-    {
-        ["Str"] = (StatModifierKind.Str, StatModifierForm.Flat),
-        ["Agi"] = (StatModifierKind.Agi, StatModifierForm.Flat),
-        ["Con"] = (StatModifierKind.Con, StatModifierForm.Flat),
-        ["Int"] = (StatModifierKind.Int, StatModifierForm.Flat),
-        ["Hp"] = (StatModifierKind.Hp, StatModifierForm.Flat),
-        ["Vp"] = (StatModifierKind.Vp, StatModifierForm.Flat),
-        ["Atk"] = (StatModifierKind.Atk, StatModifierForm.Flat),
-        ["Def"] = (StatModifierKind.Def, StatModifierForm.Flat),
-        ["Br"] = (StatModifierKind.Br, StatModifierForm.Flat),
-        ["AtkPercent"] = (StatModifierKind.Atk, StatModifierForm.Percent),
-        ["DefPercent"] = (StatModifierKind.Def, StatModifierForm.Percent),
-        ["BrPercent"] = (StatModifierKind.Br, StatModifierForm.Percent),
-        ["CardSlashLimit"] = (StatModifierKind.CardSlashLimit, StatModifierForm.Flat),
-        ["ExtraCardSlashes"] = (StatModifierKind.ExtraCardSlashes, StatModifierForm.Flat),
-        ["DigimonExpPercent"] = (StatModifierKind.DigimonExp, StatModifierForm.Percent),
-        ["TamerExp"] = (StatModifierKind.TamerExp, StatModifierForm.Flat),
-        ["HpRecovery"] = (StatModifierKind.HpRecovery, StatModifierForm.Flat),
-        ["VpRecovery"] = (StatModifierKind.VpRecovery, StatModifierForm.Flat),
-        ["EvpRecovery"] = (StatModifierKind.EvpRecovery, StatModifierForm.Flat),
-        ["MaintainEvolution"] = (StatModifierKind.MaintainEvolution, StatModifierForm.Flat),
-        ["AutoSummonPartners"] = (StatModifierKind.AutoSummonPartners, StatModifierForm.Flat),
-        ["DamagePercent"] = (StatModifierKind.Damage, StatModifierForm.Percent),
-        ["SingleSkillDamagePercent"] = (StatModifierKind.SingleSkillDamage, StatModifierForm.Percent),
-        ["MultiSkillDamagePercent"] = (StatModifierKind.MultiSkillDamage, StatModifierForm.Percent),
-        ["MeleeSkillDamagePercent"] = (StatModifierKind.MeleeSkillDamage, StatModifierForm.Percent),
-        ["RangedSkillDamagePercent"] = (StatModifierKind.RangedSkillDamage, StatModifierForm.Percent),
-        ["OnHitHealHp"] = (StatModifierKind.OnHitHealHp, StatModifierForm.Flat),
-        ["OnHitHealVp"] = (StatModifierKind.OnHitHealVp, StatModifierForm.Flat),
-    };
 
     private static FrozenDictionary<uint, NpcShop> LoadNpcShops(string root)
     {
