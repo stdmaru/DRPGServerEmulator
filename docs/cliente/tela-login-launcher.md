@@ -35,7 +35,7 @@ Proporções tiradas de uma captura da tela antiga enviada pelo dono (era "Digim
 
 - Fundo `dr2_in_000_000_eng` em (0, 0).
 - Painel `dr2_in_003_000` em (243, 151): centrado na horizontal.
-- Mascotes sobre a borda de cima, à direita do título: `003_001` em painel + (225, −10), `003_002` em painel + (270, −10).
+- Mascotes **apoiados** na borda de cima da caixa (pés sobre a borda, y 54–61 do painel), à direita do título: `003_001` em painel + (225, 2) e `003_002` em painel + (270, −2). Os quadros têm linhas transparentes embaixo (o último pixel opaco fica em y 59 e 63), por isso os y diferem. Animados em laço pelos 4 quadros. ❓ Tempo por quadro: 150 ms provisório, a conferir com vídeo.
 - OK em painel + (148, 170), CANCEL em painel + (206, 170).
 - Sem botão sair: o **CANCEL** fecha o launcher (confirmado pelo dono). `dr2_in_000_001`/`_006` não são usados.
 - Texto dos campos em branco, a 4 px da borda esquerda; a senha aparece como `*` com cursor `_`.
