@@ -10,6 +10,7 @@ namespace DRPG.Launcher.Platform;
 public abstract record InputEvent;
 public sealed record QuitEvent : InputEvent;
 public sealed record MouseMoveEvent(int X, int Y) : InputEvent;
+public sealed record MouseLeaveEvent : InputEvent;
 public sealed record MouseButtonEvent(int X, int Y, bool Down) : InputEvent;
 public sealed record KeyEvent(LauncherKey Key) : InputEvent;
 public sealed record TextEvent(string Text) : InputEvent;
@@ -46,6 +47,9 @@ public sealed unsafe class SdlPlatform : IDisposable
             SDL_SetWindowFullscreen(_window, true);
         _renderer = new SdlRenderer(_window);
         SDL_StartTextInput(_window);
+        // The game's cursor is a sprite drawn by the launcher (CursorView); the system one would sit on top of it.
+        if (!hidden)
+            SDL_HideCursor();
     }
 
     public IRenderer Renderer => _renderer;
@@ -68,6 +72,9 @@ public sealed unsafe class SdlPlatform : IDisposable
                     var (x, y) = _renderer.ToFrame(e.motion.x, e.motion.y);
                     events.Add(new MouseMoveEvent(x, y));
                 }
+                    break;
+                case SDL_EventType.SDL_EVENT_WINDOW_MOUSE_LEAVE:
+                    events.Add(new MouseLeaveEvent());
                     break;
                 case SDL_EventType.SDL_EVENT_MOUSE_BUTTON_DOWN or SDL_EventType.SDL_EVENT_MOUSE_BUTTON_UP when e.button.button == 1:
                 {

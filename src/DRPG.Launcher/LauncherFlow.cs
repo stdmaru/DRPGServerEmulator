@@ -11,7 +11,7 @@ public enum LauncherStage
     Ready,       // login panel usable; the status box shows the last login error, if any
     LoggingIn,   // panel frozen, "Logging in..."
     LoggedIn,    // game key received: the launcher starts the game (see GameLogin)
-    Failed,      // message in the status box; OK retries the failed step
+    Failed,      // message in the status box; retried by itself unless nothing can be retried
 }
 
 /// <summary>
@@ -19,8 +19,21 @@ public enum LauncherStage
 /// Patching and the handshake run in the background; the frame loop reads <see cref="Snapshot"/> each frame and never
 /// waits on them.
 /// </summary>
-public sealed class LauncherFlow(LauncherSettings settings, Patcher patcher, Func<PatchConfiguration.LoginServerSection, LoginClient> createClient)
+public sealed class LauncherFlow(
+    LauncherSettings settings,
+    Patcher patcher,
+    Func<PatchConfiguration.LoginServerSection, LoginClient> createClient,
+    Func<int, TimeSpan> retryDelay)
 {
+    /// <summary>Wait before the n-th automatic retry in a row (1-based): 5, 10, 20, then every 30 s.</summary>
+    public static TimeSpan DefaultRetryDelay(int attempt) => attempt switch
+    {
+        1 => TimeSpan.FromSeconds(5),
+        2 => TimeSpan.FromSeconds(10),
+        3 => TimeSpan.FromSeconds(20),
+        _ => TimeSpan.FromSeconds(30),
+    };
+
     /// <summary><paramref name="Status"/> is empty when there is nothing to show (the status box hides).</summary>
     public sealed record State(LauncherStage Stage, string Status, PatchProgress? Progress);
 
@@ -28,6 +41,8 @@ public sealed class LauncherFlow(LauncherSettings settings, Patcher patcher, Fun
     private State _state = new(LauncherStage.Patching, "Checking for updates...", null);
     private PatchConfiguration? _configuration;
     private Func<Task>? _retry;
+    private string _failure = "";
+    private int _failuresInARow;
     private Task _running = Task.CompletedTask;
 
     public LoginClient? Client { get; private set; }
@@ -43,14 +58,7 @@ public sealed class LauncherFlow(LauncherSettings settings, Patcher patcher, Fun
 
     public bool IsBusy => !_running.IsCompleted;
 
-    public void Start(CancellationToken ct) => _running = Guard(() => PatchAsync(ct));
-
-    /// <summary>Repeats the step that failed (patch or handshake).</summary>
-    public void Retry()
-    {
-        if (Snapshot.Stage == LauncherStage.Failed && !IsBusy && _retry is { } retry)
-            _running = Guard(retry);
-    }
+    public void Start(CancellationToken ct) => _running = Run(() => PatchAsync(ct), null, ct);
 
     /// <summary>Sends ID and password (Ready only). Empty fields are refused here without asking the server.</summary>
     public void Login(string login, string password, CancellationToken ct)
@@ -63,7 +71,7 @@ public sealed class LauncherFlow(LauncherSettings settings, Patcher patcher, Fun
             return;
         }
         // an unexpected error retries the handshake, never a login with a password kept in a closure
-        _running = Guard(() => LoginAsync(login, password, ct), () => ConnectAsync(ct));
+        _running = Run(() => LoginAsync(login, password, ct), () => ConnectAsync(ct), ct);
     }
 
     /// <summary>The game could not be started: back to the panel with the reason.</summary>
@@ -77,21 +85,53 @@ public sealed class LauncherFlow(LauncherSettings settings, Patcher patcher, Fun
 
     /// <summary>
     /// Runs a background step so that nothing can leave the screen stuck: an unexpected exception becomes a Failed
-    /// state with its message, retrying <paramref name="retry"/> (the same step by default).
+    /// state with its message (retrying <paramref name="onError"/>, or the same step). A failure that can be retried
+    /// is retried by itself after <c>retryDelay</c>, with a countdown in the status box: nothing waits on a click,
+    /// and the login panel stays disabled until the server answers.
     /// </summary>
-    private async Task Guard(Func<Task> step, Func<Task>? retry = null)
+    private async Task Run(Func<Task> step, Func<Task>? onError, CancellationToken ct)
     {
+        var current = step;
         try
         {
-            await step();
+            while (true)
+            {
+                try
+                {
+                    await current();
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    Fail($"Unexpected error: {e.Message}", onError ?? current);
+                }
+                onError = null;
+                if (Snapshot.Stage != LauncherStage.Failed || _retry is null)
+                {
+                    if (Snapshot.Stage != LauncherStage.Failed)
+                        _failuresInARow = 0;
+                    return;
+                }
+                current = _retry;
+                await CountdownAsync(retryDelay(++_failuresInARow), ct);
+            }
         }
         catch (OperationCanceledException)
         {
             // launcher closing
         }
-        catch (Exception e)
+    }
+
+    private async Task CountdownAsync(TimeSpan delay, CancellationToken ct)
+    {
+        var end = DateTime.UtcNow + delay;
+        while (true)
         {
-            Fail($"Unexpected error: {e.Message}", retry ?? step);
+            var left = end - DateTime.UtcNow;
+            if (left <= TimeSpan.Zero)
+                return;
+            int seconds = (int)Math.Ceiling(left.TotalSeconds);
+            Set(LauncherStage.Failed, $"{_failure} Retrying in {seconds} s...", log: false);
+            await Task.Delay(left < TimeSpan.FromSeconds(1) ? left : TimeSpan.FromSeconds(1), ct);
         }
     }
 
@@ -182,17 +222,20 @@ public sealed class LauncherFlow(LauncherSettings settings, Patcher patcher, Fun
         }
     }
 
+    /// <summary><paramref name="retry"/> null: nothing to retry (the user must update or reinstall).</summary>
     private void Fail(string status, Func<Task>? retry)
     {
         _retry = retry;
-        Set(LauncherStage.Failed, retry is null ? status : status + " (OK to retry)");
+        _failure = status;
+        Set(LauncherStage.Failed, status);
     }
 
-    private void Set(LauncherStage stage, string status, PatchProgress? progress = null)
+    private void Set(LauncherStage stage, string status, bool log = true)
     {
         lock (_lock)
-            _state = new State(stage, status, progress);
-        Console.WriteLine($"[{stage}] {status}");
+            _state = new State(stage, status, null);
+        if (log)
+            Console.WriteLine($"[{stage}] {status}");
     }
 
     private sealed class ProgressSink(LauncherFlow flow) : IProgress<PatchProgress>

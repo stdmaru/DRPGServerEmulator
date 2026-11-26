@@ -40,12 +40,13 @@ public sealed class LauncherFlowTests : IDisposable
         var http = new HttpClient(new OneFile(Encoding.UTF8.GetBytes(Config(port))));
         var settings = new LauncherSettings("http://patch.test/DR_Configuration.json", AllowInsecure: true, Runner: null);
         return new LauncherFlow(settings, new Patcher(http, _install, allowInsecure: true), server => new LoginClient(
-            new LoginClient.Options(LoginClient.Tcp(server.Host, server.Port), 1, null, TimeSpan.FromSeconds(5))));
+            new LoginClient.Options(LoginClient.Tcp(server.Host, server.Port), 1, null, TimeSpan.FromSeconds(5))),
+            _ => TimeSpan.FromMilliseconds(300));
     }
 
     private static async Task<LauncherFlow.State> WaitFor(LauncherFlow flow, LauncherStage stage)
     {
-        for (int i = 0; i < 500 && flow.Snapshot.Stage != stage; i++)
+        for (int i = 0; i < 1000 && flow.Snapshot.Stage != stage; i++)
             await Task.Delay(10);
         return flow.Snapshot;
     }
@@ -67,7 +68,7 @@ public sealed class LauncherFlowTests : IDisposable
     }
 
     [Fact]
-    public async Task Unreachable_server_fails_and_retry_connects_again()
+    public async Task Unreachable_server_fails_and_is_retried_by_itself()
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -78,11 +79,11 @@ public sealed class LauncherFlowTests : IDisposable
         flow.Start(default);
         var failed = await WaitFor(flow, LauncherStage.Failed);
         Assert.True(failed.Status.Contains("Could not connect"), failed.Status);
+        Assert.True(flow.IsBusy); // waiting to retry, no click needed
 
         using var again = new TcpListener(IPAddress.Loopback, port);
         again.Start();
         var server = AnswerHello(again);
-        flow.Retry();
 
         Assert.Equal(LauncherStage.Ready, (await WaitFor(flow, LauncherStage.Ready)).Stage);
         await server;

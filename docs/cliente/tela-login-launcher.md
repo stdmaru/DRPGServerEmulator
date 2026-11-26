@@ -42,11 +42,17 @@ A caixinha funciona (pedido do dono): clique na caixa ou no texto ao lado altern
 
 Guardado no `option.ini` do jogo, numa seção nossa: `[DRPGLauncher] Remember=1`, `Login=<id>`. Só o ID, nunca a senha; desmarcar apaga o ID. O ID só é gravado depois de um login bem-sucedido e só se for ASCII imprimível sem `;[]=` (até 64). ❓ O launcher oficial escreve `[Member] id=1`, de significado desconhecido; não é tocado. O jogo grava o `option.ini` chave por chave (`0x00b429f0`, `WritePrivateProfileString`), então a seção nossa sobrevive.
 
+### Desabilitado e cursor
+- **Só libera com o servidor conectado** (handshake feito) e nada em andamento (pedido do dono). Fora disso, campos, caixinha e OK ficam **cinza** e não respondem: cópia em tons de cinza do sprite (luminância Rec. 601 × 3/4, `SpriteStore.GuiDisabled`), desenhada por cima da área de cada controle (margem de 3 px), e texto cinza `#9A9A9A`. ❓ O original não tem visual de desabilitado nesta tela; é do launcher.
+- CANCEL, Esc e fechar a janela **sempre** funcionam.
+- Falhas que podem ser repetidas (patch, servidor fora, queda durante o login) **tentam de novo sozinhas** após 5, 10, 20 e depois a cada 30 s, com contagem na caixa de status ("... Retrying in 5 s..."). Não há mais "OK para repetir". Launcher desatualizado, versão antiga demais ou chave do servidor diferente não repetem.
+- **Cursor do jogo:** `Interface\cursor_normal.spr` (seta roxa com o digivice girando, 8 quadros de 36×36), carregado pelo jogo em `0x00b3ebf0`; `cursor_click` enquanto o botão está apertado. Ponta da seta = pixel (0, 0). Desenhado como sprite por último no quadro; o cursor do sistema fica escondido. ❓ Tempo por quadro (100 ms) e uso do `cursor_click` não confirmados.
+
 ### Campos e login
 - Campos na parte escura das barras: ID em painel + (138, 83), PASSWORD em painel + (138, 129), 146×18. Texto branco, 3 px de margem; texto maior que o campo mostra o final. Senha como `*`.
 - Só ASCII imprimível (sem espaço no ID), até 64 caracteres. Clique escolhe o campo, Tab alterna, Backspace apaga, Enter ou OK enviam, Esc ou CANCEL fecham. ❓ Teclas e limites do original não confirmados.
 - Foco inicial no ID, ou na senha quando há ID lembrado.
-- OK com campo vazio: "Enter your ID and password." sem falar com o servidor. Durante o envio o painel congela com "Logging in...". Recusa ("Wrong ID or password.", "Too many attempts...", "This account cannot play.", "Server error...") volta ao painel com a mensagem e limpa a senha. Servidor fora: falha com OK para novo handshake.
+- OK com campo vazio: "Enter your ID and password." sem falar com o servidor. Durante o envio o painel congela com "Logging in...". Recusa ("Wrong ID or password.", "Too many attempts...", "This account cannot play.", "Server error...") volta ao painel com a mensagem e limpa a senha. Servidor fora: falha e repete o handshake sozinho.
 - Sucesso: grava o ID (se marcado), inicia `LanuncherInfo.RunExeFileName` da pasta do jogo com `<usuário do jogo> <chave>` (`GameStarter`; `[Game] Runner=wine` no Linux) e fecha o launcher. Nome do executável, usuário (até 20, ASCII sem espaço) e chave (40 hex) são conferidos antes; erro volta ao painel com a mensagem.
 
 ### Fonte

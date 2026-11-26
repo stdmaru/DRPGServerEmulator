@@ -27,8 +27,9 @@ public sealed class LoginScene : IDisposable
     public const int MaxPasswordLength = 64;
 
     private readonly ITexture _background, _panel, _status, _check;
+    private readonly ITexture _panelDisabled, _checkDisabled;
     private readonly ITexture[] _mascotA, _mascotB;
-    private readonly ITexture? _rememberLabel;
+    private readonly ITexture? _rememberLabel, _rememberLabelDisabled;
     private readonly Button _ok, _cancel;
     private readonly TextField _id, _password;
     private readonly RememberedLogin _remember;
@@ -48,9 +49,12 @@ public sealed class LoginScene : IDisposable
         _mascotB = sprites.Gui("dr2_in_003_002");
         _status = sprites.Gui("dr_friend_016")[0];
         _check = sprites.Gui("dr2_sub_001_001")[0];
+        _panelDisabled = sprites.GuiDisabled("dr2_in_003_000")[0];
+        _checkDisabled = sprites.GuiDisabled("dr2_sub_001_001")[0];
         _rememberLabel = font?.Render(renderer, RememberLabel, TextColor);
-        _ok = new Button(sprites.Gui("dr2_in_003_003"), PanelX + 148, PanelY + 170);
-        _cancel = new Button(sprites.Gui("dr2_in_003_004"), PanelX + 206, PanelY + 170);
+        _rememberLabelDisabled = font?.Render(renderer, RememberLabel, TextField.DisabledTextColor);
+        _ok = new Button(sprites.Gui("dr2_in_003_003"), sprites.GuiDisabled("dr2_in_003_003")[0], PanelX + 148, PanelY + 170);
+        _cancel = new Button(sprites.Gui("dr2_in_003_004"), sprites.GuiDisabled("dr2_in_003_004")[0], PanelX + 206, PanelY + 170);
         // The dark inner part of the ID and PASSWORD bars, measured on dr2_in_003_000.
         _id = new TextField(PanelX + 138, PanelY + 83, 146, 18, MaxLoginLength, masked: false, allowSpace: false);
         _password = new TextField(PanelX + 138, PanelY + 129, 146, 18, MaxPasswordLength, masked: true, allowSpace: true);
@@ -65,8 +69,8 @@ public sealed class LoginScene : IDisposable
     public string Login => _id.Text;
     public string Password => _password.Text;
 
-    /// <summary>False while patching, connecting and logging in: the panel is shown frozen and ignores mouse and keys
-    /// (Esc and closing the window still quit).</summary>
+    /// <summary>True only while connected to the server and idle (handshake done). Otherwise fields, checkbox and OK
+    /// are drawn grey and ignore input; CANCEL, Esc and closing the window always work.</summary>
     public bool Interactive { get; set; }
 
     /// <summary>After a failed login: the password is typed again, the ID stays.</summary>
@@ -83,24 +87,31 @@ public sealed class LoginScene : IDisposable
             CloseRequested = true;
             return;
         }
+        // CANCEL is never disabled: the launcher can always be closed.
+        switch (e)
+        {
+            case MouseMoveEvent m:
+                _cancel.Hover(m.X, m.Y);
+                break;
+            case MouseButtonEvent b:
+                if (_cancel.Press(b.X, b.Y, b.Down)) CloseRequested = true;
+                break;
+        }
         if (!Interactive)
         {
             _ok.Reset();
-            _cancel.Reset();
             return;
         }
         switch (e)
         {
             case MouseMoveEvent m:
                 _ok.Hover(m.X, m.Y);
-                _cancel.Hover(m.X, m.Y);
                 break;
             case MouseButtonEvent b:
                 if (b.Down && OnRemember(b.X, b.Y)) _remember.Toggle();
                 if (b.Down && _id.Contains(b.X, b.Y)) Focus(_id);
                 if (b.Down && _password.Contains(b.X, b.Y)) Focus(_password);
                 if (_ok.Press(b.X, b.Y, b.Down)) SubmitRequested = true;
-                if (_cancel.Press(b.X, b.Y, b.Down)) CloseRequested = true;
                 break;
             case KeyEvent { Key: LauncherKey.Enter }:
                 SubmitRequested = true;
@@ -153,15 +164,30 @@ public sealed class LoginScene : IDisposable
         r.Draw(_panel, PanelX, PanelY);
         r.Draw(_mascotA[(int)(nowMs / MascotAFrameMs % (ulong)_mascotA.Length)], PanelX + 225, PanelY + 2);
         r.Draw(_mascotB[(int)(nowMs / MascotBFrameMs % (ulong)_mascotB.Length)], PanelX + 270, PanelY - 2);
+        bool enabled = Interactive;
+        if (!enabled)
+        {
+            DrawDisabledArea(r, _id.Bounds);
+            DrawDisabledArea(r, _password.Bounds);
+            DrawDisabledArea(r, (CheckX, CheckY, CheckSize, CheckSize));
+        }
         if (_remember.Remember)
-            r.Draw(_check, CheckX, CheckY);
-        if (_rememberLabel is { } label)
+            r.Draw(enabled ? _check : _checkDisabled, CheckX, CheckY);
+        if ((enabled ? _rememberLabel : _rememberLabelDisabled) is { } label)
             r.Draw(label, LabelX, CheckY + (CheckSize - label.Height + 1) / 2);
 
-        _id.Draw(r, _font, nowMs, showCaret: Interactive);
-        _password.Draw(r, _font, nowMs, showCaret: Interactive);
-        _ok.Draw(r);
-        _cancel.Draw(r);
+        _id.Draw(r, _font, nowMs, enabled);
+        _password.Draw(r, _font, nowMs, enabled);
+        _ok.Draw(r, enabled);
+        _cancel.Draw(r, enabled: true);
+    }
+
+    /// <summary>The grey panel over one control's area (with a 3 px margin, so the bar's rim turns grey too).</summary>
+    private void DrawDisabledArea(IRenderer r, (int X, int Y, int Width, int Height) area)
+    {
+        const int Margin = 3;
+        int x = area.X - Margin, y = area.Y - Margin;
+        r.DrawRegion(_panelDisabled, x, y, x - PanelX, y - PanelY, area.Width + 2 * Margin, area.Height + 2 * Margin);
     }
 
     /// <summary>The square or its label.</summary>
@@ -172,10 +198,12 @@ public sealed class LoginScene : IDisposable
     {
         _statusText?.Dispose();
         _rememberLabel?.Dispose();
+        _rememberLabelDisabled?.Dispose();
     }
 
-    /// <summary>Three-state button: normal, hover, pressed (frame order of the sprite; ❓ to confirm in CSceneServer).</summary>
-    private sealed class Button(ITexture[] frames, int x, int y)
+    /// <summary>Three-state button: normal, hover, pressed (frame order of the sprite; ❓ to confirm in CSceneServer),
+    /// plus a grey copy of the normal frame when disabled.</summary>
+    private sealed class Button(ITexture[] frames, ITexture disabled, int x, int y)
     {
         private bool _hover, _pressed;
 
@@ -199,7 +227,19 @@ public sealed class LoginScene : IDisposable
             return clicked;
         }
 
-        public void Draw(IRenderer r) =>
-            r.Draw(frames[Math.Min(_pressed ? 2 : _hover ? 1 : 0, frames.Length - 1)], x, y);
+        public void Draw(IRenderer r, bool enabled)
+        {
+            if (!enabled)
+            {
+                r.Draw(disabled, x, y);
+                return;
+            }
+            int frame = 0;
+            if (_pressed)
+                frame = 2;
+            else if (_hover)
+                frame = 1;
+            r.Draw(frames[Math.Min(frame, frames.Length - 1)], x, y);
+        }
     }
 }

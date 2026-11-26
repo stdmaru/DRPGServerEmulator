@@ -35,6 +35,7 @@ internal static class Program
         var remembered = RememberedLogin.Load(Path.Combine(install.Directory, "option.ini"));
         using var login = new LoginScene(sprites, remembered, font, renderer);
         var patchView = new PatchView(sprites);
+        var cursor = new CursorView(sprites);
 
         if (screenshot is not null)
         {
@@ -68,7 +69,8 @@ internal static class Program
                 LoginClient.Tcp(server.Host, server.Port),
                 LauncherVersion,
                 settings.AllowInsecure ? null : server.KeyFingerprint,
-                TimeSpan.FromSeconds(10))));
+                TimeSpan.FromSeconds(10))),
+            LauncherFlow.DefaultRetryDelay);
         flow.Start(stop.Token);
 
         var events = new List<InputEvent>();
@@ -76,7 +78,7 @@ internal static class Program
         while (!login.CloseRequested)
         {
             var state = flow.Snapshot;
-            login.Interactive = state.Stage is LauncherStage.Ready or LauncherStage.Failed;
+            login.Interactive = state.Stage == LauncherStage.Ready; // connected to the server and idle
             if (previousStage == LauncherStage.LoggingIn && state.Stage != LauncherStage.LoggingIn)
                 login.ClearPassword(); // refused or failed: typed again; on success it is not needed any more
             previousStage = state.Stage;
@@ -99,18 +101,17 @@ internal static class Program
                 if (e is QuitEvent)
                     return Quit(stop);
                 login.Handle(e);
+                cursor.Handle(e);
             }
             if (login.SubmitRequested)
             {
                 login.SubmitRequested = false;
-                if (state.Stage == LauncherStage.Failed)
-                    flow.Retry();
-                else if (state.Stage == LauncherStage.Ready)
-                    flow.Login(login.Login, login.Password, stop.Token);
+                flow.Login(login.Login, login.Password, stop.Token);
             }
 
             renderer.BeginFrame();
             DrawFrame(renderer, login, patchView, state.Stage, state.Progress?.Fraction ?? 0, SdlPlatform.TicksMs, state.Status);
+            cursor.Draw(renderer, SdlPlatform.TicksMs);
             renderer.EndFrame();
         }
         return Quit(stop);
