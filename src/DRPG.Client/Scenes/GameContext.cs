@@ -1,6 +1,7 @@
 using DRPG.Client.Net;
 using DRPG.Client.Startup;
 using DRPG.Engine.Assets;
+using DRPG.Engine.Audio;
 using DRPG.Engine.Rendering;
 using DRPG.Engine.Scenes;
 using DRPG.Shared.Formats.Pack;
@@ -13,6 +14,7 @@ public sealed class GameContext(
     PackArchive resource,
     SpriteStore sprites,
     IFont? font,
+    IAudio audio,
     GameCommandLine command,
     ClientSettings settings)
 {
@@ -23,6 +25,7 @@ public sealed class GameContext(
     public PackArchive Resource { get; } = resource;
     public SpriteStore Sprites { get; } = sprites;
     public IFont? Font { get; } = font;
+    public IAudio Audio { get; } = audio;
     public GameCommandLine Command { get; } = command;
     public ClientSettings Settings { get; } = settings;
 

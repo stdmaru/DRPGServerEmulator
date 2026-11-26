@@ -23,17 +23,18 @@ Um repositório só (monorepo), uma solução, .NET 10. Uma mudança de protocol
 ```
 src/
   DRPG.Shared/    protocolo, pacotes, formatos de arquivo, tabelas do cliente   (sem I/O de rede, sem banco, sem SDL)
+  DRPG.Engine/    plataforma SDL3, renderização, fontes, sprites, instalação, cursor, áudio   (sem protocolo, sem cena)
   DRPG.Server/    emulador
   DRPG.Launcher/  login + auto-patcher (marco 1)
-  DRPG.Client/    cliente (SDL3 + SDL_GPU)
+  DRPG.Client/    cliente: cenas, rede (login → channel), carga (marco 2)
   DRPG.Tools/     ferramentas de linha de comando (extração, visualizador, geradores de XML)
 tests/
-  DRPG.Shared.Tests/  DRPG.Server.Tests/  DRPG.Launcher.Tests/  DRPG.Client.Tests/  DRPG.Architecture.Tests/
+  DRPG.Shared.Tests/  DRPG.Engine.Tests/  DRPG.Server.Tests/  DRPG.Launcher.Tests/  DRPG.Client.Tests/  DRPG.Architecture.Tests/
 docs/             esta wiki
 ```
-**Hoje** existem `DRPG.Shared`, `DRPG.Server` e `DRPG.Launcher` (com os testes de cada um). `DRPG.Client`, `DRPG.Tools` e `DRPG.Architecture.Tests` vêm depois ([plano do cliente](../planos/cliente-novo.md)).
+**Hoje** existem `DRPG.Shared`, `DRPG.Engine`, `DRPG.Server`, `DRPG.Launcher` e `DRPG.Client` (com os testes de cada um). `DRPG.Tools` e `DRPG.Architecture.Tests` vêm depois ([plano do cliente](../planos/cliente-novo.md)).
 
-**Regra do Shared:** só entra no `DRPG.Shared` o que **mais de um projeto usa** (ex.: o protocolo do launcher, que o servidor abre e o launcher fecha; o leitor `.hf/.pf`, que o servidor e o cliente leem). Código de um projeto só fica nele, mesmo que um dia possa ser útil a outro: muda para o Shared quando o segundo usuário existir. Por isso `PatchConfiguration` e `PatchMerger` ficam no launcher.
+**Regra do Shared:** só entra no `DRPG.Shared` o que **mais de um projeto usa** (ex.: o protocolo do launcher, que o servidor abre e o launcher fecha; o leitor `.hf/.pf`, que o servidor e o cliente leem; os pacotes de login e channel, que o servidor lê e o cliente grava, e o contrário). Código de um projeto só fica nele, mesmo que um dia possa ser útil a outro: muda para o Shared quando o segundo usuário existir. Por isso `PatchConfiguration` e `PatchMerger` ficam no launcher.
 
 Dependências permitidas entre projetos (conferidas por `DRPG.Architecture.Tests`):
 
@@ -41,8 +42,9 @@ Dependências permitidas entre projetos (conferidas por `DRPG.Architecture.Tests
 |---|---|---|
 | `DRPG.Shared` | só a BCL | Server, Client, banco, SDL, rede |
 | `DRPG.Server` | Shared, Dapper/MySqlConnector, Microsoft.Extensions.* | Client, SDL |
-| `DRPG.Launcher` | Shared, SDL3 | Server, banco |
-| `DRPG.Client` | Shared, SDL3, bibliotecas de fonte/áudio | Server, banco |
+| `DRPG.Engine` | Shared, SDL3, SDL3_ttf, NVorbis | Server, Launcher, Client, banco, protocolo de jogo (pacotes), cenas |
+| `DRPG.Launcher` | Shared, Engine | Server, banco |
+| `DRPG.Client` | Shared, Engine | Server, banco |
 | `DRPG.Tools` | Shared | Server, Client |
 
 ## O mesmo desenho nos dois lados

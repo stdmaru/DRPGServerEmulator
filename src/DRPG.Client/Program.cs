@@ -1,5 +1,6 @@
 using DRPG.Client.Scenes;
 using DRPG.Engine.Assets;
+using DRPG.Engine.Audio;
 using DRPG.Engine.Platform;
 using DRPG.Engine.Rendering;
 using DRPG.Engine.Rendering.Backends;
@@ -15,6 +16,11 @@ internal static class Program
 
     /// <summary>Development only: where the game is when it is not next to the executable. The command line stays at 2 tokens.</summary>
     private const string GameDirectoryVariable = "DRPG_GAME_DIR";
+
+    /// <summary>Development only: <c>path.ppm</c> to save the frame shown after <see cref="ScreenshotDelayVariable"/> ms (hidden window), then quit.</summary>
+    private const string ScreenshotVariable = "DRPG_SCREENSHOT";
+
+    private const string ScreenshotDelayVariable = "DRPG_SCREENSHOT_MS";
 
     private static int Main(string[] args)
     {
@@ -41,15 +47,18 @@ internal static class Program
     {
         var install = GameInstall.Find(Environment.GetEnvironmentVariable(GameDirectoryVariable))
             ?? throw new IOException("resource.hf/.pf not found: run the client from the game folder.");
+        var screenshot = Environment.GetEnvironmentVariable(ScreenshotVariable);
+        ulong screenshotAtMs = ulong.TryParse(Environment.GetEnvironmentVariable(ScreenshotDelayVariable), out var delay) ? delay : 1000;
         var settings = ClientSettings.Load(Path.Combine(AppContext.BaseDirectory, ClientSettings.FileName));
 
-        using var platform = new SdlPlatform(WindowTitle, fullscreen: false, hidden: false);
+        using var platform = new SdlPlatform(WindowTitle, fullscreen: false, hidden: screenshot is not null);
         var renderer = platform.Renderer;
         Console.WriteLine($"renderer: {renderer.BackendName}");
         var resource = PackArchive.Open(install.ResourcePath);
         using var sprites = new SpriteStore(resource, renderer);
         using var font = OpenUiFont();
-        var game = new GameContext(install, resource, sprites, font, command, settings);
+        using var audio = AudioFactory.Create(Console.Error.WriteLine);
+        var game = new GameContext(install, resource, sprites, font, audio, command, settings);
         using var scenes = new SceneManager(id => CreateScene(id, game));
         game.Scenes = scenes;
         var cursor = new CursorView(sprites);
@@ -57,6 +66,7 @@ internal static class Program
         scenes.Switch(SceneId.Title);
         var events = new List<InputEvent>();
         ulong lastFrameMs = 0;
+        ulong startedMs = SdlPlatform.TicksMs;
         while (game.FatalError is null)
         {
             platform.Poll(events);
@@ -75,9 +85,15 @@ internal static class Program
                 continue;
             }
             lastFrameMs = now;
+            audio.Update();
             renderer.BeginFrame();
             scenes.Frame(renderer, now);
             cursor.Draw(renderer, now);
+            if (screenshot is not null && now - startedMs >= screenshotAtMs)
+            {
+                Screenshot.WritePpm(screenshot, renderer.Capture(), IRenderer.FrameWidth, IRenderer.FrameHeight);
+                return 0;
+            }
             renderer.EndFrame();
         }
         Console.Error.WriteLine(game.FatalError);

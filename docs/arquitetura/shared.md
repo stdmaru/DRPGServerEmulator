@@ -2,7 +2,7 @@
 
 O que servidor, cliente e ferramentas têm em comum: **protocolo**, **pacotes**, **formatos de arquivo** e **tabelas do cliente**. Não tem regra de jogo, rede, banco nem gráficos: só bytes ↔ tipos. Visão geral em [arquitetura](README.md).
 
-**Hoje** o Shared tem `Protocol/` (framing, CRC, leitor/escritor, `Launcher/`), `Formats/Pack` (`.hf/.pf`) e `Formats/Sprite` (`.spr`). Os pacotes do jogo e as tabelas continuam no servidor até o cliente precisar deles. Só entra aqui o que mais de um projeto usa ([regra](README.md#repositório)).
+**Hoje** o Shared tem `Protocol/` (framing, CRC, leitor/escritor, `Launcher/`, `LoginChannelOpcodes`), `Packets/Login` e `Packets/Channel` (de mão dupla, `…Request`/`…Reply`, com teste de ida e volta e dos layouts das capturas), `Formats/Pack` (`.hf/.pf`) e `Formats/Sprite` (`.spr`). Os pacotes do mapa e do global, e as tabelas, continuam no servidor até o cliente precisar deles. Só entra aqui o que mais de um projeto usa ([regra](README.md#repositório)).
 
 ## Pastas
 ```

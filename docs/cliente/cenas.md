@@ -35,7 +35,10 @@ Levantamento para o marco 2 do [cliente novo](../planos/cliente-novo.md): abrir 
   | 6 | texto `Digimon RPG 3.26` | (0, 1) | branco |
 - `FUN_00b56ff0(modo, sprite, x, y, quadro, ?, ?)` desenha um sprite; `FUN_00b21be0` busca o sprite no cache por nome.
 - **Progresso exibido** (`+0x64c`) persegue o alvo (`+0x644`, gravado pela carga) a cada 10 ms ou mais: `exibido += alvo × 0,01 × 0,18`, ×7 quando o alvo ainda está bem à frente (`+0x648 < alvo − 1`). A carga termina quando `[DAT_01158504]+0x81 == 1`.
-- ❓ A barra **troca de quadro** conforme o progresso (não é cortada). Conferir quantos quadros tem `dr2_in_001_002` (o launcher hoje corta o 1º quadro; ver [tela do patch](tela-login-launcher.md#tela-do-patch)).
+- ✅ **Implementado** em `DRPG.Client/Scenes/TitleScene.cs` (fase A): sprites e posições da tabela, 30 FPS, texto da versão em (0, 1), progresso por `LoadingProgress` e carga real em segundo plano (`StartupLoader`: abre `table`, lê `Language/`; a barra recebe o progresso por etapa). Conferido com screenshot da instalação real: igual à tela do original.
+- ✅ Descoberta no `0x00b34d40`: o multiplicador ×7 da perseguição usa o campo `+0x648` = 39,0, gravado ao subir o alvo, e não o alvo em si; implementado assim.
+- ✅ `dr2_in_001_002` tem **2 quadros** de 231×23 (conferido na `resource.hf` real). Com a fórmula `1 + (quadros − 1) × progresso / 100` o quadro é sempre o de índice 1 (o contorno vazio, como a screenshot mostra); o avanço visível da barra vem então do **desenho "modo 1"** do item 5, que continua ❓ e **não é desenhado** no cliente novo. ❓ Se a contagem do original parte de 0 ou de 1 não está confirmado.
+- ❓ Como a carga real é rápida (centenas de milissegundos), a tela dura pouco: o original só termina quando a carga acaba (`+0x81 == 1`), sem esperar a barra encher, e o cliente novo faz igual.
 
 ## CSceneServer (seleção de mundo) ❓
 - **Pré-carga** (construtor `0x00b504b0`): `dr2_in_000_000`, `000_006`, `002_000..010`, `003_000..004` (os do login antigo também).

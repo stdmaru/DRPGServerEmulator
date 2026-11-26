@@ -17,7 +17,7 @@ public sealed class TitleSceneTests : IDisposable
         var install = GameInstall.Find(_install.Directory)!;
         _resource = PackArchive.Open(install.ResourcePath);
         _sprites = new SpriteStore(_resource, _renderer);
-        _game = new GameContext(install, _resource, _sprites, null, new GameCommandLine("u", "k"), ClientSettings.Local);
+        _game = new GameContext(install, _resource, _sprites, null, new DRPG.Engine.Audio.SilentAudio(), new GameCommandLine("u", "k"), ClientSettings.Local);
         _game.Scenes = new SceneManager(_ => throw new InvalidOperationException("no scene is created in these tests"));
     }
 

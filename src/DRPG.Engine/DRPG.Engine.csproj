@@ -19,6 +19,7 @@
   <ItemGroup>
     <PackageReference Include="ppy.SDL3-CS" Version="2026.1002.1" />
     <PackageReference Include="ppy.SDL3_ttf-CS" Version="2026.1002.1" />
+    <PackageReference Include="NVorbis" Version="0.10.5" />
   </ItemGroup>
 
 </Project>
