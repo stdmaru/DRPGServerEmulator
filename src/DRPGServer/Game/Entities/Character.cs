@@ -1,5 +1,6 @@
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Stats;
+using DRPGServer.Game.World;
 
 namespace DRPGServer.Game.Entities;
 
@@ -46,6 +47,13 @@ public sealed class Character
 
     /// <summary>Bônus juntos de todos os equipamentos do Tamer.</summary>
     public StatModifiers EquipmentModifiers => Inventory.EquipmentModifiers();
+
+    /// <summary>
+    /// Velocidade de movimento do Tamer em células/s por eixo (Chebyshev).
+    /// ✅ <c>DigimonRPG.bin @ 0x85e6ab / 0x85e6fd</c>: equipamentos de velocidade (ex.: Cycle Costume, <c>MoveSpeed 200%</c>)
+    /// definem a velocidade total para 200% da base (2×).
+    /// </summary>
+    public double MoveSpeed => Movement.BaseMoveSpeed * (Math.Max(100, EquipmentModifiers.Percent(StatModifierKind.MoveSpeed)) / 100.0);
 
     /// <summary>
     /// Recalcula o bônus total de equipamentos do Tamer e propaga para todos os Digimons do time

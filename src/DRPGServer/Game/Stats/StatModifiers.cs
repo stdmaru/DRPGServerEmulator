@@ -36,6 +36,8 @@ public enum StatModifierKind : byte
     /// <summary>HP recuperado a cada golpe que acerta.</summary>
     OnHitHealHp,
     OnHitHealVp,
+    /// <summary>Bônus percentual de velocidade de movimento no mapa (ex.: Cycle Costume +200%).</summary>
+    MoveSpeed,
 }
 
 public enum StatModifierForm : byte
@@ -64,17 +66,18 @@ public static class StatModifierRules
     public static StatStacking Stacking(StatModifierKind kind) => kind switch
     {
         StatModifierKind.CardSlashLimit => StatStacking.Max,
+        StatModifierKind.MoveSpeed => StatStacking.Max,
         StatModifierKind.MaintainEvolution => StatStacking.Any,
         _ => StatStacking.Sum,
     };
 
-    /// <summary>Se o tipo existe na forma: ATK, DEF e BR nas duas; EXP de Digimon e dano só em %; o resto só plano.</summary>
+    /// <summary>Se o tipo existe na forma: ATK, DEF e BR nas duas; EXP de Digimon, MoveSpeed e dano só em %; o resto só plano.</summary>
     public static bool Allows(StatModifierKind kind, StatModifierForm form) => kind switch
     {
         StatModifierKind.Atk or StatModifierKind.Def or StatModifierKind.Br => true,
-        StatModifierKind.DigimonExp or StatModifierKind.Damage or StatModifierKind.SingleSkillDamage
-            or StatModifierKind.MultiSkillDamage or StatModifierKind.MeleeSkillDamage
-            or StatModifierKind.RangedSkillDamage => form == StatModifierForm.Percent,
+        StatModifierKind.DigimonExp or StatModifierKind.MoveSpeed or StatModifierKind.Damage
+            or StatModifierKind.SingleSkillDamage or StatModifierKind.MultiSkillDamage
+            or StatModifierKind.MeleeSkillDamage or StatModifierKind.RangedSkillDamage => form == StatModifierForm.Percent,
         _ => form == StatModifierForm.Flat,
     };
 }

@@ -116,6 +116,9 @@ public class EquipmentTests
         Assert.Equal((8, 13), (effects[718].Flat(StatModifierKind.HpRecovery), effects[718].Flat(StatModifierKind.EvpRecovery)));
         // Smart Watch #23552
         Assert.Equal((25, 200, 100, 3), (effects[23552].Flat(StatModifierKind.Atk), effects[23552].Flat(StatModifierKind.Vp), effects[23552].Flat(StatModifierKind.Br), effects[23552].Percent(StatModifierKind.Def)));
+        // Cycle Costume #7601 e Luxury Costume #7529 (MoveSpeed +200%)
+        Assert.Equal(200, effects[7601].Percent(StatModifierKind.MoveSpeed));
+        Assert.Equal((200, 10, 75), (effects[7529].Percent(StatModifierKind.MoveSpeed), effects[7529].Flat(StatModifierKind.TamerExp), effects[7529].Percent(StatModifierKind.DigimonExp)));
     }
 
     /// <summary>

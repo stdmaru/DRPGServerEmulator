@@ -31,6 +31,7 @@ RE_RECOVERY = re.compile(r'^(HP|VP|EVP)\s+Recovery Amount\s+(\d+)$', re.I)
 RE_SKILL_DMG = re.compile(r'^(Single|Multi|Melee|Ranged)\s+Skill Damage\s*\+?\s*(\d+)\s*%$', re.I)
 RE_GEN_DMG = re.compile(r'^Damag?e\s*\+?\s*(\d+)\s*%$', re.I)
 RE_ON_HIT = re.compile(r'^Recover\s+(\d+)\s+(HP|VP),?\s*when attacking\.?$', re.I)
+RE_MOVE_SPEED = re.compile(r'^Movement\s+speed\s*\+?\s*(\d+)\s*%$', re.I)
 
 
 def parse_item(item_id, desc, extra_desc):
@@ -47,6 +48,7 @@ def parse_item(item_id, desc, extra_desc):
         'SingleSkillDamagePercent': 0, 'MultiSkillDamagePercent': 0,
         'MeleeSkillDamagePercent': 0, 'RangedSkillDamagePercent': 0,
         'OnHitHealHp': 0, 'OnHitHealVp': 0,
+        'MoveSpeedPercent': 0,
     }
 
     if extra_desc and 'summons the leader and partner digimon' in extra_desc.lower():
@@ -94,6 +96,9 @@ def parse_item(item_id, desc, extra_desc):
                 if m.group(2).upper() == 'HP': b['OnHitHealHp'] += v
                 else: b['OnHitHealVp'] += v
                 continue
+            if m := RE_MOVE_SPEED.match(part):
+                b['MoveSpeedPercent'] += int(m.group(1))
+                continue
             if m := RE_KR_ATK.search(part):
                 b['Atk'] += int(m.group(1))
                 continue
@@ -136,6 +141,7 @@ MODIFIERS = [
     ('MeleeSkillDamagePercent', 'MeleeSkillDamage', 'Percent'),
     ('RangedSkillDamagePercent', 'RangedSkillDamage', 'Percent'),
     ('OnHitHealHp', 'OnHitHealHp', 'Value'), ('OnHitHealVp', 'OnHitHealVp', 'Value'),
+    ('MoveSpeedPercent', 'MoveSpeed', 'Percent'),
 ]
 
 

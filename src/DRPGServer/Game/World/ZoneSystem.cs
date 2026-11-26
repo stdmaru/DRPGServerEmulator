@@ -64,7 +64,7 @@ public sealed class ZoneSystem : IWorldSystem
     {
         if (player.Zone is not { } zone) return;
         var c = player.Character;
-        var verdict = Movement.Check(zone, c.X, c.Y, x, y, _world.Now - player.LastMoveAt);
+        var verdict = Movement.Check(zone, c.X, c.Y, x, y, _world.Now - player.LastMoveAt, player.MoveSpeed);
         if (verdict != Movement.Verdict.Ok)
         {
             _log.LogInformation("{Player}: passo recusado ({Verdict}) de ({X0}, {Y0}) para ({X}, {Y}) em {Zone}",

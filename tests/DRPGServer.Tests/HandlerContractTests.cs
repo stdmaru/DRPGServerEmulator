@@ -58,6 +58,18 @@ public class HandlerContractTests
     }
 
     [Fact]
+    public void ChatNormalRequest_reads_291_byte_v322_payload_and_rejects_277_bytes()
+    {
+        var payload = new byte[291];
+        System.Text.Encoding.ASCII.GetBytes("Maruzak").CopyTo(payload, 0);
+        System.Text.Encoding.ASCII.GetBytes("/teleport 10 20").CopyTo(payload, 21);
+
+        var parsed = ClientPacket.Parse<ChatNormalRequest>(payload);
+        Assert.Equal("/teleport 10 20", parsed.Message);
+        Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<ChatNormalRequest>(new byte[277]));
+    }
+
+    [Fact]
     public void Player_packet_before_entering_world_closes_session()
     {
         var session = TestSupport.NewSession();
