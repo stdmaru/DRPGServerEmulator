@@ -59,11 +59,13 @@ services.AddOptions<DatabaseOptions>().Bind(builder.Configuration.GetSection(Dat
 services.AddOptions<PersistenceOptions>().Bind(builder.Configuration.GetSection(PersistenceOptions.Section)).ValidateOnStart();
 services.AddOptions<NetworkOptions>().Bind(builder.Configuration.GetSection(NetworkOptions.Section)).ValidateOnStart();
 services.AddOptions<GameOptions>().Bind(builder.Configuration.GetSection(GameOptions.Section)).ValidateOnStart();
+services.AddOptions<LauncherLoginOptions>().Bind(builder.Configuration.GetSection(LauncherLoginOptions.Section)).ValidateOnStart();
 services.AddSingleton<IValidateOptions<ServersOptions>, ServersOptionsValidator>();
 services.AddSingleton<IValidateOptions<DatabaseOptions>, DatabaseOptionsValidator>();
 services.AddSingleton<IValidateOptions<PersistenceOptions>, PersistenceOptionsValidator>();
 services.AddSingleton<IValidateOptions<NetworkOptions>, NetworkOptionsValidator>();
 services.AddSingleton<IValidateOptions<GameOptions>, GameOptionsValidator>();
+services.AddSingleton<IValidateOptions<LauncherLoginOptions>, LauncherLoginOptionsValidator>();
 services.AddSingleton(TimeProvider.System);
 services.AddSingleton<IGameClock, GameClock>();
 
@@ -73,6 +75,10 @@ services.AddSingleton<DatabaseMigrator>();
 services.AddSingleton<AccountRepository>();
 services.AddSingleton<IAccountStore>(sp => sp.GetRequiredService<AccountRepository>());
 services.AddSingleton<AccountAuthenticator>();
+services.AddSingleton<ILauncherAccountStore>(sp => sp.GetRequiredService<AccountRepository>());
+services.AddSingleton<LauncherServerKey>();
+services.AddSingleton<LoginAttemptLimiter>();
+services.AddSingleton<LauncherLoginService>();
 services.AddSingleton<DRPGServer.Game.DigimonUids>();
 services.AddSingleton<IAuditLog, EconomyLogRepository>();
 services.AddSingleton<CharacterRepository>();
@@ -143,6 +149,7 @@ foreach (var read in new Action[]
     () => _ = host.Services.GetRequiredService<IOptions<PersistenceOptions>>().Value,
     () => _ = host.Services.GetRequiredService<IOptions<NetworkOptions>>().Value,
     () => _ = host.Services.GetRequiredService<IOptions<GameOptions>>().Value,
+    () => _ = host.Services.GetRequiredService<IOptions<LauncherLoginOptions>>().Value,
 })
 {
     try { read(); }
@@ -172,10 +179,14 @@ try
         await host.Services.GetRequiredService<DatabaseMigrator>().MigrateAsync(cts.Token);
         var converted = await host.Services.GetRequiredService<AccountAuthenticator>().ConvertPlainKeysAsync(cts.Token);
         if (converted > 0) log.LogInformation("{Count} auth_key em texto puro convertida(s) para hash", converted);
+        var passwords = await host.Services.GetRequiredService<LauncherLoginService>().ConvertPlainPasswordsAsync(cts.Token);
+        if (passwords > 0) log.LogInformation("{Count} plain-text password(s) converted to hash", passwords);
         var maxUid = await host.Services.GetRequiredService<CharacterRepository>().MaxDigimonUidAsync(cts.Token);
         host.Services.GetRequiredService<DRPGServer.Game.DigimonUids>().Seed(maxUid);
         await host.Services.GetRequiredService<ExpEventService>().ReloadAsync(forceNotify: false, cts.Token);
     }
+
+    host.Services.GetRequiredService<LauncherServerKey>();   // creates the key on first start and logs its fingerprint
 
     // os sistemas se registram no mundo ao serem criados; criar antes da thread do mundo subir
     var world = host.Services.GetRequiredService<GameWorld>();

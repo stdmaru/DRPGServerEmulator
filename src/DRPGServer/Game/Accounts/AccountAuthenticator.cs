@@ -1,5 +1,6 @@
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.World;
 using Microsoft.Extensions.Logging;
 
 namespace DRPGServer.Game.Accounts;
@@ -8,8 +9,9 @@ namespace DRPGServer.Game.Accounts;
 /// Confere usuário + <c>auth_key</c> do channel (0x04). A chave fica no banco como hash
 /// (<see cref="AuthKeyHash"/>); chave em texto puro, como o emissor ainda grava, é aceita uma vez, em tempo constante, e
 /// convertida na hora. Usuário inexistente custa o mesmo tempo que chave errada. Nenhuma chave vai para o log.
+/// A key issued by the launcher login carries an expiry (<c>auth_key_expires_at</c>); an expired key is refused.
 /// </summary>
-public sealed class AccountAuthenticator(IAccountStore accounts, ILogger<AccountAuthenticator> log)
+public sealed class AccountAuthenticator(IAccountStore accounts, IGameClock clock, ILogger<AccountAuthenticator> log)
 {
     public async Task<AuthenticatedAccount?> AuthenticateAsync(string username, string key, CancellationToken ct)
     {
@@ -28,7 +30,8 @@ public sealed class AccountAuthenticator(IAccountStore accounts, ILogger<Account
 
         if (string.IsNullOrEmpty(record.AuthKeyHash))
             return Refuse(key);
-        return AuthKeyHash.Verify(key, record.AuthKeyHash) ? record.Account : null;
+        if (!AuthKeyHash.Verify(key, record.AuthKeyHash)) return null;
+        return record.AuthKeyExpiresAt == 0 || clock.UnixNow < record.AuthKeyExpiresAt ? record.Account : null;
     }
 
     private static AuthenticatedAccount? Refuse(string key)

@@ -12,6 +12,10 @@ public enum ServerRole : byte
 public enum LoginOpcode : ushort
 {
     Handshake = 0x05,
+
+    /// <summary>Launcher login (docs/protocolo/launcher.md); values from <see cref="DRPG.Shared.Protocol.Launcher.LauncherOpcode"/>.</summary>
+    LauncherHello = (ushort)DRPG.Shared.Protocol.Launcher.LauncherOpcode.Hello,
+    LauncherLogin = (ushort)DRPG.Shared.Protocol.Launcher.LauncherOpcode.Login,
 }
 
 public enum ChannelOpcode : ushort

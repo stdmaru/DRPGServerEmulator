@@ -140,3 +140,20 @@ public sealed class GameOptionsValidator : IValidateOptions<GameOptions>
         return e.Result();
     }
 }
+
+public sealed class LauncherLoginOptionsValidator : IValidateOptions<LauncherLoginOptions>
+{
+    public ValidateOptionsResult Validate(string? name, LauncherLoginOptions o)
+    {
+        var e = new OptionsErrors();
+        const string s = LauncherLoginOptions.Section;
+        e.Check(!string.IsNullOrWhiteSpace(o.KeyPath), $"{s}:KeyPath is empty");
+        e.Range(o.GameKeyValidHours, 0.1, 24 * 7, $"{s}:GameKeyValidHours");
+        foreach (var (field, limit) in new[] { ("AttemptsPerAddress", o.AttemptsPerAddress), ("AttemptsPerLogin", o.AttemptsPerLogin) })
+        {
+            e.Range(limit.PerSecond, 0.001, 100, $"{s}:{field}:PerSecond");
+            e.Range(limit.Burst, 1, 1000, $"{s}:{field}:Burst");
+        }
+        return e.Result();
+    }
+}

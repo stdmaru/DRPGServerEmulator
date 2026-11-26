@@ -33,7 +33,7 @@ public class AuthKeyTests
     }
 
     private static AccountAuthenticator Authenticator(FakeAccounts accounts) =>
-        new(accounts, NullLogger<AccountAuthenticator>.Instance);
+        new(accounts, TestSupport.Clock, NullLogger<AccountAuthenticator>.Instance);
 
     [Fact]
     public void Hash_has_the_documented_format_and_a_fresh_salt()
@@ -137,7 +137,7 @@ public class AccountRepositoryDatabaseTests(DatabaseFixture db) : IClassFixture<
     public async Task Hash_is_stored_only_while_the_plain_key_is_unchanged()
     {
         await using (var conn = await db.Database.OpenAsync())
-            await conn.ExecuteAsync("INSERT INTO account (username, password, auth_key) VALUES ('hashme', '', 'K1')");
+            await conn.ExecuteAsync("INSERT INTO account (username, auth_key) VALUES ('hashme', 'K1')");
         var repo = new AccountRepository(db.Database);
         var record = (await repo.FindByUsernameAsync("hashme", default))!;
 

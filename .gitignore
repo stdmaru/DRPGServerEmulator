@@ -9,3 +9,5 @@ appsettings.Local.json
 src/DRPGServer/Resources/Client/
 # snapshots que não chegaram ao banco (Persistence:DeadLetterPath, docs/emulador/seguranca.md#persistência)
 dead-letter/
+# launcher login private key (Configuration/Options.cs LauncherLoginOptions.KeyPath); never commit
+launcher-login.pem

@@ -69,6 +69,9 @@ public sealed class Session
     /// <summary>✅ Chave AES-128 derivada do 0x0E global (para cifrar/decifrar 0x7B e 0x7C).</summary>
     public byte[]? GlobalAesKey { get; set; }
 
+    /// <summary>Launcher login: one-time nonce of the last hello reply; consumed by the next login (docs/protocolo/launcher.md).</summary>
+    public byte[]? LauncherNonce { get; set; }
+
     /// <summary>✅ Chave AES-128 derivada do 0x0E do mapa (para cifrar Map 0xE6 de evento de EXP).</summary>
     public byte[]? MapAesKey { get; set; }
 

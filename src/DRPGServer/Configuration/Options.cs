@@ -203,3 +203,30 @@ public sealed class GameOptions
     /// </summary>
     public bool AllowMultiLevelUp { get; set; } = false;
 }
+
+/// <summary>Launcher login on the LoginServer (docs/protocolo/launcher.md).</summary>
+public sealed class LauncherLoginOptions
+{
+    public const string Section = "LauncherLogin";
+
+    /// <summary>Off: the hello is answered with <c>Disabled</c> and no login is accepted.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// PKCS#8 PEM file with the LoginServer ECDH P-256 key. Created on first start when missing; relative paths are
+    /// under the server folder. Keep it out of git; its fingerprint is logged at start for <c>DR_Configuration.json</c>.
+    /// </summary>
+    public string KeyPath { get; set; } = "launcher-login.pem";
+
+    /// <summary>Hours a game key issued by the launcher stays valid.</summary>
+    public double GameKeyValidHours { get; set; } = 5;
+
+    /// <summary>Lowest launcher version allowed to log in (0 = any).</summary>
+    public uint MinLauncherVersion { get; set; }
+
+    /// <summary>Login attempts per address: bucket refilled at <c>PerSecond</c>, up to <c>Burst</c>.</summary>
+    public RateLimitOptions AttemptsPerAddress { get; set; } = new() { PerSecond = 0.1, Burst = 10 };
+
+    /// <summary>Login attempts per login name, from any address.</summary>
+    public RateLimitOptions AttemptsPerLogin { get; set; } = new() { PerSecond = 0.05, Burst = 5 };
+}

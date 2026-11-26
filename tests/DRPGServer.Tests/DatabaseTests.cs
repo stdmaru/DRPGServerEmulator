@@ -63,7 +63,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
     {
         await using var db = await Database.OpenAsync();
         uint account = await db.ExecuteScalarAsync<uint>(
-            "INSERT INTO account (username, password, auth_key) VALUES (@name, '', ''); SELECT LAST_INSERT_ID();", new { name });
+            "INSERT INTO account (username, auth_key) VALUES (@name, ''); SELECT LAST_INSERT_ID();", new { name });
         var characters = new CharacterRepository(Database, uids, new EconomyLogRepository());
         uint character = (await characters.CreateAsync(new NewCharacter(account, 0, name, 1, 10, "Koromon", 79, 56, 56), default))!.Value;
         return (account, character);
