@@ -4,7 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Channels;
 using DRPGServer.Game.Entities;
-using DRPGServer.Network.Protocol;
+using DRPG.Shared.Protocol;
 using DRPGServer.Network.Traffic;
 using Microsoft.Extensions.Logging;
 

@@ -1,5 +1,5 @@
 using System.Text;
-using DRPGServer.Network.Protocol;
+using DRPG.Shared.Protocol;
 using Microsoft.Extensions.Logging;
 
 namespace DRPGServer.Network;

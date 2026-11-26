@@ -1,16 +1,16 @@
 using System.Buffers.Binary;
 
-namespace DRPGServer.Network.Protocol;
+namespace DRPG.Shared.Protocol;
 
 /// <summary>
-/// Cabeçalho de 14 bytes de todo pacote (ver docs/protocolo/cabecalho.md).
+/// The 14-byte header of every packet (docs/protocolo/cabecalho.md).
 /// </summary>
 public readonly record struct PacketHeader(ushort Opcode, uint Size, uint Sequence, ushort Crc)
 {
     public const int Length = 14;
     public const ushort Signature = 0x00CC;
 
-    /// <summary>O dispatcher do cliente rejeita pacotes maiores que isso.</summary>
+    /// <summary>The client's dispatcher rejects packets larger than this.</summary>
     public const int MaxPacketSize = 0x3080;
 
     public int PayloadLength => (int)Size - Length;

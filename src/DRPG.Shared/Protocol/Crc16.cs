@@ -1,9 +1,9 @@
-namespace DRPGServer.Network.Protocol;
+namespace DRPG.Shared.Protocol;
 
 /// <summary>
-/// CRC16-XMODEM (poly 0x1021, init 0) sobre o payload seguido de 14 bytes zero.
-/// Confere com 99% dos pacotes capturados. O cliente às vezes manda CRC errado e o
-/// servidor oficial não valida, então só calculamos na saída.
+/// CRC16-XMODEM (poly 0x1021, init 0) over the payload followed by 14 zero bytes.
+/// Matches 99% of captured packets. The client sometimes sends a wrong CRC and the
+/// official server does not check it, so it is only computed on output.
 /// </summary>
 public static class Crc16
 {

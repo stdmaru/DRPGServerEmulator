@@ -4,7 +4,7 @@ using DRPGServer.Game.Items;
 using DRPGServer.Game.Stats;
 using DRPGServer.Network;
 using DRPGServer.Network.Packets.Map;
-using DRPGServer.Network.Protocol;
+using DRPG.Shared.Protocol;
 
 namespace DRPGServer.Game.World;
 

@@ -1,11 +1,11 @@
 using System.Buffers.Binary;
 using System.Text;
 
-namespace DRPGServer.Network.Protocol;
+namespace DRPG.Shared.Protocol;
 
 public sealed class PacketFormatException(string message) : Exception(message);
 
-/// <summary>Leitura sequencial do payload, little-endian. Lança <see cref="PacketFormatException"/> se faltar dado.</summary>
+/// <summary>Sequential little-endian reader over a payload. Throws <see cref="PacketFormatException"/> when data runs out.</summary>
 public sealed class PacketReader(ReadOnlyMemory<byte> payload)
 {
     private int _position;
@@ -17,7 +17,7 @@ public sealed class PacketReader(ReadOnlyMemory<byte> payload)
     private ReadOnlySpan<byte> Take(int count)
     {
         if (count < 0 || count > Remaining)
-            throw new PacketFormatException($"leitura de {count} bytes na posição {_position}, restam {Remaining}");
+            throw new PacketFormatException($"read of {count} bytes at position {_position}, {Remaining} left");
         var span = payload.Span.Slice(_position, count);
         _position += count;
         return span;
@@ -34,7 +34,7 @@ public sealed class PacketReader(ReadOnlyMemory<byte> payload)
     public byte[] ReadBytes(int count) => Take(count).ToArray();
     public void Skip(int count) => Take(count);
 
-    /// <summary>String de tamanho fixo terminada em \0 (bytes depois do \0 são lixo e são ignorados).</summary>
+    /// <summary>Fixed-length, \0-terminated string (bytes after the \0 are garbage and ignored).</summary>
     public string ReadFixedString(int length)
     {
         var span = Take(length);
@@ -45,6 +45,6 @@ public sealed class PacketReader(ReadOnlyMemory<byte> payload)
 
 public static class FixedString
 {
-    /// <summary>Latin-1: ida e volta byte a byte, sem perder nada que o cliente mande.</summary>
+    /// <summary>Latin-1: byte-for-byte round trip, nothing the client sends is lost.</summary>
     public static readonly Encoding Encoding = Encoding.Latin1;
 }

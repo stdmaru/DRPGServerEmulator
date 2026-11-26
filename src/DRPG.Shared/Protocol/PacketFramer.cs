@@ -1,18 +1,18 @@
 using System.Buffers;
 
-namespace DRPGServer.Network.Protocol;
+namespace DRPG.Shared.Protocol;
 
 public enum FrameStatus { Incomplete, Complete, Invalid }
 
-/// <summary>Um pacote recebido: cabeçalho e cópia do payload.</summary>
+/// <summary>A received packet: header and a copy of the payload.</summary>
 public sealed record IncomingFrame(PacketHeader Header, byte[] Payload)
 {
     public ushort Opcode => Header.Opcode;
 }
 
 /// <summary>
-/// Corta o fluxo TCP em pacotes. Assinatura ou tamanho inválido = conexão corrompida:
-/// o chamador fecha a sessão (o cliente oficial nunca dessincroniza, ver cabecalho.md).
+/// Cuts the TCP stream into packets. A bad signature or size means a corrupt connection:
+/// the caller closes the session (the official client never desyncs, see docs/protocolo/cabecalho.md).
 /// </summary>
 public static class PacketFramer
 {
@@ -29,14 +29,14 @@ public static class PacketFramer
         ushort signature = (ushort)(head[0] | head[1] << 8);
         if (signature != PacketHeader.Signature)
         {
-            error = $"assinatura inválida 0x{signature:X4}";
+            error = $"invalid signature 0x{signature:X4}";
             return FrameStatus.Invalid;
         }
 
         var header = PacketHeader.Read(head);
         if (header.Size < PacketHeader.Length || header.Size > PacketHeader.MaxPacketSize)
         {
-            error = $"tamanho inválido {header.Size} (opcode 0x{header.Opcode:X})";
+            error = $"invalid size {header.Size} (opcode 0x{header.Opcode:X})";
             return FrameStatus.Invalid;
         }
 

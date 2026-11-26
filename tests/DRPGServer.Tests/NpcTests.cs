@@ -4,7 +4,7 @@ using DRPGServer.Game.Items;
 using DRPGServer.Game.Npcs;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
-using DRPGServer.Network.Protocol;
+using DRPG.Shared.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DRPGServer.Tests;

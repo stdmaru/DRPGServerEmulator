@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
-using DRPGServer.Network.Protocol;
+using DRPG.Shared.Protocol;
 
 namespace DRPGServer.Game;
 

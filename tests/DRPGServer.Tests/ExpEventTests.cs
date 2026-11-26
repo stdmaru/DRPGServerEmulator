@@ -8,7 +8,7 @@ using DRPGServer.Game.Shop;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
 using DRPGServer.Network.Packets.Map;
-using DRPGServer.Network.Protocol;
+using DRPG.Shared.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DRPGServer.Tests;

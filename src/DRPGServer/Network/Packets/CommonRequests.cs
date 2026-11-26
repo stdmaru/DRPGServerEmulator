@@ -1,4 +1,4 @@
-using DRPGServer.Network.Protocol;
+using DRPG.Shared.Protocol;
 
 namespace DRPGServer.Network.Packets;
 

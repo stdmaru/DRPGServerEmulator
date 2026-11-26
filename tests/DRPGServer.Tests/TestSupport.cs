@@ -16,7 +16,7 @@ using DRPGServer.Game.Shop;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
 using DRPGServer.Network.Handlers;
-using DRPGServer.Network.Protocol;
+using DRPG.Shared.Protocol;
 using DRPGServer.Network.Traffic;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;

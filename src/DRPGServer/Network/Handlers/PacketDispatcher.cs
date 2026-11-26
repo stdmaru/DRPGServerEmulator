@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Reflection;
 using DRPGServer.Game.World;
-using DRPGServer.Network.Protocol;
+using DRPG.Shared.Protocol;
 using DRPGServer.Network.Traffic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

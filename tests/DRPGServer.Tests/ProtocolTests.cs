@@ -1,5 +1,5 @@
 using System.Buffers;
-using DRPGServer.Network.Protocol;
+using DRPG.Shared.Protocol;
 
 namespace DRPGServer.Tests;
 

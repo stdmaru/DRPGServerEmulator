@@ -5,7 +5,7 @@ using DRPGServer.Game.Items;
 using DRPGServer.Game.Npcs;
 using DRPGServer.Network;
 using DRPGServer.Network.Packets.Map;
-using DRPGServer.Network.Protocol;
+using DRPG.Shared.Protocol;
 
 namespace DRPGServer.Tests;
 

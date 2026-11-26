@@ -1,8 +1,8 @@
 using System.Buffers.Binary;
 
-namespace DRPGServer.Network.Protocol;
+namespace DRPG.Shared.Protocol;
 
-/// <summary>Escrita sequencial little-endian num buffer que cresce. Reservado o espaço do cabeçalho no início.</summary>
+/// <summary>Sequential little-endian writer over a growing buffer. Room for the header is reserved at the start.</summary>
 public sealed class PacketWriter
 {
     private byte[] _buffer;
@@ -14,7 +14,7 @@ public sealed class PacketWriter
         _length = PacketHeader.Length;
     }
 
-    /// <summary>Posição dentro do payload (sem o cabeçalho).</summary>
+    /// <summary>Position inside the payload (without the header).</summary>
     public int Position => _length - PacketHeader.Length;
 
     private Span<byte> Grow(int count)
@@ -39,7 +39,7 @@ public sealed class PacketWriter
     public void WriteBytes(ReadOnlySpan<byte> value) => value.CopyTo(Grow(value.Length));
     public void WriteZeros(int count) => Grow(count).Clear();
 
-    /// <summary>String de tamanho fixo. Trunca para caber com pelo menos um \0 no fim.</summary>
+    /// <summary>Fixed-length string. Truncated to leave at least one \0 at the end.</summary>
     public void WriteFixedString(string? value, int length)
     {
         var span = Grow(length);
@@ -51,8 +51,8 @@ public sealed class PacketWriter
     }
 
     /// <summary>
-    /// Escreve um bloco de <paramref name="length"/> bytes zerado, exceto pelos trechos dados
-    /// (offset relativo ao início do bloco). Para regiões capturadas e ainda não entendidas.
+    /// Writes a zeroed block of <paramref name="length"/> bytes except for the given runs
+    /// (offsets relative to the block start). For captured regions not understood yet.
     /// </summary>
     public void WriteSparse(int length, params ReadOnlySpan<(int Offset, byte[] Bytes)> runs)
     {
@@ -62,11 +62,11 @@ public sealed class PacketWriter
             bytes.CopyTo(span[offset..]);
     }
 
-    /// <summary>Fecha o pacote: preenche o cabeçalho e devolve os bytes prontos para enviar.</summary>
+    /// <summary>Closes the packet: fills the header and returns the bytes ready to send.</summary>
     public byte[] ToFrame(ushort opcode, uint sequence = 0)
     {
         if (_length > PacketHeader.MaxPacketSize)
-            throw new InvalidOperationException($"pacote 0x{opcode:X} com {_length} bytes passa do limite de {PacketHeader.MaxPacketSize}");
+            throw new InvalidOperationException($"packet 0x{opcode:X} with {_length} bytes is over the {PacketHeader.MaxPacketSize} limit");
         var payload = _buffer.AsSpan(PacketHeader.Length, _length - PacketHeader.Length);
         new PacketHeader(opcode, (uint)_length, sequence, Crc16.Compute(payload)).Write(_buffer);
         return _buffer.AsSpan(0, _length).ToArray();

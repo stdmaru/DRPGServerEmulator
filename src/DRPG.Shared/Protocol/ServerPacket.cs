@@ -1,9 +1,9 @@
-namespace DRPGServer.Network.Protocol;
+namespace DRPG.Shared.Protocol;
 
 /// <summary>
-/// Pacote enviado pelo servidor. Subclasses só descrevem o layout em <see cref="Write"/>;
-/// a serialização acontece no envio, na thread de quem chama (no mapa: a thread do mundo),
-/// então o pacote reflete o estado daquele instante.
+/// An outgoing packet. Subclasses only describe the layout in <see cref="Write"/>;
+/// serialization happens when it is sent, on the caller's thread (on the map server: the world thread),
+/// so the packet reflects the state at that moment.
 /// </summary>
 public abstract class ServerPacket
 {
@@ -18,7 +18,7 @@ public abstract class ServerPacket
         return writer.ToFrame(Opcode);
     }
 
-    /// <summary>Só o payload (testes e comparação com capturas).</summary>
+    /// <summary>Payload only (tests and comparison with captures).</summary>
     public byte[] EncodePayload()
     {
         var writer = new PacketWriter();

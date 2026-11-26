@@ -1,6 +1,6 @@
 using DRPGServer.Game;
 using DRPGServer.Game.Entities;
-using DRPGServer.Network.Protocol;
+using DRPG.Shared.Protocol;
 
 namespace DRPGServer.Network.Packets.Map;
 
