@@ -42,25 +42,8 @@ public sealed class JoinCharacterHandler(
             return;
         }
 
-        if (!await entry.EnterAsync(session, account, nickname, SendWorldState, ct))
+        if (!await entry.EnterAsync(session, account, nickname, p => p.Send(MapSequences.WorldState(p, expEvents.Current)), ct))
             session.Close("entrada no mapa recusada");
-    }
-
-    /// <summary>Sequência que o oficial manda na entrada (capturas v242/v322).</summary>
-    private void SendWorldState(Player player)
-    {
-        player.Send(new CharacterDataPacket(player.Character, player.Character.Inventory.Clock.UnixNow));
-        player.Send(new InventoryDataPacket(player.Character.Inventory));
-        if (player.Character.Wallet.Medals > 0 || player.Character.Wallet.Coins > 0)
-            player.Send(new CurrencyUpdatePacket(player.Character));
-        for (int i = 0x29; i <= 0x2F; i++) player.Send(new Unknown7EPacket(i));
-        for (int i = 0x3D; i <= 0x43; i++) player.Send(new Unknown7FPacket(i));
-        player.Send(new Unknown05Packet());
-        player.Send(new ExpEventPacket(player.Session.MapAesKey, expEvents.Current));
-        player.Send(new Unknown74Packet());
-        player.Send(new Unknown152Packet());
-        player.Send(new SingleDigimonInfoPacket(player.Leader));
-        player.Send(new Unknown73Packet());
     }
 }
 

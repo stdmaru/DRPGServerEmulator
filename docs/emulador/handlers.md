@@ -92,7 +92,7 @@ io.Run(player, "cash-shop.open",
 
 ## Respostas (S2C)
 - Um `ServerPacket` por S2C, em `Network/Packets/<Servidor>/`. O pacote só serializa o que recebe, sem regra.
-- Sequências que o oficial manda juntas (entrada no mapa, efeitos de equipamento) ficam num método só do serviço do domínio e são chamadas de todos os lugares que precisam delas (**PR #41: G5, G7**).
+- Sequências que o oficial manda juntas ficam num lugar só e são chamadas de todos os lugares que precisam delas: efeitos de equipamento em `EquipmentService.Changed`, entrada no mapa e páginas `0x7E`/`0x7F` em `Network/Packets/Map/MapSequences.cs` (`player.Send(MapSequences.WorldState(...))`).
 - `Templates/*.hex` guarda payloads capturados ainda não decodificados.
 
 ## Checklist de handler novo

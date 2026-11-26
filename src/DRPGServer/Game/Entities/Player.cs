@@ -107,6 +107,12 @@ public sealed class Player(
 
     public void Send(ServerPacket packet) => Session.Send(packet);
 
+    public void Send(IEnumerable<ServerPacket> packets)
+    {
+        foreach (var packet in packets)
+            Session.Send(packet);
+    }
+
     /// <summary>Envia mensagem de chat normal (<c>0x21</c>) somente para este jogador.</summary>
     public void SendMessage(string sender, string message) => Send(new ChatNormalPacket(sender, message));
 

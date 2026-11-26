@@ -75,8 +75,7 @@ public sealed class VillageOfBeginningNpcs : NpcScriptBase
         Items.GiveItems(player, FinalItems, ChoiceReason(choiceId));
 
         // ✅ o oficial repete aqui os 0x7E e 0x7F da entrada
-        for (int i = 0x29; i <= 0x2F; i++) player.Send(new Unknown7EPacket(i));
-        for (int i = 0x3D; i <= 0x43; i++) player.Send(new Unknown7FPacket(i));
+        player.Send(MapSequences.ListPages());
         return true;
     }
 }

@@ -87,32 +87,28 @@ public sealed record CharacterSnapshot(
         var digimons = new List<DigimonSnapshot>();
         var forms = new List<FormRow>();
         var titles = new List<TitleRow>();
+        // time e Digimon Depository: mesma linha, só a posição e a flag mudam
         for (int slot = 0; slot < Character.PartySize; slot++)
-        {
-            if (c.Party[slot] is not { Uid: > 0 } d) continue;
-            digimons.Add(new DigimonSnapshot(d.Uid, (byte)slot, slot == 0, false, d.BaseForm.Species.Id, d.Name, d.Level, d.Exp,
-                d.UnlockedStage, d.PointsOf(d.BaseForm), d.SkillPoints, d.TotalWins, d.TotalBattles, d.FreeRename, d.TitleId,
-                d.Hp, d.Vp, d.Evp));
-            forms.AddRange(d.Forms.Select(f => new FormRow(d.Uid, f.Species.Id, f.Allocated.Str, f.Allocated.Agi,
-                f.Allocated.Con, f.Allocated.Int, (byte)f.SkillLevels[0], (byte)f.SkillLevels[1])));
-            titles.AddRange(d.Titles.Select(t => new TitleRow(d.Uid, t)));
-        }
+            Add(c.Party[slot], slot, inDepository: false);
         for (int slot = 0; slot < Character.MaxDepositorySlots; slot++)
-        {
-            if (c.DepositoryGrid[slot] is not { Uid: > 0 } d) continue;
-            digimons.Add(new DigimonSnapshot(d.Uid, (byte)slot, false, true, d.BaseForm.Species.Id, d.Name, d.Level, d.Exp,
-                d.UnlockedStage, d.PointsOf(d.BaseForm), d.SkillPoints, d.TotalWins, d.TotalBattles, d.FreeRename, d.TitleId,
-                d.Hp, d.Vp, d.Evp));
-            forms.AddRange(d.Forms.Select(f => new FormRow(d.Uid, f.Species.Id, f.Allocated.Str, f.Allocated.Agi,
-                f.Allocated.Con, f.Allocated.Int, (byte)f.SkillLevels[0], (byte)f.SkillLevels[1])));
-            titles.AddRange(d.Titles.Select(t => new TitleRow(d.Uid, t)));
-        }
+            Add(c.DepositoryGrid[slot], slot, inDepository: true);
         var items = new[] { c.Inventory.Main, c.Inventory.Battle, c.Inventory.CardSlots, c.Inventory.Equipment }
             .SelectMany(b => b.Items.Select(i => new ItemRow((byte)b.Kind, (byte)i.Slot, i.Uid, i.ItemId, i.Amount, i.ExpiresAt)))
             .ToList();
         return new(c.Uid, c.Level, c.MapId, c.X, c.Y, c.Wallet.Bits, c.Wallet.Medals, c.Wallet.Coins, c.Wallet.LadderPoints,
             c.TotalWins, c.TotalBattles, c.DepositorySlots,
             digimons, forms, items, c.Flags.Order().ToList(), titles, c.Economy.Pending.ToList());
+
+        void Add(Digimon? d, int slot, bool inDepository)
+        {
+            if (d is not { Uid: > 0 }) return;
+            digimons.Add(new DigimonSnapshot(d.Uid, (byte)slot, IsLeader: !inDepository && slot == 0, inDepository,
+                d.BaseForm.Species.Id, d.Name, d.Level, d.Exp, d.UnlockedStage, d.PointsOf(d.BaseForm), d.SkillPoints,
+                d.TotalWins, d.TotalBattles, d.FreeRename, d.TitleId, d.Hp, d.Vp, d.Evp));
+            forms.AddRange(d.Forms.Select(f => new FormRow(d.Uid, f.Species.Id, f.Allocated.Str, f.Allocated.Agi,
+                f.Allocated.Con, f.Allocated.Int, (byte)f.SkillLevels[0], (byte)f.SkillLevels[1])));
+            titles.AddRange(d.Titles.Select(t => new TitleRow(d.Uid, t)));
+        }
     }
 }
 
