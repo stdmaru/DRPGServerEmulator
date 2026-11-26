@@ -118,6 +118,10 @@ Exemplo real: `Patch_240.zip` contém `DigimonRPG.bin`, `patch_240.hf/.pf` (59 M
 
 **Arte:** os sprites antigos que continuam no `resource.hf`, lidos 1:1: `gui\dr2_in_000_*`, `dr2_in_001_*` e `dr2_in_003_*`, com as variantes `_eng.spr`. Os `dr_title_*` são da janela de títulos do jogo, não do login. Layout medido nos sprites e decidido em [tela de login do launcher](../cliente/tela-login-launcher.md) (não há código original).
 
+**Servidor de patch (desenvolvimento):** serviço `patch` (nginx) no `.devcontainer/docker-compose.yml`, com bind mount só leitura de `work/web/Patch` em `http://127.0.0.1:8080/`. Serve apenas `DR_Configuration.json` (sem cache) e `Patch_<n>.zip`; o resto dá 404. Subir sem reiniciar o resto: `docker compose -f .devcontainer/docker-compose.yml -p server_devcontainer up -d patch`. Em produção, HTTPS na frente.
+
+**Leitura da configuração:** `DRPG.Shared/Patching/PatchConfiguration` lê o JSON oficial (com o erro `LanuncherInfo`) e a seção nova `LoginServer`, valida versões, `%d` e impressão digital, e lista os patches pendentes a partir do `VersionInfo.ini` (UTF-16 LE). Instalação abaixo de `MinPatchVersion` exige reinstalar.
+
 **Projeto:** `src/DRPG.Launcher` (NativeAOT), com as camadas `Platform/`, `Rendering/` (`IRenderer`) e `Assets/`, que depois o cliente reaproveita. ❓ Elas vão para uma biblioteca comum (`DRPG.Engine`) quando o cliente nascer.
 
 **Segurança**
