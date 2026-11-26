@@ -5,6 +5,7 @@ using DRPGServer.Data.Repositories;
 using DRPGServer.Game;
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
 using DRPGServer.Network.Handlers;
@@ -72,8 +73,8 @@ public class EconomyTests
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), Entities.Character());
         var npc = new EconomyReason(EconomySource.Npc, "choice", "escolha 7");
 
-        Assert.True(player.GiveItems([(25, 5)], npc, refresh: false));
-        Assert.True(player.ExchangeItems(25, 5, [(1, 1)], npc, refresh: false));
+        Assert.True(TestSupport.Items().GiveItems(player, [new(25, 5)], npc, refresh: false));
+        Assert.True(TestSupport.Items().Exchange(player, 25, 5, [new(1)], npc, refresh: false));
 
         Assert.Equal([(EconomyAsset.Item, 25u, 5L), (EconomyAsset.Item, 25u, -5L), (EconomyAsset.Item, 1u, 1L)],
             player.Character.Economy.Pending.Select(e => (e.Asset, e.AssetId, e.Amount)));

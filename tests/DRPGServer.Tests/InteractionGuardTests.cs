@@ -1,4 +1,5 @@
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.Npcs;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
@@ -68,7 +69,7 @@ public class InteractionGuardTests
     [Fact]
     public void Choice_runs_only_next_to_its_npc()
     {
-        var registry = TestSupport.NewNpcRegistry(new DigitalBureauNpcs());
+        var registry = TestSupport.NewNpcRegistry(new DigitalBureauNpcs(TestSupport.Items()));
         var player = At(DigitalBureauNpcs.BureauMapId, 0, 0);
         player.Character.Inventory.Main.Add(VillageOfBeginningNpcs.TunomonCard, 1);
 
@@ -84,7 +85,7 @@ public class InteractionGuardTests
     private sealed class ChoiceOfMissingNpc : NpcScriptBase
     {
         public override byte MapId => 1;
-        public ChoiceOfMissingNpc() => RegisterChoice(77, 9_999, _ => true);
+        public ChoiceOfMissingNpc() : base(TestSupport.Items()) => RegisterChoice(77, 9_999, _ => true);
     }
 
     [Fact]

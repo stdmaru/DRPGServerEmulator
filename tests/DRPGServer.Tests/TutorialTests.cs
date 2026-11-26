@@ -3,6 +3,7 @@ using DRPGServer.Data.Repositories;
 using DRPGServer.Game;
 using DRPGServer.Game.Battle;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
@@ -313,7 +314,7 @@ public class TutorialTests
 
     // ---------- NPCs ----------
 
-    private DRPGServer.Game.Npcs.NpcScriptRegistry Npcs => TestSupport.NewNpcRegistry(new DRPGServer.Game.Npcs.VillageOfBeginningNpcs(_zones));
+    private DRPGServer.Game.Npcs.NpcScriptRegistry Npcs => TestSupport.NewNpcRegistry(new DRPGServer.Game.Npcs.VillageOfBeginningNpcs(_zones, TestSupport.Items()));
 
     /// <summary>Escolha <paramref name="choice"/> falando com o NPC <paramref name="npcId"/> do mapa 79, de perto.</summary>
     private bool Talk(uint choice, ushort npcId)

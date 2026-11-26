@@ -1,4 +1,5 @@
 using DRPGServer.Data.GameData;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.World;
 
 namespace DRPGServer.Game.Entities;
@@ -83,7 +84,6 @@ public sealed class InventoryItem
     public int Column => Slot % Inventory.Columns;
 }
 
-/// <summary>Uma bolsa de itens ou cards (24 posições nas mochilas; 6 nos Card Slots equipados).</summary>
 /// <summary>O que um <see cref="Bag.Grant"/> mudou, para <see cref="Bag.Revert"/>.</summary>
 public sealed class BagGrant
 {
@@ -102,6 +102,7 @@ public sealed class BagGrant
     public IReadOnlyList<InventoryItem> Changed => Parts.Select(p => p.Item).ToList();
 }
 
+/// <summary>Uma bolsa de itens ou cards (24 posições nas mochilas; 6 nos Card Slots equipados).</summary>
 public sealed class Bag
 {
     private readonly InventoryItem?[] _slots;
@@ -135,18 +136,16 @@ public sealed class Bag
 
     /// <summary>
     /// Empilha nas pilhas existentes e depois ocupa posições livres. Devolve as posições alteradas (vazio se não
-    /// coube nada; nada é adicionado se não couber tudo).
-    /// Para itens não empilháveis (<c>MaxStack == 1</c>), <paramref name="durationSeconds"/> pode ser:
-    /// <c>null</c> (usa duração padrão do <see cref="ItemInfo"/>), <c>-1</c> (permanente) ou <c>&gt; 0</c> (duração arbitrária em segundos).
+    /// coube nada; nada é adicionado se não couber tudo). <paramref name="duration"/> só vale para não empilháveis.
     /// </summary>
-    public IReadOnlyList<InventoryItem> Add(uint itemId, uint amount, long? durationSeconds = null) =>
-        Grant(itemId, amount, durationSeconds)?.Changed ?? [];
+    public IReadOnlyList<InventoryItem> Add(uint itemId, uint amount, ItemDuration duration = default) =>
+        Grant(itemId, amount, duration)?.Changed ?? [];
 
     /// <summary>
     /// Como <see cref="Add"/>, mas devolve o que mudou de forma que <see cref="Revert"/> desfaça exatamente (rollback de
     /// transferência). Null se não couber tudo.
     /// </summary>
-    public BagGrant? Grant(uint itemId, uint amount, long? durationSeconds = null)
+    public BagGrant? Grant(uint itemId, uint amount, ItemDuration duration = default)
     {
         if (amount == 0 || Room(itemId) < amount) return null;
         uint max = _owner.MaxStackOf(itemId, IsCardBag);
@@ -162,7 +161,7 @@ public sealed class Bag
                 if (amount == 0) return new BagGrant(this, parts);
             }
         }
-        uint expiresAt = ResolveExpiresAt(itemId, max, durationSeconds);
+        uint expiresAt = ResolveExpiresAt(itemId, max, duration);
         while (amount > 0)
         {
             int slot = Array.IndexOf(_slots, null);
@@ -189,20 +188,32 @@ public sealed class Bag
         }
     }
 
-    private uint ResolveExpiresAt(uint itemId, uint maxStack, long? durationSeconds)
+    /// <summary>Se tudo cabe junto (pilhas existentes e posições livres), sem mudar nada.</summary>
+    public bool CanFit(IEnumerable<(uint ItemId, uint Amount)> entries)
+    {
+        int slotsNeeded = 0;
+        foreach (var group in entries.GroupBy(e => e.ItemId))
+        {
+            uint max = _owner.MaxStackOf(group.Key, IsCardBag);
+            long total = group.Sum(e => (long)e.Amount);
+            long room = max <= 1 ? 0 : Items.Where(i => i.ItemId == group.Key).Sum(i => (long)(max - Math.Min(max, i.Amount)));
+            long overflow = Math.Max(0, total - room);
+            slotsNeeded += (int)Math.Min(int.MaxValue, (overflow + max - 1) / max);
+        }
+        return slotsNeeded <= _slots.Count(s => s is null);
+    }
+
+    private uint ResolveExpiresAt(uint itemId, uint maxStack, ItemDuration duration)
     {
         if (IsCardBag || maxStack > 1) return 0;
-        if (durationSeconds == Inventory.PermanentDuration) return 0;
-
-        uint effectiveDuration;
-        if (durationSeconds is > 0)
-            effectiveDuration = (uint)Math.Min(durationSeconds.Value, uint.MaxValue);
-        else
-            effectiveDuration = _owner.FindInfo(itemId)?.DurationSeconds ?? 0u;
-
-        if (effectiveDuration == 0) return 0;
-        long expires = _owner.Clock.UnixNow + effectiveDuration;
-        return (uint)Math.Clamp(expires, 1, uint.MaxValue);
+        uint seconds = duration.Kind switch
+        {
+            ItemDurationKind.Permanent => 0,
+            ItemDurationKind.Seconds => duration.Seconds,
+            _ => _owner.FindInfo(itemId)?.DurationSeconds ?? 0u,
+        };
+        if (seconds == 0) return 0;
+        return (uint)Math.Clamp(_owner.Clock.UnixNow + seconds, 1, uint.MaxValue);
     }
 
     /// <summary>Remove todos os itens cujo <see cref="InventoryItem.ExpiresAt"/> já venceu em <paramref name="unixNow"/>.</summary>
@@ -359,8 +370,6 @@ public sealed class Inventory
     public const int Size = 24;
     public const int Columns = 6;
     public const int CardSlotCount = 6;
-    /// <summary>Valor sentinela para entregar um item não empilhável como permanente (sem expiração).</summary>
-    public const int PermanentDuration = -1;
     /// <summary>O cliente interpreta +12 como timestamp de expiração somente quando +16 &gt; 999.</summary>
     public const uint MinClientDurationSeconds = 1000;
 
@@ -457,7 +466,7 @@ public sealed class Inventory
     // atalhos do inventário principal
     public InventoryItem? Find(uint itemId) => Main.Find(itemId);
     public bool HasFreeSlot => Main.HasFreeSlot;
-    public InventoryItem? Add(uint itemId, uint amount, long? durationSeconds = null) =>
-        Main.Add(itemId, amount, durationSeconds) is [.., var last] ? last : null;
+    public InventoryItem? Add(uint itemId, uint amount, ItemDuration duration = default) =>
+        Main.Add(itemId, amount, duration) is [.., var last] ? last : null;
     public bool Remove(uint itemId, uint amount) => Main.Remove(itemId, amount).Count > 0;
 }

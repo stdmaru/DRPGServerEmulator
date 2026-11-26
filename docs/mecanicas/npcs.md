@@ -26,7 +26,7 @@ Evidências: `table.pf` (`npc_info_us`, `npc_function_us`, `npcdialogwindow_us`,
 Para manter o código organizado conforme novas cidades e sistemas forem implementados:
 - **Serviços genéricos de NPC** ficam separados por funcionalidade (ex.: `Depository`, e futuramente `Shops`, `Quests`, `NpcServices`).
 - **Scripts de escolha (`0x56`)** ficam em `src/DRPGServer/Game/Npcs/`, agrupados **por mapa/cidade** herdando de `NpcScriptBase`:
-  - `NpcScriptBase.cs`: helpers reutilizáveis (`GiveItemOnce`, `ExchangeItemsOnce` com rollback atômico, `FinishChoice`, `ReplyError(99)`).
+  - `NpcScriptBase.cs`: helpers reutilizáveis sobre o `ItemService` (`GiveItemsOnce`, `ExchangeItemsOnce` com rollback atômico, `ReplyError(99)`).
   - `NpcScriptRegistry.cs`: coleta todos os `NpcScriptBase` via DI. Na partida recusa `choiceId` duplicado e escolha cujo NPC não existe no mapa do script. Antes de executar, o `InteractionGuard` confere que o jogador está perto do NPC da escolha ([seguranca.md](../emulador/seguranca.md#interação-e-alcance)).
   - Cada escolha é registrada com o NPC que a oferece: `RegisterChoice(choiceId, npcId, handler)`. ✅ Mapa 79: `1` Patamon (123), `2` Yukimi Botamon (124), `3` Mochimon (125), `4` Pyocomon (126), `5` Tunomon (127), `7`/`8` Elecmon (128). Mapa 1: `10` Nyang (33). Vindos da posição do jogador em cada escolha nas capturas.
   - `VillageOfBeginningNpcs.cs`: Mapa 79 (tutorial).

@@ -56,6 +56,10 @@ internal static class TestSupport
 
     public static GameWorld NewWorld() => new(NullLogger<GameWorld>.Instance);
 
+    /// <summary><see cref="ItemService"/> para entregas na thread do teste (o depósito da conta não é usado).</summary>
+    public static ItemService Items() =>
+        new(new CharacterTransfers(NewWorld(), new PersistenceQueue(), NullLogger<CharacterTransfers>.Instance), new InMemoryCashStore(), Clock);
+
     /// <summary>Motivo de auditoria para testes que não olham a auditoria.</summary>
     public static EconomyReason Reason { get; } = new(EconomySource.Gm, "test");
 

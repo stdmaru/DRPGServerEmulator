@@ -1,6 +1,7 @@
 using System.Text;
 using DRPGServer.Game;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.Npcs;
 using DRPGServer.Network;
 using DRPGServer.Network.Packets.Map;
@@ -81,7 +82,7 @@ public class AdminDebugChatTests
 
     private sealed class TestNpcScript : NpcScriptBase
     {
-        public TestNpcScript(byte mapId, uint choiceId)
+        public TestNpcScript(byte mapId, uint choiceId) : base(TestSupport.Items())
         {
             MapId = mapId;
             RegisterChoice(choiceId, 12, _ => true);   // NPC 40:12 do pacote de teste

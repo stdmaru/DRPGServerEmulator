@@ -3,6 +3,7 @@ using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.World;
+using DRPGServer.Network.Packets.Map;
 
 namespace DRPGServer.Game.Items;
 
@@ -33,12 +34,96 @@ public enum StorageTakeResult
 public readonly record struct StorageTake(StorageTakeResult Result, IReadOnlyList<InventoryItem> Items);
 
 /// <summary>
-/// Movimentação de itens entre o personagem e o depósito da conta (Cash/Shop Depository), sempre como transferência
-/// atômica (<see cref="CharacterTransfers"/>). Loja NPC, Cash Depository, correio e troca usam esta API. Thread do
-/// mundo; os callbacks rodam nela também com o jogador offline (pacotes para sessão fechada são descartados).
+/// API única para itens e cards que entram ou saem do personagem por uma fonte (NPC, loja, recompensa, GM, depósito da
+/// conta). Cada operação confere espaço antes, muda tudo ou nada, registra a auditoria e manda os pacotes de
+/// recebimento. Thread do mundo.
+/// <para>
+/// O depósito da conta (Cash/Shop Depository) é sempre transferência atômica (<see cref="CharacterTransfers"/>); os
+/// callbacks rodam na thread do mundo também com o jogador offline (pacotes para sessão fechada são descartados).
+/// </para>
 /// </summary>
 public sealed class ItemService(CharacterTransfers transfers, IAccountTransferStore store, IGameClock clock)
 {
+    /// <summary>
+    /// Entrega itens na aba Items: um <c>0xC9</c> com as posições alteradas (e <c>0xFC</c> se <paramref name="refresh"/>).
+    /// <paramref name="beforeNotify"/> roda depois da entrega e antes dos pacotes. Falso, sem mudar nada, se faltar
+    /// espaço ou a entrega for inválida (quantidade zero, prazo em item empilhável).
+    /// </summary>
+    public bool GiveItems(Player player, IReadOnlyList<ItemGrant> items, EconomyReason reason, bool refresh = true,
+        Action? beforeNotify = null)
+    {
+        var bag = player.Character.Inventory.Main;
+        if (!IsValid(player, items, cards: false) || !bag.CanFit(Amounts(items))) return false;
+
+        var added = Put(bag, items);
+        player.Character.Economy.RecordItems(reason, Amounts(items), cards: false);
+        beforeNotify?.Invoke();
+        Notify(player, added, cards: false, refresh);
+        return true;
+    }
+
+    /// <summary>Como <see cref="GiveItems"/>, na aba Cards (<c>0xC8</c>). Cards não têm prazo.</summary>
+    public bool GiveCards(Player player, IReadOnlyList<ItemGrant> cards, EconomyReason reason, bool refresh = true)
+    {
+        var bag = player.Character.Inventory.Battle;
+        if (!IsValid(player, cards, cards: true) || !bag.CanFit(Amounts(cards))) return false;
+
+        var added = Put(bag, cards);
+        player.Character.Economy.RecordItems(reason, Amounts(cards), cards: true);
+        Notify(player, added, cards: true, refresh);
+        return true;
+    }
+
+    /// <summary>
+    /// Troca na aba Items: tira <paramref name="takeAmount"/> de <paramref name="takeItemId"/> e entrega
+    /// <paramref name="give"/>, contando com a posição que a retirada libera. Tudo ou nada; um <c>0xC9</c> com o estado
+    /// final das posições. <paramref name="beforeNotify"/> como em <see cref="GiveItems"/>.
+    /// </summary>
+    public bool Exchange(Player player, uint takeItemId, uint takeAmount, IReadOnlyList<ItemGrant> give, EconomyReason reason,
+        bool refresh = true, Action? beforeNotify = null)
+    {
+        var bag = player.Character.Inventory.Main;
+        if (takeAmount == 0 || bag.Count(takeItemId) < takeAmount || !IsValid(player, give, cards: false)) return false;
+
+        var removed = bag.Remove(takeItemId, takeAmount);
+        if (!bag.CanFit(Amounts(give)))
+        {
+            bag.Add(takeItemId, takeAmount);
+            return false;
+        }
+        var added = Put(bag, give);
+        player.Character.Economy.RecordItems(reason, [(takeItemId, takeAmount)], cards: false, sign: -1);
+        player.Character.Economy.RecordItems(reason, Amounts(give), cards: false);
+        beforeNotify?.Invoke();
+
+        // posição esvaziada e ocupada de novo na mesma troca: vale o último estado
+        Notify(player, removed.Concat(added).GroupBy(i => i.Slot).Select(g => g.Last()).ToList(), cards: false, refresh);
+        return true;
+    }
+
+    private static bool IsValid(Player player, IReadOnlyList<ItemGrant> grants, bool cards)
+    {
+        var inventory = player.Character.Inventory;
+        return grants.All(g => g.Amount > 0
+            && (g.Duration.Kind == ItemDurationKind.Default || !cards && inventory.MaxStackOf(g.ItemId, isCard: false) <= 1));
+    }
+
+    private static IEnumerable<(uint ItemId, uint Amount)> Amounts(IEnumerable<ItemGrant> grants) =>
+        grants.Select(g => (g.ItemId, g.Amount));
+
+    private static List<InventoryItem> Put(Bag bag, IEnumerable<ItemGrant> grants) =>
+        grants.SelectMany(g => bag.Add(g.ItemId, g.Amount, g.Duration)).ToList();
+
+    private static void Notify(Player player, IReadOnlyList<InventoryItem> changed, bool cards, bool refresh)
+    {
+        if (changed.Count > 0 && cards)
+            player.Send(new BattleItemReceivePacket(changed));
+        else if (changed.Count > 0)
+            player.Send(new ItemReceivePacket(changed));
+        if (refresh)
+            player.RefreshInventory();
+    }
+
     /// <summary>
     /// Guarda <paramref name="entries"/> no depósito da conta. Quem chama já aplicou o custo no personagem (moeda, item
     /// tirado da mochila) e passa em <paramref name="undo"/> como desfazê-lo: ele roda se a transferência não gravar.
@@ -110,9 +195,9 @@ public sealed class ItemService(CharacterTransfers transfers, IAccountTransferSt
         var inventory = player.Character.Inventory;
         var bag = row.Kind == CashShopItemKind.Card ? inventory.Battle : inventory.Main;
         // o prazo de um item com validade no depósito continua de onde estava
-        long? duration = row.Kind == CashShopItemKind.Item && row.ExpiresAt > 0
-            ? Math.Max(1, row.ExpiresAt - clock.UnixNow)
-            : null;
+        var duration = row.Kind == CashShopItemKind.Item && row.ExpiresAt > 0
+            ? ItemDuration.FromSeconds(Math.Max(1, row.ExpiresAt - clock.UnixNow))
+            : ItemDuration.Default;
         if (bag.Grant(row.ItemId, row.Amount, duration) is not { } grant)
         {
             done(new(StorageTakeResult.InventoryFull, []));

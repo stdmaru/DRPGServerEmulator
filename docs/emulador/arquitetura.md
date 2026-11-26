@@ -39,7 +39,7 @@ Cada camada só conhece a de baixo. Regra de negócio nunca fica em handler nem 
 | Domínio | Pasta | Peças |
 |---|---|---|
 | Mundo | `Game/World` | `GameWorld` (thread do mundo), `Zone`, `ZoneSystem`, `PlayerSystem`, `WorldIo`, `IGameClock`, `InteractionGuard` (**S4**) |
-| Itens | `Game/Items` | `ItemService` (dar, tirar, trocar, depósito da conta; **G2**), `ItemGrant`/`ItemDuration` (**G1**), `EquipmentService` (**G5**), `ItemUseService` e efeitos de uso (**E4**) |
+| Itens | `Game/Items` | `ItemService` (dar, trocar, conferir espaço, depósito da conta), `ItemGrant`/`ItemDuration`, `EquipmentService` (**G5**), `ItemUseService` e efeitos de uso (**E4**) |
 | Economia | `Game/Economy` | `Wallet`/`CurrencyKind` (**G3**), `NpcShopService` (**G4**), `CashShopService`, `EconomyLedger`, `IAuditLog` |
 | Status | `Game/Stats` | `StatFormulas` (**o único lugar** com fórmulas de status), `ExpFormulas`, `StatModifiers` (**E1**) |
 | Digimon | `Game/Digimons` | títulos, captura (`Taming`), progressão |
