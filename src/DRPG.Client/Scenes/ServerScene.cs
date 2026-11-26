@@ -90,21 +90,21 @@ public sealed class ServerScene(GameContext game) : IScene
         _lowerPanel = sprites.Gui("dr2_in_002_010");
         _box = new MessageBox(sprites.Load("gui\\dr2_in_000_003.spr"), game.Text);
 
-        // ✅ links, texts 0x5da.. (docs/cliente/cenas.md): (text id, x, y, bracket indent, event id)
+        // ✅ links, arguments of the 0x00b53db0 calls in 0x00b52b30: (text id, x, y, bracket indent, event id)
         _digitalWorldLinks =
         [
             new(0x5da, 448, 166, 30, EventNetOcean),
-            new(0x5dd, 430, 366, 9, EventConsignmentStore),
+            new(0x5dd, 430, 366, 8, EventConsignmentStore),
             new(0x5e8, 430, 398, 8, EventChannelEvent),
         ];
         _channelLinks =
         [
-            new(0x5e0, 430, 191, 26, EventChannel1 + 1),
-            new(0x5e1, 430, 216, 26, EventChannel1 + 2),
-            new(0x5e2, 430, 241, 26, EventChannel1 + 3),
-            new(0x5e3, 430, 166, 26, EventChannel1),
+            new(0x5e0, 430, 191, 9, EventChannel1 + 1),
+            new(0x5e1, 430, 216, 9, EventChannel1 + 2),
+            new(0x5e2, 430, 241, 9, EventChannel1 + 3),
+            new(0x5e3, 430, 166, 9, EventChannel1),
         ];
-        _battleZoneLinks = [new(0x5da, 326, 315, 30, EventNetOcean)];   // ❓ the indent of this one is not in the dump
+        _battleZoneLinks = [new(0x5da, 326, 315, 26, EventNetOcean)];
 
         game.Sounds.Register(ButtonSound, "sound\\menu-bt.wav");
         game.Sounds.Register(OpenSound, "sound\\menu-1.wav");

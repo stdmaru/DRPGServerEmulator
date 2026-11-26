@@ -24,7 +24,7 @@ public sealed class AnimatedSprites(PackArchive resource, SpriteStore sprites, A
         {
             var ani = AniFile.Parse(resource.ReadEntry(aniPath));
             var folder = aniPath[..(aniPath.LastIndexOf('\\') + 1)];
-            return new SpriteAnimator(ani, sprites.Load(folder + ani.SpriteName + ".spr"));
+            return new SpriteAnimator(ani, sprites.LoadLazy(folder + ani.SpriteName + ".spr"));
         }
         catch (Exception e) when (e is AniFormatException or SpriteFormatException or PackFormatException or InvalidDataException)
         {
@@ -62,8 +62,8 @@ public sealed class AnimatedSprites(PackArchive resource, SpriteStore sprites, A
     {
         if (tamerId < 1 || Open($"Sprite\\a_{tamerId - 1:00}.ani") is not { } body)
             return null;
-        var layers = new List<ITexture[]>();
-        var loaded = new Dictionary<int, ITexture[]?>();
+        var layers = new List<IReadOnlyList<ITexture>>();
+        var loaded = new Dictionary<int, IReadOnlyList<ITexture>?>();
         foreach (int part in TamerLayers)
         {
             if (!loaded.TryGetValue(part, out var frames))
@@ -74,7 +74,7 @@ public sealed class AnimatedSprites(PackArchive resource, SpriteStore sprites, A
         return new TamerDoll(body, layers);
     }
 
-    private ITexture[]? OpenSprite(string path)
+    private IReadOnlyList<ITexture>? OpenSprite(string path)
     {
         if (!resource.Contains(path))
         {
@@ -83,7 +83,7 @@ public sealed class AnimatedSprites(PackArchive resource, SpriteStore sprites, A
         }
         try
         {
-            return sprites.Load(path);
+            return sprites.LoadLazy(path);
         }
         catch (Exception e) when (e is SpriteFormatException or PackFormatException or InvalidDataException)
         {
@@ -94,11 +94,11 @@ public sealed class AnimatedSprites(PackArchive resource, SpriteStore sprites, A
 }
 
 /// <summary>A tamer as the character selection draws it: the animated body and the clothes over it, all by the body's frame.</summary>
-public sealed class TamerDoll(SpriteAnimator body, IReadOnlyList<ITexture[]> layers)
+public sealed class TamerDoll(SpriteAnimator body, IReadOnlyList<IReadOnlyList<ITexture>> layers)
 {
     public SpriteAnimator Body { get; } = body;
 
-    public IReadOnlyList<ITexture[]> Layers { get; } = layers;
+    public IReadOnlyList<IReadOnlyList<ITexture>> Layers { get; } = layers;
 
     /// <summary>✅ <c>0x0099fb90</c>: every layer by the top-left corner of the frame at the same point; a layer without that frame is skipped.</summary>
     public void Draw(IRenderer renderer, int x, int y)
@@ -106,7 +106,7 @@ public sealed class TamerDoll(SpriteAnimator body, IReadOnlyList<ITexture[]> lay
         if (Body.Texture is { } frame)
             renderer.Draw(frame, x, y);
         foreach (var layer in Layers)
-            if (Body.Frame >= 0 && Body.Frame < layer.Length)
+            if (Body.Frame >= 0 && Body.Frame < layer.Count)
                 renderer.Draw(layer[Body.Frame], x, y);
     }
 }

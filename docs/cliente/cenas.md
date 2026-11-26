@@ -96,7 +96,7 @@ Ordem por quadro:
        - Sem o bit 15: `GUI\dr2_in_002_010.spr` quadro 1 em **(363, 330)**; links "Net Ocean" `0x5da` em (448, 166) (id 102), "Net Ocean Consignment Store" `0x5dd` em (430, 366) (id 210), "Net Ocean Event Channel" `0x5e8` em (430, 398) (id 213).
        - Com o bit 15: "Net Ocean - Channel 2" `0x5e0` em (430, 191) (id 201), "Channel 3" `0x5e1` em (430, 216) (id 202), "Channel 4" `0x5e2` em (430, 241) (id 203), "Channel 1" `0x5e3` em (430, 166) (id 200).
      - BATTLE ZONE: `GUI\dr2_in_002_007.spr` quadro 0 em **(231, 147)**; link "Net Ocean" `0x5da` em (326, 315) (id 102).
-   - **Link de texto** `0x00b53db0(slot, idTexto, x, y, recuo, idEvento)`: retângulo = medida do texto na fonte padrão; normal: texto **amarelo** `0xffff` com sombra em (x, y); sob o mouse: texto em (x, y − 1) e os colchetes `GUI\dr2_in_002_008.spr` quadro 1 em (x − recuo, y − 9) (recuos: 30, 9, 8, 26 conforme a lista acima). Clique → `evento(idEvento)` (`0x00b51950`).
+   - **Link de texto** `0x00b53db0(slot, idTexto, x, y, recuo, idEvento)`: retângulo = medida do texto na fonte padrão; normal: texto **amarelo** `0xffff` com sombra em (x, y); sob o mouse: texto em (x, y − 1) e os colchetes `GUI\dr2_in_002_008.spr` quadro 1 em (x − recuo, y − 9) (✅ recuos, argumentos das chamadas em `0x00b52b30`: "Net Ocean" do DIGITAL WORLD 30, Consignment Store 8, Event Channel 8, os quatro canais 9, "Net Ocean" do BATTLE ZONE 26). Clique → `evento(idEvento)` (`0x00b51950`).
 5. Mensagens centradas (caixa `FUN_007dd610`, branco): bit 13 → `0x5ee` em (400, 260) por 80 quadros; sem rede (`IsNetworkAlive`, `0x00ad2870`) → `0x5ef` em (400, 300) por 100 quadros e bloqueia os cliques; bit 7 → `+0x2468` em (400, 260) por 20 quadros. O contador `+0xae0` é compartilhado; também some ao clicar (`[DAT_011584ec]+0x250`).
 6. Depois do desenho da GUI: versão `Digimon RPG 3.26` em (1, 1); **`0x5eb` "ⓒ Akiyoshi Hongo, Toei Animation"** em (5, 585) branco (`FUN_00b55760`, ❓ com fundo/contorno); cursor.
 
@@ -150,10 +150,10 @@ Ordem das capturas: login `0x05` → channel `0x03` → `0x04` → `0x12` + `0x1
 4. Botões (`0x009b75a0(x, y, sprite)`):
    | Campo | Sprite | Posição | Função |
    |---|---|---|---|
-   | `+0xf80` | `dr2_ch_000_001` | (26, 66) | slot 0 (mapa de quadros 0, 1, 1, 1) |
-   | `+0xfc0` | `dr2_ch_000_002` | (425, 66) | slot 1 (mapa padrão 0, 1, 2, 3) |
-   | `+0x1000` | `dr2_ch_000_003` | (26, 301) | slot 2 (padrão) |
-   | `+0x1040` | `dr2_ch_000_004` | (425, 301) | slot 3 (padrão) |
+   | `+0xf80` | `dr2_ch_000_001` | (26, 66) | slot 0 (os 4 slots: mapa de quadros 0, 1, 1, 1, laço em `0x00b48000`) |
+   | `+0xfc0` | `dr2_ch_000_002` | (425, 66) | slot 1 |
+   | `+0x1000` | `dr2_ch_000_003` | (26, 301) | slot 2 |
+   | `+0x1040` | `dr2_ch_000_004` | (425, 301) | slot 3 |
    | `+0x1080` | `dr2_ch_000_005` (`_ENG` "Delete Character") | (26, 565) | apagar |
    | `+0x10c0` | `dr2_ch_000_006` ("Create Character") | (134, 565) | criar |
    | `+0x1400` | `dr2_ch_000_009` ("Exchange Password") | (246, 565) | trocar senha |
@@ -220,7 +220,7 @@ Código em `src/DRPG.Client` (`Scenes/`, `Ui/`, `Startup/`, `Text/`, `Data/`) e 
 
 ### Ainda ❓ (não inventado)
 - ✅ **tamerId → `a_%02d`:** `id − 1` confirmado em `0x00b21cd0` (laço de 1 a 4, `a_%02d` com `id − 1`, roupas com `id`).
-- **Silhueta do BZ** (modo de mistura `0xc`) e o recuo do colchete dos links do BZ: não implementados.
+- **Silhueta do BZ** (modo de mistura `0xc`): não implementada.
 - **Chave do `option.ini`** de cada volume: `[BGM] sound` (efeitos) e `bgm` (música), padrão 1.
 - **Overlay de idioma da tabela Map** não aplicado; **animação de 3 s "voltar à cena 2"** não implementada; **`IsNetworkAlive`** não implementado.
 - **Senha fraca:** o diálogo mostra só a primeira linha. **Sombra de sprite** (opção) não aplicada. **Espécie 817** com `+0x80 == 2` (`817_2.ani`) não tratada.

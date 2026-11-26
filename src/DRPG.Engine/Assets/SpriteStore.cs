@@ -8,6 +8,7 @@ namespace DRPG.Engine.Assets;
 public sealed class SpriteStore(PackArchive pack, IRenderer renderer) : IDisposable
 {
     private readonly Dictionary<string, ITexture[]> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, SpriteFrames> _lazy = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyDictionary<string, SpriteFile>? _preloaded;
 
     /// <summary>
@@ -90,14 +91,30 @@ public sealed class SpriteStore(PackArchive pack, IRenderer renderer) : IDisposa
 
     public ITexture[] Load(string path) => Load(path, disabled: false);
 
+    /// <summary>
+    /// Like <see cref="Load(string)"/>, but each frame is decoded and uploaded only when it is first drawn
+    /// (<see cref="SpriteFrames"/>): for the animated sprites, whose many frames are mostly never shown.
+    /// </summary>
+    public SpriteFrames LoadLazy(string path)
+    {
+        if (_lazy.TryGetValue(path, out var frames))
+            return frames;
+        frames = new SpriteFrames(Parse(path), renderer);
+        _lazy[path] = frames;
+        return frames;
+    }
+
+    private SpriteFile Parse(string path) =>
+        _preloaded is not null && _preloaded.TryGetValue(PackPath.Normalize(path), out var parsed)
+            ? parsed
+            : SpriteFile.Parse(pack.ReadEntry(path));
+
     private ITexture[] Load(string path, bool disabled)
     {
         var key = disabled ? path + "|disabled" : path;
         if (_cache.TryGetValue(key, out var frames))
             return frames;
-        var sprite = _preloaded is not null && _preloaded.TryGetValue(PackPath.Normalize(path), out var parsed)
-            ? parsed
-            : SpriteFile.Parse(pack.ReadEntry(path));
+        var sprite = Parse(path);
         frames = new ITexture[sprite.Frames.Count];
         for (int i = 0; i < frames.Length; i++)
         {
@@ -132,5 +149,8 @@ public sealed class SpriteStore(PackArchive pack, IRenderer renderer) : IDisposa
             foreach (var t in frames)
                 t.Dispose();
         _cache.Clear();
+        foreach (var frames in _lazy.Values)
+            frames.Dispose();
+        _lazy.Clear();
     }
 }

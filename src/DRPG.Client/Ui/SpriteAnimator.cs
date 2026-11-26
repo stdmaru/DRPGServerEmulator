@@ -9,7 +9,7 @@ namespace DRPG.Client.Ui;
 /// <c>start + count − 1</c>, goes back to <c>start</c> (so the last frame of the range is never shown). Direction 0 always.
 /// Changing to another animation keeps the current frame until the next loop, like the original; <see cref="Restart"/> does not.
 /// </summary>
-public sealed class SpriteAnimator(AniFile ani, ITexture[] frames)
+public sealed class SpriteAnimator(AniFile ani, IReadOnlyList<ITexture> frames)
 {
     public const int TicksPerFrame = 3;
 
@@ -25,7 +25,7 @@ public sealed class SpriteAnimator(AniFile ani, ITexture[] frames)
     public int Frame { get; private set; } = ani.Range(Standing, 0).Start;
 
     /// <summary>The texture of the current frame; null when the animation points outside the sprite.</summary>
-    public ITexture? Texture => Frame >= 0 && Frame < frames.Length ? frames[Frame] : null;
+    public ITexture? Texture => Frame >= 0 && Frame < frames.Count ? frames[Frame] : null;
 
     /// <summary>The anchor of the current frame; (0, 0) when there is none.</summary>
     public (int X, int Y) Anchor => Frame >= 0 && Frame < Ani.Frames.Count ? (Ani.Frames[Frame].AnchorX, Ani.Frames[Frame].AnchorY) : (0, 0);

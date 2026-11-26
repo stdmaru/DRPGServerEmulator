@@ -55,8 +55,9 @@ public sealed class CharacterSelectScene(GameContext game) : IScene
         _background = sprites.Gui("dr2_ch_000_000")[0];
         for (int i = 0; i < SlotCount; i++)
         {
-            // ✅ slot 0 maps its states to frames 0, 1, 1, 1; the others to 0, 1, 2, 3 (the sprites have only two frames)
-            _slotButtons[i] = new Button(sprites.Gui(SlotSprites[i]), SlotButtons[i].X, SlotButtons[i].Y, i == 0 ? [0, 1, 1, 1] : null);
+            // ✅ 0x00b48000: a loop over the four slots maps their states to frames 0, 1, 1, 1 (the sprites have only two
+            // frames, so "pressed" shows the highlighted one)
+            _slotButtons[i] = new Button(sprites.Gui(SlotSprites[i]), SlotButtons[i].X, SlotButtons[i].Y, [0, 1, 1, 1]);
         }
         _delete = new Button(sprites.Gui("dr2_ch_000_005"), DeleteX, ButtonsY);
         _create = new Button(sprites.Gui("dr2_ch_000_006"), CreateX, ButtonsY);

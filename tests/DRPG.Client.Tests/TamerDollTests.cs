@@ -1,3 +1,4 @@
+using DRPG.Engine.Assets;
 using DRPG.Client.Data;
 using DRPG.Client.Ui;
 
@@ -31,6 +32,20 @@ public sealed class TamerDollTests
 
         Assert.DoesNotContain(fixture.Renderer.Draws, d => d.Texture.Width == 19);
         Assert.Equal(7, fixture.Renderer.Draws.Count);
+    }
+
+    [Fact]
+    public void Only_the_frames_that_are_drawn_are_uploaded()
+    {
+        using var fixture = new SceneFixture();
+        var doll = new AnimatedSprites(fixture.Resource, fixture.Sprites, fixture.Log.Add).OpenTamer(1)!;
+        var clothes = Assert.IsType<SpriteFrames>(doll.Layers[0]);
+        Assert.Equal(0, clothes.Uploaded);       // opening the screen uploads nothing (it froze for 2 s uploading all)
+
+        doll.Draw(fixture.Renderer, 0, 0);
+
+        Assert.Equal(1, clothes.Uploaded);
+        Assert.Equal(16, clothes.Count);
     }
 
     [Theory]
