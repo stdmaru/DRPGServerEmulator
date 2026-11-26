@@ -61,9 +61,10 @@ public static class StatFormulas
     };
 
     /// <summary>
-    /// Atributos base da forma: 10 + 20 por estágio acima de in-training + status-base × (nível limitado − 1).
-    /// ✅ in-training e rookie (Monodramon L11 60/50/50/50, Kotemon L160 87/68/68/49). ❓ champion e ultimate batem
-    /// em CON e INT (Musyamon, Vajramon L160) mas não em STR/AGI; mega não segue a fórmula. Espécie sem dex não cresce.
+    /// Atributos base de uma espécie isolada: 10 + 20 por estágio acima de in-training + status-base × (nível limitado − 1).
+    /// ✅ in-training e rookie (Monodramon L11 60/50/50/50, Bearmon/V-mon L20 87/68/68/49).
+    /// Para formas evoluídas (champion em diante), use <see cref="BaseAttributes(IReadOnlyList{DigimonSpecies}, int)"/>
+    /// para acumular o crescimento de cada janela de estágio da linha. Espécie sem dex não cresce.
     /// </summary>
     public static Attributes BaseAttributes(DigimonSpecies species, int level)
     {
@@ -72,6 +73,43 @@ public static class StatFormulas
         var g = species.Growth ?? default;
         int b = 10 + 20 * (stage - 1);
         return new(b + g.Str * levels, b + g.Agi * levels, b + g.Con * levels, b + g.Int * levels);
+    }
+
+    /// <summary>
+    /// Atributos base cumulativos ao longo da linha evolutiva (<paramref name="line"/> ordenada da forma-base até a forma atual).
+    /// ✅ Confirmado em v322 (sessão 56): cada estágio acima da forma-base soma +20 por estágio e aplica o seu próprio
+    /// crescimento apenas na janela de níveis daquele estágio (champion 21–30, ultimate 31–40, mega 41+):
+    /// XV-mon L21 (V-mon 3/2/2/1 → XV-mon 3/2/1/2) = 110/90/89/71 (+ alloc 4/8/2/20 = 114/98/91/91);
+    /// Gryzmon L160 = 137/108/108/79; Grappu Leomon L160 = 187/148/148/109 (0 erros).
+    /// ❓ Mega L160 (921) tem +2 extra por nível em todos os atributos além do crescimento da dex (amostra única).
+    /// </summary>
+    public static Attributes BaseAttributes(IReadOnlyList<DigimonSpecies> line, int level)
+    {
+        if (line.Count == 0) return default;
+        if (line.Count == 1) return BaseAttributes(line[0], level);
+
+        var total = BaseAttributes(line[0], level);
+        byte prevStage = Math.Max(InTraining, line[0].Stage);
+
+        for (int i = 1; i < line.Count; i++)
+        {
+            var species = line[i];
+            byte stage = Math.Max(prevStage, species.Stage);
+            int stageBonus = 20 * (stage - prevStage);
+            int startLevel = StageLevel(stage) - 1;
+            int windowLevels = Math.Max(0, Math.Min(level, GrowthCap(stage)) - startLevel);
+            var g = species.Growth ?? default;
+
+            total += new Attributes(
+                stageBonus + g.Str * windowLevels,
+                stageBonus + g.Agi * windowLevels,
+                stageBonus + g.Con * windowLevels,
+                stageBonus + g.Int * windowLevels);
+
+            prevStage = stage;
+        }
+
+        return total;
     }
 
     /// <summary>

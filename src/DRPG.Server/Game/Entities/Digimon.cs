@@ -116,7 +116,37 @@ public sealed class Digimon
     public int Evp { get; private set; }
 
     public Attributes Allocated => Current.Allocated;
-    public Attributes Attributes => StatFormulas.BaseAttributes(Species, Level) + Current.Allocated;
+    public Attributes Attributes => StatFormulas.BaseAttributes(EvolutionLine(Current.Species), Level) + EffectiveAllocated(Current);
+
+    /// <summary>
+    /// ✅ Pontos de atributo efetivos da forma: os próprios somados aos distribuídos nas formas anteriores da linha
+    /// (sessão 56: XV-mon L21 herda os 34 pts do V-mon; em 0x38a85, pontos gastos no rookie propagam para
+    /// champion/ultimate/mega e pontos gastos no champion propagam para ultimate/mega).
+    /// </summary>
+    public Attributes EffectiveAllocated(DigimonForm form)
+    {
+        if (form == BaseForm || form.Species.Stage <= StatFormulas.Rookie)
+            return form.Allocated;
+
+        var total = BaseForm.Allocated;
+        for (byte stage = (byte)(BaseForm.Species.Stage + 1); stage < form.Species.Stage; stage++)
+            if (LineSpecies(stage) is { } ancestor && FindForm(ancestor.Id) is { } ancestorForm)
+                total += ancestorForm.Allocated;
+        return total + form.Allocated;
+    }
+
+    private List<DigimonSpecies> EvolutionLine(DigimonSpecies target)
+    {
+        var line = new List<DigimonSpecies> { BaseForm.Species };
+        if (target.Id == BaseForm.Species.Id || target.Stage <= BaseForm.Species.Stage)
+            return line;
+
+        for (byte stage = (byte)(BaseForm.Species.Stage + 1); stage < target.Stage; stage++)
+            if (LineSpecies(stage) is { } ancestor)
+                line.Add(ancestor);
+        line.Add(target);
+        return line;
+    }
 
     public CombatStats Stats => WildStats ?? ComputePlayerStats();
     public long ExpToNextLevel => _data.DigimonExpToNext(Level);
