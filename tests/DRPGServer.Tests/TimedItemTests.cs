@@ -183,9 +183,10 @@ public class TimedItemTests
         Assert.Null(inv.EquippedAt(ItemPlace.Crest1));
         Assert.Equal(boostedAtk - 15, player.Leader.Stats.Atk);
         var ops = session.SentOpcodes();
-        Assert.Contains((ushort)MapOpcode.InventoryRefresh, ops);
-        Assert.Contains((ushort)MapOpcode.TamerExp, ops);
-        Assert.Contains((ushort)MapOpcode.BattleDigimonStatus, ops);
+        // EquipmentService: 0xFC da mochila, depois a sequência de troca de equipamento (0xB1 → 0xB4 por Digimon → 0x10)
+        ushort[] sequence = [(ushort)MapOpcode.InventoryRefresh, (ushort)MapOpcode.TamerExp,
+            (ushort)MapOpcode.BattleDigimonStatus, (ushort)MapOpcode.RefreshCharacterInfo];
+        Assert.Equal(sequence, ops.Where(sequence.Contains));
 
         // 3. Persistência e recarga: item válido permanece com ExpiresAt; item vencido é descartado no login
         var validTimed = inv.Create(718, (int)ItemPlace.Aura, 1, expiresAt: futureTs);

@@ -1,6 +1,7 @@
 using DRPGServer.Game;
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;
 
@@ -154,29 +155,9 @@ public sealed class ItemMoveHandler(InteractionGuard guard) : PlayerHandler<Item
         }
     }
 
-    /// <summary>
-    /// ✅ Sequência oficial ao equipar/desequipar (captures.db conn=234 pid=115773..115778):
-    /// 0xB1 (Tamer + equipamentos) → 0xB4 (um por Digimon do time com status recalculados) → 0x10 → 0x91.
-    /// </summary>
     private static void ApplyEquipmentChange(Player player, ItemMoveHeader header, InventoryItem moved, InventoryItem? displaced)
     {
-        var c = player.Character;
-        c.SyncEquipmentBonuses();
-        // Ao desequipar uma Aura que mantém evolução, Digimons evoluídos no mapa voltam para a forma-base
-        if (!c.TotalEquipmentBonus.MaintainEvolution)
-        {
-            foreach (var digimon in c.Digimons)
-                if (digimon.IsEvolved)
-                    digimon.Devolve();
-        }
-        player.RequestImmediateSave();
-        player.Send(new TamerExpPacket(c));
-        foreach (var digimon in c.Digimons)
-            player.Send(new BattleDigimonStatusPacket(digimon));
-        if (player.Zone is { } zone)
-            zone.Broadcast(new RefreshCharacterInfoPacket(c));
-        else
-            player.Send(new RefreshCharacterInfoPacket(c));
+        EquipmentService.Changed(player);
         player.Send(new ItemMovePacket(header, moved, displaced));
     }
 

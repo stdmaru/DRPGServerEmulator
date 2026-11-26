@@ -1,7 +1,7 @@
 # Equipamentos do Tamer
 
 Dados: engenharia reversa de `DigimonRPG.bin` (`0x00AF030C`, `0x00B0E740..0x00B0FEFD`, `0x00B5BB50`, `0x00B5C170`) e capturas v322 em `captures.db` (`conn=234`, `conn=238`, `conn=428`).
-Código em `Game/Entities/EquipmentSlots.cs`, `Game/Entities/Inventory.cs`, `Network/Handlers/Map/ItemHandlers.cs`, `Network/Packets/Map/CharacterPackets.cs` (`0x02`) e `Network/Packets/Map/BattlePackets.cs` (`0xB1`).
+Código em `Game/Entities/EquipmentSlots.cs`, `Game/Entities/Inventory.cs`, `Game/Items/EquipmentService.cs`, `Network/Handlers/Map/ItemHandlers.cs`, `Network/Packets/Map/CharacterPackets.cs` (`0x02`) e `Network/Packets/Map/BattlePackets.cs` (`0xB1`).
 
 ---
 
@@ -53,6 +53,7 @@ Confirmado em `captures.db` (`conn=234`, `pid=115772..115794`):
    2. **`S2C 0xB4` (696 B) × N**: um bloco atualizado por Digimon da party.
    3. **`S2C 0x10` (204 B)**: atualização do Tamer no mapa.
    4. **`S2C 0x91` (236 B)**: eco da movimentação com o item movido e o item trocado (ou zeros).
+3. Os passos 1 a 3 (bônus, evolução sem Aura, gravação, `0xB1`/`0xB4`/`0x10`) ficam em `Game/Items/EquipmentService.Changed`, que o `0x91` e o vencimento de prazo no tick da zona (`EquipmentService.RemoveExpired`, com `0xFC` antes se a mochila também perdeu itens) usam igual.
 
 ---
 
