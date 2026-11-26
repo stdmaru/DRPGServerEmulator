@@ -18,7 +18,15 @@ Código: `Network/AccountRegistry.cs`. Testes: `AccountRegistryTests`.
 - Enquanto alguma sessão da conta está aberta, o ticket não vence. Depois que a última fecha, ele vale por `Network:AccountTicketSeconds` (padrão 60).
 - Um novo login no channel substitui o ticket e derruba as sessões do anterior (channel, mapa e global).
 - Recusa vai para o log com o motivo (`ClaimRejection`: sem ticket, vencido, outro IP, já usado) e fecha a conexão.
-- `auth_key` é guardada como hash PBKDF2-SHA256 com sal, e a comparação é em tempo constante (**PR #41: S8**).
+
+### `auth_key`
+Código: `Game/Accounts/AuthKeyHash.cs` e `AccountAuthenticator.cs`. Testes: `AuthKeyTests`.
+- Guardada em `account.auth_key_hash` (migração `0013`) no formato `pbkdf2-sha256$<iterações>$<sal base64>$<hash base64>`: sal de 16 bytes, hash de 32, 100 000 iterações. A chave é um token aleatório emitido a cada login, não uma senha escolhida; mais iterações só encareceriam cada tentativa de login.
+- O launcher continua mandando a chave em claro no `0x04`. A comparação é sempre em tempo constante, e usuário inexistente, chave vazia ou conta sem chave gastam o mesmo tempo de um hash conferido.
+- **Compatibilidade com o emissor:** quem emite a chave (site, launcher, `INSERT` de teste) pode continuar gravando em `account.auth_key` em texto puro. Essa chave é a emissão mais nova e vale no lugar do hash antigo; no primeiro login com ela, ou na próxima partida do servidor, ela vira hash e a coluna `auth_key` fica `NULL`. A conversão só grava se a chave ainda for a mesma (o emissor pode ter trocado nesse meio-tempo).
+- O emissor também pode gravar o hash direto, por exemplo em Python: `hashlib.pbkdf2_hmac('sha256', chave.encode(), sal, 100000, 32)`, com o resultado montado no formato acima.
+- Nenhuma chave nem hash vai para o log.
+- ❓ A coluna `account.password` não é usada pelo servidor e continua como o emissor a grava.
 
 ## Entrada e saída do mundo
 Código: `PlayerSystem` (estado da conta, thread do mundo) e `WorldEntry` (o fluxo do `0x01`). Testes: `WorldEntryTests`.

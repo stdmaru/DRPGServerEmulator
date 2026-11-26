@@ -14,6 +14,7 @@ INSERT INTO account(username,password,auth_key,authority) VALUES('replay','x','R
 INSERT INTO `character`(account_uid,name,tamer_id,level,map_id,pos_x,pos_y,slot) VALUES(LAST_INSERT_ID(),'Replayer',1,1,79,56,56,0);
 INSERT INTO digimon(character_uid,digimon_id,name,level,is_leader) VALUES(LAST_INSERT_ID(),10,'Agumon',1,1);
 ```
+A `auth_key` em texto puro é convertida em hash no primeiro login ou na próxima partida ([segurança](../emulador/seguranca.md#auth_key)); o script continua mandando `REPLAYKEY`.
 
 ## Usar
 ```bash

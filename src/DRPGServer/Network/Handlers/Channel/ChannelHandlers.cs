@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using DRPGServer.Configuration;
 using DRPGServer.Data.Repositories;
+using DRPGServer.Game.Accounts;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Channel;
@@ -38,7 +39,7 @@ public sealed class ChannelSelectHandler(IOptions<GameOptions> options) : Sessio
 
 /// <summary>0x04: autenticação por usuário + auth key (a do launcher).</summary>
 [PacketHandler(ChannelOpcode.Authenticate)]
-public sealed class AuthenticateHandler(AccountRepository accounts, AccountRegistry registry, ILogger<AuthenticateHandler> log)
+public sealed class AuthenticateHandler(AccountAuthenticator authenticator, AccountRegistry registry, ILogger<AuthenticateHandler> log)
     : SessionHandler<AuthenticateRequest>
 {
     protected override async ValueTask HandleAsync(Session session, AuthenticateRequest request, CancellationToken ct)
@@ -49,8 +50,7 @@ public sealed class AuthenticateHandler(AccountRepository accounts, AccountRegis
             return;
         }
 
-        var record = await accounts.FindByUsernameAsync(request.Username, ct);
-        if (record is null || string.IsNullOrEmpty(record.AuthKey) || record.AuthKey != request.AuthKey)
+        if (await authenticator.AuthenticateAsync(request.Username, request.AuthKey, ct) is not { } account)
         {
             log.LogWarning("Autenticação recusada para {Username} de {Session}", request.Username, session);
             session.Send(new AuthenticationPacket(ChannelError.InvalidCredentials, request.Username, request.AuthKey,
@@ -58,13 +58,13 @@ public sealed class AuthenticateHandler(AccountRepository accounts, AccountRegis
             return;
         }
 
-        if (!registry.SignIn(record.Account, session))
+        if (!registry.SignIn(account, session))
         {
             session.Close("conexão sem endereço");
             return;
         }
-        log.LogInformation("{Username} autenticado ({Authority})", record.Account.Username, record.Account.Authority);
-        session.Send(new AuthenticationPacket(ChannelError.None, record.Account.Username));
+        log.LogInformation("{Username} autenticado ({Authority})", account.Username, account.Authority);
+        session.Send(new AuthenticationPacket(ChannelError.None, account.Username));
     }
 }
 

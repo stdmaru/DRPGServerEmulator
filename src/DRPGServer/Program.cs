@@ -3,6 +3,7 @@ using DRPGServer.Data;
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Persistence;
 using DRPGServer.Data.Repositories;
+using DRPGServer.Game.Accounts;
 using DRPGServer.Game.Battle;
 using DRPGServer.Game.Commands;
 using DRPGServer.Game.Npcs;
@@ -68,6 +69,8 @@ services.AddSingleton<IGameClock, GameClock>();
 services.AddSingleton<Database>();
 services.AddSingleton<DatabaseMigrator>();
 services.AddSingleton<AccountRepository>();
+services.AddSingleton<IAccountStore>(sp => sp.GetRequiredService<AccountRepository>());
+services.AddSingleton<AccountAuthenticator>();
 services.AddSingleton<DRPGServer.Game.DigimonUids>();
 services.AddSingleton<CharacterRepository>();
 services.AddSingleton<ICharacterSnapshotStore>(sp => sp.GetRequiredService<CharacterRepository>());
@@ -162,6 +165,8 @@ try
     using (var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5)))
     {
         await host.Services.GetRequiredService<DatabaseMigrator>().MigrateAsync(cts.Token);
+        var converted = await host.Services.GetRequiredService<AccountAuthenticator>().ConvertPlainKeysAsync(cts.Token);
+        if (converted > 0) log.LogInformation("{Count} auth_key em texto puro convertida(s) para hash", converted);
         var maxUid = await host.Services.GetRequiredService<CharacterRepository>().MaxDigimonUidAsync(cts.Token);
         host.Services.GetRequiredService<DRPGServer.Game.DigimonUids>().Seed(maxUid);
         await host.Services.GetRequiredService<ExpEventService>().ReloadAsync(forceNotify: false, cts.Token);
