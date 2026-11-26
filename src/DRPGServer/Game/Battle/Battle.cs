@@ -65,6 +65,8 @@ public sealed class Battle
     /// <summary>✅ Selvagens usam skills em ~31 % dos turnos nas capturas v322 (22 de 70 ações) quando têm VP.</summary>
     public const double WildSkillChance = 0.30;
     public const int MaxPerSide = 5;
+    /// <summary>❓ Chance do Digimon Graveyard levar o HP do alvo à metade (sem amostra; valor de projeto).</summary>
+    public const double HalveEnemyHpProbability = 0.20;
 
     private enum Phase { Opening, Running, Animating, Over }
 
@@ -234,23 +236,67 @@ public sealed class Battle
         actor.Gauge = 0;
     }
 
+    /// <summary>Tudo o que um golpe precisa depois de resolvidos skill, cards e equipamento.</summary>
+    private sealed record AttackPlan(
+        Data.GameData.SkillInfo? Skill,
+        int SkillLevel,
+        List<Combatant> Targets,
+        CardAttackContext? Attack,
+        CardDefenseContext? Defense,
+        Dictionary<Combatant, ActivatedCards> ActivatedCards,
+        StatModifiers AttackerEquipment,
+        double DamageMultiplier,
+        double DefenseMultiplier,
+        double AttackerBrMultiplier,
+        double TargetBrMultiplier);
+
+    /// <summary>
+    /// Golpe: resolve skill e modificadores, aplica em cada alvo, ajusta a barra, dá recompensas de nocaute e avisa
+    /// (<c>0x67</c>). Termina a batalha se um lado caiu.
+    /// </summary>
     /// <param name="skillSlot">null = ataque básico.</param>
     private void Attack(Combatant actor, Combatant target, int? skillSlot)
     {
         Broadcast(new LockActionBarPacket());
-        var digimon = actor.Digimon;
-        Data.GameData.SkillInfo? skill = null;
-        int skillLevel = 0;
+        var (acting, other) = actor.Side == BattleSide.A ? (_teamA, _teamB) : (_teamB, _teamA);
+        var (skill, skillLevel) = ChooseSkill(actor.Digimon, skillSlot);
+        var plan = ResolveModifiers(actor, target, skill, skillLevel, acting, other);
+
+        var hits = new Dictionary<Combatant, bool>(plan.Targets.Count);
+        foreach (var victim in plan.Targets)
+            hits[victim] = Strike(actor, victim, plan);
+
+        actor.Actions++;
+        actor.Gauge = GaugeAfterAttack(plan.Attack);
+        GrantKnockoutRewards(actor, target, plan);
+
+        byte attackType = skill?.Type ?? Data.GameData.SkillInfo.TypeMelee;
+        Broadcast(new ActionResultsPacket(acting, other, actor, hits, attackType, skill?.Id ?? 0,
+            plan.ActivatedCards.Count > 0 ? plan.ActivatedCards : null));
+
+        if (_teamB.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Win);
+        else if (_teamA.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Lose);
+        else _phase = Phase.Animating;
+    }
+
+    /// <summary>A skill do slot, se está aprendida e o VP paga; senão ataque básico (null).</summary>
+    private static (Data.GameData.SkillInfo? Skill, int Level) ChooseSkill(Digimon digimon, int? skillSlot)
+    {
         if (skillSlot is { } slot
             && digimon.Current.SkillLevels[slot] >= 1
             && digimon.SkillInfoOf(slot) is { } candidate
             && digimon.SpendVp(candidate.VpCost))
-        {
-            skill = candidate;
-            skillLevel = digimon.Current.SkillLevels[slot];
-        }
+            return (candidate, digimon.Current.SkillLevels[slot]);
+        return (null, 0);
+    }
 
-        var (acting, other) = actor.Side == BattleSide.A ? (_teamA, _teamB) : (_teamB, _teamA);
+    /// <summary>
+    /// Cards de ataque (e os efeitos que valem antes do golpe), alvos, cards de defesa e bônus de equipamento,
+    /// nessa ordem.
+    /// </summary>
+    private AttackPlan ResolveModifiers(Combatant actor, Combatant target, Data.GameData.SkillInfo? skill, int skillLevel,
+        IReadOnlyList<Combatant> acting, IReadOnlyList<Combatant> other)
+    {
         var activatedCards = new Dictionary<Combatant, ActivatedCards>();
         CardAttackContext? atkCtx = null;
         CardDefenseContext? defCtx = null;
@@ -275,94 +321,102 @@ public sealed class Battle
             defCtx = CardEffectEvaluator.EvaluateDefense(defActivated);
         }
 
-        var atkEquip = actor.Owner?.Character.EquipmentModifiers ?? StatModifiers.None;
-        double equipDamageMult = 1.0 + EquipmentDamageBonusPercent(atkEquip, skill) / 100.0;
-        double damageMult = (atkCtx?.DamageMultiplier ?? 1.0) * (defCtx?.IncomingDamageMultiplier ?? 1.0) * equipDamageMult;
-        double defenseMult = defCtx?.DefenseMultiplier ?? 1.0;
-        double attackerBrMult = atkCtx?.BrMultiplier ?? 1.0;
-        double targetBrMult = defCtx?.BrMultiplier ?? 1.0;
-        bool guaranteedHit = atkCtx?.GuaranteedHit == true;
-        var hits = new Dictionary<Combatant, bool>(targets.Count);
+        var equipment = actor.Owner?.Character.EquipmentModifiers ?? StatModifiers.None;
+        double equipDamageMult = 1.0 + EquipmentDamageBonusPercent(equipment, skill) / 100.0;
+        return new AttackPlan(
+            skill, skillLevel, targets, atkCtx, defCtx, activatedCards, equipment,
+            DamageMultiplier: (atkCtx?.DamageMultiplier ?? 1.0) * (defCtx?.IncomingDamageMultiplier ?? 1.0) * equipDamageMult,
+            DefenseMultiplier: defCtx?.DefenseMultiplier ?? 1.0,
+            AttackerBrMultiplier: atkCtx?.BrMultiplier ?? 1.0,
+            TargetBrMultiplier: defCtx?.BrMultiplier ?? 1.0);
+    }
 
-        foreach (var victim in targets)
+    /// <summary>Um alvo: fórmula, dano extra dos cards, reflexão, dano e efeitos depois do acerto. True se acertou.</summary>
+    private bool Strike(Combatant actor, Combatant victim, AttackPlan plan)
+    {
+        var attacker = actor.Digimon;
+        var atkCtx = plan.Attack;
+        Hit hit = plan.Skill is { } skill
+            ? BattleFormulas.Skill(attacker, victim.Digimon, skill, plan.SkillLevel, _system.Random,
+                plan.DamageMultiplier, plan.DefenseMultiplier, atkCtx?.OverrideAttackerAttribute, atkCtx?.OverrideTargetAttribute,
+                plan.AttackerBrMultiplier, plan.TargetBrMultiplier, atkCtx?.GuaranteedHit == true)
+            : BattleFormulas.Attack(attacker, victim.Digimon, _system.Random,
+                plan.DamageMultiplier, plan.DefenseMultiplier, atkCtx?.OverrideAttackerAttribute, atkCtx?.OverrideTargetAttribute,
+                plan.AttackerBrMultiplier, plan.TargetBrMultiplier, atkCtx?.GuaranteedHit == true);
+        if (!hit.Landed) return false;
+
+        int damage = CardBonusDamage(hit.Damage, victim.Digimon, atkCtx);
+
+        if (plan.Defense?.ReflectAttack == true)
         {
-            Hit hit = skill is not null
-                ? BattleFormulas.Skill(digimon, victim.Digimon, skill, skillLevel, _system.Random,
-                    damageMult, defenseMult, atkCtx?.OverrideAttackerAttribute, atkCtx?.OverrideTargetAttribute,
-                    attackerBrMult, targetBrMult, guaranteedHit)
-                : BattleFormulas.Attack(digimon, victim.Digimon, _system.Random,
-                    damageMult, defenseMult, atkCtx?.OverrideAttackerAttribute, atkCtx?.OverrideTargetAttribute,
-                    attackerBrMult, targetBrMult, guaranteedHit);
-            hits[victim] = hit.Landed;
-            if (!hit.Landed) continue;
-
-            int damage = hit.Damage;
-            if (atkCtx is not null)
-            {
-                if (atkCtx.BonusCurrentHpDamageFraction > 0)
-                    damage += (int)Math.Floor(victim.Digimon.Hp * atkCtx.BonusCurrentHpDamageFraction);
-                if (atkCtx.HalveEnemyHpChance && _system.Random.NextDouble() < 0.20)
-                    damage = Math.Max(damage, victim.Digimon.Hp / 2);
-            }
-
-            if (defCtx?.ReflectAttack == true)
-            {
-                digimon.TakeDamage(damage);
-                continue;
-            }
-
-            if (atkCtx?.LeaveOneHp == true && damage >= victim.Digimon.Hp)
-                damage = Math.Max(0, victim.Digimon.Hp - 1);
-
-            victim.Digimon.TakeDamage(damage);
-
-            if (atkCtx?.LifestealFraction > 0 && damage > 0)
-                digimon.Heal((int)Math.Floor(damage * atkCtx.LifestealFraction), 0, 0);
-            int onHitHp = atkEquip.Flat(StatModifierKind.OnHitHealHp), onHitVp = atkEquip.Flat(StatModifierKind.OnHitHealVp);
-            if (onHitHp > 0 || onHitVp > 0)
-                digimon.Heal(onHitHp, onHitVp, 0);
+            attacker.TakeDamage(damage);
+            return true;
         }
 
-        actor.Actions++;
-        actor.Gauge = atkCtx?.KeepGaugeFraction > 0
+        if (atkCtx?.LeaveOneHp == true && damage >= victim.Digimon.Hp)
+            damage = Math.Max(0, victim.Digimon.Hp - 1);
+
+        victim.Digimon.TakeDamage(damage);
+        AfterHit(attacker, damage, atkCtx, plan.AttackerEquipment);
+        return true;
+    }
+
+    /// <summary>Dano por HP atual do alvo e a chance de levar o HP do alvo à metade.</summary>
+    private int CardBonusDamage(int damage, Digimon victim, CardAttackContext? atkCtx)
+    {
+        if (atkCtx is null) return damage;
+        if (atkCtx.BonusCurrentHpDamageFraction > 0)
+            damage += (int)Math.Floor(victim.Hp * atkCtx.BonusCurrentHpDamageFraction);
+        if (atkCtx.HalveEnemyHpChance && _system.Random.NextDouble() < HalveEnemyHpProbability)
+            damage = Math.Max(damage, victim.Hp / 2);
+        return damage;
+    }
+
+    /// <summary>Roubo de vida do card e cura por acerto do equipamento.</summary>
+    private static void AfterHit(Digimon attacker, int damage, CardAttackContext? atkCtx, StatModifiers equipment)
+    {
+        if (atkCtx?.LifestealFraction > 0 && damage > 0)
+            attacker.Heal((int)Math.Floor(damage * atkCtx.LifestealFraction), 0, 0);
+        int onHitHp = equipment.Flat(StatModifierKind.OnHitHealHp), onHitVp = equipment.Flat(StatModifierKind.OnHitHealVp);
+        if (onHitHp > 0 || onHitVp > 0)
+            attacker.Heal(onHitHp, onHitVp, 0);
+    }
+
+    /// <summary>Barra zera depois do golpe, a não ser que um card mantenha parte dela.</summary>
+    private static int GaugeAfterAttack(CardAttackContext? atkCtx) =>
+        atkCtx?.KeepGaugeFraction > 0
             ? Math.Clamp((int)Math.Round(BattleFormulas.MaxGauge * atkCtx.KeepGaugeFraction), 0, BattleFormulas.MaxGauge)
             : 0;
 
-        // ✅ AoE pode derrubar vários combatentes no mesmo golpe: envia um 0x6E por alvo derrotado antes do 0x67
+    /// <summary>
+    /// ✅ AoE pode derrubar vários no mesmo golpe: um <c>0x6E</c> por derrotado, antes do <c>0x67</c>. Jogador que derruba
+    /// selvagem ganha recompensa; selvagem refletido por Reverse Sevens dá a recompensa ao defensor; digimon do jogador
+    /// nocauteado perde 1 % da EXP do nível (✅ conn=408, <c>0x6E</c> negativo).
+    /// </summary>
+    private void GrantKnockoutRewards(Combatant actor, Combatant target, AttackPlan plan)
+    {
         if (actor.Owner is { } owner)
         {
             var standing = _teamA.Where(c => c.Owner == owner && !c.Digimon.IsKnockedOut).ToList();
-            foreach (var victim in targets)
+            foreach (var victim in plan.Targets)
                 if (victim.Digimon.IsKnockedOut && victim.Wild is { } member)
                     _system.GrantRewards(owner, actor, standing, member, _teamB.Count);
+            return;
         }
-        else
+
+        if (plan.Defense?.ReflectAttack == true && actor.Digimon.IsKnockedOut && actor.Wild is { } reflectedWild
+            && target.Owner is { } defOwner)
         {
-            // Se Reverse Sevens refletiu o ataque e derrubou o selvagem, concede as recompensas ao defensor
-            if (defCtx?.ReflectAttack == true && actor.Digimon.IsKnockedOut && actor.Wild is { } reflectedWild
-                && target.Owner is { } defOwner)
-            {
-                var standing = _teamA.Where(c => c.Owner == defOwner && !c.Digimon.IsKnockedOut).ToList();
-                _system.GrantRewards(defOwner, target, standing, reflectedWild, _teamB.Count);
-            }
-            // ✅ captura v322 (conn=408): ao ser nocauteado em batalha, perde 1 % de ExpToNextLevel e recebe 0x6E negativo antes do 0x67
-            foreach (var victim in targets)
-                if (victim.Digimon.IsKnockedOut && victim.Owner is { } victimOwner)
-                {
-                    long lost = victim.Digimon.LoseExp(victim.Digimon.ExpToNextLevel / 100);
-                    if (lost > 0)
-                        victimOwner.Send(new RewardBitExpPacket(victim.Digimon.Serial, -lost, 0));
-                }
+            var standing = _teamA.Where(c => c.Owner == defOwner && !c.Digimon.IsKnockedOut).ToList();
+            _system.GrantRewards(defOwner, target, standing, reflectedWild, _teamB.Count);
         }
-
-        byte attackType = skill?.Type ?? Data.GameData.SkillInfo.TypeMelee;
-        ushort skillId = skill?.Id ?? 0;
-        Broadcast(new ActionResultsPacket(acting, other, actor, hits, attackType, skillId,
-            activatedCards.Count > 0 ? activatedCards : null));
-
-        if (_teamB.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Win);
-        else if (_teamA.All(c => c.Digimon.IsKnockedOut)) End(BattleResult.Lose);
-        else _phase = Phase.Animating;
+        foreach (var victim in plan.Targets)
+            if (victim.Digimon.IsKnockedOut && victim.Owner is { } victimOwner)
+            {
+                long lost = victim.Digimon.LoseExp(victim.Digimon.ExpToNextLevel / 100);
+                if (lost > 0)
+                    victimOwner.Send(new RewardBitExpPacket(victim.Digimon.Serial, -lost, 0));
+            }
     }
 
     private static void ApplyPreAttackCardEffects(Combatant actor, IReadOnlyList<Combatant> allies, CardAttackContext ctx)
