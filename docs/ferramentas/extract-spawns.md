@@ -1,6 +1,6 @@
 # extract_spawns.py
 
-`work/tools/extract_spawns.py`: lê as sessões v322 do `captures.db` do [proxy](proxy.md) junto com o `grids.bin` do cliente para medir a consistência das amostras de cada mapa e gerar/atualizar o `src/DRPGServer/Resources/Map/DigimonSpawns.xml`.
+`work/tools/extract_spawns.py`: lê as sessões v322 do `captures.db` do [proxy](proxy.md) junto com o `grids.bin` do cliente para medir a consistência das amostras de cada mapa e gerar/atualizar o `src/DRPG.Server/Resources/Map/DigimonSpawns.xml`.
 
 Quanto mais sessões, passagens e batalhas houver no `captures.db`, mais fiéis ficam as casas (`<Point>`), composições de grupo (`AppearanceRate`), EXP base, Bits e stats especiais (`Veteran` / tutorial).
 
@@ -27,7 +27,7 @@ Imprime uma tabela com todos os mapas visitados nas capturas v322, mostrando:
 # Imprime o XML dos mapas escolhidos no terminal
 python3 /media/games/DigimonRPG/work/tools/extract_spawns.py --maps 79 2 4 46
 
-# Grava direto em src/DRPGServer/Resources/Map/DigimonSpawns.xml
+# Grava direto em src/DRPG.Server/Resources/Map/DigimonSpawns.xml
 python3 /media/games/DigimonRPG/work/tools/extract_spawns.py --maps 79 2 4 46 --write
 
 # Seleciona automaticamente todos os mapas com score >= 75% (dry-run primeiro)

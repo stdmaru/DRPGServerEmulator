@@ -26,7 +26,12 @@ Código: `Game/Accounts/AuthKeyHash.cs` e `AccountAuthenticator.cs`. Testes: `Au
 - **Compatibilidade com o emissor:** quem emite a chave (site, launcher, `INSERT` de teste) pode continuar gravando em `account.auth_key` em texto puro. Essa chave é a emissão mais nova e vale no lugar do hash antigo; no primeiro login com ela, ou na próxima partida do servidor, ela vira hash e a coluna `auth_key` fica `NULL`. A conversão só grava se a chave ainda for a mesma (o emissor pode ter trocado nesse meio-tempo).
 - O emissor também pode gravar o hash direto, por exemplo em Python: `hashlib.pbkdf2_hmac('sha256', chave.encode(), sal, 100000, 32)`, com o resultado montado no formato acima.
 - Nenhuma chave nem hash vai para o log.
-- ❓ A coluna `account.password` não é usada pelo servidor e continua como o emissor a grava.
+- A chave emitida pelo launcher tem validade em `account.auth_key_expires_at` (5 h, `LauncherLogin:GameKeyValidHours`); vencida, é recusada. `0` = sem validade (emissores antigos).
+
+## Senha
+- A coluna `account.password` saiu na migração `0015`. A senha fica em `account.password_hash`, PBKDF2-SHA256 com 600 000 iterações, mesmo formato da chave.
+- A migração copia as senhas antigas como `plain$<senha>`; o servidor as converte em hash na partida. Hash com menos iterações é refeito no próximo login.
+- Login por usuário ou `account.email` (único). Limite de tentativas por IP e por login; usuário inexistente gasta o mesmo tempo de uma senha conferida. Protocolo em [login do launcher](../protocolo/launcher.md).
 
 ## Entrada e saída do mundo
 Código: `PlayerSystem` (estado da conta, thread do mundo) e `WorldEntry` (o fluxo do `0x01`). Testes: `WorldEntryTests`.

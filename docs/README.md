@@ -27,12 +27,20 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 ### Protocolo
 - [Cabeçalho e framing](protocolo/cabecalho.md): os 14 bytes, CRC, limites.
 - [Servidores e conexões](protocolo/servidores.md): IPs, portas, ordem das conexões e de onde o cliente tira os endereços.
+- [Login do launcher](protocolo/launcher.md): opcodes novos 0x0F00..0x0F03, cripto e impressão digital.
 - [Catálogo de opcodes](protocolo/opcodes.md): opcodes tratados pelo cliente, capturados e implementados.
 - Structs:
   - [Status de digimon](protocolo/structs/status-digimon.md): bloco comum aos opcodes 0x02, 0x10, 0x63, 0x70, 0x71…
   - [Channel](protocolo/structs/channel.md): lista (0x12), criar (0x10) e apagar (0x11) personagem.
   - [Inventário](protocolo/structs/inventario.md): 0x03 (24 × 76 + 24 × 108) e o registro de item de 108 bytes.
   - [Resumo do tamer (0x10)](protocolo/structs/tamer-resumo.md): nível, posição/destino, líder; 204 bytes na v322.
+
+### Arquitetura (leitura obrigatória antes de codar)
+- [Fundação](arquitetura/README.md): valores (segurança > legibilidade > expansão), monorepo `DRPG.Shared`/`Server`/`Client`/`Tools`, o mesmo modelo de thread e camadas nos dois lados.
+- [Padrões de código](arquitetura/padroes-de-codigo.md): nomes e sufixos, tamanho, tipos e erros, recursos permitidos/proibidos, testes, garantias automáticas (analyzers, APIs banidas, testes de arquitetura).
+- [Biblioteca compartilhada](arquitetura/shared.md): pacotes de mão dupla com ida e volta e testes dourados, leitores de formato, versões do oficial.
+- [Cliente](arquitetura/cliente.md): camadas, fatia de feature (`State`/`Handlers`/`Actions`/`Window`), frame, registro compatível com NativeAOT, resolução e UI ancorada.
+- [Como estender](arquitetura/extensao.md): receitas fechadas (item, C2S, S2C, janela, domínio, formato, opção, patch do oficial) e os únicos pontos de registro manuais.
 
 ### Emulador
 - [Arquitetura](emulador/arquitetura.md): como rodar, migrações, camadas, onde fica cada coisa, modelo de threads, dependências, testes.
@@ -60,6 +68,14 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Arquivos de dados](cliente/arquivos-de-dados.md): `table.pf` e `resource.pf`, `drpg_pack.py`, colunas que o servidor lê na partida, o que falta.
 - [Wine](cliente/wine.md): rodar no Linux, prefixo dedicado, causa e correção da tela congelada no loading (corrida no backbuffer DirectDraw).
 - [Qualidade de vida](cliente/qualidade-de-vida.md): resolução e os três níveis (wrapper → hooks → decompilação incremental).
+- [Cliente Reboot (fãs)](cliente/reboot-analise.md): reescrita do zero em C# .NET 8 NativeAOT + MonoGame que lê a arte original e fala o protocolo; evidências e licença.
+
+### Planos
+- [Cliente novo](planos/cliente-novo.md): em andamento (PR #42: marco 1 Loading → Login; launcher de login + patch). Source port em C# .NET 10 + SDL3/SDL_GPU (Vulkan/D3D12), Windows/Linux x64/arm64, regras de desempenho, RE de formatos e marcos.
+- [Cards e Card Slash](planos/card-slash.md): especificação do sistema de cards.
+
+### Ferramentas de RE
+- [Dump de RE](ferramentas/dump-re.md): Ghidra headless → decompilado por função, strings, chamadas e símbolos em `work/re/<versão>/dump`, consultados com `grep`; pontos conhecidos da v322 (WinMain, linha de comando, cenas).
 
 ### Captura
 - [Campanha de captura](captura/campanha.md): checklist do que capturar e em que ordem.

@@ -5,9 +5,9 @@
 ## Preparar
 Rode o emulador **no devcontainer**, num banco separado para não mexer nos dados de jogo. O script roda no host e conecta nas portas que o compose publica em 127.0.0.1:
 ```bash
-docker exec -w /workspaces/DRPGServer -e DRPG_Database__Name=drpg_replay server_devcontainer-server-1 dotnet run --project src/DRPGServer
+docker exec -w /workspaces/DRPGServer -e DRPG_Database__Name=drpg_replay server_devcontainer-server-1 dotnet run --project src/DRPG.Server
 ```
-Parar: `docker exec server_devcontainer-server-1 pkill -TERM -f DRPGServer` (encerrar o `docker exec` não para o processo no container).
+Parar: `docker exec server_devcontainer-server-1 pkill -TERM -f DRPG.Server` (encerrar o `docker exec` não para o processo no container).
 Na primeira vez, crie a conta de teste (padrões do script: `replay` / `REPLAYKEY` / `Replayer`):
 ```sql
 INSERT INTO account(username,password,auth_key,authority) VALUES('replay','x','REPLAYKEY',3);

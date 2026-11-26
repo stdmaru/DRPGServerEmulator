@@ -4,7 +4,7 @@ Especificação das lojas genéricas de NPC (compra e venda por Bits), baseada n
 
 ---
 
-## 1. Catálogo (`src/DRPGServer/Resources/Item/NpcShop.xml`)
+## 1. Catálogo (`src/DRPG.Server/Resources/Item/NpcShop.xml`)
 
 Cada `<Shop>` possui:
 - `ID`: identificador enviado pelo cliente em `C2S 0x0050` (cards) ou `C2S 0x0052` (itens).

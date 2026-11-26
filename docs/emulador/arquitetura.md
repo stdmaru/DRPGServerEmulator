@@ -12,7 +12,7 @@ Páginas desta seção:
 
 ## Rodar
 - **Stack:** `.devcontainer/docker-compose.yml`: MariaDB 11.8 (com healthcheck) + `dotnet/sdk:10.0`. O serviço `server` só sobe quando o banco estiver saudável.
-- **Sempre no devcontainer** (é o ambiente de trabalho): `dotnet run --project src/DRPGServer` e `dotnet test DRPGServer.sln`. De fora: `docker exec -w /workspaces/DRPGServer server_devcontainer-server-1 dotnet ...`.
+- **Sempre no devcontainer** (é o ambiente de trabalho): `dotnet run --project src/DRPG.Server` e `dotnet test DRPG.sln`. De fora: `docker exec -w /workspaces/DRPGServer server_devcontainer-server-1 dotnet ...`.
 - O compose publica 7000–7003 e 3306 em 127.0.0.1, para o cliente (Wine) e as ferramentas Python do host.
 - **Protocolo alvo: v322.**
 - **Configuração:** `appsettings.json`, depois `appsettings.Local.json` (fora do git) e variáveis `DRPG_<Seção>__<Chave>`. Seções: `Servers` (porta e IP de cada servidor), `Database`, `Game` (taxas, nível máximo, mapa inicial, autosave), `Network` (validade do ticket entre servidores; limites de conexão, prazos e pacotes, ver [segurança](seguranca.md#limites-de-recurso)). Toda opção é validada na partida (`Configuration/OptionsValidation.cs`, `ValidateOnStart`): o boot lista todos os erros de uma vez e não sobe. O que depende das tabelas (mapa e posição inicial) é conferido pelo `PlayerSystem` na construção. `Database:Name` só aceita letras, números e `_`, porque entra no `CREATE DATABASE`. Opção nova entra com o limite dela no validador.
@@ -63,13 +63,13 @@ Antes de escrever uma função de jogo, procure o serviço do domínio. Se uma l
 - Tempo: o mundo usa `GameWorld.Now` (monotônico), e o tempo de calendário (expiração de itens, histórico) vem de `IGameClock`. Ninguém chama `DateTimeOffset.UtcNow` direto: entidades recebem o relógio (o `Inventory` guarda o dele) e pacotes recebem o horário pronto (ex.: `CharacterDataPacket(character, serverUnixTime)`). Prazos de infraestrutura (espera do banco, folga de ticket) usam `TimeProvider`. Nos testes, `GameClock` sobre `ManualTime` controla o calendário.
 
 ## Dependências
-- Todas as dependências são **obrigatórias** e vêm pelo construtor (DI). Não existe parâmetro `= null` para "funcionar sem" um serviço. Os testes usam fakes (`tests/DRPGServer.Tests/TestSupport.cs`), nunca um caminho alternativo no código de produção. O container de DI valida o grafo inteiro na partida (`ValidateOnBuild`), também em produção.
+- Todas as dependências são **obrigatórias** e vêm pelo construtor (DI). Não existe parâmetro `= null` para "funcionar sem" um serviço. Os testes usam fakes (`tests/DRPG.Server.Tests/TestSupport.cs`), nunca um caminho alternativo no código de produção. O container de DI valida o grafo inteiro na partida (`ValidateOnBuild`), também em produção.
 - Entidades não recebem serviços. Quem precisa de `GameData` recebe os dados que usa.
 
 ## Autenticação entre servidores
 O channel valida usuário + `auth_key` e emite um **ticket** da conta, amarrado ao IP da conexão. Mapa e global só aceitam a conta com ticket válido, do mesmo IP, e uma vez por servidor. Um segundo login no channel derruba o primeiro. Detalhes em [segurança](seguranca.md#autenticação-entre-servidores).
 
 ## Verificação
-- Testes de banco (`[DatabaseFact]`) rodam contra o MariaDB do devcontainer só com `DRPG_TEST_DB_HOST=database`, cada classe num banco descartável: `docker exec -e DRPG_TEST_DB_HOST=database -w /workspaces/DRPGServer server_devcontainer-server-1 dotnet test DRPGServer.sln`. Sem a variável, eles aparecem como pulados.
-- Testes unitários em `tests/DRPGServer.Tests`, um arquivo por domínio: CRC contra capturas, framing, tamanho de payload dos S2C contra o capturado, conta, digimon, batalha simulada, migrações, entradas inválidas de cada handler.
+- Testes de banco (`[DatabaseFact]`) rodam contra o MariaDB do devcontainer só com `DRPG_TEST_DB_HOST=database`, cada classe num banco descartável: `docker exec -e DRPG_TEST_DB_HOST=database -w /workspaces/DRPGServer server_devcontainer-server-1 dotnet test DRPG.sln`. Sem a variável, eles aparecem como pulados.
+- Testes unitários em `tests/DRPG.Server.Tests`, um arquivo por domínio: CRC contra capturas, framing, tamanho de payload dos S2C contra o capturado, conta, digimon, batalha simulada, migrações, entradas inválidas de cada handler.
 - Replay de captura contra o emulador: [drpg_replay.py](../ferramentas/replay.md).

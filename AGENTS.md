@@ -1,6 +1,8 @@
 # AGENTS.md — Guia de Desenvolvimento e Contribuição
 
-Este arquivo define as diretrizes de fluxo de trabalho, organização de código e qualidade para agentes e desenvolvedores que atuam no **DRPGServer**.
+Este arquivo define as diretrizes de fluxo de trabalho, organização de código e qualidade para agentes e desenvolvedores que atuam no **DRPG.Server**.
+
+> **Leitura obrigatória antes de qualquer código:** [arquitetura do projeto](docs/arquitetura/README.md) (valores, camadas, threads), [padrões de código](docs/arquitetura/padroes-de-codigo.md) e [como estender](docs/arquitetura/extensao.md). Elas valem para servidor, cliente e ferramentas e prevalecem sobre preferências pessoais. Mudança nelas só com entrada no [registro de decisões](docs/projeto/decisoes.md).
 
 ---
 
@@ -18,6 +20,7 @@ Este arquivo define as diretrizes de fluxo de trabalho, organização de código
   - Diagnóstico técnico com evidências (capturas v322 em `captures.db`, tabelas do cliente ou engenharia reversa quando aplicável).
   - Lista de alterações e checklist de validação.
 - **Validação obrigatória antes de abrir/atualizar PR:**
+  - A mudança segue uma [receita](docs/arquitetura/extensao.md); se tocou arquivo fora dela, a página foi corrigida no mesmo PR ou o desvio foi discutido.
   - Rodar toda a suíte de testes unitários com `dotnet test` (caso `obj/` ou `bin/` tenham permissões restritas no ambiente local, usar `dotnet test --artifacts-path /tmp/dotnet-drpg`).
   - Zero erros de compilação e 100% dos testes passando.
 - **Testes locais antes do push:** quando o mantenedor pedir para testar localmente antes de subir, aplicar as mudanças sem fazer `git push` até receber confirmação.
@@ -58,9 +61,9 @@ public static int StageLevel(byte stage) => stage switch
 
 ### Responsabilidade Única (SRP) e Coesão
 - **Um domínio por arquivo:** não agrupe dezenas de classes de áreas diferentes em um único arquivo monolítico.
-  - **Handlers** ficam separados por domínio em `src/DRPGServer/Network/Handlers/<Servidor>/` (ex.: `Map/ItemHandlers.cs`, `Map/BattleHandlers.cs`, `Map/NpcShopHandlers.cs`). Domínio novo ganha arquivo novo.
-  - **Serviços** ficam um por domínio em `src/DRPGServer/Game/<Domínio>/` ([onde fica cada coisa](docs/emulador/arquitetura.md#onde-fica-cada-coisa)).
-  - **Testes unitários** ficam separados por domínio em `tests/DRPGServer.Tests/` (`BattleTests.cs`, `FormulaTests.cs`, `DigimonTests.cs`, `WorldTests.cs`, `ClientTablesTests.cs`, `TutorialTests.cs`, `CaptureTests.cs`, etc.).
+  - **Handlers** ficam separados por domínio em `src/DRPG.Server/Network/Handlers/<Servidor>/` (ex.: `Map/ItemHandlers.cs`, `Map/BattleHandlers.cs`, `Map/NpcShopHandlers.cs`). Domínio novo ganha arquivo novo.
+  - **Serviços** ficam um por domínio em `src/DRPG.Server/Game/<Domínio>/` ([onde fica cada coisa](docs/emulador/arquitetura.md#onde-fica-cada-coisa)).
+  - **Testes unitários** ficam separados por domínio em `tests/DRPG.Server.Tests/` (`BattleTests.cs`, `FormulaTests.cs`, `DigimonTests.cs`, `WorldTests.cs`, `ClientTablesTests.cs`, `TutorialTests.cs`, `CaptureTests.cs`, etc.).
 - **Camadas** (detalhes em [`docs/emulador/arquitetura.md`](docs/emulador/arquitetura.md#camadas)):
   - **Pacotes** (`Network/Packets`) só descrevem layout: S2C em `ServerPacket`, C2S em request tipado (`IClientPacket<T>`) com tamanho declarado. Handler nunca lê byte nem usa offset.
   - **Handlers** (`Network/Handlers`) recebem o request tipado, declaram pré-condições (`[RequiresState]`), chamam **um** serviço e enviam a resposta. Nada de preço, inventário, moeda ou banco no handler.
@@ -94,8 +97,8 @@ public static int StageLevel(byte stage) => stage switch
   - `✅` comportamento confirmado nas capturas oficiais (`captures.db`) ou no cliente.
   - `❓` comportamento inferido, parcial ou ainda em aberto.
 - **Sincronia obrigatória:** ao confirmar ou corrigir uma fórmula, layout de pacote ou mecânica, atualize no mesmo PR:
-  1. O código em `src/DRPGServer/`.
-  2. Os testes unitários em `tests/DRPGServer.Tests/`.
+  1. O código em `src/DRPG.Server/`.
+  2. Os testes unitários em `tests/DRPG.Server.Tests/`.
   3. A documentação correspondente em `docs/`.
 
 ---

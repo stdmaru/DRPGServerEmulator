@@ -9,6 +9,7 @@ Decisão: **não** decompilar e recompilar tudo de uma vez (ver [decisões](../p
 | 1. Wrapper DirectDraw | Trocar `ddraw.dll` pelo **cnc-ddraw** (open source) | Janela, borderless ou tela cheia em qualquer resolução, com upscale (integer/bilinear/shader), vsync, Windows moderno e Wine. **Não aumenta o campo de visão.** | dias |
 | 2. DLL de hooks | DLL injetada (proxy de `version.dll`/`dinput`) + MinHook | Viewport maior de verdade, UI ancorada nas bordas, correção de bugs, limite de FPS, melhorias de chat | semanas por feature |
 | 3. Decompilação incremental | Na mesma DLL, trocar funções originais por C++ uma de cada vez, testando no jogo (abordagem OpenRCT2/re3) | O binário vira um "host" e, no fim, um source port (DirectDraw → SDL2/D3D11) | contínuo |
+| 4. Cliente novo (source port) | Cliente C# + SDL3/SDL_GPU que lê o `resource.pf` e fala o protocolo v322 ([plano](../planos/cliente-novo.md)); o fã-cliente [Reboot](reboot-analise.md) seguiu esse caminho | Resolução livre, TTF, nativo em Linux, sem DirectDraw | meses |
 
 Notas:
 - Começar o nível 3 por `NetworkMgr` e pelos handlers de pacote. Isso também alimenta o [catálogo de opcodes](../protocolo/opcodes.md).

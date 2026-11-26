@@ -1,11 +1,11 @@
 # extract_equipment_effects.py
 
-`tools/extract_equipment_effects.py` (no repositório): gera `src/DRPGServer/Resources/Item/EquipmentEffects.xml` a partir de `table\item_info_us.dat` do cliente v322. É o único lugar que lê o texto de bônus da coluna 28 (`STR +6 / ATK 3%`, `Card Slash 23 times`, `HP Recovery Amount 8`…). O servidor só carrega o XML (regra em [dados](../emulador/dados.md)).
+`tools/extract_equipment_effects.py` (no repositório): gera `src/DRPG.Server/Resources/Item/EquipmentEffects.xml` a partir de `table\item_info_us.dat` do cliente v322. É o único lugar que lê o texto de bônus da coluna 28 (`STR +6 / ATK 3%`, `Card Slash 23 times`, `HP Recovery Amount 8`…). O servidor só carrega o XML (regra em [dados](../emulador/dados.md)).
 
 ## Uso
 De `work/`, com o cliente desempacotado em `client/` e o `drpg_pack.py` em `tools/`:
 ```bash
-python3 -I server/tools/extract_equipment_effects.py client/table.hf client/table.pf server/src/DRPGServer/Resources/Item/EquipmentEffects.xml --pack tools
+python3 -I server/tools/extract_equipment_effects.py client/table.hf client/table.pf server/src/DRPG.Server/Resources/Item/EquipmentEffects.xml --pack tools
 ```
 Depois revise o `git diff` do XML e rode os testes (`EquipmentTests.EquipmentEffects_xml_loads_all_structured_bonuses_and_auras` confere itens com bônus confirmados em captura).
 

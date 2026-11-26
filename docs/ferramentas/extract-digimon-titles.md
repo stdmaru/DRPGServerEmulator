@@ -1,11 +1,11 @@
 # extract_digimon_titles.py
 
-`tools/extract_digimon_titles.py` (no repositório): gera `src/DRPGServer/Resources/Digimon/DigimonTitles.xml` a partir de `table\digimon_title_us.dat` do cliente v322. O servidor só carrega o XML (regra em [dados](../emulador/dados.md)).
+`tools/extract_digimon_titles.py` (no repositório): gera `src/DRPG.Server/Resources/Digimon/DigimonTitles.xml` a partir de `table\digimon_title_us.dat` do cliente v322. O servidor só carrega o XML (regra em [dados](../emulador/dados.md)).
 
 ## Uso
 De `work/`, com o cliente desempacotado em `client/` e o `drpg_pack.py` em `tools/`:
 ```bash
-python3 -I server/tools/extract_digimon_titles.py client/table.hf client/table.pf server/src/DRPGServer/Resources/Digimon/DigimonTitles.xml --pack tools
+python3 -I server/tools/extract_digimon_titles.py client/table.hf client/table.pf server/src/DRPG.Server/Resources/Digimon/DigimonTitles.xml --pack tools
 ```
 Depois revise o `git diff` do XML e rode os testes (`DigimonTitleTests`).
 
