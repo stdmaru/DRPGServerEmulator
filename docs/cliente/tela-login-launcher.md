@@ -41,13 +41,13 @@ Proporções tiradas de uma captura da tela antiga enviada pelo dono (era "Digim
 - Texto dos campos em branco, a 4 px da borda esquerda; a senha aparece como `*` com cursor `_`.
 
 ## Caixa de status
-Na captura, uma caixa pequena centrada **abaixo do painel**, ~182×24 em (309, 392), mostra o estado em uma linha ("Verifying ID and Password...."). O launcher usa a mesma caixa para tudo:
+Na captura, uma caixa pequena centrada **abaixo do painel**, ~182×24 na captura, mostra o estado em uma linha ("Verifying ID and Password...."). O launcher usa a mesma caixa para tudo:
 
 1. Ao abrir: "Connecting to server..." enquanto faz o handshake. ID, senha e OK ficam desligados até a resposta.
 2. Ao enviar: "Verifying ID and Password...".
 3. Erros e avisos (credenciais inválidas, muitas tentativas, launcher desatualizado, servidor fora, impressão digital diferente) aparecem nela; os campos voltam a ficar ativos quando dá para tentar de novo.
 4. Durante o patch, ❓ a caixa de loading `dr2_in_001_000` com a barra `001_002`.
 
-❓ Sprite da caixa: nenhum sprite de GUI é igual ao da captura (azul-marinho, cantos redondos, borda clara). Mais próximos: `gui\dr_friend_006.spr` (187×21, mesmo tamanho) e `gui\dr_friend_016.spr` (244×21, cantos redondos). Pode ter sido desenhada por código. A escolher pelo dono.
+Sprite da caixa: **`gui\dr_friend_016.spr`** (244×21, cantos redondos, borda clara), escolhido pelo dono em 2026-11-26. Nenhum sprite é igual ao da captura (pode ter sido desenhada por código). Fica centrado em x = 400, a partir de y = 392: em (278, 392). O texto vai em branco, a 8 px da borda esquerda.
 
 A tela inteira segue a regra do [cliente novo](../planos/cliente-novo.md): quadro 800×600 centralizado, sem esticar.
