@@ -1,10 +1,10 @@
 using System.Runtime.InteropServices;
-using DRPG.Launcher.Rendering;
-using DRPG.Launcher.Rendering.Backends;
+using DRPG.Engine.Rendering;
+using DRPG.Engine.Rendering.Backends;
 using SDL;
 using static SDL.SDL3;
 
-namespace DRPG.Launcher.Platform;
+namespace DRPG.Engine.Platform;
 
 /// <summary>Input in frame coordinates (800×600), already converted from window pixels.</summary>
 public abstract record InputEvent;
@@ -12,12 +12,12 @@ public sealed record QuitEvent : InputEvent;
 public sealed record MouseMoveEvent(int X, int Y) : InputEvent;
 public sealed record MouseLeaveEvent : InputEvent;
 public sealed record MouseButtonEvent(int X, int Y, bool Down) : InputEvent;
-public sealed record KeyEvent(LauncherKey Key) : InputEvent;
+public sealed record KeyEvent(GameKey Key) : InputEvent;
 public sealed record TextEvent(string Text) : InputEvent;
 
-public enum LauncherKey { Other, Enter, Escape, Tab, Backspace }
+public enum GameKey { Other, Enter, Escape, Tab, Backspace }
 
-/// <summary>SDL window, renderer and event pump. Nothing else in the launcher calls SDL directly.</summary>
+/// <summary>SDL window, renderer and event pump. Nothing else in a game executable calls SDL directly.</summary>
 public sealed unsafe class SdlPlatform : IDisposable
 {
     private readonly SDL_Window* _window;
@@ -85,11 +85,11 @@ public sealed unsafe class SdlPlatform : IDisposable
                 case SDL_EventType.SDL_EVENT_KEY_DOWN:
                     events.Add(new KeyEvent(e.key.key switch
                     {
-                        SDL_Keycode.SDLK_RETURN or SDL_Keycode.SDLK_KP_ENTER => LauncherKey.Enter,
-                        SDL_Keycode.SDLK_ESCAPE => LauncherKey.Escape,
-                        SDL_Keycode.SDLK_TAB => LauncherKey.Tab,
-                        SDL_Keycode.SDLK_BACKSPACE => LauncherKey.Backspace,
-                        _ => LauncherKey.Other,
+                        SDL_Keycode.SDLK_RETURN or SDL_Keycode.SDLK_KP_ENTER => GameKey.Enter,
+                        SDL_Keycode.SDLK_ESCAPE => GameKey.Escape,
+                        SDL_Keycode.SDLK_TAB => GameKey.Tab,
+                        SDL_Keycode.SDLK_BACKSPACE => GameKey.Backspace,
+                        _ => GameKey.Other,
                     }));
                     break;
                 case SDL_EventType.SDL_EVENT_TEXT_INPUT:

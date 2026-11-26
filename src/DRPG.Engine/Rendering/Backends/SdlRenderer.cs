@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using SDL;
 using static SDL.SDL3;
 
-namespace DRPG.Launcher.Rendering.Backends;
+namespace DRPG.Engine.Rendering.Backends;
 
 /// <summary>
 /// <see cref="IRenderer"/> on the SDL3 2D renderer, asking for its <c>gpu</c> driver (SDL_GPU: Vulkan, D3D12, Metal)

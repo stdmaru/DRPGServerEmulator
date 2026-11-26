@@ -1,4 +1,4 @@
-namespace DRPG.Launcher.Rendering;
+namespace DRPG.Engine.Rendering;
 
 /// <summary>
 /// Where the fixed 800×600 frame goes inside an output of any size: centered, at the largest whole-number scale that

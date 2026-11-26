@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shared by the launcher and the client: SDL3 window/renderer, fonts, sprite cache, game cursor, audio.
+       Knows nothing about the protocol or about any scene (docs/arquitetura/README.md). -->
+  <PropertyGroup>
+    <RootNamespace>DRPG.Engine</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DRPG.Shared\DRPG.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DRPG.Engine.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ppy.SDL3-CS" Version="2026.1002.1" />
+    <PackageReference Include="ppy.SDL3_ttf-CS" Version="2026.1002.1" />
+  </ItemGroup>
+
+</Project>

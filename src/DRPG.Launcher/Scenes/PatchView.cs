@@ -1,5 +1,5 @@
-using DRPG.Launcher.Assets;
-using DRPG.Launcher.Rendering;
+using DRPG.Engine.Assets;
+using DRPG.Engine.Rendering;
 
 namespace DRPG.Launcher.Scenes;
 

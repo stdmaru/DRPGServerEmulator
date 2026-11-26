@@ -2,7 +2,7 @@ using SDL;
 using static SDL.SDL3;
 using static SDL.SDL3_ttf;
 
-namespace DRPG.Launcher.Rendering.Backends;
+namespace DRPG.Engine.Rendering.Backends;
 
 /// <summary><see cref="IFont"/> on SDL3_ttf (FreeType). The only file that touches SDL_ttf.</summary>
 public sealed unsafe class SdlTtfFont : IFont

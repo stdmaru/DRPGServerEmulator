@@ -1,6 +1,6 @@
-using DRPG.Launcher.Assets;
-using DRPG.Launcher.Platform;
-using DRPG.Launcher.Rendering;
+using DRPG.Engine.Assets;
+using DRPG.Engine.Platform;
+using DRPG.Engine.Rendering;
 
 namespace DRPG.Launcher.Scenes;
 
@@ -83,7 +83,7 @@ public sealed class LoginScene : IDisposable
 
     public void Handle(InputEvent e)
     {
-        if (e is KeyEvent { Key: LauncherKey.Escape })
+        if (e is KeyEvent { Key: GameKey.Escape })
         {
             CloseRequested = true;
             return;
@@ -114,13 +114,13 @@ public sealed class LoginScene : IDisposable
                 if (b.Down && _password.Contains(b.X, b.Y)) Focus(_password);
                 if (_ok.Press(b.X, b.Y, b.Down)) SubmitRequested = true;
                 break;
-            case KeyEvent { Key: LauncherKey.Enter }:
+            case KeyEvent { Key: GameKey.Enter }:
                 SubmitRequested = true;
                 break;
-            case KeyEvent { Key: LauncherKey.Tab }:
+            case KeyEvent { Key: GameKey.Tab }:
                 Focus(_id.Focused ? _password : _id);
                 break;
-            case KeyEvent { Key: LauncherKey.Backspace }:
+            case KeyEvent { Key: GameKey.Backspace }:
                 FocusedField.Backspace();
                 break;
             case TextEvent t:

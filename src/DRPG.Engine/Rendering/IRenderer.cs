@@ -1,4 +1,4 @@
-namespace DRPG.Launcher.Rendering;
+namespace DRPG.Engine.Rendering;
 
 /// <summary>A GPU texture owned by a renderer. Only the renderer that created it can draw it.</summary>
 public interface ITexture : IDisposable
@@ -8,7 +8,7 @@ public interface ITexture : IDisposable
 }
 
 /// <summary>
-/// Everything the launcher draws goes through this interface (docs/arquitetura/cliente.md). Coordinates are in the
+/// Everything the engine draws goes through this interface (docs/arquitetura/cliente.md). Coordinates are in the
 /// fixed 800×600 frame; the backend scales it into the window only by whole numbers, with black bars, and never stretches.
 /// </summary>
 public interface IRenderer : IDisposable

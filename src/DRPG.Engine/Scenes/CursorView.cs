@@ -1,8 +1,8 @@
-using DRPG.Launcher.Assets;
-using DRPG.Launcher.Platform;
-using DRPG.Launcher.Rendering;
+using DRPG.Engine.Assets;
+using DRPG.Engine.Platform;
+using DRPG.Engine.Rendering;
 
-namespace DRPG.Launcher.Scenes;
+namespace DRPG.Engine.Scenes;
 
 /// <summary>
 /// The game's mouse cursor, drawn as a sprite like the original (v322 <c>0x00b3ebf0</c> loads

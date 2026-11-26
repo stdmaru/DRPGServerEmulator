@@ -1,16 +1,8 @@
-namespace DRPG.Launcher.Rendering;
-
-/// <summary>A TTF face at one size that turns a line of text into a texture (RGBA8888, R in the low byte).</summary>
-public interface IFont : IDisposable
-{
-    int LineHeight { get; }
-
-    ITexture Render(IRenderer renderer, string text, uint rgba);
-}
+namespace DRPG.Engine.Rendering;
 
 /// <summary>
 /// ❓ The original draws UI text with GDI "굴림체" (GulimChe, cp949) at a 12 px cell (v322 <c>0x00b563f0</c>). Gulim
-/// cannot be shipped (copyright), so the launcher uses it when the system has it and otherwise the first fallback
+/// cannot be shipped (copyright), so the engine uses it when the system has it and otherwise the first fallback
 /// found. <c>Fonts\123RF_123RF_TTF.ttf</c> from the install is a decorative face used elsewhere.
 /// </summary>
 public static class FontLocator

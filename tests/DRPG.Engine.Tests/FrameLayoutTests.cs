@@ -1,6 +1,6 @@
-using DRPG.Launcher.Rendering;
+using DRPG.Engine.Rendering;
 
-namespace DRPG.Launcher.Tests;
+namespace DRPG.Engine.Tests;
 
 public sealed class FrameLayoutTests
 {

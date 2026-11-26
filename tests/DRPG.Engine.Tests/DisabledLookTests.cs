@@ -1,6 +1,6 @@
-using DRPG.Launcher.Assets;
+using DRPG.Engine.Assets;
 
-namespace DRPG.Launcher.Tests;
+namespace DRPG.Engine.Tests;
 
 public sealed class DisabledLookTests
 {
