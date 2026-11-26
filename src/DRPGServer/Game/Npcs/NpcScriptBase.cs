@@ -1,3 +1,4 @@
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Network.Packets.Map;
 
@@ -48,7 +49,7 @@ public abstract class NpcScriptBase
 
         MarkDone(player, choiceId);
         player.Send(new NpcChoicePacket(choiceId));
-        player.GiveItem(itemId, amountOrDuration, refresh: true);
+        player.GiveItem(itemId, ChoiceReason(choiceId), amountOrDuration, refresh: true);
         return true;
     }
 
@@ -58,12 +59,15 @@ public abstract class NpcScriptBase
     {
         if (HasDone(player, choiceId)) return false;
 
-        return player.ExchangeItems(takeItemId, takeAmount, giveItems, refresh: true, beforeNotify: () =>
+        return player.ExchangeItems(takeItemId, takeAmount, giveItems, ChoiceReason(choiceId), refresh: true, beforeNotify: () =>
         {
             MarkDone(player, choiceId);
             player.Send(new NpcChoicePacket(choiceId));
         });
     }
+
+    /// <summary>Motivo de auditoria de uma entrega ou troca feita por uma escolha de NPC.</summary>
+    protected static EconomyReason ChoiceReason(uint choiceId) => new(EconomySource.Npc, "choice", $"escolha {choiceId}");
 
     /// <summary>Envia o código oficial de erro/fechar janela (<c>S2C 0x56 = 99</c>).</summary>
     protected static void ReplyError(Player player) =>

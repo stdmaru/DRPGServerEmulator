@@ -89,32 +89,32 @@ public class TimedItemTests
         long before = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
         // 1. Período arbitrário: 1 dia (86400 s) de Aura #718
-        Assert.True(player.GiveItems([(718, 86400)]));
+        Assert.True(player.GiveItems([(718, 86400)], TestSupport.Reason));
         var oneDay = player.Character.Inventory.Main[0]!;
         Assert.True(oneDay.IsTimed);
         Assert.InRange(oneDay.ExpiresAt, (uint)(before + 86395), (uint)(before + 86410));
 
         // 2. Permanente (-1): mesmo item #718 (que tem col 26 = 2593000) vira permanente
-        Assert.True(player.GiveItems([(718, -1)]));
+        Assert.True(player.GiveItems([(718, -1)], TestSupport.Reason));
         var permanent = player.Character.Inventory.Main[1]!;
         Assert.False(permanent.IsTimed);
         Assert.Equal(0u, permanent.ExpiresAt);
 
         // 3. Padrão (1): usa a duração padrão do ItemInfo (2593000 s)
-        Assert.True(player.GiveItems([(718, 1)]));
+        Assert.True(player.GiveItems([(718, 1)], TestSupport.Reason));
         var defaultTimed = player.Character.Inventory.Main[2]!;
         Assert.True(defaultTimed.IsTimed);
         Assert.InRange(defaultTimed.ExpiresAt, (uint)(before + 2_592_995), (uint)(before + 2_593_010));
 
         // 4. Item não empilhável originalmente permanente (#1) pode receber período arbitrário (3600 s)
-        Assert.True(player.GiveItems([(1, 3600)]));
+        Assert.True(player.GiveItems([(1, 3600)], TestSupport.Reason));
         var timedCrest = player.Character.Inventory.Main[3]!;
         Assert.True(timedCrest.IsTimed);
         Assert.InRange(timedCrest.ExpiresAt, (uint)(before + 3595), (uint)(before + 3610));
 
         // 5. Item empilhável (#25) trata o valor como quantidade normal (e rejeita -1)
-        Assert.False(player.GiveItems([(25, -1)]));
-        Assert.True(player.GiveItems([(25, 10)]));
+        Assert.False(player.GiveItems([(25, -1)], TestSupport.Reason));
+        Assert.True(player.GiveItems([(25, 10)], TestSupport.Reason));
         var bread = player.Character.Inventory.Main[4]!;
         Assert.False(bread.IsTimed);
         Assert.Equal(10u, bread.Amount);
@@ -124,7 +124,7 @@ public class TimedItemTests
     public void ItemRecord_and_CharacterData_0x02_encode_timestamps_at_official_offsets()
     {
         var (player, _) = MakePlayer();
-        Assert.True(player.GiveItems([(718, 86400), (718, -1)]));
+        Assert.True(player.GiveItems([(718, 86400), (718, -1)], TestSupport.Reason));
         var timed = player.Character.Inventory.Main[0]!;
         var perm = player.Character.Inventory.Main[1]!;
 
@@ -225,11 +225,11 @@ public class TimedItemTests
     public void ExchangeItems_supports_timed_and_permanent_and_GiveCards_accepts_batch()
     {
         var (player, session) = MakePlayer();
-        Assert.True(player.GiveItem(25, 5, refresh: false));
+        Assert.True(player.GiveItem(25, TestSupport.Reason, 5, refresh: false));
         session.SentOpcodes();
 
         // ExchangeItems aceita -1 (permanente) e período arbitrário (86400 s) no mesmo lote
-        Assert.True(player.ExchangeItems(25, 5, [(718, -1), (1, 86400)]));
+        Assert.True(player.ExchangeItems(25, 5, [(718, -1), (1, 86400)], TestSupport.Reason));
         Assert.Equal(0u, player.Character.Inventory.Main.Count(25));
         var permAura = player.Character.Inventory.Main.Find(718)!;
         var timedCrest = player.Character.Inventory.Main.Find(1)!;
@@ -238,13 +238,13 @@ public class TimedItemTests
 
         // GiveCards entrega múltiplos cards em um único pacote 0xC8
         session.SentOpcodes();
-        Assert.True(player.GiveCards([(74, 50), (19, 10)], refresh: false));
+        Assert.True(player.GiveCards([(74, 50), (19, 10)], TestSupport.Reason, refresh: false));
         Assert.Equal(50u, player.Character.Inventory.Battle.Count(74));
         Assert.Equal(10u, player.Character.Inventory.Battle.Count(19));
         Assert.Equal([(ushort)MapOpcode.BattleItemReceive], session.SentOpcodes());
 
         // GiveCards rejeita quantidade 0 sem alterar nada
-        Assert.False(player.GiveCards([(74, 1), (19, 0)], refresh: false));
+        Assert.False(player.GiveCards([(74, 1), (19, 0)], TestSupport.Reason, refresh: false));
         Assert.Equal(50u, player.Character.Inventory.Battle.Count(74));
     }
 }

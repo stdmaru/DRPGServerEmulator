@@ -45,8 +45,8 @@ public sealed class PersistenceService(
             {
                 bool wroteCharacter = await job.Run(CancellationToken.None);
                 _outage = false;
-                if (wroteCharacter && job.CharacterUid is { } uid)
-                    deadLetters.Resolve(uid);
+                if (wroteCharacter)
+                    Committed(job);
                 return;
             }
             catch (Exception e) when (attempt < maxAttempts)
@@ -69,6 +69,20 @@ public sealed class PersistenceService(
                 GiveUp(job, attempt, e);
                 return;
             }
+        }
+    }
+
+    private void Committed(PersistenceJob job)
+    {
+        if (job.CharacterUid is { } uid)
+            deadLetters.Resolve(uid);
+        try
+        {
+            job.Committed?.Invoke();
+        }
+        catch (Exception e)
+        {
+            log.LogError(e, "Erro depois de gravar {Job}", job.Name);
         }
     }
 

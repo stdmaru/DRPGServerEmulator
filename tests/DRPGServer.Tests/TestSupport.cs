@@ -5,6 +5,7 @@ using DRPGServer.Data.GameData;
 using DRPGServer.Data.Persistence;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Battle;
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Items;
 using DRPGServer.Game.Npcs;
@@ -54,6 +55,9 @@ internal static class TestSupport
         new(NetworkOptions(configure), time ?? TimeProvider.System);
 
     public static GameWorld NewWorld() => new(NullLogger<GameWorld>.Instance);
+
+    /// <summary>Motivo de auditoria para testes que não olham a auditoria.</summary>
+    public static EconomyReason Reason { get; } = new(EconomySource.Gm, "test");
 
     public static IOptions<PersistenceOptions> PersistenceOptions(Action<PersistenceOptions>? configure = null)
     {

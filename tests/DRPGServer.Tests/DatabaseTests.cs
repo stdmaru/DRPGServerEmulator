@@ -63,7 +63,7 @@ public sealed class DatabaseFixture : IAsyncLifetime
         await using var db = await Database.OpenAsync();
         uint account = await db.ExecuteScalarAsync<uint>(
             "INSERT INTO account (username, password, auth_key) VALUES (@name, '', ''); SELECT LAST_INSERT_ID();", new { name });
-        var characters = new CharacterRepository(Database, uids);
+        var characters = new CharacterRepository(Database, uids, new EconomyLogRepository());
         uint character = (await characters.CreateAsync(new NewCharacter(account, 0, name, 1, 10, "Koromon", 79, 56, 56), default))!.Value;
         return (account, character);
     }
@@ -86,8 +86,8 @@ public class AccountTransferDatabaseTests(DatabaseFixture db) : IClassFixture<Da
 
     private (CashRepository Cash, CharacterRepository Characters, AccountTransferRepository Transfers) Repositories()
     {
-        var cash = new CashRepository(db.Database, TestSupport.Clock);
-        var characters = new CharacterRepository(db.Database, _uids);
+        var cash = new CashRepository(db.Database, TestSupport.Clock, new EconomyLogRepository());
+        var characters = new CharacterRepository(db.Database, _uids, new EconomyLogRepository());
         return (cash, characters, new AccountTransferRepository(db.Database, cash, characters));
     }
 

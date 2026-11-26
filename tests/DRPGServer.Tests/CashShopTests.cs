@@ -305,7 +305,7 @@ public class CashShopTests
             // a linha foi lida, mas outra conexão a retira antes da transferência
             Assert.True(await store.TakeAsync(42, itemRow, CharacterSnapshot.Of(player.Character), CancellationToken.None));
             StorageTake? take = null;
-            await world.RunAsync(() => items.TakeFromAccountStorage(player, itemRow, t => take = t));
+            await world.RunAsync(() => items.TakeFromAccountStorage(player, itemRow, TestSupport.Reason, t => take = t));
 
             Assert.Equal(StorageTakeResult.NotFound, take!.Value.Result);
             Assert.Equal(0u, player.Character.Inventory.Main.Count(718));
@@ -331,8 +331,8 @@ public class CashShopTests
             var results = new List<StorageTakeResult>();
             await world.InvokeAsync(() =>
             {
-                items.TakeFromAccountStorage(player, itemRow, t => results.Add(t.Result));
-                items.TakeFromAccountStorage(player, itemRow, t => results.Add(t.Result));
+                items.TakeFromAccountStorage(player, itemRow, TestSupport.Reason, t => results.Add(t.Result));
+                items.TakeFromAccountStorage(player, itemRow, TestSupport.Reason, t => results.Add(t.Result));
                 return true;
             });
             release.SetResult();

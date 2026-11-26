@@ -1,5 +1,6 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
+using DRPGServer.Game.Economy;
 
 namespace DRPGServer.Tests;
 
@@ -48,13 +49,17 @@ internal sealed class InMemoryCashStore : ICashStore, IAccountTransferStore
             return Task.FromResult(_balances.TryGetValue(accountUid, out var b) ? (CashBalance?)b : null);
     }
 
-    public Task<CashBalance?> AddCashAsync(uint accountUid, uint cashDelta, uint bonusCashDelta, CancellationToken ct)
+    /// <summary>Motivos recebidos nas operações só da conta (o SQL grava a auditoria na mesma transação).</summary>
+    public List<EconomyReason> Reasons { get; } = [];
+
+    public Task<CashBalance?> AddCashAsync(uint accountUid, uint cashDelta, uint bonusCashDelta, EconomyReason reason, CancellationToken ct)
     {
         lock (_lock)
         {
             if (!_balances.TryGetValue(accountUid, out var b)) return Task.FromResult<CashBalance?>(null);
             var next = new CashBalance(b.Cash + cashDelta, b.BonusCash + bonusCashDelta);
             _balances[accountUid] = next;
+            Reasons.Add(reason);
             return Task.FromResult<CashBalance?>(next);
         }
     }
@@ -72,10 +77,11 @@ internal sealed class InMemoryCashStore : ICashStore, IAccountTransferStore
     }
 
     public Task<CashPurchaseOutcome> PurchaseAsync(uint accountUid, uint itemDataId, uint quantity, uint unitPrice,
-        uint totalPrice, IReadOnlyList<AccountStorageEntry> entries, CancellationToken ct)
+        uint totalPrice, IReadOnlyList<AccountStorageEntry> entries, EconomyReason reason, CancellationToken ct)
     {
         lock (_lock)
         {
+            Reasons.Add(reason);
             if (!_balances.TryGetValue(accountUid, out var bal))
                 return Task.FromResult(new CashPurchaseOutcome(CashPurchaseResult.AccountNotFound, default));
             if (bal.Total < totalPrice)

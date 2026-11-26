@@ -200,7 +200,11 @@ public sealed class PlayerSystem : IWorldSystem
     private void Save(Player player, TimeSpan now)
     {
         player.MarkSaved(now);
-        _persistence.SaveCharacter(_characters, CharacterSnapshot.Of(player.Character));
+        var snapshot = CharacterSnapshot.Of(player.Character);
+        // a auditoria foi gravada junto com o snapshot: sai do personagem (um snapshot coalescido nunca roda, e as
+        // movimentações dele seguem no próximo)
+        _persistence.SaveCharacter(_characters, snapshot,
+            committed: () => _world.Post(() => player.Character.Economy.Acknowledge(snapshot.Economy)));
     }
 
     public void Update(TimeSpan now, TimeSpan dt)

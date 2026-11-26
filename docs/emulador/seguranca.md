@@ -106,10 +106,19 @@ Código em `Data/Persistence/` e `Game/World/DeadLetterReplay.cs`; opções na s
 - Transferência conta ↔ personagem tem uma tentativa só e nunca vai para o dead-letter: a falha é desfeita no personagem, e o rollback é gravado como save comum.
 - ❓ Apagar um arquivo à mão desbloqueia o personagem com o estado do banco, perdendo o que estava no arquivo. Só faça isso de propósito.
 
-## Auditoria (**PR #41: S9**)
-- Toda movimentação de moeda e de item entre fontes (loja, Cash Shop, depósitos, GM, drop coletado, NPC, recompensa) gera uma linha em `economy_log`: quem, o quê, quanto, de onde, para onde, saldo depois e motivo.
-- A linha é gravada **na mesma transação** da operação, para não existir movimento sem registro nem registro sem movimento.
-- Comandos de GM sempre registram autor e alvo.
+## Auditoria
+Código em `Game/Economy/` e `Data/Repositories/EconomyLogRepository.cs`; tabela `economy_log` (`sql/upgrade/0014_economy_log.sql`).
+
+- **O que gera linha:** moedas (Bits, Medals, Coins, Ladder), Cash e bônus, e itens e cards que entram ou saem por uma fonte: loja NPC (compra, venda, reembolso), Shop Depository, Cash Shop, Cash Depository, comando de GM, drop coletado, escolha de NPC (prêmio e troca), recompensa de batalha e taxa do depósito de Digimon.
+- **Linha:** id UUIDv7, data, conta, personagem (nulo quando o movimento é do depósito da conta), fonte, ação, ativo, id do item, quantidade com sinal (positivo entrou, negativo saiu), saldo depois (moedas e Cash) e detalhe curto (até 255). Uma transferência tem as duas pontas: retirar do Cash Depository gera −1 na conta e +1 no personagem.
+- **Quantidade real:** registra o que mudou de fato. Crédito cortado pelo teto registra só o que entrou; zero e gasto recusado não registram.
+- **Mesma transação:** o personagem acumula as linhas (`Character.Economy`) e o snapshot as leva. `CharacterRepository.SaveAsync` grava as linhas na transação do snapshot, então não existe movimento gravado sem linha, nem linha sem movimento. Depois do commit, a thread do mundo tira do personagem as linhas que foram gravadas.
+- **Sem duplicar nem perder:** o insert é `INSERT IGNORE` pelo id. Um snapshot coalescido, uma confirmação perdida ou um dead-letter reaplicado gravam as mesmas linhas de novo sem duplicar. Save que falha mantém as linhas para o próximo snapshot e para o arquivo do dead-letter.
+- **Transferência:** as linhas da conta vão só no snapshot da transferência. Se ela for recusada (depósito cheio), elas somem, e o gasto e o reembolso do personagem ficam para o próximo save.
+- **Só conta:** compra no Cash Shop e `/cash` gravam as linhas na transação do `CashRepository`.
+- **GM:** `/cash` e `/currency` registram o autor no detalhe (`/cash por <conta>`).
+- ❓ Consumo (usar item, card em batalha, item que expira) não é auditado: não troca de dono, e o volume seria alto. Fica para depois, se for preciso investigar.
+- ❓ A ordem das linhas é a coluna `at` (milissegundo). Dentro do mesmo milissegundo, o id não segue a ordem de inserção.
 
 ## Regras para código novo
 - Ids do cliente (`Uid`, `Serial`, `ItemId`, slot, página) são conferidos contra o estado do servidor: pertence ao jogador, está na bolsa, mapa ou batalha esperada, e o tipo confere.

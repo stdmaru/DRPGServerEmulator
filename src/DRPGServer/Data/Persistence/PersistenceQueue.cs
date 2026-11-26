@@ -74,6 +74,7 @@ public sealed class PersistenceQueue
 
 public static class PersistenceQueueExtensions
 {
-    public static void SaveCharacter(this PersistenceQueue queue, ICharacterSnapshotStore repository, CharacterSnapshot snapshot) =>
-        queue.EnqueueCharacterSave(PersistenceJob.SaveCharacter(repository, snapshot));
+    public static void SaveCharacter(this PersistenceQueue queue, ICharacterSnapshotStore repository, CharacterSnapshot snapshot,
+        Action? committed = null) =>
+        queue.EnqueueCharacterSave(PersistenceJob.SaveCharacter(repository, snapshot, committed));
 }

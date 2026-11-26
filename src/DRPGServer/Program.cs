@@ -72,6 +72,7 @@ services.AddSingleton<AccountRepository>();
 services.AddSingleton<IAccountStore>(sp => sp.GetRequiredService<AccountRepository>());
 services.AddSingleton<AccountAuthenticator>();
 services.AddSingleton<DRPGServer.Game.DigimonUids>();
+services.AddSingleton<IAuditLog, EconomyLogRepository>();
 services.AddSingleton<CharacterRepository>();
 services.AddSingleton<ICharacterSnapshotStore>(sp => sp.GetRequiredService<CharacterRepository>());
 services.AddSingleton<CashRepository>();

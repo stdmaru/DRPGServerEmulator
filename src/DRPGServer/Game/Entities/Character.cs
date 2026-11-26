@@ -1,3 +1,5 @@
+using DRPGServer.Game.Economy;
+
 namespace DRPGServer.Game.Entities;
 
 /// <summary>✅ Códigos de resultado do Map 0x89 (offset 32) confirmados em DigimonRPG.bin @ 0x00AC2498.</summary>
@@ -36,6 +38,7 @@ public sealed class Character
     {
         _party[0] = leader;
         Inventory = inventory;
+        Economy = new EconomyLedger(this);
         SyncEquipmentBonuses();
     }
 
@@ -92,43 +95,84 @@ public sealed class Character
     public bool HasFlag(ushort flag) => _flags.Contains(flag);
     public bool SetFlag(ushort flag) => _flags.Add(flag);
 
+    /// <summary>Movimentações de moeda e item que ainda não chegaram ao banco (<see cref="EconomyLedger"/>).</summary>
+    public EconomyLedger Economy { get; }
+
+    // Set*: carga do banco, sem auditoria. Add*/TrySpend*: toda mudança em jogo, com o motivo registrado em Economy.
+
     public void SetBits(double bits) => Bits = Math.Max(0, bits);
-    public void AddBits(double amount) => SetBits(Bits + amount);
-    public bool TrySpendBits(double amount)
+
+    public void AddBits(double amount, EconomyReason reason)
+    {
+        double before = Bits;
+        SetBits(Bits + amount);
+        RecordBits(reason, before);
+    }
+
+    public bool TrySpendBits(double amount, EconomyReason reason)
     {
         if (amount <= 0) return true;
         if (Bits < amount) return false;
+        double before = Bits;
         Bits -= amount;
+        RecordBits(reason, before);
         return true;
     }
 
+    private void RecordBits(EconomyReason reason, double before) =>
+        Economy.Record(reason, EconomyAsset.Bits, 0, (long)Math.Round(Bits - before), (long)Bits);
+
     public void SetMedals(ushort medals) => Medals = medals;
-    public void AddMedals(uint amount) => Medals = (ushort)Math.Min((uint)Medals + amount, ushort.MaxValue);
-    public bool TrySpendMedals(uint amount)
+
+    public void AddMedals(uint amount, EconomyReason reason)
+    {
+        ushort before = Medals;
+        Medals = (ushort)Math.Min((uint)Medals + amount, ushort.MaxValue);
+        Economy.Record(reason, EconomyAsset.Medals, 0, Medals - before, Medals);
+    }
+
+    public bool TrySpendMedals(uint amount, EconomyReason reason)
     {
         if (amount == 0) return true;
         if (Medals < amount) return false;
         Medals -= (ushort)amount;
+        Economy.Record(reason, EconomyAsset.Medals, 0, -(long)amount, Medals);
         return true;
     }
 
     public void SetCoins(ushort coins) => Coins = Math.Min(coins, MaxCoins);
-    public void AddCoins(uint amount) => Coins = (ushort)Math.Min((uint)Coins + amount, MaxCoins);
-    public bool TrySpendCoins(uint amount)
+
+    public void AddCoins(uint amount, EconomyReason reason)
+    {
+        ushort before = Coins;
+        Coins = (ushort)Math.Min((uint)Coins + amount, MaxCoins);
+        Economy.Record(reason, EconomyAsset.Coins, 0, Coins - before, Coins);
+    }
+
+    public bool TrySpendCoins(uint amount, EconomyReason reason)
     {
         if (amount == 0) return true;
         if (Coins < amount) return false;
         Coins -= (ushort)amount;
+        Economy.Record(reason, EconomyAsset.Coins, 0, -(long)amount, Coins);
         return true;
     }
 
     public void SetLadderPoints(uint points) => LadderPoints = points;
-    public void AddLadderPoints(uint amount) => LadderPoints = (uint)Math.Min((ulong)LadderPoints + amount, uint.MaxValue);
-    public bool TrySpendLadderPoints(uint amount)
+
+    public void AddLadderPoints(uint amount, EconomyReason reason)
+    {
+        uint before = LadderPoints;
+        LadderPoints = (uint)Math.Min((ulong)LadderPoints + amount, uint.MaxValue);
+        Economy.Record(reason, EconomyAsset.LadderPoints, 0, (long)LadderPoints - before, LadderPoints);
+    }
+
+    public bool TrySpendLadderPoints(uint amount, EconomyReason reason)
     {
         if (amount == 0) return true;
         if (LadderPoints < amount) return false;
         LadderPoints -= amount;
+        Economy.Record(reason, EconomyAsset.LadderPoints, 0, -(long)amount, LadderPoints);
         return true;
     }
 
@@ -232,7 +276,7 @@ public sealed class Character
             return DepositoryResult.DepositFailed;
 
         double fee = ResolveDepositoryFee(digimon.Level, configuredFee);
-        if (!TrySpendBits(fee))
+        if (!TrySpendBits(fee, new(EconomySource.DigimonDepository, "deposit-fee", $"digimon {digimon.Uid}")))
             return DepositoryResult.DepositNotEnoughBits;
 
         _party[partySlot] = null;
@@ -251,7 +295,7 @@ public sealed class Character
         if (depSlot < 0 || freePartySlot < 0)
             return (DepositoryResult.WithdrawFailed, null);
         double fee = ResolveDepositoryFee(digimon.Level, configuredFee);
-        if (!TrySpendBits(fee))
+        if (!TrySpendBits(fee, new(EconomySource.DigimonDepository, "withdraw-fee", $"digimon {digimon.Uid}")))
             return (DepositoryResult.WithdrawNotEnoughBits, null);
 
         _depository[depSlot] = null;
@@ -273,7 +317,7 @@ public sealed class Character
             return (DepositoryResult.SwapFailed, null);
         double fee = ResolveDepositoryFee(partyDigimon.Level, configuredFee)
                    + ResolveDepositoryFee(storedDigimon.Level, configuredFee);
-        if (!TrySpendBits(fee))
+        if (!TrySpendBits(fee, new(EconomySource.DigimonDepository, "swap-fee", $"digimon {partyDigimon.Uid} ↔ {storedDigimon.Uid}")))
             return (DepositoryResult.SwapNotEnoughBits, null);
 
         _party[partySlot] = storedDigimon;

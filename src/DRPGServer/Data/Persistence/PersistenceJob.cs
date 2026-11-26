@@ -16,7 +16,10 @@ public sealed record PersistenceJob(string Name, Func<CancellationToken, Task<bo
     /// <summary>Snapshot que vai para o dead-letter se as tentativas acabarem. Sem ele, a desistência é só log crítico.</summary>
     public CharacterSnapshot? DeadLetter { get; init; }
 
-    public static PersistenceJob SaveCharacter(ICharacterSnapshotStore store, CharacterSnapshot snapshot) =>
+    /// <summary>Roda na thread da fila depois de <see cref="Run"/> devolver <c>true</c> (ex.: confirmar a auditoria).</summary>
+    public Action? Committed { get; init; }
+
+    public static PersistenceJob SaveCharacter(ICharacterSnapshotStore store, CharacterSnapshot snapshot, Action? committed = null) =>
         new("character.save", async ct =>
         {
             await store.SaveAsync(snapshot, ct);
@@ -25,5 +28,6 @@ public sealed record PersistenceJob(string Name, Func<CancellationToken, Task<bo
         {
             CharacterUid = snapshot.Uid,
             DeadLetter = snapshot,
+            Committed = committed,
         };
 }

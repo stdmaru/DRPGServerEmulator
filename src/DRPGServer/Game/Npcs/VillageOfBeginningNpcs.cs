@@ -70,8 +70,8 @@ public sealed class VillageOfBeginningNpcs : NpcScriptBase
         _zones.Teleport(player, FinalMap, FinalX, FinalY);
         player.Send(new NpcChoicePacket(choiceId));
         MarkDone(player, FinalChoice);
-        player.GiveCard(GoldenDrillX, drillAmount, refresh: false);
-        player.GiveItems(FinalItems, refresh: true);
+        player.GiveCard(GoldenDrillX, ChoiceReason(choiceId), drillAmount, refresh: false);
+        player.GiveItems(FinalItems, ChoiceReason(choiceId), refresh: true);
 
         // ✅ o oficial repete aqui os 0x7E e 0x7F da entrada
         for (int i = 0x29; i <= 0x2F; i++) player.Send(new Unknown7EPacket(i));

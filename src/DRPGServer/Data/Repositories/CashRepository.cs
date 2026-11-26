@@ -1,5 +1,6 @@
 using Dapper;
 using DRPGServer.Data.GameData;
+using DRPGServer.Game.Economy;
 
 namespace DRPGServer.Data.Repositories;
 
@@ -47,11 +48,13 @@ public sealed record CashShopHistoryPage(IReadOnlyList<CashShopHistoryEntry> Ent
 public interface ICashStore
 {
     Task<CashBalance?> GetBalanceAsync(uint accountUid, CancellationToken ct);
-    Task<CashBalance?> AddCashAsync(uint accountUid, uint cashDelta, uint bonusCashDelta, CancellationToken ct);
+    /// <summary>Credita Cash; a auditoria (<paramref name="reason"/>) entra na mesma transação.</summary>
+    Task<CashBalance?> AddCashAsync(uint accountUid, uint cashDelta, uint bonusCashDelta, EconomyReason reason, CancellationToken ct);
     Task<IReadOnlyList<CashDepositoryRow>> ListDepositoryAsync(uint accountUid, CancellationToken ct);
     Task<CashDepositoryRow?> FindDepositoryItemAsync(uint accountUid, CashShopItemKind kind, uint uid, CancellationToken ct);
+    /// <summary>Debita o Cash e guarda <paramref name="entries"/> no depósito; a auditoria entra na mesma transação.</summary>
     Task<CashPurchaseOutcome> PurchaseAsync(uint accountUid, uint itemDataId, uint quantity, uint unitPrice, uint totalPrice,
-        IReadOnlyList<AccountStorageEntry> entries, CancellationToken ct);
+        IReadOnlyList<AccountStorageEntry> entries, EconomyReason reason, CancellationToken ct);
     Task<CashShopHistoryPage> GetHistoryAsync(uint accountUid, ushort year, ushort month, ushort page, CancellationToken ct);
 }
 
@@ -59,7 +62,7 @@ public interface ICashStore
 /// Depósito da conta (<c>cash_depository_item</c>). As operações que mudam o depósito rodam dentro de uma
 /// <see cref="UnitOfWork"/> e travam a linha da conta primeiro, para serializar tudo o que mexe no depósito dela.
 /// </summary>
-public sealed class CashRepository(Database database, Game.World.IGameClock clock) : ICashStore
+public sealed class CashRepository(Database database, Game.World.IGameClock clock, IAuditLog audit) : ICashStore
 {
     public const int DepositoryCapacityPerKind = 24;
     public const int HistoryPageSize = 20;
@@ -107,7 +110,8 @@ public sealed class CashRepository(Database database, Game.World.IGameClock cloc
         return row is null ? null : new CashBalance(row.Cash, row.BonusCash);
     }
 
-    public async Task<CashBalance?> AddCashAsync(uint accountUid, uint cashDelta, uint bonusCashDelta, CancellationToken ct)
+    public async Task<CashBalance?> AddCashAsync(uint accountUid, uint cashDelta, uint bonusCashDelta, EconomyReason reason,
+        CancellationToken ct)
     {
         await using var uow = await database.BeginAsync(ct);
         if (await LockBalanceAsync(uow, accountUid, ct) is not { } row) return null;
@@ -117,6 +121,11 @@ public sealed class CashRepository(Database database, Game.World.IGameClock cloc
         await uow.Connection.ExecuteAsync(new CommandDefinition(
             "UPDATE account SET cash = @newCash, bonus_cash = @newBonus WHERE uid = @accountUid",
             new { accountUid, newCash, newBonus }, uow.Transaction, cancellationToken: ct));
+        var at = clock.UtcNow;
+        await audit.WriteAsync(uow, [
+            EconomyEntry.Create(at, accountUid, null, reason, EconomyAsset.Cash, 0, (long)newCash - row.Cash, newCash),
+            EconomyEntry.Create(at, accountUid, null, reason, EconomyAsset.BonusCash, 0, (long)newBonus - row.BonusCash, newBonus),
+        ], ct);
         await uow.CommitAsync(ct);
         return new CashBalance(newCash, newBonus);
     }
@@ -143,7 +152,7 @@ public sealed class CashRepository(Database database, Game.World.IGameClock cloc
     }
 
     public async Task<CashPurchaseOutcome> PurchaseAsync(uint accountUid, uint itemDataId, uint quantity, uint unitPrice,
-        uint totalPrice, IReadOnlyList<AccountStorageEntry> entries, CancellationToken ct)
+        uint totalPrice, IReadOnlyList<AccountStorageEntry> entries, EconomyReason reason, CancellationToken ct)
     {
         await using var uow = await database.BeginAsync(ct);
         if (await LockBalanceAsync(uow, accountUid, ct) is not { } bal)
@@ -178,6 +187,16 @@ public sealed class CashRepository(Database database, Game.World.IGameClock cloc
             BonusCashAfter = newBonus,
             PurchasedAt = (uint)Math.Clamp(clock.UnixNow, 0, uint.MaxValue),
         }, uow.Transaction, cancellationToken: ct));
+
+        var at = clock.UtcNow;
+        var economy = new List<EconomyEntry>
+        {
+            EconomyEntry.Create(at, accountUid, null, reason, EconomyAsset.Cash, 0, -(long)takeFromCash, newCash),
+            EconomyEntry.Create(at, accountUid, null, reason, EconomyAsset.BonusCash, 0, -(long)takeFromBonus, newBonus),
+        };
+        economy.AddRange(entries.GroupBy(e => (e.Kind, e.ItemId)).Select(g => EconomyEntry.Create(at, accountUid, null, reason,
+            g.Key.Kind == CashShopItemKind.Card ? EconomyAsset.Card : EconomyAsset.Item, g.Key.ItemId, g.Sum(e => (long)e.Amount), null)));
+        await audit.WriteAsync(uow, economy.Where(e => e.Amount != 0).ToList(), ct);
 
         await uow.CommitAsync(ct);
         return new CashPurchaseOutcome(CashPurchaseResult.Ok, new CashBalance(newCash, newBonus));

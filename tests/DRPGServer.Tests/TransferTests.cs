@@ -67,7 +67,7 @@ public class TransferTests
         await f.Harness.InvokeAsync(() =>
         {
             player.Character.SetBits(500);
-            f.Harness.Transfers.Run(player, "teste",
+            f.Harness.Transfers.Run(player, "teste", [],
                 commit: async (snapshot, _) => { committed = snapshot; return await commit.Task; },
                 settled: outcome => settled.SetResult(outcome));
             player.RequestImmediateSave();                // pedido de save no meio da transferência

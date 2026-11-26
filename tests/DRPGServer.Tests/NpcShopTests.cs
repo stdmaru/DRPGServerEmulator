@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Collections.Frozen;
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Items;
 using DRPGServer.Game.Stats;
@@ -300,6 +301,69 @@ public class NpcShopTests
         Assert.Equal(500u, BinaryPrimitives.ReadUInt32LittleEndian(charPayload.Slice(0x5C)));
         Assert.Equal((ushort)77, BinaryPrimitives.ReadUInt16LittleEndian(charPayload.Slice(0x19A8)));
         Assert.Equal((ushort)50, BinaryPrimitives.ReadUInt16LittleEndian(charPayload.Slice(0x19AA)));
+    }
+
+    private static List<(EconomyAsset Asset, uint AssetId, long Amount, long? Balance, string Action, uint? Character)> Audit(
+        IEnumerable<EconomyEntry> entries) =>
+        entries.Select(e => (e.Asset, e.AssetId, e.Amount, e.BalanceAfter, e.Action, e.CharacterUid)).ToList();
+
+    [Fact]
+    public void Shop_trades_are_audited_with_balance_after()
+    {
+        var (data, player, session) = MakeEnv(bits: 5000);
+        var itemTrade = ItemTrade(data);
+        var cardTrade = new CardShopTradeHandler(data, TestSupport.Guard(data));
+
+        itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 29, 3, ItemPlace.Inventory, 0, 0, 40101));
+        var burger = player.Character.Inventory.Main.Find(29)!;
+        itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Sell, burger.Uid, 29, 2, ItemPlace.Inventory, burger.Column, burger.Row, 40101));
+        cardTrade.Dispatch(session, BuildCardTrade(NpcShopAction.Buy, 0, 3, 5, ItemPlace.Inventory, 0, 0, 5201));
+
+        Assert.Equal([
+            (EconomyAsset.Bits, 0u, -1800L, (long?)3200, "buy", (uint?)10),
+            (EconomyAsset.Item, 29u, 3L, null, "buy", 10u),
+            (EconomyAsset.Item, 29u, -2L, null, "sell", 10u),
+            (EconomyAsset.Bits, 0u, 120L, 3320, "sell", 10u),
+            (EconomyAsset.Bits, 0u, -1000L, 2320, "buy", 10u),
+            (EconomyAsset.Card, 3u, 5L, null, "buy", 10u),
+        ], Audit(player.Character.Economy.Pending));
+        Assert.All(player.Character.Economy.Pending, e => Assert.Equal((EconomySource.NpcShop, 1u), (e.Source, e.AccountUid)));
+    }
+
+    [Fact]
+    public void Refused_purchase_is_not_audited()
+    {
+        var (data, player, session) = MakeEnv(bits: 100);
+        ItemTrade(data).Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 29, 3, ItemPlace.Inventory, 0, 0, 40101));
+        Assert.Empty(player.Character.Economy.Pending);
+    }
+
+    [Fact]
+    public async Task Shop_depository_purchase_audits_the_account_side_inside_the_transfer()
+    {
+        var cashStore = new InMemoryCashStore();
+        var (data, player, session) = MakeEnv();
+        await using var world = new WorldHarness();
+        await world.StartAsync();
+        player.Character.SetCoins(400);
+        var itemTrade = ItemTrade(data, cashStore, world);
+
+        await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
+
+        // a moeda (personagem) e a entrada no depósito (conta, sem personagem) foram no snapshot da transferência
+        Assert.Equal([
+            (EconomyAsset.Coins, 0u, -150L, (long?)250, "buy", (uint?)10),
+            (EconomyAsset.Item, 21008u, 1L, null, "buy", null),
+        ], Audit(Assert.Single(cashStore.Snapshots).Economy));
+        Assert.Empty(player.Character.Economy.Pending);         // confirmado: saiu do personagem
+
+        // depósito cheio: a entrada da conta some, o gasto e o reembolso ficam para o próximo save
+        cashStore.Fill(1, CashShopItemKind.Item);
+        await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
+        Assert.Equal([
+            (EconomyAsset.Coins, 0u, -150L, (long?)100, "buy", (uint?)10),
+            (EconomyAsset.Coins, 0u, 150L, 250, "refund", 10u),
+        ], Audit(player.Character.Economy.Pending));
     }
 
     [Fact]

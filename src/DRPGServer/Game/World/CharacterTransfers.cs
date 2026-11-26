@@ -1,5 +1,6 @@
 using DRPGServer.Data.Persistence;
 using DRPGServer.Data.Repositories;
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using Microsoft.Extensions.Logging;
 
@@ -33,17 +34,22 @@ public enum TransferOutcome
 public sealed class CharacterTransfers(GameWorld world, PersistenceQueue persistence, ILogger<CharacterTransfers> log)
 {
     /// <param name="operation">Nome curto para o log (ex.: <c>shop-depository.deposit</c>).</param>
+    /// <param name="economy">
+    /// Auditoria da parte da conta: vai só no snapshot desta transferência e é gravada junto com ela, ou some se ela não
+    /// gravar. A parte do personagem já está em <see cref="Character.Economy"/>.
+    /// </param>
     /// <param name="commit">Fora da thread do mundo: grava conta + snapshot. Falso = recusado.</param>
     /// <param name="settled">Na thread do mundo, com o jogador online ou não.</param>
-    public void Run(Player player, string operation, Func<CharacterSnapshot, CancellationToken, Task<bool>> commit,
-        Action<TransferOutcome> settled)
+    public void Run(Player player, string operation, IReadOnlyList<EconomyEntry> economy,
+        Func<CharacterSnapshot, CancellationToken, Task<bool>> commit, Action<TransferOutcome> settled)
     {
         world.AssertWorldThread();
         if (player.State != PlayerStates.Idle)
             throw new InvalidOperationException($"{player}: transferência {operation} fora de Idle ({player.State})");
 
         player.BeginTransfer();
-        var snapshot = CharacterSnapshot.Of(player.Character);
+        var pending = CharacterSnapshot.Of(player.Character);
+        var snapshot = pending with { Economy = [.. pending.Economy, .. economy] };
         // uma tentativa só, sem dead-letter: a falha é desfeita no personagem, e o rollback é gravado como save comum
         persistence.EnqueueCharacterTransfer(new PersistenceJob(operation, async ct =>
         {
@@ -57,7 +63,7 @@ public sealed class CharacterTransfers(GameWorld world, PersistenceQueue persist
                 log.LogError(e, "Transferência {Operation} falhou ({Player}); desfazendo no personagem", operation, player);
                 outcome = TransferOutcome.Failed;
             }
-            world.Post(() => Settle(player, operation, outcome, settled));
+            world.Post(() => Settle(player, operation, outcome, snapshot, settled));
             return outcome == TransferOutcome.Committed;   // o snapshot foi gravado junto com a conta
         })
         {
@@ -65,8 +71,11 @@ public sealed class CharacterTransfers(GameWorld world, PersistenceQueue persist
         });
     }
 
-    private void Settle(Player player, string operation, TransferOutcome outcome, Action<TransferOutcome> settled)
+    private void Settle(Player player, string operation, TransferOutcome outcome, CharacterSnapshot snapshot,
+        Action<TransferOutcome> settled)
     {
+        if (outcome == TransferOutcome.Committed)
+            player.Character.Economy.Acknowledge(snapshot.Economy);
         try
         {
             settled(outcome);

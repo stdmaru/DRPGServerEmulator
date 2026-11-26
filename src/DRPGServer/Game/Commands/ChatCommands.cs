@@ -1,5 +1,6 @@
 using DRPGServer.Configuration;
 using DRPGServer.Game.Battle;
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Shop;
 using DRPGServer.Game.World;
@@ -99,12 +100,13 @@ public sealed class ChatCommands
         Add("currency", "/currency <bits|medals|coins|ladder> <valor>", Authority.GameMaster, (p, args) =>
         {
             if (args.Length < 2 || !uint.TryParse(args[1], out var amount)) return;
+            var reason = new EconomyReason(EconomySource.Gm, "grant", $"/currency por {p.Account.Username}");
             switch (args[0].ToLowerInvariant())
             {
-                case "bits": p.Character.AddBits(amount); break;
-                case "medals": p.Character.AddMedals(amount); break;
-                case "coins": p.Character.AddCoins(amount); break;
-                case "ladder": p.Character.AddLadderPoints(amount); break;
+                case "bits": p.Character.AddBits(amount, reason); break;
+                case "medals": p.Character.AddMedals(amount, reason); break;
+                case "coins": p.Character.AddCoins(amount, reason); break;
+                case "ladder": p.Character.AddLadderPoints(amount, reason); break;
                 default: return;
             }
             p.RequestImmediateSave();

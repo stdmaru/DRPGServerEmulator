@@ -1,5 +1,6 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.World;
 
@@ -42,7 +43,7 @@ public sealed class ItemService(CharacterTransfers transfers, IAccountTransferSt
     /// Guarda <paramref name="entries"/> no depósito da conta. Quem chama já aplicou o custo no personagem (moeda, item
     /// tirado da mochila) e passa em <paramref name="undo"/> como desfazê-lo: ele roda se a transferência não gravar.
     /// </summary>
-    public void SendToAccountStorage(Player player, IReadOnlyList<AccountStorageEntry> entries, Action undo,
+    public void SendToAccountStorage(Player player, IReadOnlyList<AccountStorageEntry> entries, EconomyReason reason, Action undo,
         Action<StorageSendResult> done)
     {
         if (player.State != PlayerStates.Idle || entries.Count == 0)
@@ -53,7 +54,7 @@ public sealed class ItemService(CharacterTransfers transfers, IAccountTransferSt
         }
 
         uint accountUid = player.Account.Uid;
-        transfers.Run(player, "account-storage.send",
+        transfers.Run(player, "account-storage.send", AccountEntries(player, reason, entries.Select(e => (e.Kind, e.ItemId, e.Amount)), sign: 1),
             commit: (snapshot, ct) => store.DepositAsync(accountUid, entries, snapshot, ct),
             settled: outcome =>
             {
@@ -65,6 +66,18 @@ public sealed class ItemService(CharacterTransfers transfers, IAccountTransferSt
                 undo();
                 done(outcome == TransferOutcome.Refused ? StorageSendResult.Full : StorageSendResult.Failed);
             });
+    }
+
+    /// <summary>Movimentação no depósito da conta (sem personagem): positivo entrou nele, negativo saiu.</summary>
+    private IReadOnlyList<EconomyEntry> AccountEntries(Player player, EconomyReason reason,
+        IEnumerable<(CashShopItemKind Kind, uint ItemId, uint Amount)> items, int sign)
+    {
+        var at = clock.UtcNow;
+        return items.GroupBy(i => (i.Kind, i.ItemId))
+            .Select(g => EconomyEntry.Create(at, player.Account.Uid, null, reason,
+                g.Key.Kind == CashShopItemKind.Card ? EconomyAsset.Card : EconomyAsset.Item, g.Key.ItemId,
+                sign * g.Sum(i => (long)i.Amount), null))
+            .ToList();
     }
 
     /// <summary>Divide <paramref name="quantity"/> em pilhas do tamanho máximo do item, como o depósito guarda.</summary>
@@ -86,7 +99,7 @@ public sealed class ItemService(CharacterTransfers transfers, IAccountTransferSt
     /// Tira <paramref name="row"/> do depósito da conta para a mochila (cards na de batalha). A linha é conferida de
     /// novo dentro da transação: se outra conexão já a retirou, nada muda.
     /// </summary>
-    public void TakeFromAccountStorage(Player player, CashDepositoryRow row, Action<StorageTake> done)
+    public void TakeFromAccountStorage(Player player, CashDepositoryRow row, EconomyReason reason, Action<StorageTake> done)
     {
         if (player.State != PlayerStates.Idle)
         {
@@ -107,7 +120,13 @@ public sealed class ItemService(CharacterTransfers transfers, IAccountTransferSt
         }
 
         uint accountUid = player.Account.Uid;
-        transfers.Run(player, "account-storage.take",
+        // saiu da conta e entrou no personagem: as duas pontas, gravadas só se a transferência gravar
+        var asset = row.Kind == CashShopItemKind.Card ? EconomyAsset.Card : EconomyAsset.Item;
+        var at = clock.UtcNow;
+        var economy = AccountEntries(player, reason, [(row.Kind, row.ItemId, row.Amount)], sign: -1)
+            .Append(EconomyEntry.Create(at, accountUid, player.Character.Uid, reason, asset, row.ItemId, row.Amount, null))
+            .ToList();
+        transfers.Run(player, "account-storage.take", economy,
             commit: (snapshot, ct) => store.TakeAsync(accountUid, row, snapshot, ct),
             settled: outcome =>
             {

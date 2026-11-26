@@ -1,4 +1,5 @@
 using DRPGServer.Data.GameData;
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Items;
 using DRPGServer.Game.World;
@@ -71,13 +72,15 @@ public sealed class CardShopTradeHandler(GameData data, InteractionGuard guard) 
         var bag = player.Character.Inventory.Battle;
         if (bag.Room(cardId) < quantity) return;
 
-        if (!player.Character.TrySpendBits(totalCost)) return;
+        var reason = new EconomyReason(EconomySource.NpcShop, "buy", $"shop {shopId}");
+        if (!player.Character.TrySpendBits(totalCost, reason)) return;
         var added = bag.Add(cardId, quantity);
         if (added.Count == 0)
         {
-            player.Character.AddBits(totalCost);
+            player.Character.AddBits(totalCost, reason with { Action = "refund" });
             return;
         }
+        player.Character.Economy.RecordItems(reason, [(cardId, quantity)], cards: true);
 
         player.RequestImmediateSave();
         var primary = added[0];
@@ -101,12 +104,14 @@ public sealed class CardShopTradeHandler(GameData data, InteractionGuard guard) 
 
         uint sellPrice = card.SellPrice;
         double totalGain = (double)sellPrice * quantity;
+        var reason = new EconomyReason(EconomySource.NpcShop, "sell", $"shop {shopId} uid {uid}");
 
         item.Amount -= quantity;
         if (item.Amount == 0)
             bag.Destroy(slot);
 
-        player.Character.AddBits(totalGain);
+        player.Character.Economy.RecordItems(reason, [(cardId, quantity)], cards: true, sign: -1);
+        player.Character.AddBits(totalGain, reason);
         player.RequestImmediateSave();
 
         player.Send(new CardShopTradePacket(
@@ -167,12 +172,14 @@ public sealed class ItemShopTradeHandler(GameData data, ItemService items, Inter
 
         if (shop.DeliverTo == NpcShopDelivery.ShopDepository)
         {
-            if (!TrySpendCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong))
+            var depositReason = new EconomyReason(EconomySource.ShopDepository, "buy", $"shop {shopId}");
+            if (!TrySpendCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong, depositReason))
                 return;
 
             // conta (depósito) e personagem (moeda gasta) gravam juntos; se não gravar, a moeda volta
             items.SendToAccountStorage(player, ItemService.StorageEntries(player, CashShopItemKind.Item, info.Id, quantity),
-                undo: () => RefundCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong),
+                depositReason,
+                undo: () => RefundCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong, depositReason with { Action = "refund" }),
                 done: result =>
                 {
                     if (result != StorageSendResult.Ok)
@@ -196,15 +203,17 @@ public sealed class ItemShopTradeHandler(GameData data, ItemService items, Inter
         var bag = character.Inventory.Main;
         if (bag.Room(itemId) < quantity) return;
 
-        if (!TrySpendCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong))
+        var reason = new EconomyReason(EconomySource.NpcShop, "buy", $"shop {shopId}");
+        if (!TrySpendCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong, reason))
             return;
 
         var added = bag.Add(itemId, quantity);
         if (added.Count == 0)
         {
-            RefundCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong);
+            RefundCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong, reason with { Action = "refund" });
             return;
         }
+        character.Economy.RecordItems(reason, [(itemId, quantity)], cards: false);
 
         player.RequestImmediateSave();
         var primary = added[0];
@@ -217,24 +226,26 @@ public sealed class ItemShopTradeHandler(GameData data, ItemService items, Inter
             player.Send(new CurrencyUpdatePacket(character));
     }
 
-    private static bool TrySpendCurrency(Character character, NpcShopCurrency currency, uint unitPrice, uint quantity, ulong totalCostLong) =>
+    private static bool TrySpendCurrency(Character character, NpcShopCurrency currency, uint unitPrice, uint quantity,
+        ulong totalCostLong, EconomyReason reason) =>
         currency switch
         {
-            NpcShopCurrency.Bits => character.TrySpendBits((double)unitPrice * quantity),
-            NpcShopCurrency.Medals => character.TrySpendMedals((uint)totalCostLong),
-            NpcShopCurrency.Coins => character.TrySpendCoins((uint)totalCostLong),
-            NpcShopCurrency.LadderPoints => character.TrySpendLadderPoints((uint)totalCostLong),
+            NpcShopCurrency.Bits => character.TrySpendBits((double)unitPrice * quantity, reason),
+            NpcShopCurrency.Medals => character.TrySpendMedals((uint)totalCostLong, reason),
+            NpcShopCurrency.Coins => character.TrySpendCoins((uint)totalCostLong, reason),
+            NpcShopCurrency.LadderPoints => character.TrySpendLadderPoints((uint)totalCostLong, reason),
             _ => false,
         };
 
-    private static void RefundCurrency(Character character, NpcShopCurrency currency, uint unitPrice, uint quantity, ulong totalCostLong)
+    private static void RefundCurrency(Character character, NpcShopCurrency currency, uint unitPrice, uint quantity,
+        ulong totalCostLong, EconomyReason reason)
     {
         switch (currency)
         {
-            case NpcShopCurrency.Bits: character.AddBits((double)unitPrice * quantity); break;
-            case NpcShopCurrency.Medals: character.AddMedals((uint)totalCostLong); break;
-            case NpcShopCurrency.Coins: character.AddCoins((uint)totalCostLong); break;
-            case NpcShopCurrency.LadderPoints: character.AddLadderPoints((uint)totalCostLong); break;
+            case NpcShopCurrency.Bits: character.AddBits((double)unitPrice * quantity, reason); break;
+            case NpcShopCurrency.Medals: character.AddMedals((uint)totalCostLong, reason); break;
+            case NpcShopCurrency.Coins: character.AddCoins((uint)totalCostLong, reason); break;
+            case NpcShopCurrency.LadderPoints: character.AddLadderPoints((uint)totalCostLong, reason); break;
         }
     }
 
@@ -253,12 +264,14 @@ public sealed class ItemShopTradeHandler(GameData data, ItemService items, Inter
 
         uint sellPrice = info.SellPrice;
         double totalGain = (double)sellPrice * quantity;
+        var reason = new EconomyReason(EconomySource.NpcShop, "sell", $"shop {shopId} uid {uid}");
 
         item.Amount -= quantity;
         if (item.Amount == 0)
             bag.Destroy(slot);
 
-        player.Character.AddBits(totalGain);
+        player.Character.Economy.RecordItems(reason, [(itemId, quantity)], cards: false, sign: -1);
+        player.Character.AddBits(totalGain, reason);
         player.RequestImmediateSave();
 
         player.Send(new ItemShopTradePacket(

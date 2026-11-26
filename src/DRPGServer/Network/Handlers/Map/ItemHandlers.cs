@@ -1,4 +1,5 @@
 using DRPGServer.Game;
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;
@@ -28,6 +29,7 @@ public sealed class CardMoveHandler(InteractionGuard guard) : PlayerHandler<Card
                     || !guard.CanPickUp(player, drop)) return;
                 if (cardBag.Add(drop.ItemId, 1) is not [.., var card]) return;
                 zone.RemoveDrop(drop);
+                player.Character.Economy.RecordItems(Pickup(drop), [(drop.ItemId, 1)], cards: true);
                 player.RequestImmediateSave();
                 player.Send(new CardMovePacket(header with { ToA = card.Row, ToB = card.Column }, card));
                 break;
@@ -60,6 +62,9 @@ public sealed class CardMoveHandler(InteractionGuard guard) : PlayerHandler<Card
         player.Send(new CardMovePacket(header, card, displaced));
     }
 
+    internal static EconomyReason Pickup(ItemDrop drop) =>
+        new(EconomySource.DropPickup, "pickup", $"drop {drop.Uid} dono {drop.OwnerCharacterUid}");
+
     internal static int CardSlotOf(int row, int column) =>
         row == 0 && column is >= 0 and < Inventory.CardSlotCount ? column : -1;
 }
@@ -87,6 +92,7 @@ public sealed class ItemMoveHandler(InteractionGuard guard) : PlayerHandler<Item
                 || !guard.CanPickUp(player, drop)) return;
             if (bag.Add(drop.ItemId, 1) is not [.., var item]) return;   // inventário cheio: fica no chão
             zone.RemoveDrop(drop);
+            player.Character.Economy.RecordItems(CardMoveHandler.Pickup(drop), [(drop.ItemId, 1)], cards: false);
             player.RequestImmediateSave();
             player.Send(new ItemMovePacket(header with { ToA = item.Row, ToB = item.Column }, item));
             return;

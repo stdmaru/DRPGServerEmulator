@@ -1,5 +1,6 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Items;
 using DRPGServer.Game.World;
@@ -80,7 +81,8 @@ public sealed class CashShopService(
 
         uint accountUid = player.Account.Uid;
         io.Run(player, "cash-shop.buy",
-            work: ct => store.PurchaseAsync(accountUid, product.ItemDataId, quantity, product.Price, totalPrice, expanded, ct),
+            work: ct => store.PurchaseAsync(accountUid, product.ItemDataId, quantity, product.Price, totalPrice, expanded,
+                new EconomyReason(EconomySource.CashShop, "buy", $"produto {productId} x{quantity}"), ct),
             then: outcome =>
             {
                 log.LogInformation("CashShopBuy resultado ({Player}): result={Result} itemDataId={ItemDataId} totalPrice={Price} saldo={Cash}+{Bonus}",
@@ -175,7 +177,8 @@ public sealed class CashShopService(
                     player.Send(new CashDepositoryWithdrawPacket(kind, null, CashDepositoryWithdrawResult.NotFound));
                     return;
                 }
-                items.TakeFromAccountStorage(player, row, take => Delivered(player, row, take));
+                items.TakeFromAccountStorage(player, row, new EconomyReason(EconomySource.CashDepository, "withdraw", $"row {row.Uid}"),
+                    take => Delivered(player, row, take));
             },
             failed: _ => player.Send(new CashDepositoryWithdrawPacket(kind, null, CashDepositoryWithdrawResult.Failed)));
     }
@@ -207,7 +210,8 @@ public sealed class CashShopService(
     /// <summary>Credita Cash (ou bônus) na conta — usado pelo comando GM <c>/cash</c>.</summary>
     public void GrantCash(Player requester, uint cashDelta, uint bonusCashDelta, Action<CashBalance?> then, Action failed) =>
         io.Run(requester, "gm.cash",
-            work: ct => store.AddCashAsync(requester.Account.Uid, cashDelta, bonusCashDelta, ct),
+            work: ct => store.AddCashAsync(requester.Account.Uid, cashDelta, bonusCashDelta,
+                new EconomyReason(EconomySource.Gm, "grant", $"/cash por {requester.Account.Username}"), ct),
             then: then,
             failed: _ => failed());
 

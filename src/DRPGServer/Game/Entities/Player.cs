@@ -1,9 +1,10 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.World;
-using DRPGServer.Network;
 using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
+using DRPGServer.Network;
 
 namespace DRPGServer.Game.Entities;
 
@@ -131,15 +132,15 @@ public sealed class Player(
     /// <c>-1</c> (permanente), <c>0</c>/<c>1</c> (duração padrão do <c>ItemInfo</c>) ou <c>&gt; 1</c> (duração arbitrária em segundos, ex.: <c>86400</c> = 1 dia).
     /// Para itens empilháveis, representa a quantidade. Devolve <c>false</c> sem alterar o inventário se não houver espaço ou valor inválido.
     /// </summary>
-    public bool GiveItem(uint itemId, int amountOrDuration = 1, bool refresh = true) =>
-        GiveItems([(itemId, amountOrDuration)], refresh);
+    public bool GiveItem(uint itemId, EconomyReason reason, int amountOrDuration = 1, bool refresh = true) =>
+        GiveItems([(itemId, amountOrDuration)], reason, refresh);
 
     /// <summary>
     /// Entrega um lote de itens na aba <b>Items</b> (uso fora de batalha), enviando um único <c>0xC9</c>
     /// (e <c>0xFC</c> se <paramref name="refresh"/>). Suporta períodos arbitrários em segundos ou permanentes (<c>-1</c>)
     /// para itens não empilháveis (<c>MaxStack == 1</c>): ex. <c>player.GiveItems([(718, 86400), (718, -1)])</c>.
     /// </summary>
-    public bool GiveItems(IReadOnlyList<(uint ItemId, int AmountOrDuration)> items, bool refresh = true)
+    public bool GiveItems(IReadOnlyList<(uint ItemId, int AmountOrDuration)> items, EconomyReason reason, bool refresh = true)
     {
         var bag = Character.Inventory.Main;
         if (!TryResolveItems(items, out var resolved)) return false;
@@ -148,6 +149,7 @@ public sealed class Player(
         var added = new List<InventoryItem>();
         foreach (var (itemId, amount, duration) in resolved)
             added.AddRange(bag.Add(itemId, amount, duration));
+        Character.Economy.RecordItems(reason, resolved.Select(r => (r.ItemId, r.Amount)), cards: false);
 
         if (added.Count > 0) Send(new ItemReceivePacket(added));
         if (refresh) RefreshInventory();
@@ -158,14 +160,14 @@ public sealed class Player(
     /// Entrega um card na aba <b>Cards</b> (uso em batalha), enviando <c>0xC8</c> (e <c>0xFC</c> se <paramref name="refresh"/>).
     /// Devolve <c>false</c> sem alterar o inventário se não houver espaço suficiente.
     /// </summary>
-    public bool GiveCard(uint cardId, uint amount = 1, bool refresh = true) =>
-        GiveCards([(cardId, amount)], refresh);
+    public bool GiveCard(uint cardId, EconomyReason reason, uint amount = 1, bool refresh = true) =>
+        GiveCards([(cardId, amount)], reason, refresh);
 
     /// <summary>
     /// Entrega um lote de cards na aba <b>Cards</b> (uso em batalha), enviando um único <c>0xC8</c>
     /// (e <c>0xFC</c> se <paramref name="refresh"/>). Devolve <c>false</c> sem alterar nada se faltar espaço.
     /// </summary>
-    public bool GiveCards(IReadOnlyList<(uint CardId, uint Amount)> cards, bool refresh = true)
+    public bool GiveCards(IReadOnlyList<(uint CardId, uint Amount)> cards, EconomyReason reason, bool refresh = true)
     {
         var bag = Character.Inventory.Battle;
         if (cards.Any(c => c.Amount == 0)) return false;
@@ -174,6 +176,7 @@ public sealed class Player(
         var added = new List<InventoryItem>();
         foreach (var (cardId, amount) in cards)
             added.AddRange(bag.Add(cardId, amount));
+        Character.Economy.RecordItems(reason, cards, cards: true);
 
         if (added.Count > 0) Send(new BattleItemReceivePacket(added));
         if (refresh) RefreshInventory();
@@ -191,6 +194,7 @@ public sealed class Player(
         uint takeItemId,
         uint takeAmount,
         IReadOnlyList<(uint ItemId, int AmountOrDuration)> giveItems,
+        EconomyReason reason,
         bool refresh = true,
         Action? beforeNotify = null)
     {
@@ -208,6 +212,8 @@ public sealed class Player(
         var added = new List<InventoryItem>();
         foreach (var (itemId, amount, duration) in resolved)
             added.AddRange(bag.Add(itemId, amount, duration));
+        Character.Economy.RecordItems(reason, [(takeItemId, takeAmount)], cards: false, sign: -1);
+        Character.Economy.RecordItems(reason, resolved.Select(r => (r.ItemId, r.Amount)), cards: false);
 
         beforeNotify?.Invoke();
 
