@@ -77,8 +77,48 @@ public sealed record PatchConfiguration
         }
         if (config is null)
             throw new PatchConfigurationException("empty configuration");
+        config = config.Normalized();
         config.Validate();
         return config;
+    }
+
+    /// <summary>
+    /// Missing sections and fields, or an explicit <c>null</c> from the server, become the defaults, so nothing
+    /// after parsing has to check for null.
+    /// </summary>
+    private PatchConfiguration Normalized()
+    {
+        var server = ServerInfo ?? new();
+        var launcher = LauncherInfo ?? new();
+        var patch = PatchInfo ?? new();
+        var main = MainUrl ?? new();
+        var defaults = new PatchInfoSection();
+        return this with
+        {
+            ServerInfo = server with
+            {
+                Message = new MessageSection { Title = server.Message?.Title ?? "", Msg = server.Message?.Msg ?? "" },
+            },
+            LauncherInfo = launcher with
+            {
+                DownloadPath = launcher.DownloadPath ?? "",
+                FileName = launcher.FileName ?? "",
+                LauncherFileName = launcher.LauncherFileName ?? "",
+                RunExeFileName = launcher.RunExeFileName ?? "",
+            },
+            PatchInfo = patch with
+            {
+                DownloadUrl = patch.DownloadUrl ?? "",
+                DownloadFileHeader = patch.DownloadFileHeader ?? defaults.DownloadFileHeader,
+                PatchFileHeader = patch.PatchFileHeader ?? defaults.PatchFileHeader,
+            },
+            MainUrl = new MainUrlSection { HomePageUrl = main.HomePageUrl ?? "", MainPageUrl = main.MainPageUrl ?? "" },
+            LoginServer = LoginServer is null ? null : LoginServer with
+            {
+                Host = LoginServer.Host ?? "",
+                KeyFingerprint = LoginServer.KeyFingerprint ?? "",
+            },
+        };
     }
 
     private void Validate()

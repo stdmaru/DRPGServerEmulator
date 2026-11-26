@@ -78,6 +78,23 @@ public sealed unsafe class SdlRenderer : IRenderer
         SDL_RenderTexture(_renderer, t.Handle, null, &dst);
     }
 
+    public void DrawLeft(ITexture texture, int x, int y, int width)
+    {
+        var t = (Texture)texture;
+        width = Math.Clamp(width, 0, t.Width);
+        if (width == 0 || t.Height == 0)
+            return;
+        var src = new SDL_FRect { x = 0, y = 0, w = width, h = t.Height };
+        var dst = new SDL_FRect
+        {
+            x = _layout.OffsetX + x * _layout.Scale,
+            y = _layout.OffsetY + y * _layout.Scale,
+            w = width * _layout.Scale,
+            h = t.Height * _layout.Scale,
+        };
+        SDL_RenderTexture(_renderer, t.Handle, &src, &dst);
+    }
+
     public void EndFrame() => SDL_RenderPresent(_renderer);
 
     public uint[] Capture()

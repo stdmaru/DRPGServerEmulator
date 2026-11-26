@@ -62,6 +62,10 @@ Definido pelo dono em 2026-11-26:
 
 Erros em qualquer etapa aparecem na caixa de status. Sem patch pendente, a etapa 2 é pulada.
 
+✅ Implementado em `DRPG.Launcher/LauncherFlow.cs` (etapas `Patching` → `Connecting` → `Ready`, ou `Failed` com OK para repetir a etapa que falhou). Testado de ponta a ponta em 2026-11-26 contra o emulador local e o nginx do devcontainer. Qualquer exceção inesperada vira `Failed` (a tela nunca trava).
+
+**Zip do patch** (igual ao oficial, conferido no `Patch_240.zip`): `patch_N.hf/.pf` são mesclados no `resource`; os demais arquivos substituem os da instalação (caminhos com `..`, absolutos ou `resource.*` são recusados). ❓ O zip oficial traz `DigimonRPG.bin`, que sobrescreveria o binário sem XIGNCODE / o cliente novo.
+
 ### Tela do patch
 Sprites: `dr2_in_001_000` (239×196; título "Loading" e moldura da barra, só a faixa y 126–190 é opaca) e `dr2_in_001_002` (231×23, a barra; o 2º quadro é vazio). A barra encaixa dentro da moldura em (3, 165) e é desenhada **cortada na largura** = 231 × progresso. `dr2_in_001_001` (65×77, 3 quadros) é totalmente transparente.
 

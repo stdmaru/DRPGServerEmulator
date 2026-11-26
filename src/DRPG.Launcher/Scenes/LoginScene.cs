@@ -6,7 +6,8 @@ namespace DRPG.Launcher.Scenes;
 
 /// <summary>
 /// The old login screen rebuilt from its sprites. Positions and timings: docs/cliente/tela-login-launcher.md.
-/// Text (fields and status) is not drawn yet: it needs the font renderer.
+/// Text (fields and status) is not drawn yet: it needs the font renderer. While patching, the Loading box
+/// (<see cref="PatchView"/>) takes the panel's place.
 /// </summary>
 public sealed class LoginScene
 {
@@ -30,10 +31,25 @@ public sealed class LoginScene
     }
 
     public bool CloseRequested { get; private set; }
-    public bool SubmitRequested { get; private set; }
+    public bool SubmitRequested { get; set; }
+
+    /// <summary>False while patching and connecting: the panel is shown frozen and ignores mouse and keys (Esc and
+    /// closing the window still quit).</summary>
+    public bool Interactive { get; set; }
 
     public void Handle(InputEvent e)
     {
+        if (e is KeyEvent { Key: LauncherKey.Escape })
+        {
+            CloseRequested = true;
+            return;
+        }
+        if (!Interactive)
+        {
+            _ok.Reset();
+            _cancel.Reset();
+            return;
+        }
         switch (e)
         {
             case MouseMoveEvent m:
@@ -44,25 +60,24 @@ public sealed class LoginScene
                 if (_ok.Press(b.X, b.Y, b.Down)) SubmitRequested = true;
                 if (_cancel.Press(b.X, b.Y, b.Down)) CloseRequested = true;
                 break;
-            case KeyEvent { Key: LauncherKey.Escape }:
-                CloseRequested = true;
-                break;
             case KeyEvent { Key: LauncherKey.Enter }:
                 SubmitRequested = true;
                 break;
         }
     }
 
-    public void Draw(IRenderer r, ulong nowMs)
+    public void DrawBackground(IRenderer r) => r.Draw(_background, 0, 0);
+
+    public void DrawStatusBox(IRenderer r) => r.Draw(_status, StatusX, StatusY);
+
+    public void DrawPanel(IRenderer r, ulong nowMs)
     {
         int frame = (int)(nowMs / MascotFrameMs);
-        r.Draw(_background, 0, 0);
         r.Draw(_panel, PanelX, PanelY);
         r.Draw(_mascotA[frame % _mascotA.Length], PanelX + 225, PanelY + 2);
         r.Draw(_mascotB[frame % _mascotB.Length], PanelX + 270, PanelY - 2);
         _ok.Draw(r);
         _cancel.Draw(r);
-        r.Draw(_status, StatusX, StatusY);
     }
 
     /// <summary>Three-state button: normal, hover, pressed (frame order of the sprite; ❓ to confirm in CSceneServer).</summary>
@@ -73,6 +88,8 @@ public sealed class LoginScene
         private bool Contains(int px, int py) => px >= x && py >= y && px < x + frames[0].Width && py < y + frames[0].Height;
 
         public void Hover(int px, int py) => _hover = Contains(px, py);
+
+        public void Reset() => _hover = _pressed = false;
 
         /// <summary>True on release over the button after pressing it.</summary>
         public bool Press(int px, int py, bool down)

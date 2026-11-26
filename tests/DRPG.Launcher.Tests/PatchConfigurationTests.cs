@@ -56,6 +56,17 @@ public sealed class PatchConfigurationTests
         Assert.Throws<PatchConfigurationException>(() => PatchConfiguration.Parse(Official.Replace(from, to)));
 
     [Fact]
+    public void Missing_or_null_fields_get_defaults()
+    {
+        var c = PatchConfiguration.Parse("""{ "ServerInfo": null, "PatchInfo": { "PatchVersion": 3, "DownloadFileHeader": null } }""");
+
+        Assert.Equal("Patch_%d.zip", c.PatchInfo.DownloadFileHeader);
+        Assert.Equal("", c.ServerInfo.Message.Title);
+        Assert.Equal("", c.LauncherInfo.RunExeFileName);
+        Assert.Null(c.LoginServer);
+    }
+
+    [Fact]
     public void Rejects_invalid_json() =>
         Assert.Throws<PatchConfigurationException>(() => PatchConfiguration.Parse("{ nope"));
 
