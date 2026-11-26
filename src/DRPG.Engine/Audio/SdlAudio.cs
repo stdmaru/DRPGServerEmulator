@@ -56,15 +56,24 @@ public sealed unsafe class SdlAudio : IAudio
         if (stream == null)
             throw new InvalidOperationException($"SDL audio: {SDL_GetError()}");
         SDL_SetAudioStreamGain(stream, Math.Clamp(volume, 0f, 1f));
-        var voice = new SdlVoice(this, stream, sound, loop);
-        Queue(voice);
+        // bound before any data goes in: binding is what gives the stream its output format (the device's)
         if (!SDL_BindAudioStream(_device, stream))
         {
             var error = SDL_GetError();
             SDL_DestroyAudioStream(stream);
             throw new InvalidOperationException($"SDL audio: {error}");
         }
+        var voice = new SdlVoice(this, stream, sound, loop);
         _voices.Add(voice);
+        try
+        {
+            Queue(voice);
+        }
+        catch (InvalidOperationException)
+        {
+            voice.Stop();
+            throw;
+        }
         return voice;
     }
 
