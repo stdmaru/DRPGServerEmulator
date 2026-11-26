@@ -2,6 +2,8 @@
 
 Este arquivo define as diretrizes de fluxo de trabalho, organização de código e qualidade para agentes e desenvolvedores que atuam no **DRPGServer**.
 
+> **Leitura obrigatória antes de qualquer código:** [arquitetura do projeto](docs/arquitetura/README.md) (valores, camadas, threads), [padrões de código](docs/arquitetura/padroes-de-codigo.md) e [como estender](docs/arquitetura/extensao.md). Elas valem para servidor, cliente e ferramentas e prevalecem sobre preferências pessoais. Mudança nelas só com entrada no [registro de decisões](docs/projeto/decisoes.md).
+
 ---
 
 ## 1. Fluxo de Trabalho via Pull Requests (PRs)
@@ -18,6 +20,7 @@ Este arquivo define as diretrizes de fluxo de trabalho, organização de código
   - Diagnóstico técnico com evidências (capturas v322 em `captures.db`, tabelas do cliente ou engenharia reversa quando aplicável).
   - Lista de alterações e checklist de validação.
 - **Validação obrigatória antes de abrir/atualizar PR:**
+  - A mudança segue uma [receita](docs/arquitetura/extensao.md); se tocou arquivo fora dela, a página foi corrigida no mesmo PR ou o desvio foi discutido.
   - Rodar toda a suíte de testes unitários com `dotnet test` (caso `obj/` ou `bin/` tenham permissões restritas no ambiente local, usar `dotnet test --artifacts-path /tmp/dotnet-drpg`).
   - Zero erros de compilação e 100% dos testes passando.
 - **Testes locais antes do push:** quando o mantenedor pedir para testar localmente antes de subir, aplicar as mudanças sem fazer `git push` até receber confirmação.

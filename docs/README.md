@@ -34,6 +34,13 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
   - [Inventário](protocolo/structs/inventario.md): 0x03 (24 × 76 + 24 × 108) e o registro de item de 108 bytes.
   - [Resumo do tamer (0x10)](protocolo/structs/tamer-resumo.md): nível, posição/destino, líder; 204 bytes na v322.
 
+### Arquitetura (leitura obrigatória antes de codar)
+- [Fundação](arquitetura/README.md): valores (segurança > legibilidade > expansão), monorepo `DRPG.Shared`/`Server`/`Client`/`Tools`, o mesmo modelo de thread e camadas nos dois lados.
+- [Padrões de código](arquitetura/padroes-de-codigo.md): nomes e sufixos, tamanho, tipos e erros, recursos permitidos/proibidos, testes, garantias automáticas (analyzers, APIs banidas, testes de arquitetura).
+- [Biblioteca compartilhada](arquitetura/shared.md): pacotes de mão dupla com ida e volta e testes dourados, leitores de formato, versões do oficial.
+- [Cliente](arquitetura/cliente.md): camadas, fatia de feature (`State`/`Handlers`/`Actions`/`Window`), frame, registro compatível com NativeAOT, resolução e UI ancorada.
+- [Como estender](arquitetura/extensao.md): receitas fechadas (item, C2S, S2C, janela, domínio, formato, opção, patch do oficial) e os únicos pontos de registro manuais.
+
 ### Emulador
 - [Arquitetura](emulador/arquitetura.md): como rodar, migrações, camadas, onde fica cada coisa, modelo de threads, dependências, testes.
 - [Handlers](emulador/handlers.md): caminho de um pacote, request tipado (C2S), bases de handler, pré-condições, I/O pelo `WorldIo`, checklist de handler novo.
@@ -60,6 +67,11 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Arquivos de dados](cliente/arquivos-de-dados.md): `table.pf` e `resource.pf`, `drpg_pack.py`, colunas que o servidor lê na partida, o que falta.
 - [Wine](cliente/wine.md): rodar no Linux, prefixo dedicado, causa e correção da tela congelada no loading (corrida no backbuffer DirectDraw).
 - [Qualidade de vida](cliente/qualidade-de-vida.md): resolução e os três níveis (wrapper → hooks → decompilação incremental).
+- [Cliente Reboot (fãs)](cliente/reboot-analise.md): reescrita do zero em C# .NET 8 NativeAOT + MonoGame que lê a arte original e fala o protocolo; evidências e licença.
+
+### Planos
+- [Cliente novo](planos/cliente-novo.md): **estacionado até o merge do PR #41**. Source port em C# .NET 10 + SDL3/SDL_GPU (Vulkan/D3D12), Windows/Linux x64/arm64, regras de desempenho, RE de formatos e marcos.
+- [Cards e Card Slash](planos/card-slash.md): especificação do sistema de cards.
 
 ### Captura
 - [Campanha de captura](captura/campanha.md): checklist do que capturar e em que ordem.
