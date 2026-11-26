@@ -23,14 +23,14 @@ Um repositório só (monorepo), uma solução, .NET 10. Uma mudança de protocol
 ```
 src/
   DRPG.Shared/    protocolo, pacotes, formatos de arquivo, tabelas do cliente   (sem I/O de rede, sem banco, sem SDL)
-  DRPG.Server/    emulador (hoje: DRPGServer)
+  DRPG.Server/    emulador (hoje: DRPG.Server)
   DRPG.Client/    cliente (SDL3 + SDL_GPU)
   DRPG.Tools/     ferramentas de linha de comando (extração, visualizador, geradores de XML)
 tests/
   DRPG.Shared.Tests/  DRPG.Server.Tests/  DRPG.Client.Tests/  DRPG.Architecture.Tests/
 docs/             esta wiki
 ```
-❓ **Hoje** existe só `src/DRPGServer` e `tests/DRPGServer.Tests`. A divisão acima é o **marco 0** do [plano do cliente](../planos/cliente-novo.md), feito depois do PR #41.
+❓ **Hoje** existe só `src/DRPG.Server` e `tests/DRPG.Server.Tests`. A divisão acima é o **marco 0** do [plano do cliente](../planos/cliente-novo.md), feito depois do PR #41.
 
 Dependências permitidas entre projetos (conferidas por `DRPG.Architecture.Tests`):
 

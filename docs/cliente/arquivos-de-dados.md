@@ -15,15 +15,15 @@ python3 drpg_pack.py pack out/table client/table.hf
 
 ## O servidor lê o pacote na partida
 O emulador abre o `table.hf`/`table.pf` com `Data/GameData/ClientPack.cs`, uma porta do `drpg_pack.py` só de
-leitura. O pacote fica em `src/DRPGServer/Resources/Client/`, **fora do git** ([legal](../projeto/legal.md)).
+leitura. O pacote fica em `src/DRPG.Server/Resources/Client/`, **fora do git** ([legal](../projeto/legal.md)).
 O próprio servidor monta essa pasta a partir do cliente (v322):
 ```bash
-dotnet DRPGServer.dll extract-client <pasta do cliente> src/DRPGServer/Resources/Client
+dotnet DRPG.Server.dll extract-client <pasta do cliente> src/DRPG.Server/Resources/Client
 ```
 Ele copia o `table.hf`/`table.pf` e gera o `grids.bin` (~0,5 MB), com a grade de cada mapa lida do
 `resource.pf` ([mapas](mapas.md)). O `resource.pf` (11,8 GB) não é copiado. Sem `grids.bin`, o servidor sobe
 sem validar células. `Game:ClientTablePath` aponta para outra pasta se precisar. Os casos de borda são testados com um pacote sintético
-em `tests/DRPGServer.Tests/Fixtures/`. `Resources/` guarda só o que o cliente não tem: spawns, drops e os
+em `tests/DRPG.Server.Tests/Fixtures/`. `Resources/` guarda só o que o cliente não tem: spawns, drops e os
 pontos de chegada dos portais.
 
 | Tabela | Colunas usadas (índice a partir de 0) | Vira |

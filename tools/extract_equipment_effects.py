@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Gera src/DRPGServer/Resources/Item/EquipmentEffects.xml a partir de table\\item_info_us.dat (v322), offline.
+Gera src/DRPG.Server/Resources/Item/EquipmentEffects.xml a partir de table\\item_info_us.dat (v322), offline.
 
 O texto de bônus (coluna 28) só é lido aqui; o servidor carrega o XML com elementos <Modifier> e não
 interpreta texto de UI. Revise o diff do XML antes de commitar.
 
 Uso (de work/):
   python3 -I server/tools/extract_equipment_effects.py client/table.hf client/table.pf \\
-      server/src/DRPGServer/Resources/Item/EquipmentEffects.xml --pack tools
+      server/src/DRPG.Server/Resources/Item/EquipmentEffects.xml --pack tools
 """
 import argparse
 import importlib.util

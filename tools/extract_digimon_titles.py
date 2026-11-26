@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gera src/DRPGServer/Resources/Digimon/DigimonTitles.xml a partir de table\\digimon_title_us.dat (v322), offline.
+Gera src/DRPG.Server/Resources/Digimon/DigimonTitles.xml a partir de table\\digimon_title_us.dat (v322), offline.
 
 - Nome e id vêm da tabela (colunas 0 e 1).
 - Bônus: as linhas "※ ..." das colunas 3..13 viram <Modifier>. O servidor nunca lê esse texto.
@@ -8,7 +8,7 @@ Gera src/DRPGServer/Resources/Digimon/DigimonTitles.xml a partir de table\\digim
 
 Uso (de work/):
   python3 -I server/tools/extract_digimon_titles.py client/table.hf client/table.pf \\
-      server/src/DRPGServer/Resources/Digimon/DigimonTitles.xml --pack tools
+      server/src/DRPG.Server/Resources/Digimon/DigimonTitles.xml --pack tools
 """
 import argparse
 import importlib.util
