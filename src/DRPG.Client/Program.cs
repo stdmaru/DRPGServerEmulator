@@ -114,10 +114,19 @@ internal static class Program
         return 3;
     }
 
+    /// <summary>✅ <c>FUN_00b500a0(2)</c>: a return to scene 2 first shows the 3 s loading screen; the first entry does not.</summary>
+    internal static IScene ServerOrReturnLoading(GameContext game)
+    {
+        if (!game.SkipReturnLoading)
+            return new ReturnLoadingScene(game, Random.Shared);
+        game.SkipReturnLoading = false;
+        return new ServerScene(game);
+    }
+
     private static IScene CreateScene(SceneId id, GameContext game) => id switch
     {
         SceneId.Title => new TitleScene(game),
-        SceneId.Server => new ServerScene(game),
+        SceneId.Server => ServerOrReturnLoading(game),
         SceneId.CharacterSelect => new CharacterSelectScene(game),
         SceneId.Game => throw new NotSupportedException("the map scene comes with milestone 3"),
         _ => throw new ArgumentOutOfRangeException(nameof(id), id, "unknown scene"),

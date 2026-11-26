@@ -9,6 +9,7 @@ Especificação para o marco 2 do [cliente novo](../planos/cliente-novo.md): abr
 - ✅ **Troca de cena** `FUN_00b500a0(n)`: 1 = `CSceneTitle` (ctor `0x00b54ae0`), 2 = `CSceneServer` (`0x00b504b0`), 4 = `CSceneCharSel` (`0x00b43f20`, vtable `0x0102ebc4`), 5 = `CSceneGame` (`0x00b494f0`). ❓ 3 não é criada aqui.
   - Ao pedir a cena 2: escolhe a linha 1 da tabela de servidores (`FUN_00b3a950(1, 0)`), conecta (`FUN_00b52460`) e, se conectou, envia o **login `0x05`** com o usuário (`FUN_00b54150`). Ou seja: **o login é feito ao entrar na seleção de mundo**, antes de qualquer clique.
   - Se a cena 2 for pedida com `[DAT_0135b150]+0x690 == 0` (volta do jogo/da seleção de personagens), antes desenha 30 quadros de `FUN_00b34250(i % 12)` com `Sleep(100)` entre eles (3 s). Na primeira vez (`Game Init` põe `+0x690 = 1`) isso é pulado.
+    - ✅ `FUN_00b34250` (sprites de `0x00b34980`): `GUI\loading_image_ENG.spr` num quadro sorteado uma vez, em (0, 0); `GUI\loading_under_line.spr` quadro 0 em (0, 550); uma dica = pedaço n (sorteado de 1 a 15, uma vez) do texto `0xa6b` dividido nas quebras `†` (`FUN_0091b7d0`), amarelo com sombra preta, centrado nos 800 px em y 580 (`FUN_00b55560`); `GUI\game_end_gauge.spr` quadro `i % 12` em (740, 540). Depois recria a cena 2, que faz o login de novo. Implementado em `ReturnLoadingScene`.
 - Toda cena desenha o texto `Digimon RPG 3.26` no canto (`FUN_00b55270(0, texto, x, 1, 0xffffff, 1, 0)`; x = 0 na carga, 1 na seleção de mundo).
 - `FUN_00b3e3d0`: cursor (`Interface\cursor_*.spr`, carregados em `0x00b3ebf0`). `FUN_00b56010` + `FUN_007dbf10`: fim do quadro (apresentação).
 - ✅ 30 quadros por segundo em todas as cenas (`FUN_00867ed0(0x1e)` no `WinMain` e no fim do `Game Init`).
@@ -122,7 +123,8 @@ Todos tocam **2** e são ignorados com `+0x348 ≠ 0`. "Conectar na linha n" = `
 `0x00b524b0` esvazia a fila de pacotes (`0x00b3fb30`) a cada quadro, pelo tipo:
 - **5 (resposta do login `0x05`)**: `+0x8fc = (segundo campo ≠ 0x68)`. ✅ Isso **habilita o botão BATTLE ZONE**. As capturas oficiais mandam `0x2710` (habilitado); o emulador manda `0x68` (desabilitado).
 - **3 (resposta `0x03`)**: liga os bits 7 e 10, guarda o terceiro campo em `[DAT_0135a308]+0x14` (o 4º digimon inicial). Resultado 2 → zera o bit 0, liga o bit 6 e **envia `0x04`** (`0x00b53ee0`: usuário `+0xb8`, chave `+0xd0` e três textos `DAT_0135b298`; liga o bit 8; `Sleep(100)`). Outro resultado → mensagem `0x5f1`.
-- **4 (resposta `0x04`)**: resultado 2 → guarda o usuário em minúsculas e liga o bit 9. Resultado 3 → erro pelo código: 11 `0x5f2`, 10 `0x5f3`, 16 `0x5f4`, 12 `0x5f5`, 13 `0x5f6`, 15 `0x5f7`, 0x7d2 `0x5f8`, 14 liga o bit 14, outros `0x5f9` "Please Log-In through the website. (%d)" e desconecta.
+- **4 (resposta `0x04`)**: resultado 2 → guarda o usuário em minúsculas e liga o bit 9.
+  - ✅ **Chave recusada** (resultado 3, exceto 14): o texto vai para `+0x2480` e a conexão é fechada (`0x00b3f8a0`). A cena continua no bit 6 (sem Close nem botões dos mundos; o painel já fechou com o `0x03`), e a cada quadro `0x00b546c0` → `0x00b538f0` desenha `+0x2480` em (400, 260) enquanto não há conexão: **a mensagem fica na tela**. ❓ O clique que sai dela não foi achado no dump; pelo que o dono viu no original, o clique leva à tela de 3 s de `FUN_00b500a0(2)` e de volta à seleção de mundo. Resultado 3 → erro pelo código: 11 `0x5f2`, 10 `0x5f3`, 16 `0x5f4`, 12 `0x5f5`, 13 `0x5f6`, 15 `0x5f7`, 0x7d2 `0x5f8`, 14 liga o bit 14, outros `0x5f9` "Please Log-In through the website. (%d)" e desconecta.
 - Com o bit 9 (`0x00b546c0`): `Sleep(100)`, e a cada quadro `escuro += dt × 10` (`0x0102ee70`) e `FUN_00b55f10(escuro)` escurece a tela (subtrai `4·escuro − 1` de cada canal de 5 bits, o verde de 6 bits em dobro); quando `escuro > 15` (`0x0102ee74`), **cena 4**. ❓ `dt` = tempo do quadro em segundos (`FUN_00867e30`): a 30 FPS são ~1,5 s, a tela fica preta em ~0,8 s.
 - Liberar (`0x00b52da0`): destrói as caixas de edição, zera as flags; a conexão do channel continua aberta para a cena 4.
 
@@ -207,6 +209,7 @@ Para cada slot com tamer (`+4 ≠ 0`):
   - Ids usados aqui: `0x5da..0x5ea` nomes dos servidores, `0x5eb` copyright, `0x5ee/0x5ef` conexão, `0x5f1..0x5f9` erros do `0x03`/`0x04`, `0x5fa..0x602` avisos, `0xee4..0xee6`, `0xef1` "Level %3d", `0xef2` vitórias, `0x25e..0x264` criação, `0xef3` "You are disconnected with server.".
 - **Efeitos**: não há tabela fixa id → arquivo. Cada cena registra os seus com `FUN_00a187b0(id, caminho)` (790 posições, `0x00a18890(id, 0)` toca). Barra de carga: 5 = `sound\menu-bt.wav`; seleção de mundo: 2/3/4 (acima); seleção de personagens: 5 = `Sound\menu-1.wav`. ✅ **Correção:** `FUN_00b3a950(n, 0)` **não é som**: copia a linha n da tabela de servidores.
 - **BGM**: `0x00b42500(caminho, 0)` no gerenciador `DAT_0135a1f0`.
+- ✅ **Altura do texto:** o original mede e posiciona tudo com a célula GDI do GulimChe 12 px (12 de altura; ❓ ascendente 10). A fonte substituta (Noto Sans CJK no Linux: linha de 17 px, ascendente 14) é desenhada com a linha de base onde ficaria a do GulimChe e medida com 12 de altura (`UiText.CellHeight/CellAscent`); antes o texto ficava 3–4 px baixo dentro das caixas de mensagem.
 - Fontes GDI criadas em `0x00b563f0`: "굴림체" (GulimChe, charset 0x81) — `+0x1dc` 12 px normal (a padrão), `+0x1e4` 14 px negrito, e outras (14/12/11/10, 13×5, 32×24, 15); `Fonts\123RF_123RF_TTF.ttf` (face "123RF", 16 px). Ver [fonte do launcher](tela-login-launcher.md#fonte).
 
 ## Implementação (fase C) ✅
@@ -222,7 +225,7 @@ Código em `src/DRPG.Client` (`Scenes/`, `Ui/`, `Startup/`, `Text/`, `Data/`) e 
 - ✅ **tamerId → `a_%02d`:** `id − 1` confirmado em `0x00b21cd0` (laço de 1 a 4, `a_%02d` com `id − 1`, roupas com `id`).
 - **Silhueta do BZ** (modo de mistura `0xc`): não implementada.
 - **Chave do `option.ini`** de cada volume: `[BGM] sound` (efeitos) e `bgm` (música), padrão 1.
-- **Overlay de idioma da tabela Map** não aplicado; **animação de 3 s "voltar à cena 2"** não implementada; **`IsNetworkAlive`** não implementado.
+- **Overlay de idioma da tabela Map** não aplicado; **`IsNetworkAlive`** não implementado.
 - **Senha fraca:** o diálogo mostra só a primeira linha. **Sombra de sprite** (opção) não aplicada. **Espécie 817** com `+0x80 == 2` (`817_2.ani`) não tratada.
 - **Criar/Apagar/Trocar senha** na seleção de personagens só registram no log (o protocolo desses pedidos não é do marco 2). `Map Server` é registrado sem endereço.
 - **Dados:** `Sprite\033_1.ani` (Gabumon) aponta para `s.spr` (✅ está assim no arquivo do jogo): o sprite não existe e cai no `065_1.ani`, como o fallback do original ❓.

@@ -68,7 +68,12 @@ public sealed class ServerScene(GameContext game) : IScene
     private int _messageFrames;
     private int _messageY = 260;
 
-    private bool _started, _failureShown;
+    private bool _started, _failureShown, _returning;
+
+    /// <summary>✅ <c>+0x2480</c> after the key was refused: drawn at (400, 260) until the click (<c>0x00b538f0</c>).</summary>
+    private string? _refusal;
+
+    private const int RefusalY = 260;
     private ulong _authenticatedAtMs;
     private FadeOut? _fade;
 
@@ -137,7 +142,7 @@ public sealed class ServerScene(GameContext game) : IScene
         FollowAccount(account, nowMs);
 
         renderer.Draw(_background, 0, 0);
-        bool channelAccepted = account.Step >= AccountStep.ChannelSelected && account.Step != AccountStep.Failed;
+        bool channelAccepted = _refusal is not null || (account.Step >= AccountStep.ChannelSelected && account.Step != AccountStep.Failed);
         bool clickable = _fade is null && account.Step == AccountStep.LoggedIn && _message is null;
         if (!channelAccepted)
         {
@@ -177,11 +182,19 @@ public sealed class ServerScene(GameContext game) : IScene
                 _authenticatedAtMs = nowMs;
                 _fade = new FadeOut();
                 break;
-            case AccountStep.LoggedIn when account.AuthenticationRefusal is { } code:
-                ShowMessage(RefusalText(code), ErrorFrames);
-                _panelOpen = _worldChosen = false;                  // the arts leave and the big buttons come back
+            case AccountStep.LoggedIn when account.AuthenticationRefusal is 14:
+                // ❓ the weak password warning is a dialog of its own (bit 14) without disconnecting; only its first line is shown
+                ShowMessage(RefusalText(14), ErrorFrames);
+                _panelOpen = _worldChosen = false;
                 account.Reset();
-                account.StartLogin(nowMs);                          // ❓ the original disconnects; here the player can choose again
+                account.StartLogin(nowMs);
+                break;
+            case AccountStep.LoggedIn when account.AuthenticationRefusal is { } code:
+                // ✅ 0x00b524b0: the text goes to +0x2480 and the connection is closed (0x00b3f8a0). The scene stays
+                // "channel accepted" (bit 6: no Close, no world buttons, the panel already closed), and 0x00b538f0 draws
+                // the text every frame while there is no connection: it stays until the click that goes back to scene 2.
+                _refusal = RefusalText(code);
+                account.Reset();
                 break;
             case AccountStep.Failed:
                 if (!_failureShown)
@@ -376,6 +389,18 @@ public sealed class ServerScene(GameContext game) : IScene
     /// <summary>✅ Centred message boxes: white text on <c>dr2_in_000_003</c> at (400, 260), for a number of frames, or until a click.</summary>
     private void Messages(IRenderer renderer)
     {
+        if (_refusal is not null)
+        {
+            _box.Draw(renderer, _refusal, 400, RefusalY);
+            // ❓ the handler of this click was not found in the dump; the owner saw the original wait for a click and then
+            // show the 3 s loading screen of FUN_00b500a0(2) before the world selection
+            if (game.Mouse.Pressed && !_returning)
+            {
+                _returning = true;
+                game.Scenes.Switch(SceneId.Server);
+            }
+            return;
+        }
         if (_message is null)
             return;
         _box.Draw(renderer, _message, 400, _messageY);

@@ -20,6 +20,9 @@ public sealed class SpriteStore(PackArchive pack, IRenderer renderer) : IDisposa
     /// <summary>All frames of <c>gui\&lt;name&gt;.spr</c>; prefers the <c>_eng</c> variant when it exists.</summary>
     public ITexture[] Gui(string name) => Load(GuiPath(name), disabled: false);
 
+    /// <summary><see cref="Gui"/> with each frame uploaded only when first drawn (<see cref="LoadLazy"/>).</summary>
+    public SpriteFrames GuiLazy(string name) => LoadLazy(GuiPath(name));
+
     /// <summary>Grey copy of <see cref="Gui"/>, for disabled controls (the sprites have no disabled frame).</summary>
     public ITexture[] GuiDisabled(string name) => Load(GuiPath(name), disabled: true);
 

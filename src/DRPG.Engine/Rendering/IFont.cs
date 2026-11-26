@@ -5,5 +5,8 @@ public interface IFont : IDisposable
 {
     int LineHeight { get; }
 
+    /// <summary>Pixels from the top of a rendered line to the baseline.</summary>
+    int Ascent { get; }
+
     ITexture Render(IRenderer renderer, string text, uint rgba);
 }

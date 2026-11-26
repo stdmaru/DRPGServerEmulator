@@ -63,6 +63,12 @@ public sealed class GameContext(
 
     public SceneManager Scenes { get; set; } = null!; // set once by Program before the first frame
 
+    /// <summary>
+    /// ✅ <c>[DAT_0135b150]+0x690</c>: the next switch to scene 2 skips the 3 s <see cref="ReturnLoadingScene"/>. True at
+    /// start (<c>Game Init</c> sets it), cleared by the first entry; every later return to scene 2 shows the screen first.
+    /// </summary>
+    public bool SkipReturnLoading { get; set; } = true;
+
     /// <summary>✅ <c>FUN_00b55270(0, "Digimon RPG 3.26", x, 1, 0xffffff, 1, 0)</c>: white text with shadow at (x, 1).</summary>
     public void DrawVersion(IRenderer renderer, int x) => Text.Draw(renderer, VersionText, x, 1);
 }

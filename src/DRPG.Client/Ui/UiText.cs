@@ -17,18 +17,30 @@ public sealed class UiText(IFont? font) : IDisposable
     /// <summary>Lines kept before the cache is emptied; the scenes draw a few dozen different lines.</summary>
     private const int MaxCached = 400;
 
-    private const int FallbackCharacterWidth = 6, FallbackLineHeight = 12;
+    private const int FallbackCharacterWidth = 6;
+
+    /// <summary>
+    /// ✅ The GDI cell of the original's font, GulimChe 12 px (<c>0x00b563f0</c>): every text box and message box of the
+    /// original is laid out with this height (<c>FUN_00b561f0</c> measures with <c>GetTextExtentPoint</c>).
+    /// </summary>
+    public const int CellHeight = 12;
+
+    /// <summary>
+    /// ❓ GulimChe's ascent in that cell (10 above the baseline, 2 below, from the face's metrics). A substitute face is
+    /// drawn with its baseline here: Noto Sans CJK at 12 px has a 17 px line and a 14 px ascent, and drawn by its top
+    /// it sat 3–4 px low inside the message boxes.
+    /// </summary>
+    public const int CellAscent = 10;
 
     private readonly Dictionary<(string Text, uint Color), ITexture> _cache = [];
 
     public (int Width, int Height) Measure(IRenderer renderer, string text)
     {
         if (text.Length == 0)
-            return (0, font?.LineHeight ?? FallbackLineHeight);
+            return (0, CellHeight);
         if (font is null)
-            return (text.Length * FallbackCharacterWidth, FallbackLineHeight);
-        var texture = Line(renderer, text, White);
-        return (texture.Width, Math.Max(texture.Height, font.LineHeight));
+            return (text.Length * FallbackCharacterWidth, CellHeight);
+        return (Line(renderer, text, White).Width, CellHeight);
     }
 
     /// <summary>
@@ -69,6 +81,7 @@ public sealed class UiText(IFont? font) : IDisposable
     {
         if (font is null || text.Length == 0)
             return;
+        y += CellAscent - font.Ascent;          // the substitute's baseline where GulimChe's would be
         if (shadow)
             renderer.Draw(Line(renderer, text, shadowColorRef), x + 1, y + 1);
         renderer.Draw(Line(renderer, text, colorRef), x, y);

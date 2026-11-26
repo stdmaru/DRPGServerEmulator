@@ -95,6 +95,9 @@ internal sealed class FakeInstall : IDisposable
             ("gui\\dr2_ch_000_007_eng.spr", Sprite(150, 40, 3)),
             ("gui\\dr2_ch_000_008_eng.spr", Sprite(100, 40, 3)),
             ("gui\\dr2_ch_000_009_eng.spr", Sprite(100, 30, 3)),
+            ("gui\\loading_image_eng.spr", Sprite(800, 550, 3)),
+            ("gui\\loading_under_line.spr", Sprite(800, 50)),
+            ("gui\\game_end_gauge.spr", Sprite(40, 40, 12)),
             ("sprite\\a_00.spr", Sprite(100, 160, 16)),
             ("sprite\\a_00.ani", Ani("a_00.spr", 16)),
             // the default clothes of tamer 1, without a_20 (tamer 3 of the real install has no a_20 either)

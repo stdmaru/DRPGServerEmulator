@@ -27,6 +27,8 @@ public sealed unsafe class SdlTtfFont : IFont
 
     public int LineHeight => TTF_GetFontHeight(_font);
 
+    public int Ascent => TTF_GetFontAscent(_font);
+
     public ITexture Render(IRenderer renderer, string text, uint rgba)
     {
         if (text.Length == 0)
