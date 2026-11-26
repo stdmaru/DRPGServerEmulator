@@ -4,7 +4,8 @@ using DRPG.Server.Data.Repositories;
 using DRPG.Server.Game.Accounts;
 using DRPG.Server.Game.Entities;
 using DRPG.Server.Game.World;
-using DRPG.Server.Network.Packets.Channel;
+using DRPG.Shared.Packets.Channel;
+using DRPG.Shared.Protocol;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -15,15 +16,33 @@ public sealed class CharacterListService(CharacterRepository characters)
 {
     public async Task<CharacterSummary?[]> LoadSlotsAsync(uint accountUid, CancellationToken ct)
     {
-        var slots = new CharacterSummary?[CharacterListPacket.Slots];
+        var slots = new CharacterSummary?[CharacterListReply.SlotCount];
         foreach (var row in await characters.ListByAccountAsync(accountUid, ct))
             if (row.Slot < slots.Length)
                 slots[row.Slot] = CharacterFactory.Summary(row);
         return slots;
     }
 
+    /// <summary>
+    /// The list reply for the four slots. ✅ Every slot carries its own random check offset (the client only checks
+    /// <c>check − offset = map + level</c>).
+    /// </summary>
+    public static CharacterListReply BuildList(IReadOnlyList<CharacterSummary?> slots, Random random)
+    {
+        var reply = new CharacterListSlot[CharacterListReply.SlotCount];
+        for (byte slot = 0; slot < reply.Length; slot++)
+        {
+            var offset = random.Next(0, 255);
+            reply[slot] = slot < slots.Count && slots[slot] is { } c
+                ? new CharacterListSlot(c.Uid, c.TamerId, c.Name, c.Level, c.X, c.Y, c.LeaderSpeciesId, c.LeaderLevel,
+                    c.LeaderName, c.TotalBattles, c.TotalWins, slot, c.MapId, offset)
+                : CharacterListSlot.Empty(slot, offset);
+        }
+        return new CharacterListReply(reply);
+    }
+
     public async Task SendAsync(Session session, uint accountUid, CancellationToken ct) =>
-        session.Send(new CharacterListPacket(await LoadSlotsAsync(accountUid, ct), Random.Shared));
+        session.Send(BuildList(await LoadSlotsAsync(accountUid, ct), Random.Shared));
 }
 
 /// <summary>0x03: o jogador clicou num canal.</summary>
@@ -32,7 +51,7 @@ public sealed class ChannelSelectHandler(IOptions<GameOptions> options) : Sessio
 {
     protected override ValueTask HandleAsync(Session session, ChannelSelectRequest request, CancellationToken ct)
     {
-        session.Send(new ChannelSelectPacket(options.Value.FourthStarterDigimon));
+        session.Send(new ChannelSelectReply(options.Value.FourthStarterDigimon, request.Name));
         return ValueTask.CompletedTask;
     }
 }
@@ -53,7 +72,7 @@ public sealed class AuthenticateHandler(AccountAuthenticator authenticator, Acco
         if (await authenticator.AuthenticateAsync(request.Username, request.AuthKey, ct) is not { } account)
         {
             log.LogWarning("Autenticação recusada para {Username} de {Session}", request.Username, session);
-            session.Send(new AuthenticationPacket(ChannelError.InvalidCredentials, request.Username, request.AuthKey,
+            session.Send(new AuthenticateReply(ChannelError.InvalidCredentials, request.Username, request.AuthKey,
                 request.Mac1, request.Mac2, request.Mac3));
             return;
         }
@@ -64,7 +83,7 @@ public sealed class AuthenticateHandler(AccountAuthenticator authenticator, Acco
             return;
         }
         log.LogInformation("{Username} autenticado ({Authority})", account.Username, account.Authority);
-        session.Send(new AuthenticationPacket(ChannelError.None, account.Username));
+        session.Send(new AuthenticateReply(ChannelError.None, account.Username));
     }
 }
 
@@ -82,7 +101,7 @@ public sealed class UserCheckHandler : AccountHandler<UserCheckRequest>
 {
     protected override ValueTask HandleAsync(Session session, AuthenticatedAccount account, UserCheckRequest request, CancellationToken ct)
     {
-        session.Send(new UserCheckPacket(account.Username));
+        session.Send(new UserCheckReply(account.Username));
         return ValueTask.CompletedTask;
     }
 }
@@ -121,7 +140,7 @@ public sealed partial class CharacterCreateHandler(
         int slot = header.Slot < slots.Length && slots[header.Slot] is null ? header.Slot : Array.IndexOf(slots, null);
         if (slot < 0) return;
 
-        var reply = (int error) => new CharacterCreatePacket(error, header, tamerId, name, digimonId, digimonName);
+        var reply = (int error) => new CharacterCreateReply(error, header, tamerId, name, digimonId, digimonName);
         if (await characters.IsNameTakenAsync(name, ct))
         {
             session.Send(reply(ChannelError.NameTaken));
@@ -152,7 +171,7 @@ public sealed class CharacterDeleteHandler(CharacterRepository characters, Chara
         var uid = request.CharacterUid;
         if (!await characters.DeleteAsync(uid, account.Uid, ct)) return;
         log.LogInformation("{Username} apagou o personagem {Uid}", account.Username, uid);
-        session.Send(new CharacterDeletePacket(uid, request.PasswordMd5));
+        session.Send(new CharacterDeleteReply(uid, request.PasswordMd5));
         await list.SendAsync(session, account.Uid, ct);
     }
 }

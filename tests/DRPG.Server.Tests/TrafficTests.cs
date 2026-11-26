@@ -2,6 +2,7 @@ using System.Net;
 using DRPG.Server.Configuration;
 using DRPG.Server.Network;
 using DRPG.Server.Network.Traffic;
+using DRPG.Shared.Protocol;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 

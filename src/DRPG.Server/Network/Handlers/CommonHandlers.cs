@@ -1,5 +1,5 @@
-using DRPG.Server.Network.Packets;
 using DRPG.Server.Network.Packets.Map;
+using DRPG.Shared.Packets.Channel;
 using DRPG.Shared.Protocol;
 
 namespace DRPG.Server.Network.Handlers;
@@ -14,7 +14,7 @@ public sealed class KeepAliveHandler : SessionHandler<KeepAliveRequest>
 {
     protected override ValueTask HandleAsync(Session session, KeepAliveRequest request, CancellationToken ct)
     {
-        session.Send(new KeepAlivePacket((ushort)ChannelOpcode.KeepAlive));
+        session.Send(new KeepAliveReply());
         return ValueTask.CompletedTask;
     }
 }

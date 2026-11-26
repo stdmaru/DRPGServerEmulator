@@ -3,22 +3,6 @@ using DRPG.Server.Game.Entities;
 using DRPG.Server.Game.Stats;
 using DRPG.Shared.Protocol;
 
-namespace DRPG.Server.Network.Packets.Login
-{
-    /// <summary>0x05: resposta ao primeiro pacote do login.</summary>
-    public sealed class HandshakePacket(string username) : ServerPacket
-    {
-        public override ushort Opcode => (ushort)LoginOpcode.Handshake;
-
-        protected override void Write(PacketWriter w)
-        {
-            w.WriteI32(3);
-            w.WriteI32(0x68);
-            w.WriteFixedString(username, 20);
-        }
-    }
-}
-
 namespace DRPG.Server.Network.Packets.Global
 {
     /// <summary>0xE1: 1342 bytes depois do 0x64 (só o último byte é 1). ❓</summary>

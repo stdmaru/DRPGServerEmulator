@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Threading.Channels;
 using DRPG.Server.Game.Entities;
 using DRPG.Shared.Protocol;
+using DRPG.Server.Network.Packets;
 using DRPG.Server.Network.Traffic;
 using Microsoft.Extensions.Logging;
 
@@ -85,6 +86,9 @@ public sealed class Session
         _trace.Outgoing(this, packet.Opcode, frame);
         Enqueue(frame);
     }
+
+    /// <summary>Sends a two-way packet from <c>DRPG.Shared</c> (the server writes S2C).</summary>
+    public void Send<T>(T packet) where T : ITwoWayPacket<T> => Send(new TwoWayServerPacket<T>(packet));
 
     /// <summary>Envia um quadro já codificado (broadcast: codifica uma vez, envia para vários).</summary>
     public void SendFrame(byte[] frame)
