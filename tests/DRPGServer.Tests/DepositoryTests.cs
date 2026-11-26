@@ -74,21 +74,21 @@ public class DepositoryTests
         handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: 42)));
         var poorFail = Assert.Single(session.DrainOutgoing());
         Assert.Equal((byte)DepositoryResult.DepositNotEnoughBits, poorFail[14 + 32]);
-        Assert.Equal(500, character.Bits);
+        Assert.Equal(500, character.Wallet.Bits);
 
         // Com 5000 Bits: não pode depositar o líder (slot 0)
         character.SetBits(5_000);
         handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: character.Leader.Uid)));
         var leaderFail = Assert.Single(session.DrainOutgoing());
         Assert.Equal((byte)DepositoryResult.DepositFailed, leaderFail[14 + 32]);
-        Assert.Equal(5_000, character.Bits);
+        Assert.Equal(5_000, character.Wallet.Bits);
 
         // Deposita o slot 1 (uid 42, lv 5 -> 1000 Bits)
         handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: 42)));
         var depFrames = session.DrainOutgoing();
         Assert.Equal(2, depFrames.Count);
         Assert.Equal((byte)DepositoryResult.DepositOk, depFrames[1][14 + 32]);
-        Assert.Equal(4_000, character.Bits);
+        Assert.Equal(4_000, character.Wallet.Bits);
         Assert.Null(character.Party[1]);
         var stored = Assert.Single(character.Depository);
         Assert.Equal(42u, stored.Uid);
@@ -116,7 +116,7 @@ public class DepositoryTests
         handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Swap, partyUid: 7, depUid: 42)));
         var swapLeaderFail = Assert.Single(session.DrainOutgoing());
         Assert.Equal((byte)DepositoryResult.SwapFailed, swapLeaderFail[14 + 32]);
-        Assert.Equal(4_000, character.Bits);
+        Assert.Equal(4_000, character.Wallet.Bits);
 
         // Coloca um segundo digimon no slot 1 (uid 43) e troca (Swap) slot 1 (lv 1 -> 1000) com uid 42 (lv 5 -> 1000) = 2000 Bits
         var third = new Digimon(TestSupport.Data, TestSupport.Data.FindSpecies(10)!, 1) { Uid = 43, Name = "Testmon2" };
@@ -125,7 +125,7 @@ public class DepositoryTests
         var swapFrames = session.DrainOutgoing();
         Assert.Equal(2, swapFrames.Count);
         Assert.Equal((byte)DepositoryResult.SwapOk, swapFrames[1][14 + 32]);
-        Assert.Equal(2_000, character.Bits);
+        Assert.Equal(2_000, character.Wallet.Bits);
         Assert.Equal(42u, character.Party[1]!.Uid);
         Assert.Equal(43u, Assert.Single(character.Depository).Uid);
         Assert.Equal(42u, BinaryPrimitives.ReadUInt32LittleEndian(swapFrames[1].AsSpan(14 + 40, 4))); // DigimonStatusBlock @ 40
@@ -135,7 +135,7 @@ public class DepositoryTests
         var depPage2Frames = session.DrainOutgoing();
         Assert.Equal(2, depPage2Frames.Count);
         Assert.Equal((byte)DepositoryResult.DepositOk, depPage2Frames[1][14 + 32]);
-        Assert.Equal(1_000, character.Bits);
+        Assert.Equal(1_000, character.Wallet.Bits);
         Assert.Equal(43u, Assert.Single(character.DepositoryPage(1)).Uid);
         Assert.Equal(42u, Assert.Single(character.DepositoryPage(2)).Uid);
         Assert.Equal(42u, BinaryPrimitives.ReadUInt32LittleEndian(depPage2Frames[0].AsSpan(14 + 8, 4)));
@@ -146,7 +146,7 @@ public class DepositoryTests
         handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Withdraw, depUid: 43)));
         var fullPartyFail = Assert.Single(session.DrainOutgoing());
         Assert.Equal((byte)DepositoryResult.WithdrawFailed, fullPartyFail[14 + 32]);
-        Assert.Equal(1_000, character.Bits);
+        Assert.Equal(1_000, character.Wallet.Bits);
     }
 
     [Fact]

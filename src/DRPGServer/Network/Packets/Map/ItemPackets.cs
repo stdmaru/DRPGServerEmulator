@@ -226,7 +226,7 @@ public sealed class InventoryRefreshPacket(Character character) : ServerPacket
 
     protected override void Write(PacketWriter w)
     {
-        w.WriteF64(character.Bits);
+        w.WriteF64(character.Wallet.Bits);
         InventoryLayout.Write(w, character.Inventory);
     }
 }

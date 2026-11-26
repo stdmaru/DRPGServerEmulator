@@ -110,7 +110,7 @@ public sealed record CharacterSnapshot(
         var items = new[] { c.Inventory.Main, c.Inventory.Battle, c.Inventory.CardSlots, c.Inventory.Equipment }
             .SelectMany(b => b.Items.Select(i => new ItemRow((byte)b.Kind, (byte)i.Slot, i.Uid, i.ItemId, i.Amount, i.ExpiresAt)))
             .ToList();
-        return new(c.Uid, c.Level, c.MapId, c.X, c.Y, c.Bits, c.Medals, c.Coins, c.LadderPoints,
+        return new(c.Uid, c.Level, c.MapId, c.X, c.Y, c.Wallet.Bits, c.Wallet.Medals, c.Wallet.Coins, c.Wallet.LadderPoints,
             c.TotalWins, c.TotalBattles, c.DepositorySlots,
             digimons, forms, items, c.Flags.Order().ToList(), titles, c.Economy.Pending.ToList());
     }

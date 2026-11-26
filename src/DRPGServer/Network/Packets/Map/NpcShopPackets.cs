@@ -1,4 +1,5 @@
 using DRPGServer.Data.GameData;
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Network.Protocol;
 
@@ -14,6 +15,18 @@ public enum NpcShopAction : uint
     BuyLadderPoints = 5, // Ladder Points (0xDDC, ItemRecord +92 = Col17)
 }
 
+public static class NpcShopActions
+{
+    /// <summary>✅ A ação de compra que o 0x53 usa para cada moeda.</summary>
+    public static NpcShopAction BuyWith(CurrencyKind currency) => currency switch
+    {
+        CurrencyKind.Medals => NpcShopAction.BuyMedals,
+        CurrencyKind.Coins => NpcShopAction.BuyCoins,
+        CurrencyKind.LadderPoints => NpcShopAction.BuyLadderPoints,
+        _ => NpcShopAction.Buy,
+    };
+}
+
 /// <summary>
 /// ✅ Map 0x00CB (16 B): sincroniza Bits (<c>double</c>), Medals (<c>u32 → WORD [player+0x4070]</c>) e
 /// Coins (<c>u32 → WORD [player+0x4072]</c>). Confirmado em <c>DigimonRPG.bin @ 0x00ABFAC2</c>.
@@ -24,9 +37,9 @@ public sealed class CurrencyUpdatePacket(Character character) : ServerPacket
 
     protected override void Write(PacketWriter w)
     {
-        w.WriteF64(character.Bits);        // +0x00
-        w.WriteU32(character.Medals);      // +0x08
-        w.WriteU32(character.Coins);       // +0x0C (16 B total)
+        w.WriteF64(character.Wallet.Bits); // +0x00
+        w.WriteU32(character.Wallet.Medals); // +0x08
+        w.WriteU32(character.Wallet.Coins);  // +0x0C (16 B total)
     }
 }
 
@@ -86,8 +99,8 @@ public sealed class ItemShopListPacket(NpcShop shop, GameData data, long unixNow
             {
                 info = shop.Currency switch
                 {
-                    NpcShopCurrency.Coins => info with { Col16 = (ushort)Math.Min(price, ushort.MaxValue) },
-                    NpcShopCurrency.LadderPoints => info with { Col17 = price },
+                    CurrencyKind.Coins => info with { Col16 = (ushort)Math.Min(price, ushort.MaxValue) },
+                    CurrencyKind.LadderPoints => info with { Col17 = price },
                     _ => info with { BuyPrice = price },
                 };
             }

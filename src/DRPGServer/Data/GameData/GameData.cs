@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using DRPGServer.Game.Economy;
 
 namespace DRPGServer.Data.GameData;
 
@@ -209,15 +210,6 @@ public enum NpcShopKind : byte
     Item = 2,
 }
 
-/// <summary>Moeda aceita por uma loja genérica de NPC (<c>0x0053</c>: 1=Bits, 3=Medals, 4=Coins, 5=LadderPoints).</summary>
-public enum NpcShopCurrency : byte
-{
-    Bits = 1,
-    Medals = 3,
-    Coins = 4,
-    LadderPoints = 5,
-}
-
 /// <summary>Destino dos itens comprados em uma loja genérica de NPC (<c>Inventory</c> ou <c>ShopDepository</c>).</summary>
 public enum NpcShopDelivery : byte
 {
@@ -234,7 +226,7 @@ public sealed record NpcShop(
     NpcShopKind Kind,
     string Name,
     IReadOnlyList<NpcShopEntry> Entries,
-    NpcShopCurrency Currency = NpcShopCurrency.Bits,
+    CurrencyKind Currency = CurrencyKind.Bits,
     NpcShopDelivery DeliverTo = NpcShopDelivery.Inventory)
 {
     public const int MaxSlots = 40;

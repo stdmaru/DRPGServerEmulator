@@ -20,7 +20,7 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options, Inter
         var (page, action, partyDigimonUid, depositoryDigimonUid) = request;
         var character = player.Character;
         ushort clampedPage = Math.Clamp(page, (ushort)1, character.DepositoryTotalPages);
-        double depositoryFee = options.Value.DigimonDepositoryFee;
+        long depositoryFee = options.Value.DigimonDepositoryFee;
 
         switch (action)
         {
@@ -28,7 +28,7 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options, Inter
             {
                 var result = character.DepositorySlots > 0 ? DepositoryResult.OpenOk : DepositoryResult.OpenFailed;
                 player.Send(new DepositoryListPacket(clampedPage, character));
-                player.Send(new DepositoryActionPacket(clampedPage, action, 0, 0, character.Bits, result));
+                player.Send(new DepositoryActionPacket(clampedPage, action, 0, 0, character.Wallet.Bits, result));
                 break;
             }
             case DepositoryAction.Deposit:
@@ -39,7 +39,7 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options, Inter
                     player.RequestImmediateSave();
                     player.Send(new DepositoryListPacket(clampedPage, character));
                 }
-                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, 0, character.Bits, result));
+                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, 0, character.Wallet.Bits, result));
                 break;
             }
             case DepositoryAction.Withdraw:
@@ -50,7 +50,7 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options, Inter
                     player.RequestImmediateSave();
                     player.Send(new DepositoryListPacket(clampedPage, character));
                 }
-                player.Send(new DepositoryActionPacket(clampedPage, action, 0, depositoryDigimonUid, character.Bits, result, withdrawn));
+                player.Send(new DepositoryActionPacket(clampedPage, action, 0, depositoryDigimonUid, character.Wallet.Bits, result, withdrawn));
                 break;
             }
             case DepositoryAction.Swap:
@@ -61,11 +61,11 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options, Inter
                     player.RequestImmediateSave();
                     player.Send(new DepositoryListPacket(clampedPage, character));
                 }
-                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, depositoryDigimonUid, character.Bits, result, withdrawn));
+                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, depositoryDigimonUid, character.Wallet.Bits, result, withdrawn));
                 break;
             }
             default:
-                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, depositoryDigimonUid, character.Bits, DepositoryResult.OpenCheckError));
+                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, depositoryDigimonUid, character.Wallet.Bits, DepositoryResult.OpenCheckError));
                 break;
         }
     }

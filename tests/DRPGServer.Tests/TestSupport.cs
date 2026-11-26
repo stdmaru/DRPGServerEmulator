@@ -4,6 +4,7 @@ using DRPGServer.Configuration;
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Persistence;
 using DRPGServer.Data.Repositories;
+using DRPGServer.Game;
 using DRPGServer.Game.Battle;
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
@@ -11,11 +12,10 @@ using DRPGServer.Game.Items;
 using DRPGServer.Game.Npcs;
 using DRPGServer.Game.Shop;
 using DRPGServer.Game.World;
-using DRPGServer.Game;
+using DRPGServer.Network;
 using DRPGServer.Network.Handlers;
 using DRPGServer.Network.Protocol;
 using DRPGServer.Network.Traffic;
-using DRPGServer.Network;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -326,4 +326,20 @@ internal sealed class RecordingSnapshotStore : ICharacterSnapshotStore
         Saved.Add(snapshot);
         return Task.CompletedTask;
     }
+}
+
+/// <summary>Saldos iniciais nos testes (carga, sem auditoria, como vem do banco).</summary>
+internal static class WalletSetup
+{
+    public static void SetBits(this Character c, double bits) =>
+        c.Wallet.Load(bits, c.Wallet.Medals, c.Wallet.Coins, c.Wallet.LadderPoints);
+
+    public static void SetMedals(this Character c, ushort medals) =>
+        c.Wallet.Load(c.Wallet.Bits, medals, c.Wallet.Coins, c.Wallet.LadderPoints);
+
+    public static void SetCoins(this Character c, ushort coins) =>
+        c.Wallet.Load(c.Wallet.Bits, c.Wallet.Medals, coins, c.Wallet.LadderPoints);
+
+    public static void SetLadderPoints(this Character c, uint points) =>
+        c.Wallet.Load(c.Wallet.Bits, c.Wallet.Medals, c.Wallet.Coins, points);
 }

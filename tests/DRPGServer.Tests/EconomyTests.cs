@@ -38,16 +38,46 @@ public class EconomyTests
     public void Currency_changes_record_the_real_delta_and_skip_zero()
     {
         var c = Entities.Character();
-        c.SetCoins(Character.MaxCoins - 10);
+        c.SetCoins(Wallet.MaxCoins - 10);
 
-        c.AddCoins(50, Gm);                       // teto: só 10 entraram
-        c.TrySpendMedals(0, Gm);                  // zero: nada
-        Assert.False(c.TrySpendBits(1, Gm));      // sem saldo: nada
-        c.AddBits(0.4, Gm);                       // arredonda para 0: nada
+        c.Wallet.Credit(CurrencyKind.Coins, 50, Gm);                       // teto: só 10 entraram
+        c.Wallet.TrySpend(CurrencyKind.Medals, 0, Gm);                // zero: nada
+        Assert.False(c.Wallet.TrySpend(CurrencyKind.Bits, 1, Gm));      // sem saldo: nada
+        c.Wallet.CreditBits(0.4, Gm);                       // arredonda para 0: nada
 
         var entry = Assert.Single(c.Economy.Pending);
-        Assert.Equal((EconomyAsset.Coins, 10L, (long?)Character.MaxCoins), (entry.Asset, entry.Amount, entry.BalanceAfter));
+        Assert.Equal((EconomyAsset.Coins, 10L, (long?)Wallet.MaxCoins), (entry.Asset, entry.Amount, entry.BalanceAfter));
         Assert.Equal((1u, (uint?)1u, EconomySource.Gm, "grant", "teste"), (entry.AccountUid, entry.CharacterUid, entry.Source, entry.Action, entry.Detail));
+    }
+
+    [Fact]
+    public void Wallet_applies_each_cap_and_reports_what_was_credited()
+    {
+        var w = Entities.Character().Wallet;
+        w.Load(double.NaN, ushort.MaxValue - 1, 30_000, uint.MaxValue - 2);
+        Assert.Equal((0d, (ushort)Wallet.MaxCoins), (w.Bits, w.Coins));     // carga também respeita o teto
+
+        Assert.Equal(1, w.Credit(CurrencyKind.Medals, 5, Gm));
+        Assert.Equal(0, w.Credit(CurrencyKind.Coins, 5, Gm));
+        Assert.Equal(2, w.Credit(CurrencyKind.LadderPoints, 5, Gm));
+        Assert.Equal(1_000_000_000_000, w.Credit(CurrencyKind.Bits, 1_000_000_000_000, Gm));
+        Assert.Equal(ushort.MaxValue, w.Balance(CurrencyKind.Medals));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => w.TrySpend(CurrencyKind.Bits, -1, Gm));
+        Assert.Throws<ArgumentOutOfRangeException>(() => w.Credit(CurrencyKind.Bits, -1, Gm));
+        Assert.Throws<ArgumentOutOfRangeException>(() => w.CreditBits(double.PositiveInfinity, Gm));
+    }
+
+    [Fact]
+    public void Bits_keep_the_fraction_but_spending_uses_whole_bits()
+    {
+        var w = Entities.Character().Wallet;
+        w.CreditBits(9.5, Gm);
+        Assert.False(w.TrySpend(CurrencyKind.Bits, 10, Gm));
+        Assert.True(w.TrySpend(CurrencyKind.Bits, 9, Gm));
+        Assert.Equal(0.5, w.Bits);
+        w.CreditBits(0.5, Gm);
+        Assert.Equal(1, w.Balance(CurrencyKind.Bits));
     }
 
     [Fact]
@@ -115,7 +145,7 @@ public class EconomyTests
 
         await harness.RunAsync(() =>
         {
-            character.AddBits(100, Gm);
+            character.Wallet.Credit(CurrencyKind.Bits, 100, Gm);
             player.RequestImmediateSave();
             players.Update(harness.World.Now, TimeSpan.Zero);
         });
@@ -139,7 +169,7 @@ public class EconomyTests
 
         await harness.RunAsync(() =>
         {
-            character.AddBits(100, Gm);
+            character.Wallet.Credit(CurrencyKind.Bits, 100, Gm);
             player.RequestImmediateSave();
             players.Update(harness.World.Now, TimeSpan.Zero);
         });
@@ -150,7 +180,7 @@ public class EconomyTests
         store.Down = false;
         await harness.RunAsync(() =>
         {
-            character.AddBits(5, Gm);
+            character.Wallet.Credit(CurrencyKind.Bits, 5, Gm);
             player.RequestImmediateSave();
             players.Update(harness.World.Now, TimeSpan.Zero);
         });
@@ -165,7 +195,7 @@ public class EconomyTests
     public void Dead_letter_keeps_the_audit_across_a_restart()
     {
         var c = Entities.Character();
-        c.AddBits(42, Gm);
+        c.Wallet.Credit(CurrencyKind.Bits, 42, Gm);
         var first = TestSupport.DeadLetters();
         first.Add(CharacterSnapshot.Of(c), "character.save", new TimeoutException());
 
@@ -212,7 +242,7 @@ public class EconomyLogDatabaseTests(DatabaseFixture db) : IClassFixture<Databas
         var (account, characterUid) = await db.NewCharacterAsync(_uids, "Audit1");
         var characters = new CharacterRepository(db.Database, _uids, new EconomyLogRepository());
         var c = Entities.Character();
-        c.AddBits(300, Gm);
+        c.Wallet.Credit(CurrencyKind.Bits, 300, Gm);
         c.Economy.RecordItems(Gm, [(25, 2)], cards: false);
         var entries = c.Economy.Pending.Select(e => e with { AccountUid = account, CharacterUid = characterUid }).ToList();
         var snapshot = CharacterSnapshot.Of(c) with { Uid = characterUid, Digimons = [], Forms = [], Titles = [], Economy = entries };

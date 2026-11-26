@@ -65,19 +65,19 @@ public sealed class CardShopTradeHandler(GameData data, InteractionGuard guard) 
         if (shop.FindEntry(cardId) is not { } entry) return;
         if (data.FindCard(cardId) is not { } card) return;
 
-        uint unitPrice = entry.PriceOverride ?? card.BuyPrice;
-        double totalCost = (double)unitPrice * quantity;
-        if (player.Character.Bits < totalCost) return;
+        long totalCost = (long)(entry.PriceOverride ?? card.BuyPrice) * quantity;
+        var wallet = player.Character.Wallet;
+        if (!wallet.Has(CurrencyKind.Bits, totalCost)) return;
 
         var bag = player.Character.Inventory.Battle;
         if (bag.Room(cardId) < quantity) return;
 
         var reason = new EconomyReason(EconomySource.NpcShop, "buy", $"shop {shopId}");
-        if (!player.Character.TrySpendBits(totalCost, reason)) return;
+        if (!wallet.TrySpend(CurrencyKind.Bits, totalCost, reason)) return;
         var added = bag.Add(cardId, quantity);
         if (added.Count == 0)
         {
-            player.Character.AddBits(totalCost, reason with { Action = "refund" });
+            wallet.Credit(CurrencyKind.Bits, totalCost, reason with { Action = "refund" });
             return;
         }
         player.Character.Economy.RecordItems(reason, [(cardId, quantity)], cards: true);
@@ -85,7 +85,7 @@ public sealed class CardShopTradeHandler(GameData data, InteractionGuard guard) 
         player.RequestImmediateSave();
         var primary = added[0];
         player.Send(new CardShopTradePacket(
-            NpcShopAction.Buy, primary, quantity, player.Character.Bits,
+            NpcShopAction.Buy, primary, quantity, player.Character.Wallet.Bits,
             ItemPlace.Inventory, primary.Column, primary.Row, shopId));
         player.Send(new BattleItemReceivePacket(added));
     }
@@ -102,8 +102,7 @@ public sealed class CardShopTradeHandler(GameData data, InteractionGuard guard) 
         if (item is null || item.Uid != uid || item.ItemId != cardId || item.Amount < quantity) return;
         if (data.FindCard(cardId) is not { } card) return;
 
-        uint sellPrice = card.SellPrice;
-        double totalGain = (double)sellPrice * quantity;
+        long totalGain = (long)card.SellPrice * quantity;
         var reason = new EconomyReason(EconomySource.NpcShop, "sell", $"shop {shopId} uid {uid}");
 
         item.Amount -= quantity;
@@ -111,11 +110,11 @@ public sealed class CardShopTradeHandler(GameData data, InteractionGuard guard) 
             bag.Destroy(slot);
 
         player.Character.Economy.RecordItems(reason, [(cardId, quantity)], cards: true, sign: -1);
-        player.Character.AddBits(totalGain, reason);
+        player.Character.Wallet.Credit(CurrencyKind.Bits, totalGain, reason);
         player.RequestImmediateSave();
 
         player.Send(new CardShopTradePacket(
-            NpcShopAction.Sell, item.Amount > 0 ? item : null, quantity, player.Character.Bits,
+            NpcShopAction.Sell, item.Amount > 0 ? item : null, quantity, player.Character.Wallet.Bits,
             ItemPlace.Inventory, col, row, shopId));
     }
 }
@@ -159,27 +158,28 @@ public sealed class ItemShopTradeHandler(GameData data, ItemService items, Inter
         var character = player.Character;
         uint unitPrice = shop.Currency switch
         {
-            NpcShopCurrency.Bits => entry.PriceOverride ?? info.BuyPrice,
-            NpcShopCurrency.Medals => entry.PriceOverride ?? (info.Type == 7 ? 32000u : 9999u),
-            NpcShopCurrency.Coins => entry.PriceOverride ?? info.Col16,
-            NpcShopCurrency.LadderPoints => entry.PriceOverride ?? info.Col17,
+            CurrencyKind.Bits => entry.PriceOverride ?? info.BuyPrice,
+            CurrencyKind.Medals => entry.PriceOverride ?? (info.Type == 7 ? 32000u : 9999u),
+            CurrencyKind.Coins => entry.PriceOverride ?? info.Col16,
+            CurrencyKind.LadderPoints => entry.PriceOverride ?? info.Col17,
             _ => 0u,
         };
         if (unitPrice == 0) return;
 
-        ulong totalCostLong = (ulong)unitPrice * quantity;
-        if (totalCostLong > uint.MaxValue && shop.Currency != NpcShopCurrency.Bits) return;
+        long totalCost = (long)unitPrice * quantity;
+        if (totalCost > Wallet.Max(shop.Currency)) return;
+        var wallet = character.Wallet;
 
         if (shop.DeliverTo == NpcShopDelivery.ShopDepository)
         {
             var depositReason = new EconomyReason(EconomySource.ShopDepository, "buy", $"shop {shopId}");
-            if (!TrySpendCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong, depositReason))
+            if (!wallet.TrySpend(shop.Currency, totalCost, depositReason))
                 return;
 
             // conta (depósito) e personagem (moeda gasta) gravam juntos; se não gravar, a moeda volta
             items.SendToAccountStorage(player, ItemService.StorageEntries(player, CashShopItemKind.Item, info.Id, quantity),
                 depositReason,
-                undo: () => RefundCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong, depositReason with { Action = "refund" }),
+                undo: () => wallet.Credit(shop.Currency, totalCost, depositReason with { Action = "refund" }),
                 done: result =>
                 {
                     if (result != StorageSendResult.Ok)
@@ -192,9 +192,9 @@ public sealed class ItemShopTradeHandler(GameData data, ItemService items, Inter
 
                     var preview = new InventoryItem { Uid = 0, ItemId = info.Id, Info = info, Amount = quantity };
                     player.Send(new ItemShopTradePacket(
-                        (NpcShopAction)(uint)shop.Currency, preview, quantity, character.Bits,
-                        ItemPlace.Inventory, 0, 0, shop.ShopId, character.Coins));
-                    if (shop.Currency is NpcShopCurrency.Medals or NpcShopCurrency.Coins)
+                        NpcShopActions.BuyWith(shop.Currency), preview, quantity, character.Wallet.Bits,
+                        ItemPlace.Inventory, 0, 0, shop.ShopId, character.Wallet.Coins));
+                    if (shop.Currency is CurrencyKind.Medals or CurrencyKind.Coins)
                         player.Send(new CurrencyUpdatePacket(character));
                 });
             return;
@@ -204,49 +204,26 @@ public sealed class ItemShopTradeHandler(GameData data, ItemService items, Inter
         if (bag.Room(itemId) < quantity) return;
 
         var reason = new EconomyReason(EconomySource.NpcShop, "buy", $"shop {shopId}");
-        if (!TrySpendCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong, reason))
+        if (!wallet.TrySpend(shop.Currency, totalCost, reason))
             return;
 
         var added = bag.Add(itemId, quantity);
         if (added.Count == 0)
         {
-            RefundCurrency(character, shop.Currency, unitPrice, quantity, totalCostLong, reason with { Action = "refund" });
+            wallet.Credit(shop.Currency, totalCost, reason with { Action = "refund" });
             return;
         }
         character.Economy.RecordItems(reason, [(itemId, quantity)], cards: false);
 
         player.RequestImmediateSave();
         var primary = added[0];
-        var responseAction = (NpcShopAction)(uint)shop.Currency;
+        var responseAction = NpcShopActions.BuyWith(shop.Currency);
         player.Send(new ItemShopTradePacket(
-            responseAction, primary, quantity, character.Bits,
-            ItemPlace.Inventory, primary.Column, primary.Row, shopId, character.Coins));
+            responseAction, primary, quantity, character.Wallet.Bits,
+            ItemPlace.Inventory, primary.Column, primary.Row, shopId, character.Wallet.Coins));
         player.Send(new ItemReceivePacket(added));
-        if (shop.Currency is NpcShopCurrency.Medals or NpcShopCurrency.Coins)
+        if (shop.Currency is CurrencyKind.Medals or CurrencyKind.Coins)
             player.Send(new CurrencyUpdatePacket(character));
-    }
-
-    private static bool TrySpendCurrency(Character character, NpcShopCurrency currency, uint unitPrice, uint quantity,
-        ulong totalCostLong, EconomyReason reason) =>
-        currency switch
-        {
-            NpcShopCurrency.Bits => character.TrySpendBits((double)unitPrice * quantity, reason),
-            NpcShopCurrency.Medals => character.TrySpendMedals((uint)totalCostLong, reason),
-            NpcShopCurrency.Coins => character.TrySpendCoins((uint)totalCostLong, reason),
-            NpcShopCurrency.LadderPoints => character.TrySpendLadderPoints((uint)totalCostLong, reason),
-            _ => false,
-        };
-
-    private static void RefundCurrency(Character character, NpcShopCurrency currency, uint unitPrice, uint quantity,
-        ulong totalCostLong, EconomyReason reason)
-    {
-        switch (currency)
-        {
-            case NpcShopCurrency.Bits: character.AddBits((double)unitPrice * quantity, reason); break;
-            case NpcShopCurrency.Medals: character.AddMedals((uint)totalCostLong, reason); break;
-            case NpcShopCurrency.Coins: character.AddCoins((uint)totalCostLong, reason); break;
-            case NpcShopCurrency.LadderPoints: character.AddLadderPoints((uint)totalCostLong, reason); break;
-        }
     }
 
     private void HandleSell(Player player, uint shopId, ItemPlace place, int col, int row, uint uid, uint itemId, uint quantity)
@@ -262,8 +239,7 @@ public sealed class ItemShopTradeHandler(GameData data, ItemService items, Inter
         if (item.Amount < quantity) return;
         if (data.FindItem(itemId) is not { } info) return;
 
-        uint sellPrice = info.SellPrice;
-        double totalGain = (double)sellPrice * quantity;
+        long totalGain = (long)info.SellPrice * quantity;
         var reason = new EconomyReason(EconomySource.NpcShop, "sell", $"shop {shopId} uid {uid}");
 
         item.Amount -= quantity;
@@ -271,11 +247,11 @@ public sealed class ItemShopTradeHandler(GameData data, ItemService items, Inter
             bag.Destroy(slot);
 
         player.Character.Economy.RecordItems(reason, [(itemId, quantity)], cards: false, sign: -1);
-        player.Character.AddBits(totalGain, reason);
+        player.Character.Wallet.Credit(CurrencyKind.Bits, totalGain, reason);
         player.RequestImmediateSave();
 
         player.Send(new ItemShopTradePacket(
-            NpcShopAction.Sell, item.Amount > 0 ? item : null, quantity, player.Character.Bits,
+            NpcShopAction.Sell, item.Amount > 0 ? item : null, quantity, player.Character.Wallet.Bits,
             ItemPlace.Inventory, col, row, shopId));
     }
 }

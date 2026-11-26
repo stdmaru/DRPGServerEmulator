@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Globalization;
 using System.Xml.Linq;
+using DRPGServer.Game.Economy;
 
 namespace DRPGServer.Data.GameData;
 
@@ -221,10 +222,10 @@ public static class GameDataLoader
             string name = (string?)s.Attribute("Name") ?? "";
             var currency = (string?)s.Attribute("Currency") switch
             {
-                null or "" or "Bits" => NpcShopCurrency.Bits,
-                "Medals" => NpcShopCurrency.Medals,
-                "Coins" => NpcShopCurrency.Coins,
-                "LadderPoints" => NpcShopCurrency.LadderPoints,
+                null or "" or "Bits" => CurrencyKind.Bits,
+                "Medals" => CurrencyKind.Medals,
+                "Coins" => CurrencyKind.Coins,
+                "LadderPoints" => CurrencyKind.LadderPoints,
                 var other => throw new GameDataException($"NpcShop {id}: Currency '{other}' inválido (esperado Bits, Medals, Coins ou LadderPoints)"),
             };
             var deliverTo = (string?)s.Attribute("DeliverTo") switch

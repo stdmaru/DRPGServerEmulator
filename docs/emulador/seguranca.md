@@ -48,7 +48,7 @@ Estado da conta (Cash, Cash/Shop Depository) é gravado direto no banco. Estado 
 3. O resultado volta para a thread do mundo **também com o jogador offline**: `Committed` manda os pacotes. `Refused` (depósito cheio, linha já retirada) ou `Failed` (erro de banco) desfaz a mudança no personagem (`undo` da moeda, `Bag.Revert` do que entrou na mochila), pede save imediato e avisa o jogador. Nos dois casos, o jogador volta para `Idle`.
 - Enquanto a transferência não termina, o `PlayerSystem` não grava o jogador (um snapshot com a mudança sem a parte da conta seria duplicação). Se ele sai no meio, a conta fica em `Saving` até a transferência terminar e o snapshot final gravar.
 - Se o servidor para no meio, o banco fica consistente: ou a transação gravou os dois lados, ou nenhum.
-- A API é do `ItemService`: `SendToAccountStorage(player, entries, undo, done)` (quem chama já aplicou o custo e passa como desfazê-lo) e `TakeFromAccountStorage(player, row, done)`. Loja NPC (Shop Depository) e Cash Depository já usam. Correio e troca vão usar a mesma API; `Wallet` entra com os serviços de domínio (**PR #41: G**).
+- A API é do `ItemService`: `SendToAccountStorage(player, entries, reason, undo, done)` (quem chama já aplicou o custo, pela `Wallet` ou tirando da mochila, e passa como desfazê-lo) e `TakeFromAccountStorage(player, row, reason, done)`. Loja NPC (Shop Depository) e Cash Depository já usam. Correio e troca vão usar a mesma API.
 - Operação só da conta (comprar no Cash Shop: debita Cash e põe no depósito) é uma transação de banco simples e não passa pelo personagem.
 
 ## Interação e alcance

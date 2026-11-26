@@ -139,7 +139,7 @@ public class WorldEntryTests
         f.Store.Release();
         var (reloginOk, reentered) = await relogin.WaitAsync(Wait);
         Assert.True(reloginOk);
-        Assert.Equal(1234, (await reentered.WaitAsync(Wait)).Character.Bits);
+        Assert.Equal(1234, (await reentered.WaitAsync(Wait)).Character.Wallet.Bits);
         Assert.Equal(1, await f.OnlineAsync());
     }
 
@@ -247,7 +247,7 @@ public class WorldEntryTests
         f.Store.Release();
         var (ok, reentered) = await relogin.WaitAsync(Wait);
         Assert.True(ok);
-        Assert.Equal(77, (await reentered.WaitAsync(Wait)).Character.Bits);
+        Assert.Equal(77, (await reentered.WaitAsync(Wait)).Character.Wallet.Bits);
     }
 
     private static async Task WaitUntil(Func<bool> condition)

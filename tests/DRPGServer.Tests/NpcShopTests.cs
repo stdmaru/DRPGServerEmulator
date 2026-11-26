@@ -37,10 +37,10 @@ public class NpcShopTests
             ]),
             [5050] = new NpcShop(5050, NpcShopKind.Item, "Coins Shop", [
                 new NpcShopEntry(21008),
-            ], NpcShopCurrency.Coins, NpcShopDelivery.ShopDepository),
+            ], CurrencyKind.Coins, NpcShopDelivery.ShopDepository),
             [5051] = new NpcShop(5051, NpcShopKind.Item, "Ladder Shop", [
                 new NpcShopEntry(21008),
-            ], NpcShopCurrency.LadderPoints),
+            ], CurrencyKind.LadderPoints),
             [5201] = new NpcShop(5201, NpcShopKind.Card, "DAB Cards", [
                 new NpcShopEntry(3),
             ]),
@@ -168,33 +168,33 @@ public class NpcShopTests
 
         // 1. Comprar 3x Double Burger (600 cada = 1800 Bits) -> resta 3200 Bits
         itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 29, 3, ItemPlace.Inventory, 0, 0, 40101));
-        Assert.Equal(3200.0, player.Character.Bits);
+        Assert.Equal(3200.0, player.Character.Wallet.Bits);
         Assert.Equal(3u, player.Character.Inventory.Main.Count(29));
         Assert.Equal([(ushort)MapOpcode.ItemShopTrade, (ushort)MapOpcode.InventoryItemReceive], session.SentOpcodes());
 
         // 2. Vender 2x Double Burger (60 cada = 120 Bits) -> fica 3320 Bits e 1x na mochila
         var burger = player.Character.Inventory.Main.Find(29)!;
         itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Sell, burger.Uid, 29, 2, ItemPlace.Inventory, burger.Column, burger.Row, 40101));
-        Assert.Equal(3320.0, player.Character.Bits);
+        Assert.Equal(3320.0, player.Character.Wallet.Bits);
         Assert.Equal(1u, player.Character.Inventory.Main.Count(29));
         Assert.Equal([(ushort)MapOpcode.ItemShopTrade], session.SentOpcodes());
 
         // 3. Comprar 1x item temporário com PriceOverride (500 Bits) -> resta 2820 Bits e ExpiresAt > 0
         itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 24580, 1, ItemPlace.Inventory, 0, 0, 40101));
-        Assert.Equal(2820.0, player.Character.Bits);
+        Assert.Equal(2820.0, player.Character.Wallet.Bits);
         Assert.True(player.Character.Inventory.Main.Find(24580)!.IsTimed);
         session.SentOpcodes();
 
         // 4. Comprar 5x Offense Plug-In A (200 cada = 1000 Bits) -> resta 1820 Bits
         cardTrade.Dispatch(session, BuildCardTrade(NpcShopAction.Buy, 0, 3, 5, ItemPlace.Inventory, 0, 0, 5201));
-        Assert.Equal(1820.0, player.Character.Bits);
+        Assert.Equal(1820.0, player.Character.Wallet.Bits);
         Assert.Equal(5u, player.Character.Inventory.Battle.Count(3));
         Assert.Equal([(ushort)MapOpcode.CardShopTrade, (ushort)MapOpcode.BattleItemReceive], session.SentOpcodes());
 
         // 5. Vender todos os 5 cards (100 cada = 500 Bits) -> fica 2320 Bits e slot zerado
         var card = player.Character.Inventory.Battle.Find(3)!;
         cardTrade.Dispatch(session, BuildCardTrade(NpcShopAction.Sell, card.Uid, 3, 5, ItemPlace.Inventory, card.Column, card.Row, 5201));
-        Assert.Equal(2320.0, player.Character.Bits);
+        Assert.Equal(2320.0, player.Character.Wallet.Bits);
         Assert.Equal(0u, player.Character.Inventory.Battle.Count(3));
         Assert.Equal([(ushort)MapOpcode.CardShopTrade], session.SentOpcodes());
     }
@@ -207,25 +207,25 @@ public class NpcShopTests
 
         // Bits insuficientes (1x 600 > 500)
         itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 29, 1, ItemPlace.Inventory, 0, 0, 40101));
-        Assert.Equal(500.0, player.Character.Bits);
+        Assert.Equal(500.0, player.Character.Wallet.Bits);
         Assert.Empty(session.SentOpcodes());
 
         // Item que não pertence à loja 40101
         itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 41, 1, ItemPlace.Inventory, 0, 0, 40101));
-        Assert.Equal(500.0, player.Character.Bits);
+        Assert.Equal(500.0, player.Character.Wallet.Bits);
         Assert.Empty(session.SentOpcodes());
 
         // Quantidade 0 ou > 1 em item não empilhável
         itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 29, 0, ItemPlace.Inventory, 0, 0, 40101));
         itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Buy, 0, 24580, 2, ItemPlace.Inventory, 0, 0, 40101));
-        Assert.Equal(500.0, player.Character.Bits);
+        Assert.Equal(500.0, player.Character.Wallet.Bits);
         Assert.Empty(session.SentOpcodes());
 
         // Vender com UID errado ou quantidade maior que a disponível
         var added = player.Character.Inventory.Main.Add(29, 2)[0];
         itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Sell, added.Uid + 999, 29, 1, ItemPlace.Inventory, added.Column, added.Row, 40101));
         itemTrade.Dispatch(session, BuildItemTrade(NpcShopAction.Sell, added.Uid, 29, 5, ItemPlace.Inventory, added.Column, added.Row, 40101));
-        Assert.Equal(500.0, player.Character.Bits);
+        Assert.Equal(500.0, player.Character.Wallet.Bits);
         Assert.Equal(2u, player.Character.Inventory.Main.Count(29));
         Assert.Empty(session.SentOpcodes());
     }
@@ -244,8 +244,8 @@ public class NpcShopTests
         // 1. Cliente sempre envia action=1 (Buy) em C2S 0x0053; loja 5050 (Coins + ShopDepository):
         // debita 150 Coins (Col16), deposita no Shop Depository (não na mochila), responde S2C action=4 + 0xCB (sem 0xC9)
         await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
-        Assert.Equal(5000.0, player.Character.Bits);
-        Assert.Equal((ushort)50, player.Character.Coins);
+        Assert.Equal(5000.0, player.Character.Wallet.Bits);
+        Assert.Equal((ushort)50, player.Character.Wallet.Coins);
         Assert.Equal(0u, player.Character.Inventory.Main.Count(21008));
         var deposited = Assert.Single(await cashStore.ListDepositoryAsync(1, CancellationToken.None));
         Assert.Equal((CashShopItemKind.Item, 21008u, 1u, 0u), (deposited.Kind, deposited.ItemId, deposited.Amount, deposited.ExpiresAt));
@@ -262,14 +262,14 @@ public class NpcShopTests
 
         // 2. Com Coins insuficientes (50 < 150), bloqueia a compra
         await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
-        Assert.Equal((ushort)50, player.Character.Coins);
+        Assert.Equal((ushort)50, player.Character.Wallet.Coins);
         Assert.Empty(session.SentOpcodes());
 
         // 2b. Se o Shop Depository estiver cheio, reembolsa os Coins
         await world.RunAsync(() => player.Character.SetCoins(200));
         cashStore.Fill(1, CashShopItemKind.Item);
         await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
-        Assert.Equal((ushort)200, player.Character.Coins);
+        Assert.Equal((ushort)200, player.Character.Wallet.Coins);
         Assert.Single(cashStore.Snapshots);
         Assert.Equal([(ushort)MapOpcode.ChatNotice], session.SentOpcodes());
         Assert.True(player.NeedsImmediateSave);                 // o reembolso vai para o banco
@@ -280,14 +280,14 @@ public class NpcShopTests
         cashStore.FailTransfers = true;
         itemTrade = ItemTrade(data, cashStore, world);
         await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5050));
-        Assert.Equal((ushort)200, player.Character.Coins);
+        Assert.Equal((ushort)200, player.Character.Wallet.Coins);
         Assert.Empty(cashStore.Snapshots);
         Assert.Equal([(ushort)MapOpcode.ChatNotice], session.SentOpcodes());
         cashStore.FailTransfers = false;
 
         // 3. Loja de LadderPoints (5051): C2S action=1 debita 1000 (Col17), resta 500, S2C responde action=5
         await world.DispatchAsync(itemTrade, session, BuildItemTrade(NpcShopAction.Buy, 0, 21008, 1, ItemPlace.Inventory, 0, 0, 5051));
-        Assert.Equal(500u, player.Character.LadderPoints);
+        Assert.Equal(500u, player.Character.Wallet.LadderPoints);
         var ladderFrames = session.DrainOutgoing();
         Assert.Equal(2, ladderFrames.Count);
         Assert.Equal((uint)NpcShopAction.BuyLadderPoints, BinaryPrimitives.ReadUInt32LittleEndian(ladderFrames[0].AsSpan(PacketHeader.Length + 0x00)));

@@ -392,13 +392,13 @@ public class TutorialTests
         battle.ClientReady(player);
         player.Session.DrainOutgoing();
 
-        double before = player.Character.Bits;
+        double before = player.Character.Wallet.Bits;
         battle.KnockOut(BattleSide.B);
         var frames = player.Session.DrainOutgoing();
         var rewards = frames.Where(f => PacketHeader.Read(f).Opcode == 0x6E).ToList();
         Assert.Equal(2 * battle.TeamB.Count, rewards.Count);
         double bits = rewards.Sum(f => BitConverter.ToDouble(f, PacketHeader.Length + 16 + 8));
-        Assert.Equal(player.Character.Bits - before, bits);
+        Assert.Equal(player.Character.Wallet.Bits - before, bits);
         // ✅ só o primeiro 0x6E de cada inimigo leva bits; Yuramon do tutorial: 5 a 7
         for (int k = 0; k < rewards.Count; k += 2)
         {
@@ -456,7 +456,7 @@ public class TutorialTests
         Assert.Equal(3u, loaded.Inventory.Main.Count(41));
         Assert.Equal(50u, loaded.Inventory.Battle.Count(74));
         Assert.True(loaded.HasFlag(5));
-        Assert.Equal(123.0, loaded.Bits);
+        Assert.Equal(123.0, loaded.Wallet.Bits);
         // o uid novo não repete os carregados
         Assert.DoesNotContain(loaded.Inventory.Main.Add(41, 8)[^1].Uid, s.Items.Select(i => i.Uid));
     }

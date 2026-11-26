@@ -101,18 +101,21 @@ public sealed class ChatCommands
         {
             if (args.Length < 2 || !uint.TryParse(args[1], out var amount)) return;
             var reason = new EconomyReason(EconomySource.Gm, "grant", $"/currency por {p.Account.Username}");
-            switch (args[0].ToLowerInvariant())
+            CurrencyKind? kind = args[0].ToLowerInvariant() switch
             {
-                case "bits": p.Character.AddBits(amount, reason); break;
-                case "medals": p.Character.AddMedals(amount, reason); break;
-                case "coins": p.Character.AddCoins(amount, reason); break;
-                case "ladder": p.Character.AddLadderPoints(amount, reason); break;
-                default: return;
-            }
+                "bits" => CurrencyKind.Bits,
+                "medals" => CurrencyKind.Medals,
+                "coins" => CurrencyKind.Coins,
+                "ladder" => CurrencyKind.LadderPoints,
+                _ => null,
+            };
+            if (kind is null) return;
+            var wallet = p.Character.Wallet;
+            wallet.Credit(kind.Value, amount, reason);
             p.RequestImmediateSave();
             p.Send(new CurrencyUpdatePacket(p.Character));
             var hint = args[0].Equals("ladder", StringComparison.OrdinalIgnoreCase) ? " (relogue para atualizar Ladder na UI)" : "";
-            Reply(p, $"Moedas: Bits={p.Character.Bits:F0}, Medals={p.Character.Medals}, Coins={p.Character.Coins}, Ladder={p.Character.LadderPoints}.{hint}");
+            Reply(p, $"Moedas: Bits={wallet.Bits:F0}, Medals={wallet.Medals}, Coins={wallet.Coins}, Ladder={wallet.LadderPoints}.{hint}");
         });
     }
 

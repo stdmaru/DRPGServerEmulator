@@ -24,7 +24,7 @@ public sealed class CharacterDataPacket(Character character, long serverUnixTime
         w.WriteI32(0);                          // EXP do tamer ❓ não persistido
         w.WriteI32((int)ExpFormulas.TamerExpToNext(c.Level)); // EXP para o próximo nível do tamer ✅ 5·(L + 1)
         w.WriteZeros(4);
-        w.WriteF64(c.Bits);
+        w.WriteF64(c.Wallet.Bits);
         w.WriteI32(c.TotalWins);
         w.WriteI32(c.TotalBattles);
         w.WriteI16(0);                          // vitórias ranqueadas
@@ -32,7 +32,7 @@ public sealed class CharacterDataPacket(Character character, long serverUnixTime
         w.WriteI32(1800);                       // pontos ranqueados (84..87 = 0x54)
         w.WriteU16((ushort)Rank.ChromeDigizoid);// 88..89 (0x58) ✅ WORD [player+0x12AC]
         w.WriteZeros(2);                        // 90..91 (0x5A)
-        w.WriteU32(c.LadderPoints);             // 92..95 (0x5C) ✅ DWORD [player+0x12B0] (DigimonRPG.bin @ 0x00B5C119)
+        w.WriteU32(c.Wallet.LadderPoints);            // 92..95 (0x5C) ✅ DWORD [player+0x12B0] (DigimonRPG.bin @ 0x00B5C119)
         w.WriteZeros(4);                        // 96..99 (0x60)
         // 100..747: ✅ 6 equipamentos primários (Crests 4..6 + Digimentals 7..9; 6 × 108 = 648 B, conn=238/428)
         foreach (var place in EquipmentSlots.PrimarySlots)
@@ -80,8 +80,8 @@ public sealed class CharacterDataPacket(Character character, long serverUnixTime
             {
                 if (currenciesTailOffset > cursor)
                     w.WriteZeros(currenciesTailOffset - cursor);
-                w.WriteU16(character.Medals);
-                w.WriteU16(character.Coins);
+                w.WriteU16(character.Wallet.Medals);
+                w.WriteU16(character.Wallet.Coins);
                 w.WriteZeros(4); // 0x19AC..0x19AF
                 w.WriteU32((uint)serverUnixTime);
                 cursor = currenciesTailOffset + 12; // 1856 = 0x19B4 - 4724

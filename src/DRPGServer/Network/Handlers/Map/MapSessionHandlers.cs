@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
+using DRPGServer.Game;
 using DRPGServer.Game.Commands;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.World;
-using DRPGServer.Game;
 using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
 using Microsoft.Extensions.Logging;
@@ -51,7 +51,7 @@ public sealed class JoinCharacterHandler(
     {
         player.Send(new CharacterDataPacket(player.Character, player.Character.Inventory.Clock.UnixNow));
         player.Send(new InventoryDataPacket(player.Character.Inventory));
-        if (player.Character.Medals > 0 || player.Character.Coins > 0)
+        if (player.Character.Wallet.Medals > 0 || player.Character.Wallet.Coins > 0)
             player.Send(new CurrencyUpdatePacket(player.Character));
         for (int i = 0x29; i <= 0x2F; i++) player.Send(new Unknown7EPacket(i));
         for (int i = 0x3D; i <= 0x43; i++) player.Send(new Unknown7FPacket(i));
