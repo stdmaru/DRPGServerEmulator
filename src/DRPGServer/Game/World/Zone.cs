@@ -1,6 +1,7 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Items;
+using DRPGServer.Game.Stats;
 using DRPGServer.Network;
 using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
@@ -151,10 +152,10 @@ public sealed class Zone
             if (player.InBattle || now < player.NextRecoveryAt) continue;
             player.NextRecoveryAt = now + RecoveryInterval;
             EquipmentService.RemoveExpired(player, unixNow);
-            var equip = player.Character.TotalEquipmentBonus;
-            int hpGain = 5 + equip.HpRecovery;
-            int vpGain = 3 + equip.VpRecovery;
-            int evpGain = 10 + equip.EvpRecovery;
+            var equip = player.Character.EquipmentModifiers;
+            int hpGain = 5 + equip.Flat(StatModifierKind.HpRecovery);
+            int vpGain = 3 + equip.Flat(StatModifierKind.VpRecovery);
+            int evpGain = 10 + equip.Flat(StatModifierKind.EvpRecovery);
             foreach (var digimon in player.Character.Digimons)
             {
                 // ✅ conn=408: digimons nocauteados (HP = 0) não regeneram automaticamente no mapa

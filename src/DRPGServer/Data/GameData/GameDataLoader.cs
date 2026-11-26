@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using System.Globalization;
 using System.Xml.Linq;
 using DRPGServer.Game.Economy;
+using DRPGServer.Game.Stats;
 
 namespace DRPGServer.Data.GameData;
 
@@ -162,46 +163,63 @@ public static class GameDataLoader
     /// Carrega os efeitos estruturados de equipamentos de <c>Resources/Item/EquipmentEffects.xml</c>
     /// (fonte autoritativa server-side, sem parsear texto de descrição do cliente em runtime).
     /// </summary>
-    public static FrozenDictionary<uint, EquipmentBonus> LoadEquipmentEffects(string path)
+    public static FrozenDictionary<uint, StatModifiers> LoadEquipmentEffects(string path)
     {
-        if (!File.Exists(path)) return FrozenDictionary<uint, EquipmentBonus>.Empty;
+        if (!File.Exists(path)) return FrozenDictionary<uint, StatModifiers>.Empty;
         var doc = XDocument.Load(path);
         var top = doc.Element("EquipmentEffects") ?? throw new GameDataException($"{path}: falta a raiz <EquipmentEffects>");
-        var effects = new Dictionary<uint, EquipmentBonus>();
+        var effects = new Dictionary<uint, StatModifiers>();
         foreach (var e in top.Elements("Equipment"))
         {
             uint id = U32(e, "ItemID");
-            var bonus = new EquipmentBonus(
-                Attributes: new Game.Stats.Attributes(OptI32(e, "Str"), OptI32(e, "Agi"), OptI32(e, "Con"), OptI32(e, "Int")),
-                BonusHp: OptI32(e, "Hp"),
-                BonusVp: OptI32(e, "Vp"),
-                BonusAtk: OptI32(e, "Atk"),
-                BonusDef: OptI32(e, "Def"),
-                BonusBr: OptI32(e, "Br"),
-                BonusAtkPercent: OptI32(e, "AtkPercent"),
-                BonusDefPercent: OptI32(e, "DefPercent"),
-                BonusBrPercent: OptI32(e, "BrPercent"),
-                CardSlashLimit: OptI32(e, "CardSlashLimit"),
-                ExtraCardSlashes: OptI32(e, "ExtraCardSlashes"),
-                DigimonExpPercent: OptI32(e, "DigimonExpPercent"),
-                TamerExpFlat: OptI32(e, "TamerExp"),
-                HpRecovery: OptI32(e, "HpRecovery"),
-                VpRecovery: OptI32(e, "VpRecovery"),
-                EvpRecovery: OptI32(e, "EvpRecovery"),
-                MaintainEvolution: (bool?)e.Attribute("MaintainEvolution") ?? false,
-                AutoSummonPartners: OptI32(e, "AutoSummonPartners"),
-                BonusDamagePercent: OptI32(e, "DamagePercent"),
-                SingleSkillDamagePercent: OptI32(e, "SingleSkillDamagePercent"),
-                MultiSkillDamagePercent: OptI32(e, "MultiSkillDamagePercent"),
-                MeleeSkillDamagePercent: OptI32(e, "MeleeSkillDamagePercent"),
-                RangedSkillDamagePercent: OptI32(e, "RangedSkillDamagePercent"),
-                OnHitHealHp: OptI32(e, "OnHitHealHp"),
-                OnHitHealVp: OptI32(e, "OnHitHealVp"));
-            if (!effects.TryAdd(id, bonus))
+            var modifiers = new List<StatModifier>();
+            foreach (var attr in e.Attributes())
+            {
+                if (attr.Name.LocalName is "ItemID" or "Name") continue;
+                if (!EquipmentAttributes.TryGetValue(attr.Name.LocalName, out var target))
+                    throw new GameDataException($"EquipmentEffects.xml: ItemID {id}: atributo {attr.Name} desconhecido");
+                int value = target.Kind == StatModifierKind.MaintainEvolution
+                    ? ((bool)attr ? 1 : 0)
+                    : int.Parse(attr.Value, CultureInfo.InvariantCulture);
+                modifiers.Add(new StatModifier(target.Kind, value, target.Form));
+            }
+            if (!effects.TryAdd(id, StatModifiers.Of(modifiers)))
                 throw new GameDataException($"EquipmentEffects.xml: ItemID {id} duplicado");
         }
         return effects.ToFrozenDictionary();
     }
+
+    private static readonly Dictionary<string, (StatModifierKind Kind, StatModifierForm Form)> EquipmentAttributes = new()
+    {
+        ["Str"] = (StatModifierKind.Str, StatModifierForm.Flat),
+        ["Agi"] = (StatModifierKind.Agi, StatModifierForm.Flat),
+        ["Con"] = (StatModifierKind.Con, StatModifierForm.Flat),
+        ["Int"] = (StatModifierKind.Int, StatModifierForm.Flat),
+        ["Hp"] = (StatModifierKind.Hp, StatModifierForm.Flat),
+        ["Vp"] = (StatModifierKind.Vp, StatModifierForm.Flat),
+        ["Atk"] = (StatModifierKind.Atk, StatModifierForm.Flat),
+        ["Def"] = (StatModifierKind.Def, StatModifierForm.Flat),
+        ["Br"] = (StatModifierKind.Br, StatModifierForm.Flat),
+        ["AtkPercent"] = (StatModifierKind.Atk, StatModifierForm.Percent),
+        ["DefPercent"] = (StatModifierKind.Def, StatModifierForm.Percent),
+        ["BrPercent"] = (StatModifierKind.Br, StatModifierForm.Percent),
+        ["CardSlashLimit"] = (StatModifierKind.CardSlashLimit, StatModifierForm.Flat),
+        ["ExtraCardSlashes"] = (StatModifierKind.ExtraCardSlashes, StatModifierForm.Flat),
+        ["DigimonExpPercent"] = (StatModifierKind.DigimonExp, StatModifierForm.Percent),
+        ["TamerExp"] = (StatModifierKind.TamerExp, StatModifierForm.Flat),
+        ["HpRecovery"] = (StatModifierKind.HpRecovery, StatModifierForm.Flat),
+        ["VpRecovery"] = (StatModifierKind.VpRecovery, StatModifierForm.Flat),
+        ["EvpRecovery"] = (StatModifierKind.EvpRecovery, StatModifierForm.Flat),
+        ["MaintainEvolution"] = (StatModifierKind.MaintainEvolution, StatModifierForm.Flat),
+        ["AutoSummonPartners"] = (StatModifierKind.AutoSummonPartners, StatModifierForm.Flat),
+        ["DamagePercent"] = (StatModifierKind.Damage, StatModifierForm.Percent),
+        ["SingleSkillDamagePercent"] = (StatModifierKind.SingleSkillDamage, StatModifierForm.Percent),
+        ["MultiSkillDamagePercent"] = (StatModifierKind.MultiSkillDamage, StatModifierForm.Percent),
+        ["MeleeSkillDamagePercent"] = (StatModifierKind.MeleeSkillDamage, StatModifierForm.Percent),
+        ["RangedSkillDamagePercent"] = (StatModifierKind.RangedSkillDamage, StatModifierForm.Percent),
+        ["OnHitHealHp"] = (StatModifierKind.OnHitHealHp, StatModifierForm.Flat),
+        ["OnHitHealVp"] = (StatModifierKind.OnHitHealVp, StatModifierForm.Flat),
+    };
 
     private static FrozenDictionary<uint, NpcShop> LoadNpcShops(string root)
     {
@@ -248,12 +266,12 @@ public static class GameDataLoader
     }
 
     private static FrozenDictionary<uint, ItemInfo> ApplyEquipmentEffects(
-        FrozenDictionary<uint, ItemInfo> items, FrozenDictionary<uint, EquipmentBonus> effects)
+        FrozenDictionary<uint, ItemInfo> items, FrozenDictionary<uint, StatModifiers> effects)
     {
         if (effects.Count == 0) return items;
         var merged = new Dictionary<uint, ItemInfo>(items.Count);
         foreach (var (id, info) in items)
-            merged[id] = effects.TryGetValue(id, out var bonus) ? info with { EquipmentBonus = bonus } : info;
+            merged[id] = effects.TryGetValue(id, out var modifiers) ? info with { Modifiers = modifiers } : info;
         return merged.ToFrozenDictionary();
     }
 

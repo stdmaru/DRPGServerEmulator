@@ -170,15 +170,14 @@ public static class ClientTables
 
             titles.TryAdd(id, new DigimonTitleInfo(id, f[1])
             {
-                AttributeBonus = new Attributes(str, agi, con, intl),
-                BonusHp = hp,
-                BonusVp = vp,
-                BonusAtk = atk,
-                BonusDef = def,
-                BonusBr = br,
-                BonusAtkPercent = atkPct,
-                BonusDefPercent = defPct,
-                BonusBrPercent = brPct,
+                Modifiers = StatModifiers.Of([
+                    new(StatModifierKind.Str, str), new(StatModifierKind.Agi, agi), new(StatModifierKind.Con, con),
+                    new(StatModifierKind.Int, intl), new(StatModifierKind.Hp, hp), new(StatModifierKind.Vp, vp),
+                    new(StatModifierKind.Atk, atk), new(StatModifierKind.Def, def), new(StatModifierKind.Br, br),
+                    new(StatModifierKind.Atk, atkPct, StatModifierForm.Percent),
+                    new(StatModifierKind.Def, defPct, StatModifierForm.Percent),
+                    new(StatModifierKind.Br, brPct, StatModifierForm.Percent),
+                ]),
             });
         }
         return titles.ToFrozenDictionary();

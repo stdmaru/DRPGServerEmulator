@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using DRPGServer.Game.Economy;
+using DRPGServer.Game.Stats;
 
 namespace DRPGServer.Data.GameData;
 
@@ -9,82 +10,6 @@ namespace DRPGServer.Data.GameData;
 /// </summary>
 public sealed record DigimonSpecies(
     ushort Id, string Name, byte Stage, byte Attribute, Game.Stats.Attributes? Growth, ushort Skill1, ushort Skill2, byte Element = 0);
-
-/// <summary>
-/// Bônus de status extraídos da coluna 28 de <c>item_info_us.dat</c> para equipamentos do Tamer.
-/// ✅ Confirmado em <c>captures.db</c> (<c>conn=234</c>): atributos (STR/AGI/CON/INT) entram antes de
-/// <see cref="Game.Stats.StatFormulas.Combat"/> e bônus flat (ATK/DEF/BR/HP/VP) somam depois.
-/// </summary>
-public readonly record struct EquipmentBonus(
-    Game.Stats.Attributes Attributes = default,
-    int BonusHp = 0,
-    int BonusVp = 0,
-    int BonusAtk = 0,
-    int BonusDef = 0,
-    int BonusBr = 0,
-    int BonusAtkPercent = 0,
-    int BonusDefPercent = 0,
-    int BonusBrPercent = 0,
-    int CardSlashLimit = 0,
-    int ExtraCardSlashes = 0,
-    int DigimonExpPercent = 0,
-    int TamerExpFlat = 0,
-    int HpRecovery = 0,
-    int VpRecovery = 0,
-    int EvpRecovery = 0,
-    bool MaintainEvolution = false,
-    int AutoSummonPartners = 0,
-    int BonusDamagePercent = 0,
-    int SingleSkillDamagePercent = 0,
-    int MultiSkillDamagePercent = 0,
-    int MeleeSkillDamagePercent = 0,
-    int RangedSkillDamagePercent = 0,
-    int OnHitHealHp = 0,
-    int OnHitHealVp = 0)
-{
-    public static EquipmentBonus Empty => default;
-
-    public bool IsEmpty =>
-        Attributes == default
-        && BonusHp == 0 && BonusVp == 0
-        && BonusAtk == 0 && BonusDef == 0 && BonusBr == 0
-        && BonusAtkPercent == 0 && BonusDefPercent == 0 && BonusBrPercent == 0
-        && CardSlashLimit == 0 && ExtraCardSlashes == 0
-        && DigimonExpPercent == 0 && TamerExpFlat == 0
-        && HpRecovery == 0 && VpRecovery == 0 && EvpRecovery == 0
-        && !MaintainEvolution && AutoSummonPartners == 0
-        && BonusDamagePercent == 0
-        && SingleSkillDamagePercent == 0 && MultiSkillDamagePercent == 0
-        && MeleeSkillDamagePercent == 0 && RangedSkillDamagePercent == 0
-        && OnHitHealHp == 0 && OnHitHealVp == 0;
-
-    public static EquipmentBonus operator +(EquipmentBonus a, EquipmentBonus b) => new(
-        Attributes: a.Attributes + b.Attributes,
-        BonusHp: a.BonusHp + b.BonusHp,
-        BonusVp: a.BonusVp + b.BonusVp,
-        BonusAtk: a.BonusAtk + b.BonusAtk,
-        BonusDef: a.BonusDef + b.BonusDef,
-        BonusBr: a.BonusBr + b.BonusBr,
-        BonusAtkPercent: a.BonusAtkPercent + b.BonusAtkPercent,
-        BonusDefPercent: a.BonusDefPercent + b.BonusDefPercent,
-        BonusBrPercent: a.BonusBrPercent + b.BonusBrPercent,
-        CardSlashLimit: Math.Max(a.CardSlashLimit, b.CardSlashLimit),
-        ExtraCardSlashes: a.ExtraCardSlashes + b.ExtraCardSlashes,
-        DigimonExpPercent: a.DigimonExpPercent + b.DigimonExpPercent,
-        TamerExpFlat: a.TamerExpFlat + b.TamerExpFlat,
-        HpRecovery: a.HpRecovery + b.HpRecovery,
-        VpRecovery: a.VpRecovery + b.VpRecovery,
-        EvpRecovery: a.EvpRecovery + b.EvpRecovery,
-        MaintainEvolution: a.MaintainEvolution || b.MaintainEvolution,
-        AutoSummonPartners: a.AutoSummonPartners + b.AutoSummonPartners,
-        BonusDamagePercent: a.BonusDamagePercent + b.BonusDamagePercent,
-        SingleSkillDamagePercent: a.SingleSkillDamagePercent + b.SingleSkillDamagePercent,
-        MultiSkillDamagePercent: a.MultiSkillDamagePercent + b.MultiSkillDamagePercent,
-        MeleeSkillDamagePercent: a.MeleeSkillDamagePercent + b.MeleeSkillDamagePercent,
-        RangedSkillDamagePercent: a.RangedSkillDamagePercent + b.RangedSkillDamagePercent,
-        OnHitHealHp: a.OnHitHealHp + b.OnHitHealHp,
-        OnHitHealVp: a.OnHitHealVp + b.OnHitHealVp);
-}
 
 /// <summary>Item de <c>item_info_us</c> com as colunas que o registro de 108 bytes repete (ver <see cref="ClientTables.Items"/>).</summary>
 public sealed record ItemInfo(uint Id, string Name)
@@ -104,7 +29,8 @@ public sealed record ItemInfo(uint Id, string Name)
     public bool IsTimed => DurationSeconds > 0;
     public byte Flag33 { get; init; }
     public string Description { get; init; } = "";
-    public EquipmentBonus EquipmentBonus { get; init; }
+    /// <summary>Bônus do item equipado (<c>Resources/Item/EquipmentEffects.xml</c>).</summary>
+    public StatModifiers Modifiers { get; init; } = StatModifiers.None;
 }
 
 /// <summary>Momento de ativação de um card em batalha (coluna 23 de <c>card_info_us</c>).</summary>
@@ -136,15 +62,8 @@ public sealed record CardInfo(uint Id, string Name)
 /// <summary>Título de Digimon de <c>digimon_title_us.dat</c> (236 entradas; ver <see cref="ClientTables.DigimonTitles"/>).</summary>
 public sealed record DigimonTitleInfo(uint Id, string Name)
 {
-    public Game.Stats.Attributes AttributeBonus { get; init; }
-    public int BonusHp { get; init; }
-    public int BonusVp { get; init; }
-    public int BonusAtk { get; init; }
-    public int BonusDef { get; init; }
-    public int BonusBr { get; init; }
-    public int BonusAtkPercent { get; init; }
-    public int BonusDefPercent { get; init; }
-    public int BonusBrPercent { get; init; }
+    /// <summary>Bônus do título equipado.</summary>
+    public StatModifiers Modifiers { get; init; } = StatModifiers.None;
 }
 
 /// <summary>

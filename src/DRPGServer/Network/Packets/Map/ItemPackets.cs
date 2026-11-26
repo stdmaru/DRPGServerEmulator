@@ -1,5 +1,6 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Stats;
 using DRPGServer.Network.Protocol;
 
 namespace DRPGServer.Network.Packets.Map;
@@ -46,7 +47,7 @@ public static class ItemRecord
         w.WriteU32(info.SellPrice);              // 24
         w.WriteU32(Unknown28(itemId));           // 28 ❓
         w.WriteU32(info.Level);                  // 32
-        WriteEffectTriplets(w, info.EquipmentBonus); // 36..87 (52 B): até 4 triplas (id, statCode, value) + 4 zeros
+        WriteEffectTriplets(w, info.Modifiers);      // 36..87 (52 B): até 4 triplas (id, statCode, value) + 4 zeros
         w.WriteU16(info.Type == 7 ? (ushort)32000 : (ushort)9999); // 88 ❓
         w.WriteU16(info.Col16);                  // 90
         w.WriteU32(info.Col17);                  // 92
@@ -62,7 +63,7 @@ public static class ItemRecord
     /// ✅ Capturas v322 (<c>conn=234/238/428</c>): offsets +36..83 guardam até 4 triplas <c>(effectId, statCode, value)</c>:
     /// 1=STR, 2=AGI, 3=CON, 4=INT (Digimental #215), 301=ATK, 302=DEF, 303=BR (Crest #107), 304=HP, 305=VP.
     /// </summary>
-    private static void WriteEffectTriplets(PacketWriter w, EquipmentBonus bonus)
+    private static void WriteEffectTriplets(PacketWriter w, StatModifiers bonus)
     {
         if (bonus.IsEmpty)
         {
@@ -73,15 +74,18 @@ public static class ItemRecord
         Span<(uint Id, uint Code, int Value)> triplets = stackalloc (uint, uint, int)[4];
         int count = 0;
 
-        AddTriplet(triplets, ref count, (uint)bonus.Attributes.Str, 1, bonus.Attributes.Str);
-        AddTriplet(triplets, ref count, (uint)bonus.Attributes.Agi, 2, bonus.Attributes.Agi);
-        AddTriplet(triplets, ref count, (uint)bonus.Attributes.Con, 3, bonus.Attributes.Con);
-        AddTriplet(triplets, ref count, (uint)bonus.Attributes.Int, 4, bonus.Attributes.Int);
-        AddTriplet(triplets, ref count, (uint)(10_000 + bonus.BonusAtk), 301, bonus.BonusAtk);
-        AddTriplet(triplets, ref count, (uint)(20_000 + bonus.BonusDef), 302, bonus.BonusDef);
-        AddTriplet(triplets, ref count, (uint)(30_000 + bonus.BonusBr), 303, bonus.BonusBr);
-        AddTriplet(triplets, ref count, (uint)(40_000 + bonus.BonusHp), 304, bonus.BonusHp);
-        AddTriplet(triplets, ref count, (uint)(50_000 + bonus.BonusVp), 305, bonus.BonusVp);
+        var attributes = bonus.Attributes;
+        int atk = bonus.Flat(StatModifierKind.Atk), def = bonus.Flat(StatModifierKind.Def), br = bonus.Flat(StatModifierKind.Br);
+        int hp = bonus.Flat(StatModifierKind.Hp), vp = bonus.Flat(StatModifierKind.Vp);
+        AddTriplet(triplets, ref count, (uint)attributes.Str, 1, attributes.Str);
+        AddTriplet(triplets, ref count, (uint)attributes.Agi, 2, attributes.Agi);
+        AddTriplet(triplets, ref count, (uint)attributes.Con, 3, attributes.Con);
+        AddTriplet(triplets, ref count, (uint)attributes.Int, 4, attributes.Int);
+        AddTriplet(triplets, ref count, (uint)(10_000 + atk), 301, atk);
+        AddTriplet(triplets, ref count, (uint)(20_000 + def), 302, def);
+        AddTriplet(triplets, ref count, (uint)(30_000 + br), 303, br);
+        AddTriplet(triplets, ref count, (uint)(40_000 + hp), 304, hp);
+        AddTriplet(triplets, ref count, (uint)(50_000 + vp), 305, vp);
 
         for (int i = 0; i < count; i++)
         {

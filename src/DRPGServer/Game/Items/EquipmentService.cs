@@ -1,4 +1,5 @@
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Stats;
 using DRPGServer.Network.Packets.Map;
 
 namespace DRPGServer.Game.Items;
@@ -18,8 +19,8 @@ public static class EquipmentService
     public static void Changed(Player player)
     {
         var c = player.Character;
-        c.SyncEquipmentBonuses();
-        if (!c.TotalEquipmentBonus.MaintainEvolution)
+        c.SyncEquipmentModifiers();
+        if (!c.EquipmentModifiers.Has(StatModifierKind.MaintainEvolution))
         {
             foreach (var digimon in c.Digimons)
                 if (digimon.IsEvolved)

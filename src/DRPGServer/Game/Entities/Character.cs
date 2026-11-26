@@ -1,4 +1,5 @@
 using DRPGServer.Game.Economy;
+using DRPGServer.Game.Stats;
 
 namespace DRPGServer.Game.Entities;
 
@@ -40,21 +41,21 @@ public sealed class Character
         Inventory = inventory;
         Economy = new EconomyLedger(this);
         Wallet = new Wallet(Economy);
-        SyncEquipmentBonuses();
+        SyncEquipmentModifiers();
     }
 
-    /// <summary>Soma dos bônus de todos os equipamentos atualmente equipados pelo Tamer.</summary>
-    public Data.GameData.EquipmentBonus TotalEquipmentBonus => Inventory.TotalEquipmentBonus();
+    /// <summary>Bônus juntos de todos os equipamentos do Tamer.</summary>
+    public StatModifiers EquipmentModifiers => Inventory.EquipmentModifiers();
 
     /// <summary>
     /// Recalcula o bônus total de equipamentos do Tamer e propaga para todos os Digimons do time
     /// (✅ confirmado em <c>captures.db conn=234</c>: Crests e Digimentals aplicam a todos os Digimons da party).
     /// </summary>
-    public void SyncEquipmentBonuses()
+    public void SyncEquipmentModifiers()
     {
-        var bonus = Inventory.TotalEquipmentBonus();
+        var modifiers = Inventory.EquipmentModifiers();
         foreach (var d in Digimons)
-            d.SetEquipmentBonus(bonus);
+            d.SetEquipmentModifiers(modifiers);
     }
 
     public required uint Uid { get; init; }
@@ -199,7 +200,7 @@ public sealed class Character
 
         _party[partySlot] = null;
         _depository[freeDepSlot] = digimon;
-        digimon.SetEquipmentBonus(Data.GameData.EquipmentBonus.Empty);
+        digimon.SetEquipmentModifiers(StatModifiers.None);
         return DepositoryResult.DepositOk;
     }
 
@@ -218,7 +219,7 @@ public sealed class Character
 
         _depository[depSlot] = null;
         _party[freePartySlot] = digimon;
-        digimon.SetEquipmentBonus(TotalEquipmentBonus);
+        digimon.SetEquipmentModifiers(EquipmentModifiers);
         return (DepositoryResult.WithdrawOk, digimon);
     }
 
@@ -240,7 +241,7 @@ public sealed class Character
 
         _party[partySlot] = storedDigimon;
         _depository[depSlot] = partyDigimon;
-        storedDigimon.SetEquipmentBonus(TotalEquipmentBonus);
+        storedDigimon.SetEquipmentModifiers(EquipmentModifiers);
         return (DepositoryResult.SwapOk, storedDigimon);
     }
 
@@ -249,7 +250,7 @@ public sealed class Character
     {
         if (slot is < 0 or >= PartySize || (_party[slot] is not null && slot != 0) || _party.Contains(digimon)) return false;
         _party[slot] = digimon;
-        digimon.SetEquipmentBonus(TotalEquipmentBonus);
+        digimon.SetEquipmentModifiers(EquipmentModifiers);
         return true;
     }
 

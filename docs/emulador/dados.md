@@ -20,8 +20,8 @@ Tudo vira o `GameData` imutável (`FrozenDictionary`) na partida.
 4. **Sem números mágicos no código.** Preço, chance, duração e limite de jogo vêm da tabela ou do XML. O que é constante confirmada do protocolo (✅) fica como `const` com nome e evidência.
 5. **Gerador versionado.** Ferramenta que gera um XML de `Resources/` fica em `tools/` no repositório, com página na seção Ferramentas do [índice](../README.md), e o XML diz no comentário de topo qual ferramenta e qual tabela o geraram.
 
-## Modificadores de status (**PR #41: E1**)
-Bônus de equipamento, título, card e buff são todos `StatModifier`: um tipo de modificador, um valor e uma forma (plano ou percentual). O XML é o mesmo em todos os arquivos:
+## Modificadores de status (`Game/Stats/StatModifiers.cs`)
+Bônus de equipamento, título, card e buff são todos `StatModifier`: um tipo de modificador (`StatModifierKind`), um valor e uma forma (plano ou percentual). O XML é o mesmo em todos os arquivos:
 
 ```xml
 <Equipment ItemID="1" Name="Crest of Courage +1">
@@ -36,9 +36,11 @@ Bônus de equipamento, título, card e buff são todos `StatModifier`: um tipo d
 </Title>
 ```
 
-- `StatModifierKind` é um enum fechado. Cada tipo declara como acumula: soma (atributos, ATK, EXP %), máximo (`CardSlashLimit`) ou "algum" (`MaintainEvolution`). Tipo novo = um valor no enum, a regra de acumulação e o uso no cálculo. Nada mais muda.
-- `Digimon.Stats` soma as fontes ativas (forma, equipamento do tamer, título equipado, buffs). O resultado fica em cache e é invalidado quando uma fonte muda.
-- A fórmula final continua só em `StatFormulas`.
+- `StatModifierKind` é um enum fechado. `StatModifierRules` diz, por tipo, como acumula (soma; máximo em `CardSlashLimit`; "algum" em `MaintainEvolution`) e que formas aceita (atributos e recuperação só plano; EXP do Digimon e dano só %; ATK/DEF/BR os dois). Forma não aceita é erro na carga. Tipo novo = um valor no enum, a regra em `StatModifierRules` e o uso no cálculo.
+- `StatModifiers` é o conjunto agregado de uma ou mais fontes: `Of` junta os modificadores de uma fonte, `Combine` junta fontes, e a leitura é `Flat(kind)`, `Percent(kind)`, `Has(kind)` e `Attributes`.
+- Fontes: `ItemInfo.Modifiers` (equipamento), `DigimonTitleInfo.Modifiers` (título). `Inventory.EquipmentModifiers()` junta o que o tamer veste; `Character.SyncEquipmentModifiers` repassa a cada Digimon; `Digimon.Modifiers` junta equipamento e título equipado e fica em cache até `SetEquipmentModifiers`, `EquipTitle` ou `LoadTitles`.
+- Cálculo em `Digimon`: atributos somam antes de `StatFormulas.Combat`; HP/VP planos somam depois; ATK/DEF/BR = `(base + plano) × (1 + %)`, arredondado para baixo. Os modificadores de batalha e de zona (`Damage`, `CardSlashLimit`, `HpRecovery`…) são lidos de `Character.EquipmentModifiers` por quem os usa.
+- ❓ Até a conversão do E5, `EquipmentEffects.xml` ainda usa um atributo por bônus (`Atk="75"`, `AtkPercent="3"`); `GameDataLoader.EquipmentAttributes` liga cada atributo ao par (tipo, forma). Os títulos ainda saem de `ClientTables` até o E2.
 
 ## Efeitos (**PR #41: E3, E4**)
 Comportamento (curar, teleportar, capturar, dar item, atacar todos) é um **efeito tipado**, nunca um `switch` por id de item ou card:

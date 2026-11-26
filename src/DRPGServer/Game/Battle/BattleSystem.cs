@@ -2,6 +2,7 @@ using DRPGServer.Configuration;
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;
 using Microsoft.Extensions.Logging;
@@ -106,7 +107,7 @@ public sealed class BattleSystem : IWorldSystem
     internal void GrantRewards(Player owner, Combatant killer, IReadOnlyList<Combatant> participants, WildMember defeated, int enemyCount = 1)
     {
         double eventMultiplier = _expEvents.ExpMultiplier;
-        double equipExpMultiplier = 1.0 + Math.Max(0, owner.Character.TotalEquipmentBonus.DigimonExpPercent) / 100.0;
+        double equipExpMultiplier = 1.0 + Math.Max(0, owner.Character.EquipmentModifiers.Percent(StatModifierKind.DigimonExp)) / 100.0;
         double bits = RollBits(defeated.Option.BitReward) * _options.BitRate;
         owner.Character.Wallet.CreditBits(bits, new EconomyReason(EconomySource.BattleReward, "kill", $"digimon {defeated.Digimon.Species.Id}"));
 

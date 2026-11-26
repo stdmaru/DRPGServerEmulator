@@ -21,13 +21,13 @@ public class TimedItemTests
     private static readonly ItemInfo Aura718 = new(718, "Aura T of Deva (for New Tamers)")
     {
         Type = 27, SubType = 2, Level = 1, MaxStack = 1, DurationSeconds = 2_593_000,
-        EquipmentBonus = new EquipmentBonus(HpRecovery: 8, EvpRecovery: 13, MaintainEvolution: true),
+        Modifiers = StatModifiers.Of([new(StatModifierKind.HpRecovery, 8), new(StatModifierKind.EvpRecovery, 13), new(StatModifierKind.MaintainEvolution, 1)]),
     };
 
     private static readonly ItemInfo Crest1 = new(1, "Crest of Courage +1")
     {
         Type = 1, SubType = 1, Level = 1, MaxStack = 1, DurationSeconds = 0,
-        EquipmentBonus = new EquipmentBonus(BonusAtk: 15, BonusDef: 10, BonusBr: 50),
+        Modifiers = StatModifiers.Of([new(StatModifierKind.Atk, 15), new(StatModifierKind.Def, 10), new(StatModifierKind.Br, 50)]),
     };
 
     private static readonly ItemInfo Bread25 = new(25, "Bread")
@@ -170,7 +170,7 @@ public class TimedItemTests
         // 2. Expiração em tempo real no tick da zona: remove item vencido equipado e recalcula status
         var expiredEquip = inv.Create(1, (int)ItemPlace.Crest1, 1, expiresAt: pastTs);
         inv.Equipment.Place(expiredEquip);
-        player.Character.SyncEquipmentBonuses();
+        player.Character.SyncEquipmentModifiers();
         int boostedAtk = player.Leader.Stats.Atk;
 
         var world = TestSupport.NewWorld();

@@ -17,10 +17,10 @@ public class DigimonTitleTests
 {
     private static readonly FrozenDictionary<uint, DigimonTitleInfo> SampleTitles = new Dictionary<uint, DigimonTitleInfo>
     {
-        [20030] = new(20030, "Endless Journey") { AttributeBonus = new Attributes(15, 15, 15, 15) },
-        [20100] = new(20100, "First Win") { AttributeBonus = new Attributes(1, 0, 0, 0) },
-        [20200] = new(20200, "First Lose") { AttributeBonus = new Attributes(0, 0, 1, 0) },
-        [20230] = new(20230, "King of Lose") { BonusHp = 250, BonusDefPercent = 2 },
+        [20030] = new(20030, "Endless Journey") { Modifiers = StatModifiers.Of([new(StatModifierKind.Str, 15), new(StatModifierKind.Agi, 15), new(StatModifierKind.Con, 15), new(StatModifierKind.Int, 15)]) },
+        [20100] = new(20100, "First Win") { Modifiers = StatModifiers.Of([new(StatModifierKind.Str, 1)]) },
+        [20200] = new(20200, "First Lose") { Modifiers = StatModifiers.Of([new(StatModifierKind.Con, 1)]) },
+        [20230] = new(20230, "King of Lose") { Modifiers = StatModifiers.Of([new(StatModifierKind.Hp, 250), new(StatModifierKind.Def, 2, StatModifierForm.Percent)]) },
     }.ToFrozenDictionary();
 
     private static GameData DataWithTitles() => new()

@@ -1,5 +1,6 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Items;
+using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
 
 namespace DRPGServer.Game.Entities;
@@ -421,16 +422,8 @@ public sealed class Inventory
         EquipmentSlots.IsEquipmentPlace(place) ? Equipment[(int)place] : null;
 
     /// <summary>Soma dos bônus de todos os equipamentos atualmente equipados pelo Tamer.</summary>
-    public EquipmentBonus TotalEquipmentBonus()
-    {
-        var total = EquipmentBonus.Empty;
-        foreach (var place in EquipmentSlots.All)
-        {
-            if (Equipment[(int)place]?.Info is { } info && !info.EquipmentBonus.IsEmpty)
-                total += info.EquipmentBonus;
-        }
-        return total;
-    }
+    public StatModifiers EquipmentModifiers() =>
+        StatModifiers.Combine(EquipmentSlots.All.Select(place => Equipment[(int)place]?.Info?.Modifiers ?? StatModifiers.None));
 
     internal uint MaxStackOf(uint itemId, bool isCard = false)
     {
