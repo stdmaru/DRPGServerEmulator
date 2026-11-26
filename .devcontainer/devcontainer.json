@@ -3,7 +3,7 @@
     "dockerComposeFile": "./docker-compose.yml",
     "workspaceFolder": "/workspaces/DRPGServer",
     "service": "server",
-    "runServices": ["database", "server"],
+    "runServices": ["database", "server", "patch"],
     "customizations": {
         "vscode": {
             "extensions": [

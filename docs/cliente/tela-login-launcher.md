@@ -52,4 +52,19 @@ Sprite da caixa: **`gui\dr_friend_016.spr`** (244×21, cantos redondos, borda cl
 
 **Implementado** em `DRPG.Launcher/Scenes/LoginScene.cs` (fundo, painel, mascotes animados, OK/CANCEL com 3 estados, caixa de status). Falta o texto (campos e status), que depende da fonte. Para conferir sem janela: `SDL_VIDEO_DRIVER=offscreen dotnet run --project src/DRPG.Launcher -- --game-dir <instalação> --screenshot tela.ppm`. Um pacote mínimo só com os sprites da tela pode ficar em `.local/client-mini` (fora do git), montado com `work/tools/drpg_pack.py pack`.
 
+## Fluxo do launcher
+Definido pelo dono em 2026-11-26:
+
+1. Abre a janela principal (fundo).
+2. **Patch:** baixa e aplica os patches pendentes ([configuração](../planos/cliente-novo.md#launcher-login--auto-patcher-marco-1)).
+3. **Login congelado:** o painel aparece, mas nada responde a mouse ou teclado. A caixa de status mostra "Connecting to server..." até chegar o handshake.
+4. **Login liberado:** campos e botões passam a responder.
+
+Erros em qualquer etapa aparecem na caixa de status. Sem patch pendente, a etapa 2 é pulada.
+
+### Tela do patch
+Sprites: `dr2_in_001_000` (239×196; título "Loading" e moldura da barra, só a faixa y 126–190 é opaca) e `dr2_in_001_002` (231×23, a barra; o 2º quadro é vazio). A barra encaixa dentro da moldura em (3, 165) e é desenhada **cortada na largura** = 231 × progresso. `dr2_in_001_001` (65×77, 3 quadros) é totalmente transparente.
+
+Proposta (❓ a aprovar pelo dono): a caixa "Loading" **no lugar do painel de login**, em (280, 124), e a caixa de status abaixo com o detalhe ("Downloading Patch_241.zip 12.3 / 27.1 MB", depois "Applying Patch_241..."). Dentro da barra, o texto curto ("Patch 241 (2/5) 45%"). Ao terminar, a caixa "Loading" some e o painel de login aparece congelado. A outra opção testada (painel visível e "Loading" embaixo dele) foi descartada: o título "Loading" bate nos botões OK/CANCEL.
+
 A tela inteira segue a regra do [cliente novo](../planos/cliente-novo.md): quadro 800×600 centralizado, sem esticar.

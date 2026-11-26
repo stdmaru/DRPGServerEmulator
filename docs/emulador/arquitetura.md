@@ -12,7 +12,7 @@ Páginas desta seção:
 
 ## Rodar
 - **Stack:** `.devcontainer/docker-compose.yml`: MariaDB 11.8 (com healthcheck) + `dotnet/sdk:10.0`. O serviço `server` só sobe quando o banco estiver saudável.
-- **Sempre no devcontainer** (é o ambiente de trabalho): `dotnet run --project src/DRPG.Server` e `dotnet test DRPG.sln`. De fora: `docker exec -w /workspaces/DRPGServer server_devcontainer-server-1 dotnet ...`.
+- **Sempre no devcontainer** (é o ambiente de trabalho; imagem em `.devcontainer/Dockerfile`: SDK 10 + `clang`/`lld`/`zlib` para o NativeAOT e Python 3 + Pillow para as ferramentas): `dotnet run --project src/DRPG.Server` e `dotnet test DRPG.sln`. De fora: `docker exec -w /workspaces/DRPGServer server_devcontainer-server-1 dotnet ...`.
 - O compose publica 7000–7003 e 3306 em 127.0.0.1, para o cliente (Wine) e as ferramentas Python do host.
 - **Protocolo alvo: v322.**
 - **Configuração:** `appsettings.json`, depois `appsettings.Local.json` (fora do git) e variáveis `DRPG_<Seção>__<Chave>`. Seções: `Servers` (porta e IP de cada servidor), `Database`, `Game` (taxas, nível máximo, mapa inicial, autosave), `Network` (validade do ticket entre servidores; limites de conexão, prazos e pacotes, ver [segurança](seguranca.md#limites-de-recurso)). Toda opção é validada na partida (`Configuration/OptionsValidation.cs`, `ValidateOnStart`): o boot lista todos os erros de uma vez e não sobe. O que depende das tabelas (mapa e posição inicial) é conferido pelo `PlayerSystem` na construção. `Database:Name` só aceita letras, números e `_`, porque entra no `CREATE DATABASE`. Opção nova entra com o limite dela no validador.

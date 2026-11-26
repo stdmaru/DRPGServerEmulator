@@ -15,7 +15,10 @@ services:
       start_period: 10s
 
   server:
-    image: mcr.microsoft.com/dotnet/sdk:10.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: drpg-devcontainer:10.0
     tty: true
     volumes:
       - ../:/workspaces/DRPGServer:rw
