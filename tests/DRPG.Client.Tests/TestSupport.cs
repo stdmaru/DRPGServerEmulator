@@ -97,6 +97,13 @@ internal sealed class FakeInstall : IDisposable
             ("gui\\dr2_ch_000_009_eng.spr", Sprite(100, 30, 3)),
             ("sprite\\a_00.spr", Sprite(100, 160, 16)),
             ("sprite\\a_00.ani", Ani("a_00.spr", 16)),
+            // the default clothes of tamer 1, without a_20 (tamer 3 of the real install has no a_20 either)
+            ("sprite\\a_15_01_00.spr", Sprite(15, 15, 16)),
+            ("sprite\\a_16_01_00.spr", Sprite(16, 16, 16)),
+            ("sprite\\a_17_01_00.spr", Sprite(17, 17, 16)),
+            ("sprite\\a_18_01_00.spr", Sprite(18, 18, 16)),
+            ("sprite\\a_19_01_00.spr", Sprite(19, 19, 4)),
+            ("sprite\\a_21_01_00.spr", Sprite(21, 21, 16)),
             ("sprite\\003_1.spr", Sprite(80, 80, 16)),
             ("sprite\\003_1.ani", Ani("003_1.spr", 16)),
             ("sprite\\065_1.spr", Sprite(70, 70, 16)),

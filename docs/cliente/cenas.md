@@ -191,8 +191,11 @@ Para cada slot com tamer (`+4 ≠ 0`):
   | +144 | `0xef2` "%d Win %d Lose %0.2f%%" com (vitórias, **total de batalhas**, vitórias/total × 100; 0 se total = 0) |
   Slots 2/3 (digimon em cima), a partir de `y + 10`: digimon nome +0, nível +18, vitórias +36; tamer nome +90, nível +108, mapa +126 (retângulo até +162), `(x,y)` +144.
   - ✅ O original escreve o **total de batalhas** no lugar de "Lose". Fiel.
-- **Digimon** (`0x00b46120`): sprite = `.ani` da espécie do líder (espécie → id de sprite → `Sprite\%03d_1.ani`, ver [tabelas por espécie](tabelas-de-especie.md)); desenha o quadro atual em (xBotão + dx, yBotão + dy), com (dx, dy) da tabela por espécie (padrão (−40, −14)). xBotão/yBotão = posição do botão do slot.
-- **Tamer** (`0x00b46d50`): `Sprite\a_%02d.spr` com a animação de `Sprite\a_%02d.ani` pelo id do tamer (❓ base do índice: só existem `a_00..a_03`); desenha em (xBotão + 70 − 120, yBotão + 164 − 162), +150 em x nos slots 1 e 3 (o retrato fica à direita). Com a opção de sombra (`[DAT_01158530]+2`), antes desenha a sombra do sprite (`FUN_00b57460(…, 0xe)`). Equipamento é sempre zero nas listas: só o corpo.
+- **Digimon** (`0x00b46120`): sprite = `.ani` da espécie do líder (espécie → id de sprite → `Sprite\%03d_1.ani`, ver [tabelas por espécie](tabelas-de-especie.md)); desenha o quadro atual em (x + dx, yBotão + dy), com (dx, dy) da tabela por espécie (padrão (−40, −14)). x = xBotão, **+150 nos slots 1 e 3**: o `0x00b47790` soma os 150 (`0x00b4782c`) no x que passa **para o digimon e para o tamer** (antes da correção só o tamer andava, e o digimon dos slots da direita caía em cima dos textos).
+- **Tamer** (`0x00b46d50` → `0x0099fb90`, boneco de papel): corpo + roupas, todos pelo **canto superior esquerdo** do quadro em (x + 70 − 120, yBotão + 164 − 162), com o mesmo x do digimon (+150 nos slots 1 e 3) e **o mesmo número de quadro** do `.ani` do corpo (a âncora do `.ani` não entra). Com a opção de sombra (`[DAT_01158530]+2`), antes desenha a sombra do corpo (`FUN_00b57460(…, 0xe)`) ❓ não implementada.
+  - ✅ Arquivos (`0x00b21cd0`, tamers 1–4): corpo `Sprite\a_%02d.spr`/`.ani` de `id − 1`; roupas padrão `Sprite\a_NN_%02d_00.spr` de `id`, cada uma num mapa (`DAT_010e84xx`): `a_15` `+8414`, `a_16` `+841c`, `a_17` `+8424`, `a_19` `+842c`, `a_20` `+8434`, corpo `+843c`, `a_21` `+8444`, `a_18` `+844c`. Arquivo que não existe (ex.: `a_20_03_00`) fica vazio e não desenha.
+  - ✅ Ordem com os 11 equipamentos da lista zerados (sempre, nas capturas): corpo (`0x00b1d0f0`), `a_15` (`0x00b1e630`), `a_16` atrás (`0x00b1e460`), `a_17` (`0x00b1e120`), `a_16` de novo na frente, `a_18` (`0x00b1da70`), `a_19` (`0x00b1e2c0`), `a_20` (`0x00b1cf10`), `a_21` (`0x00b1df90`).
+  - ❓ Equipamento diferente de zero: cada função troca a roupa padrão pelo sprite do item (`FUN_0078ac80(categoria 0xf..0x15/0x1c, id)`, `Sprite\%s.spr` com `%d` do tamer, chave `tamer + id × 10`). Não implementado (as listas não trazem equipamento).
 - **Animação** de ambos: animação 1 (parado) direção 0; ao selecionar, animação 5 direção 0. O quadro avança **a cada 3 quadros** do jogo; quando `quadro ≥ início + contagem − 1`, volta ao início (✅ o último quadro da animação nunca aparece). Ao perder a seleção, volta para a animação 1 (o quadro continua de onde estava até o próximo laço). Início/contagem vêm da tabela do [`.ani`](formato-ani.md).
 
 ### Sprites `dr2_ch_000`
@@ -216,7 +219,7 @@ Código em `src/DRPG.Client` (`Scenes/`, `Ui/`, `Startup/`, `Text/`, `Data/`) e 
 - Ferramentas só de desenvolvimento: `DRPG_GAME_DIR`, `DRPG_SCREENSHOT`/`DRPG_SCREENSHOT_MS` e `DRPG_SCRIPT` (mouse e Esc roteirizados, tempos contados a partir do fim da carga). `tools/publish-client.sh` publica o AOT como `DigimonRPG.bin`.
 
 ### Ainda ❓ (não inventado)
-- **tamerId → `a_%02d`:** usei `id − 1` (a especificação não fecha o deslocamento).
+- ✅ **tamerId → `a_%02d`:** `id − 1` confirmado em `0x00b21cd0` (laço de 1 a 4, `a_%02d` com `id − 1`, roupas com `id`).
 - **Silhueta do BZ** (modo de mistura `0xc`) e o recuo do colchete dos links do BZ: não implementados.
 - **Chave do `option.ini`** de cada volume: `[BGM] sound` (efeitos) e `bgm` (música), padrão 1.
 - **Overlay de idioma da tabela Map** não aplicado; **animação de 3 s "voltar à cena 2"** não implementada; **`IsNetworkAlive`** não implementado.

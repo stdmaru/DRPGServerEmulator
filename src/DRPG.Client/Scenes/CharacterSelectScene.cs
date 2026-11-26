@@ -40,7 +40,7 @@ public sealed class CharacterSelectScene(GameContext game) : IScene
     private readonly Button[] _slotButtons = new Button[SlotCount];
     private Button _delete = null!, _create = null!, _exchange = null!, _gameStart = null!, _back = null!;
     private readonly SpriteAnimator?[] _digimon = new SpriteAnimator?[SlotCount];
-    private readonly SpriteAnimator?[] _tamers = new SpriteAnimator?[SlotCount];
+    private readonly TamerDoll?[] _tamers = new TamerDoll?[SlotCount];
     private AnimatedSprites _animated = null!;                 // set in Init
     private bool _requested, _loadedSlots;
     private int _selected = -1;
@@ -141,9 +141,9 @@ public sealed class CharacterSelectScene(GameContext game) : IScene
 
             if (slot.TamerId == 0)
                 continue;
-            _digimon[i]?.Tick();
-            _tamers[i]?.Tick();
             DrawDigimon(renderer, i, slot);
+            _digimon[i]?.Tick();                                   // ✅ 0x00b46120 draws, then advances
+            _tamers[i]?.Body.Tick();                               // ✅ 0x00b46d50 advances, then draws
             DrawTamer(renderer, i);
             DrawTexts(renderer, i, slot);
         }
@@ -162,39 +162,41 @@ public sealed class CharacterSelectScene(GameContext game) : IScene
         if (_selected >= 0)
         {
             _digimon[_selected]?.Switch(SpriteAnimator.Standing);  // ✅ back to "standing", the frame goes on until the loop
-            _tamers[_selected]?.Switch(SpriteAnimator.Standing);
+            _tamers[_selected]?.Body.Switch(SpriteAnimator.Standing);
         }
         _selected = index;
         game.Sounds.PlayEffect(SelectSound);
         _digimon[index]?.Restart(SpriteAnimator.Selected);
-        _tamers[index]?.Restart(SpriteAnimator.Selected);
+        _tamers[index]?.Body.Restart(SpriteAnimator.Selected);
     }
 
-    /// <summary>✅ <c>0x00b46120</c>: the frame by its corner at (button + offset of the species), or centred for a few species.</summary>
+    /// <summary>
+    /// ✅ <c>0x00b4782c</c>: slots 1 and 3 draw their digimon and tamer 150 px right of the button, which is where
+    /// <c>0x00b47790</c> adds it before calling both.
+    /// </summary>
+    private static int DrawX(int index) => SlotButtons[index].X + (index % 2 == 1 ? 150 : 0);
+
+    /// <summary>✅ <c>0x00b46120</c>: the frame by its corner at (x + offset of the species), or centred for a few species.</summary>
     private void DrawDigimon(IRenderer renderer, int index, CharacterListSlot slot)
     {
         if (_digimon[index]?.Texture is not { } frame)
             return;
-        var (buttonX, buttonY) = SlotButtons[index];
+        int x = DrawX(index), y = SlotButtons[index].Y;
         if (SpeciesTables.CenterOf(slot.LeaderSpeciesId) is { } center)
         {
-            renderer.Draw(frame, buttonX + center.X - frame.Width / 2, buttonY + center.Y - frame.Height / 2);
+            renderer.Draw(frame, x + center.X - frame.Width / 2, y + center.Y - frame.Height / 2);
             return;
         }
         var (dx, dy) = SpeciesTables.OffsetOf(slot.LeaderSpeciesId);
-        renderer.Draw(frame, buttonX + dx, buttonY + dy);
+        renderer.Draw(frame, x + dx, y + dy);
     }
 
-    /// <summary>✅ <c>0x00b46d50</c>: the tamer by its anchor at (button + (70, 164)), 150 px further right in slots 1 and 3.</summary>
-    private void DrawTamer(IRenderer renderer, int index)
-    {
-        if (_tamers[index] is not { Texture: { } frame } tamer)
-            return;
-        var (buttonX, buttonY) = SlotButtons[index];
-        var (anchorX, anchorY) = tamer.Anchor;
-        int right = index % 2 == 1 ? 150 : 0;
-        renderer.Draw(frame, buttonX + 70 - anchorX + right, buttonY + 164 - anchorY);
-    }
+    /// <summary>
+    /// ✅ <c>0x00b46d50</c> → <c>0x0099fb90</c>: the tamer and its clothes by the frame's top-left corner at
+    /// (x + 70 − 120, y + 164 − 162). The <c>.ani</c> anchor is not used here.
+    /// </summary>
+    private void DrawTamer(IRenderer renderer, int index) =>
+        _tamers[index]?.Draw(renderer, DrawX(index) + 70 - 120, SlotButtons[index].Y + 164 - 162);
 
     /// <summary>✅ <c>0x00b47350</c>: the texts of a slot, white with a shadow.</summary>
     private void DrawTexts(IRenderer renderer, int index, CharacterListSlot slot)

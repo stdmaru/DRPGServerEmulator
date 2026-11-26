@@ -16,4 +16,4 @@ Arquivos `Sprite\*.ani` no `resource.hf`. Um `.ani` descreve as animações de u
 - `0x00873110(anim, dir)` → início; `0x008730e0(anim, dir)` → contagem. A animação `0xf` é tratada como 5 ❓.
 - Animações usadas na seleção de personagens: **1** = parado, **5** = selecionado; sempre a direção 0.
 - Laço (seleção de personagens): o quadro avança a cada 3 quadros do jogo; quando `quadro ≥ início + contagem − 1` volta a `início`. Ver [cenas](cenas.md#slots-0x00b47790).
-- ❓ Como `cx`/`cy` entram no desenho: na seleção de personagens o digimon é desenhado pelo canto do quadro (offset por espécie, [tabelas por espécie](tabelas-de-especie.md)), sem a âncora.
+- ❓ Como `cx`/`cy` entram no desenho: na seleção de personagens nem o digimon (offset por espécie, [tabelas por espécie](tabelas-de-especie.md)) nem o tamer (`0x0099fb90`, [cenas](cenas.md)) usam a âncora; os dois vão pelo canto do quadro.

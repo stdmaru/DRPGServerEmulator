@@ -4,8 +4,9 @@ using static SDL.SDL3;
 namespace DRPG.Engine.Audio;
 
 /// <summary>
-/// <see cref="IAudio"/> on SDL3: each playing sound is an <c>SDL_AudioStream</c> bound to the default output device,
-/// so SDL converts the rate and mixes the voices. A loop is refilled in <see cref="Update"/> whenever less than one
+/// <see cref="IAudio"/> on SDL3: the default output device is opened once, and each playing sound is an
+/// <c>SDL_AudioStream</c> bound to it, so SDL converts the rate and mixes the voices. (Opening a device stream per
+/// sound made every effect open a new logical device, and the reconfiguration crackled the music under it.) A loop is refilled in <see cref="Update"/> whenever less than one
 /// full pass is queued. Volume is the stream gain.
 /// </summary>
 public sealed unsafe class SdlAudio : IAudio
@@ -31,11 +32,19 @@ public sealed unsafe class SdlAudio : IAudio
     }
 
     private readonly List<SdlVoice> _voices = [];
+    private readonly SDL_AudioDeviceID _device;
 
     public SdlAudio()
     {
         if (!SDL_InitSubSystem(SDL_InitFlags.SDL_INIT_AUDIO))
             throw new InvalidOperationException($"SDL audio: {SDL_GetError()}");
+        _device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, null);
+        if (_device == 0)
+        {
+            var error = SDL_GetError();
+            SDL_QuitSubSystem(SDL_InitFlags.SDL_INIT_AUDIO);
+            throw new InvalidOperationException($"SDL audio: {error}");
+        }
     }
 
     public string BackendName => "sdl3";
@@ -43,13 +52,18 @@ public sealed unsafe class SdlAudio : IAudio
     public IVoice Play(PcmSound sound, float volume, bool loop)
     {
         var spec = new SDL_AudioSpec { format = SDL_AUDIO_F32, channels = sound.Channels, freq = sound.SampleRate };
-        var stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, null, 0);
+        var stream = SDL_CreateAudioStream(&spec, null);
         if (stream == null)
             throw new InvalidOperationException($"SDL audio: {SDL_GetError()}");
         SDL_SetAudioStreamGain(stream, Math.Clamp(volume, 0f, 1f));
         var voice = new SdlVoice(this, stream, sound, loop);
         Queue(voice);
-        SDL_ResumeAudioStreamDevice(stream);
+        if (!SDL_BindAudioStream(_device, stream))
+        {
+            var error = SDL_GetError();
+            SDL_DestroyAudioStream(stream);
+            throw new InvalidOperationException($"SDL audio: {error}");
+        }
         _voices.Add(voice);
         return voice;
     }
@@ -84,6 +98,7 @@ public sealed unsafe class SdlAudio : IAudio
     {
         foreach (var voice in _voices.ToArray())
             voice.Stop();
+        SDL_CloseAudioDevice(_device);
         SDL_QuitSubSystem(SDL_InitFlags.SDL_INIT_AUDIO);
     }
 }
