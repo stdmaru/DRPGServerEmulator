@@ -64,11 +64,15 @@ public sealed class ZoneSystem : IWorldSystem
     {
         if (player.Zone is not { } zone) return;
         var c = player.Character;
-        var verdict = Movement.Check(zone, c.X, c.Y, x, y, _world.Now - player.LastMoveAt, player.MoveSpeed);
+        var elapsed = _world.Now - player.LastMoveAt;
+        var verdict = Movement.Check(zone, c.X, c.Y, x, y, elapsed, player.MoveSpeed);
         if (verdict != Movement.Verdict.Ok)
         {
-            _log.LogInformation("{Player}: passo recusado ({Verdict}) de ({X0}, {Y0}) para ({X}, {Y}) em {Zone}",
-                player, verdict, c.X, c.Y, x, y, zone);
+            _log.LogInformation(
+                "{Player}: passo recusado ({Verdict}) de ({X0}, {Y0}) para ({X}, {Y}) em {Zone} (dist={Dist}, max={Max:F2}, dt={ElapsedMs:F0}ms, speed={Speed:F1})",
+                player, verdict, c.X, c.Y, x, y, zone,
+                Movement.Distance(c.X, c.Y, x, y), Movement.MaxDistance(elapsed, player.MoveSpeed),
+                elapsed.TotalMilliseconds, player.MoveSpeed);
             Teleport(player, zone.MapId, c.X, c.Y);
             return;
         }

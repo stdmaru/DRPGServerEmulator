@@ -218,31 +218,31 @@ public class MovementTests
     public void Allowed_distance_grows_with_time_but_not_while_idle()
     {
         Assert.Equal(Movement.MaxDistance(TimeSpan.Zero), Movement.MaxDistance(Movement.ReportInterval));
-        Assert.True(Movement.MaxDistance(Movement.ReportInterval) >= 6.0);     // tamer normal: ~5 células por 0x20 (Chebyshev)
+        Assert.True(Movement.MaxDistance(Movement.ReportInterval) >= 8.0);     // tamer normal a 60 FPS: ~6,5 células por 0x20 (Chebyshev)
         Assert.Equal(Movement.MaxDistance(TimeSpan.FromSeconds(2)), Movement.MaxDistance(TimeSpan.FromMinutes(5)));
     }
 
     [Fact]
     public void Speed_costume_doubles_allowed_move_speed_and_blocks_unbuffed_fast_steps()
     {
-        // Sem fantasia de velocidade: passo de bicicleta (dx=-6, dy=-10 -> Chebyshev 10) é recusado
+        // Sem fantasia de velocidade: passo de bicicleta a 60 FPS (dx=-5, dy=-12 -> Chebyshev 12) é recusado
         Assert.Equal(Movement.BaseMoveSpeed, _player.MoveSpeed);
-        _zones.Move(_player, 50, 46);
+        _zones.Move(_player, 51, 44);
         Assert.Equal((56, 56), (_player.Character.X, _player.Character.Y));
         Assert.Equal([(ushort)0xB0], _session.SentOpcodes());
 
-        // Com Cycle Costume #7601 (MoveSpeed 200% = 2x base): mesmo passo de 10 células é aceito
+        // Com Cycle Costume #7601 (MoveSpeed 200% = 2x base): mesmo passo de 12 células é aceito
         var inv = _player.Character.Inventory;
         inv.Equipment.Place(inv.Create(7601, (int)ItemPlace.CostumeSet, 1));
         Assert.Equal(Movement.BaseMoveSpeed * 2.0, _player.MoveSpeed);
 
-        _zones.Move(_player, 50, 46);
-        Assert.Equal((50, 46), (_player.Character.X, _player.Character.Y));
+        _zones.Move(_player, 51, 44);
+        Assert.Equal((51, 44), (_player.Character.X, _player.Character.Y));
         Assert.Empty(_session.SentOpcodes());
 
-        // Mesmo com fantasia, passo muito acima de 200% (15 células num tick) continua recusado
-        _zones.Move(_player, 35, 46);
-        Assert.Equal((50, 46), (_player.Character.X, _player.Character.Y));
+        // Mesmo com fantasia, passo muito acima de 200% (18 células num tick) continua recusado
+        _zones.Move(_player, 33, 44);
+        Assert.Equal((51, 44), (_player.Character.X, _player.Character.Y));
         Assert.Equal([(ushort)0xB0], _session.SentOpcodes());
     }
 }

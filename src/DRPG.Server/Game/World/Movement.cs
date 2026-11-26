@@ -17,14 +17,14 @@ public static class Movement
     public static readonly TimeSpan MaxElapsed = TimeSpan.FromTicks(ReportInterval.Ticks * 3 / 2);
 
     /// <summary>
-    /// ✅ Velocidade base do tamer sem bônus, em células/s por eixo (Chebyshev).
-    /// Em ~40 ticks por 0x20 (0,867 s) a 1/8 célula/tick: 5 células/envio ≈ 5,77 células/s (margem até 6,0).
-    /// Com item de 200% (1/4 célula/tick): 10 células/envio ≈ 11,54 células/s (limite 12,0).
+    /// ✅ Velocidade base do tamer sem bônus, em células/s por eixo (Chebyshev), calibrada a 60 FPS.
+    /// O cliente avança por frame (<c>1/8</c> célula/frame normal → 7,5 células/s ≈ 6,5 células por 0x20 de 0,867 s;
+    /// com item de 200% = <c>1/4</c> célula/frame → 15,0 células/s ≈ 13,0 células por 0x20).
     /// </summary>
-    public const double BaseMoveSpeed = 6.0;
+    public const double BaseMoveSpeed = 7.5;
 
-    /// <summary>Folga fixa em células (arredondamento de grade e jitter de rede).</summary>
-    public const double Slack = 1.5;
+    /// <summary>Folga fixa em células (arredondamento de grade, jitter de rede e ~62,5 FPS em Sleep(16)).</summary>
+    public const double Slack = 2.0;
 
     /// <summary>Distância Chebyshev entre duas células (<c>max(|dx|, |dy|)</c>), igual ao passo por eixo do cliente.</summary>
     public static int Distance(int fromX, int fromY, int x, int y) =>
