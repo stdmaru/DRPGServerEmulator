@@ -117,6 +117,7 @@ services.AddSingleton<NpcScriptBase, VillageOfBeginningNpcs>();
 services.AddSingleton<NpcScriptBase, DigitalBureauNpcs>();
 services.AddSingleton<NpcScriptRegistry>();
 services.AddSingleton<Taming>();
+services.AddSingleton<ItemUseService>();
 services.AddSingleton<CashShopService>();
 services.AddSingleton<ChatCommands>();
 

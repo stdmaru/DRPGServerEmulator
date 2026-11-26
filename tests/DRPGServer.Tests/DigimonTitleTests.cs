@@ -33,7 +33,6 @@ public class DigimonTitleTests
         Maps = TestSupport.Data.Maps,
         Grids = TestSupport.Data.Grids,
         DropGroups = TestSupport.Data.DropGroups,
-        TamingNets = TestSupport.Data.TamingNets,
         Portals = TestSupport.Data.Portals,
         Spawns = TestSupport.Data.Spawns,
         ZoneIds = TestSupport.Data.ZoneIds,

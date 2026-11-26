@@ -72,7 +72,7 @@ public class CaptureTests
     }
 
     private void UseItem(Player player, Taming taming, InventoryItem item, Serial target) =>
-        new ItemUseHandler(taming, _world).Dispatch(player.Session, new PacketReader(ItemUsePayload(item.Uid, target)));
+        new ItemUseHandler(TestSupport.NewItemUse(_world, taming)).Dispatch(player.Session, new PacketReader(ItemUsePayload(item.Uid, target)));
 
     // ---------- Taming Net ----------
 

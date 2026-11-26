@@ -61,7 +61,7 @@ Toda ação com alvo no mundo passa pelo `InteractionGuard`: o alvo existe, est�
 | Loja de NPC (`0x50`–`0x53`) | a loja pertence a um NPC do mapa (coluna 12 de `npc_info_us`) e ele está a até `Game:NpcInteractionRange` casas | `CanUseShop` nos 4 handlers |
 | Digimon Center (`0x89`, `0x94`) | um NPC com janela `14` no mapa está perto | `CanUseDigimonCenter` |
 | Escolha de diálogo (`0x56`) | o NPC da escolha (`RegisterChoice(choiceId, npcId, …)`) está perto | `NpcScriptRegistry.Choose` |
-| Batalha e Taming Net | o grupo selvagem pode batalhar e está a até `Game:WildInteractionRange` casas | `BattleSystem.StartPve`, `Taming.UseNet` |
+| Batalha e Taming Net | o grupo selvagem pode batalhar e está a até `Game:WildInteractionRange` casas | `BattleSystem.StartPve`, `TamingNetEffect.CanApply` |
 | Coleta de drop (`0x90`, `0x91`) | o item está a até `Game:DropPickupRange` casas e, nos primeiros `Zone.DropOwnerWindow` (40 s), só o dono coleta | `CanPickUp` nos 2 handlers |
 
 - Na partida o servidor recusa subir com uma loja do `NpcShop.xml` sem NPC dono, ou com uma escolha cujo NPC não existe no mapa do script.

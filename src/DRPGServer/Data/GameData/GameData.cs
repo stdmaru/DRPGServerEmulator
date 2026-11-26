@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using DRPGServer.Game.Battle.Cards;
 using DRPGServer.Game.Economy;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
 
@@ -33,6 +34,8 @@ public sealed record ItemInfo(uint Id, string Name)
     public string Description { get; init; } = "";
     /// <summary>Bônus do item equipado (<c>Resources/Item/EquipmentEffects.xml</c>).</summary>
     public StatModifiers Modifiers { get; init; } = StatModifiers.None;
+    /// <summary>Efeitos ao usar o item (<c>Resources/Item/ItemEffects.xml</c>). Vazio = não tem uso.</summary>
+    public IReadOnlyList<IItemUseEffect> UseEffects { get; init; } = [];
 }
 
 /// <summary>Momento de ativação de um card em batalha (coluna 23 de <c>card_info_us</c>).</summary>
@@ -94,7 +97,6 @@ public sealed record DropEntry(uint ItemId, byte Rate);
 /// Taming Net: captura no mapa um selvagem do estágio <paramref name="Stage"/> (1 in-training … 5 mega), com
 /// <paramref name="Chance"/> % (✅ as duas das amostras capturaram de primeira; são itens de cash).
 /// </summary>
-public sealed record TamingNet(uint ItemId, byte Stage, byte Chance);
 
 public sealed record PortalInfo(byte MapId, short X, short Y, byte DestMapId, short DestX, short DestY)
 {
@@ -236,7 +238,6 @@ public sealed class GameData
     /// <summary>Grade de cada mapa (vazia se o grids.bin não foi extraído: aí tudo é andável).</summary>
     public required FrozenDictionary<byte, MapGrid> Grids { get; init; }
     public required FrozenDictionary<uint, IReadOnlyList<DropEntry>> DropGroups { get; init; }
-    public FrozenDictionary<uint, TamingNet> TamingNets { get; init; } = FrozenDictionary<uint, TamingNet>.Empty;
     public required FrozenDictionary<byte, IReadOnlyList<PortalInfo>> Portals { get; init; }
     public required FrozenDictionary<byte, IReadOnlyList<SpawnArea>> Spawns { get; init; }
     public required IReadOnlyList<byte> ZoneIds { get; init; }
@@ -267,5 +268,4 @@ public sealed class GameData
     public IReadOnlyList<PortalInfo> PortalsOf(byte mapId) => Portals.GetValueOrDefault(mapId) ?? [];
     public IReadOnlyList<SpawnArea> SpawnsOf(byte mapId) => Spawns.GetValueOrDefault(mapId) ?? [];
     public IReadOnlyList<DropEntry> DropGroup(uint id) => DropGroups.GetValueOrDefault(id) ?? [];
-    public TamingNet? FindTamingNet(uint itemId) => TamingNets.GetValueOrDefault(itemId);
 }

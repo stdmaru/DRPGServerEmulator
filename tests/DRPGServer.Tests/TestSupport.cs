@@ -108,7 +108,7 @@ internal static class TestSupport
         data ??= Data;
         options ??= GameOptions();
         return new BattleSystem(world, data, options, NullLogger<BattleSystem>.Instance,
-            taming ?? new Taming(data, new DigimonUids(), options, Guard(data, options)), expEvents ?? NewExpEvents(options),
+            taming ?? new Taming(data, new DigimonUids(), options), expEvents ?? NewExpEvents(options),
             Guard(data, options));
     }
 
@@ -121,8 +121,12 @@ internal static class TestSupport
     public static Taming NewTaming(DigimonUids uids, IOptions<GameOptions>? options = null, GameData? data = null)
     {
         options ??= GameOptions();
-        return new Taming(data ?? Data, uids, options, Guard(data, options));
+        return new Taming(data ?? Data, uids, options);
     }
+
+    /// <summary>Uso de item com Taming e guarda reais.</summary>
+    public static ItemUseService NewItemUse(GameWorld world, Taming? taming = null, GameData? data = null) =>
+        new(taming ?? NewTaming(new DigimonUids(), data: data), Guard(data), world);
 
     /// <summary>Roteador de escolhas sobre <paramref name="scripts"/>, com os NPCs do pacote sintético.</summary>
     public static NpcScriptRegistry NewNpcRegistry(params NpcScriptBase[] scripts) => new(scripts, Data, Guard());

@@ -37,6 +37,14 @@ public sealed class EffectParams
         return value;
     }
 
+    /// <summary>Texto obrigatório, não vazio (o chamador interpreta o nome).</summary>
+    public string Name(string name)
+    {
+        string text = Raw(name) ?? throw Fail($"falta o parâmetro {name}");
+        if (string.IsNullOrWhiteSpace(text)) throw Fail($"{name} vazio");
+        return text;
+    }
+
     /// <summary>Valor de enum pelo nome exato (número não vale).</summary>
     public T Enum<T>(string name) where T : struct, Enum
     {

@@ -25,6 +25,17 @@ public static class StatFormulas
     public const byte InTraining = 1, Rookie = 2, Champion = 3, Ultimate = 4, Mega = 5;
 
     /// <summary>✅ Nível em que o digimon chega a cada estágio: rookie no 11, champion 21, ultimate 31, mega 41.</summary>
+    /// <summary>Estágio pelo nome usado nos XML (<c>InTraining</c>, <c>Rookie</c>, <c>Champion</c>, <c>Ultimate</c>, <c>Mega</c>).</summary>
+    public static byte? StageFromName(string name) => name switch
+    {
+        "InTraining" => InTraining,
+        "Rookie" => Rookie,
+        "Champion" => Champion,
+        "Ultimate" => Ultimate,
+        "Mega" => Mega,
+        _ => null,
+    };
+
     public static int StageLevel(byte stage) => stage switch
     {
         InTraining => 1,

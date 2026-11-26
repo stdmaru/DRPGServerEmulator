@@ -39,7 +39,7 @@ Cada camada só conhece a de baixo. Regra de negócio nunca fica em handler nem 
 | Domínio | Pasta | Peças |
 |---|---|---|
 | Mundo | `Game/World` | `GameWorld` (thread do mundo), `Zone`, `ZoneSystem`, `PlayerSystem`, `WorldIo`, `IGameClock`, `InteractionGuard` (**S4**) |
-| Itens | `Game/Items` | `ItemService` (dar, trocar, conferir espaço, depósito da conta), `ItemGrant`/`ItemDuration`, `EquipmentService` (efeitos de equipar, desequipar e vencer), `ItemUseService` e efeitos de uso (**E4**) |
+| Itens | `Game/Items` | `ItemService` (dar, trocar, conferir espaço, depósito da conta), `ItemGrant`/`ItemDuration`, `EquipmentService` (efeitos de equipar, desequipar e vencer), `ItemUseService` e efeitos de uso (`ItemUseEffects`) |
 | Economia | `Game/Economy` | `Wallet`/`CurrencyKind` (gastar, creditar, tetos e auditoria das moedas do personagem), `EconomyLedger`, `IAuditLog` |
 | Lojas | `Game/Shop` | `NpcShopService` (compra e venda de cards e itens nas lojas de NPC), `CashShopService` |
 | Status | `Game/Stats` | `StatFormulas` (**o único lugar** com fórmulas de status), `ExpFormulas`, `StatModifiers` (**E1**) |

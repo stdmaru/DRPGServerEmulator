@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Xml.Linq;
 using DRPGServer.Game.Battle.Cards;
 using DRPGServer.Game.Economy;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
 
@@ -27,6 +28,7 @@ public static class GameDataLoader
         grids ??= FrozenDictionary<byte, MapGrid>.Empty;
         var species = ClientTables.Species(pack);
         var items = ApplyEquipmentEffects(ClientTables.Items(pack), LoadEquipmentEffects(Path.Combine(root, "Item/EquipmentEffects.xml")));
+        items = ApplyItemUseEffects(items, LoadItemUseEffects(Path.Combine(root, "Item/ItemEffects.xml")));
         var maps = ClientTables.Maps(pack);
 
         var drops = new Dictionary<uint, IReadOnlyList<DropEntry>>();
@@ -40,16 +42,6 @@ public static class GameDataLoader
                 if (entry.Rate > 100) throw new GameDataException($"DropGroup {id}: taxa {entry.Rate} fora de 0..100");
             }
             if (!drops.TryAdd(id, entries)) throw new GameDataException($"DropGroup {id} duplicado");
-        }
-
-        var nets = new Dictionary<uint, TamingNet>();
-        foreach (var e in Elements(root, "Item/TamingNets.xml", "TamingNets", "Net"))
-        {
-            var net = new TamingNet(U32(e, "ItemID"), U8(e, "Stage"), U8(e, "Chance"));
-            if (!items.ContainsKey(net.ItemId)) throw new GameDataException($"TamingNets.xml: item {net.ItemId} não existe");
-            if (net.Stage is < 1 or > 5) throw new GameDataException($"TamingNets.xml: item {net.ItemId} com estágio {net.Stage} fora de 1..5");
-            if (net.Chance > 100) throw new GameDataException($"TamingNets.xml: item {net.ItemId} com chance {net.Chance} fora de 0..100");
-            if (!nets.TryAdd(net.ItemId, net)) throw new GameDataException($"TamingNets.xml: item {net.ItemId} duplicado");
         }
 
         var arrivals = new Dictionary<(byte, short, short), PortalInfo>();
@@ -116,7 +108,6 @@ public static class GameDataLoader
             Skills = ClientTables.Skills(pack),
             Evolutions = ClientTables.Evolutions(pack),
             DropGroups = drops.ToFrozenDictionary(),
-            TamingNets = nets.ToFrozenDictionary(),
             Maps = maps,
             Grids = grids,
             Portals = portals,
@@ -328,6 +319,48 @@ public static class GameDataLoader
             }
             merged[id] = info with { Effects = list };
         }
+        return merged.ToFrozenDictionary();
+    }
+
+    public static FrozenDictionary<uint, IReadOnlyList<IItemUseEffect>> LoadItemUseEffects(string path)
+    {
+        if (!File.Exists(path)) throw new GameDataException($"tabela {path} não encontrada");
+        var doc = XDocument.Load(path);
+        var top = doc.Element("ItemEffects") ?? throw new GameDataException($"{path}: falta a raiz <ItemEffects>");
+        var effects = new Dictionary<uint, IReadOnlyList<IItemUseEffect>>();
+        foreach (var e in top.Elements("Item"))
+        {
+            uint id = U32(e, "ID");
+            string where = $"ItemEffects.xml: item {id}";
+            foreach (var attr in e.Attributes())
+            {
+                if (attr.Name.LocalName is not ("ID" or "Name"))
+                    throw new GameDataException($"{where}: atributo {attr.Name} desconhecido");
+            }
+            var list = new List<IItemUseEffect>();
+            foreach (var child in e.Elements())
+            {
+                if (child.Name.LocalName != "Effect")
+                    throw new GameDataException($"{where}: elemento <{child.Name}> desconhecido");
+                list.Add(ItemUseEffectTypes.Create(new EffectParams(child, where)));
+            }
+            if (list.Count == 0) throw new GameDataException($"{where} sem <Effect>");
+            if (list.Select(x => x.Entry).Distinct().Count() > 1)
+                throw new GameDataException($"{where}: efeitos de entradas diferentes (0x41 e 0x85) no mesmo item");
+            if (!effects.TryAdd(id, list)) throw new GameDataException($"{where} duplicado");
+        }
+        return effects.ToFrozenDictionary();
+    }
+
+    private static FrozenDictionary<uint, ItemInfo> ApplyItemUseEffects(
+        FrozenDictionary<uint, ItemInfo> items, FrozenDictionary<uint, IReadOnlyList<IItemUseEffect>> effects)
+    {
+        var missing = effects.Keys.Where(id => !items.ContainsKey(id)).Order().ToList();
+        if (missing.Count > 0)
+            throw new GameDataException($"ItemEffects.xml: item(ns) {string.Join(", ", missing)} não existe(m) no item_info_us");
+        var merged = new Dictionary<uint, ItemInfo>(items.Count);
+        foreach (var (id, info) in items)
+            merged[id] = effects.TryGetValue(id, out var list) ? info with { UseEffects = list } : info;
         return merged.ToFrozenDictionary();
     }
 

@@ -20,8 +20,8 @@ Evidência: amostras em `work/packets/item_packet/` (Taming Net) e sessão 56 (c
 | 10027 | Taming Net : Rookie S | rookie |
 | 23730 | Taming Net : Rookie S (X) | rookie |
 
-- ❓ Chance: são itens de cash e tratadas como garantidas (100 %). A tabela fica em `Resources/Item/TamingNets.xml`
-  (`ItemID`, `Stage`, `Chance`). Para um item novo, basta uma linha nesse arquivo.
+- ❓ Chance: são itens de cash e tratadas como garantidas (100 %). Cada rede é um efeito em `Resources/Item/ItemEffects.xml`
+  (`<Effect Type="TamingNet" Stage="Rookie" Chance="100" />`). Para um item novo, basta uma entrada nesse arquivo.
 
 ### Pacotes
 - C2S `0x41` (822): `u32 3`, registro do item (108 bytes, uid em +4 do payload), bloco do alvo (696 bytes em +112). No
@@ -62,7 +62,8 @@ Evidência: amostras em `work/packets/item_packet/` (Taming Net) e sessão 56 (c
   oficial não capturadas. A renomeação paga (item) ainda não existe.
 
 ## No emulador
-- `Game/World/Taming.cs` (regras e criação), `Battle.Capture` (captura comum), handlers `ItemUseHandler` (`0x41`) e
+- `Game/World/Taming.cs` (regras e criação), `Game/Items/ItemUseEffects.cs` (`TamingNetEffect`: validação e captura da rede,
+  chamado por `ItemUseService.UseOnTarget`), `Battle.Capture` (captura comum), handlers `ItemUseHandler` (`0x41`) e
   `RenameHandler` (`0xF0`).
 - O uid do digimon novo vem de `Game/DigimonUids.cs`: um contador em memória, iniciado no maior uid do banco na partida.
   O snapshot faz upsert dos digimons.

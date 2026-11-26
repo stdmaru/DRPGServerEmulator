@@ -50,21 +50,11 @@ public static class TitleUnlockRules
         TitleUnlockCondition.Wins => PositiveInt(value) is { } wins ? new WinsUnlock(wins) : null,
         TitleUnlockCondition.Losses => PositiveInt(value) is { } losses ? new LossesUnlock(losses) : null,
         TitleUnlockCondition.Level => PositiveInt(value) is { } level ? new LevelUnlock(level) : null,
-        TitleUnlockCondition.Stage => StageByName(value) is { } stage ? new StageUnlock(stage) : null,
+        TitleUnlockCondition.Stage => StatFormulas.StageFromName(value) is { } stage ? new StageUnlock(stage) : null,
         _ => null,
     };
 
     private static int? PositiveInt(string value) =>
         int.TryParse(value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int n) && n > 0
             ? n : null;
-
-    private static byte? StageByName(string value) => value switch
-    {
-        "InTraining" => StatFormulas.InTraining,
-        "Rookie" => StatFormulas.Rookie,
-        "Champion" => StatFormulas.Champion,
-        "Ultimate" => StatFormulas.Ultimate,
-        "Mega" => StatFormulas.Mega,
-        _ => null,
-    };
 }
