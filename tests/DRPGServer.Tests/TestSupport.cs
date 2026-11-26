@@ -145,6 +145,11 @@ internal static class TestSupport
         return character;
     }
 
+    /// <summary><see cref="PlayerSystem"/> sobre <paramref name="world"/>, com uma fila de gravação que ninguém consome.</summary>
+    public static PlayerSystem NewPlayers(GameWorld world) =>
+        new(world, new ZoneSystem(Data, world, Clock, NullLogger<ZoneSystem>.Instance), NewBattles(world), new PersistenceQueue(),
+            new RecordingSnapshotStore(), GameOptions(), NullLogger<PlayerSystem>.Instance);
+
     /// <summary>
     /// Entrada no mundo de uma conta sem save pendente, pelos dois passos do <see cref="PlayerSystem"/> (na thread do
     /// mundo, ou sem a thread rodando).

@@ -126,7 +126,8 @@ public class EncyclopediaTests
         };
         var mapSession = TestSupport.NewSession(ServerRole.Map);
         accounts.Claim("tester", mapSession);
-        mapSession.Player = new Player(mapSession, account, character);
+        var players = TestSupport.NewPlayers(world);
+        players.EnterNow(mapSession, account, character);
 
         var globalSession = TestSupport.NewSession(ServerRole.Global);
         var lifecycle = new GlobalLifecycle(accounts);
@@ -144,8 +145,8 @@ public class EncyclopediaTests
         BinaryPrimitives.WriteUInt32LittleEndian(req7BPlain, character.Leader.Uid);
         var req7BCipher = GlobalSessionCipher.EncryptBlocks(key, req7BPlain);
 
-        var dataHandler = new EncyclopediaDataHandler(accounts, world);
-        var collectionHandler = new EncyclopediaCollectionHandler(accounts, world);
+        var dataHandler = new EncyclopediaDataHandler(players, world);
+        var collectionHandler = new EncyclopediaCollectionHandler(players, world);
 
         await world.StartAsync(CancellationToken.None);
         try

@@ -139,8 +139,11 @@ public sealed class AccountRegistry(IOptions<NetworkOptions> options, TimeProvid
         }
     }
 
-    /// <summary>Sessões abertas do ticket atual da conta.</summary>
-    public IReadOnlyList<Session> SessionsOf(string username)
+    /// <summary>
+    /// Sessões abertas do ticket atual da conta (diagnóstico e testes). Para chegar no personagem, use
+    /// <c>PlayerSystem.FindByAccount</c>.
+    /// </summary>
+    internal IReadOnlyList<Session> SessionsOf(string username)
     {
         lock (_lock)
             return _tickets.TryGetValue(username, out var ticket) ? ticket.Sessions.ToList() : [];

@@ -32,10 +32,11 @@ public sealed class GlobalUserAuthHandler(AccountRegistry accounts, ILogger<Glob
 
 /// <summary>
 /// ✅ 0x7B: enciclopédia (1104 bytes cifrados em AES-128-ECB: u32 digimonUid + u8 owned[1100]).
-/// Ecoa o uid enviado pelo cliente e marca as espécies dos Digimons guardados no Digimon Depository.
+/// Ecoa o uid enviado pelo cliente e marca as espécies dos Digimons guardados no Digimon Depository do personagem que
+/// a conta tem no mapa.
 /// </summary>
 [PacketHandler(GlobalOpcode.EncyclopediaData)]
-public sealed class EncyclopediaDataHandler(AccountRegistry accounts, GameWorld world) : AccountHandler<EncyclopediaDataRequest>
+public sealed class EncyclopediaDataHandler(PlayerSystem players, GameWorld world) : AccountHandler<EncyclopediaDataRequest>
 {
     protected override ValueTask HandleAsync(Session session, AuthenticatedAccount account, EncyclopediaDataRequest request, CancellationToken ct)
     {
@@ -45,7 +46,7 @@ public sealed class EncyclopediaDataHandler(AccountRegistry accounts, GameWorld 
 
         world.Post(() =>
         {
-            var character = FindActiveCharacter(accounts, account.Username);
+            var character = players.FindByAccount(account.Uid)?.Character;
             var storedSpecies = character is null ? Array.Empty<ushort>() : CollectDepositorySpecies(character);
             session.Send(new EncyclopediaDataPacket(aesKey, digimonUid, storedSpecies));
         });
@@ -65,24 +66,14 @@ public sealed class EncyclopediaDataHandler(AccountRegistry accounts, GameWorld 
         }
         return species.ToArray();
     }
-
-    internal static Character? FindActiveCharacter(AccountRegistry accounts, string username)
-    {
-        foreach (var s in accounts.SessionsOf(username))
-        {
-            if (s.Role == ServerRole.Map && s.Player is { } player)
-                return player.Character;
-        }
-        return null;
-    }
 }
 
 /// <summary>
 /// ✅ 0x7C: time atual e evoluções desbloqueadas para a enciclopédia (64 bytes cifrados em AES-128-ECB).
-/// Lê os 5 slots do personagem na thread do <see cref="GameWorld"/>.
+/// Lê os 5 slots do personagem que a conta tem no mapa, na thread do <see cref="GameWorld"/>.
 /// </summary>
 [PacketHandler(GlobalOpcode.EncyclopediaCollection)]
-public sealed class EncyclopediaCollectionHandler(AccountRegistry accounts, GameWorld world) : AccountHandler<EncyclopediaCollectionRequest>
+public sealed class EncyclopediaCollectionHandler(PlayerSystem players, GameWorld world) : AccountHandler<EncyclopediaCollectionRequest>
 {
     protected override ValueTask HandleAsync(Session session, AuthenticatedAccount account, EncyclopediaCollectionRequest request, CancellationToken ct)
     {
@@ -90,7 +81,7 @@ public sealed class EncyclopediaCollectionHandler(AccountRegistry accounts, Game
 
         world.Post(() =>
         {
-            var character = EncyclopediaDataHandler.FindActiveCharacter(accounts, account.Username);
+            var character = players.FindByAccount(account.Uid)?.Character;
             var entries = new EncyclopediaPartyEntry[Character.PartySize];
             if (character is not null)
             {

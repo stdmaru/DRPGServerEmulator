@@ -215,7 +215,8 @@ public class DepositoryTests
 
         var mapSession = TestSupport.NewSession(ServerRole.Map);
         accounts.Claim("tester", mapSession);
-        mapSession.Player = new Player(mapSession, account, character);
+        var players = TestSupport.NewPlayers(world);
+        players.EnterNow(mapSession, account, character);
 
         var globalSession = TestSupport.NewSession(ServerRole.Global);
         new GlobalLifecycle(accounts).OnConnected(globalSession);
@@ -227,7 +228,7 @@ public class DepositoryTests
         BinaryPrimitives.WriteUInt32LittleEndian(reqPlain, character.Leader.Uid);
         var reqCipher = GlobalSessionCipher.EncryptBlocks(key, reqPlain);
 
-        var handler = new EncyclopediaDataHandler(accounts, world);
+        var handler = new EncyclopediaDataHandler(players, world);
         await world.StartAsync(CancellationToken.None);
         try
         {

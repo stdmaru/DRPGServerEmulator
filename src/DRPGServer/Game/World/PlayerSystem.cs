@@ -170,6 +170,13 @@ public sealed class PlayerSystem : IWorldSystem
         return _bySession.Values.Any(p => p.Character.Uid == characterUid);
     }
 
+    /// <summary>O personagem da conta no mapa (no máximo um por conta). Thread do mundo.</summary>
+    public Player? FindByAccount(uint accountUid)
+    {
+        _world.AssertWorldThread();
+        return _bySession.Values.FirstOrDefault(p => p.Account.Uid == accountUid);
+    }
+
     public Player? FindByName(string name) =>
         _bySession.Values.FirstOrDefault(p => string.Equals(p.Character.Name, name, StringComparison.OrdinalIgnoreCase));
 
