@@ -2,7 +2,7 @@
 
 O que servidor, cliente e ferramentas têm em comum: **protocolo**, **pacotes**, **formatos de arquivo** e **tabelas do cliente**. Não tem regra de jogo, rede, banco nem gráficos: só bytes ↔ tipos. Visão geral em [arquitetura](README.md).
 
-❓ **Hoje** essas peças estão dentro do servidor (`Network/Protocol`, `Network/Packets`, `Data/GameData/ClientPack.cs`, `ClientTables.cs`). A mudança para `DRPG.Shared` é o marco 0.
+**Hoje** o Shared tem `Protocol/` (framing, CRC, leitor/escritor, `Launcher/`), `Formats/Pack` (`.hf/.pf`) e `Formats/Sprite` (`.spr`). Os pacotes do jogo e as tabelas continuam no servidor até o cliente precisar deles. Só entra aqui o que mais de um projeto usa ([regra](README.md#repositório)).
 
 ## Pastas
 ```

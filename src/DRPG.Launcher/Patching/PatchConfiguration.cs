@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace DRPG.Shared.Patching;
+namespace DRPG.Launcher.Patching;
 
 /// <summary>
 /// The launcher entry point <c>DR_Configuration.json</c>, in the official format (including the

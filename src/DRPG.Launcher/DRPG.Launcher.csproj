@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Login + auto-patcher (docs/planos/cliente-novo.md, milestone 1).
+       NativeAOT, no single-file, no compression, no obfuscation (antivirus false positives). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DRPG.Launcher</RootNamespace>
+    <PublishAot>true</PublishAot>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AssemblyName>DRPG.Launcher</AssemblyName>
+    <Product>DRPG Launcher</Product>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DRPG.Shared\DRPG.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DRPG.Launcher.Tests" />
+  </ItemGroup>
+
+</Project>

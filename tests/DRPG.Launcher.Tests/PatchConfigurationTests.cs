@@ -1,6 +1,6 @@
-using DRPG.Shared.Patching;
+using DRPG.Launcher.Patching;
 
-namespace DRPG.Shared.Tests;
+namespace DRPG.Launcher.Tests;
 
 public sealed class PatchConfigurationTests
 {
