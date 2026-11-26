@@ -166,7 +166,7 @@ Ordem das capturas: login `0x05` → channel `0x03` → `0x04` → `0x12` + `0x1
 
 ### Quadro `0x00b48840`
 1. Limpa; processa a rede (`0x00b45c30`).
-2. Modo `+0x85c`: 0 = seleção (`0x00b48580` → desenho da GUI `0x00b48c60` e slots `0x00b47790`); 1 = criação (`dr2_ch_001_000`, próximo marco).
+2. Modo `+0x85c`: 0 = seleção (`0x00b48580` → desenho da GUI `0x00b48c60` e slots `0x00b47790`); 1 = [criação](#criação-de-personagem-modo-1--re).
 3. Mensagens centradas: `0xee4` "The Tamer name already exists." 160 quadros; `0xee6` (manutenção) 80 quadros; `0xee5` até clicar; `+0x144c` (erro da criação) até clicar.
 4. Sem rede (`IsNetworkAlive`) → desconecta e volta para a cena 2. Erro fatal do servidor (`[DAT_011584f0]+0xf802`) → `0x602` + texto, caixa em (400, 300).
 5. Cursor, fim do quadro.
@@ -174,7 +174,7 @@ Ordem das capturas: login `0x05` → channel `0x03` → `0x04` → `0x12` + `0x1
 ### Desenho `0x00b48c60` (modo 0)
 1. Fundo `dr2_ch_000_000` (`_ENG`) em (0, 0).
 2. Para cada slot i com personagem (`uid ≠ 0`): atualiza o botão; o selecionado (`+0x860 == i`) desenha o quadro 1 fixo, os outros o quadro do estado. **Clique** num slot com tamer (byte `+4` do registro ≠ 0) e diferente do atual → seleciona, toca **5**, põe tamer e digimon na animação "selecionado" (5) a partir do início. Clique em slot vazio → `+0x860 = −1`. **Duplo clique** no selecionado → entrar no jogo.
-3. Botões, na ordem: Delete (com seleção → diálogo de confirmação, ❓ próximo marco); Create (só fora da Battle Zone; → modo 1, `0x00b45510(1)`, próximo marco); Game Start (com seleção e a lista recebida → entrar); Back → desconecta e **cena 2**. Trocar senha: ❓ tratado fora deste método (`0x00b46690`/`0x00b46f00`), próximo marco.
+3. Botões, na ordem: Delete (com seleção → [diálogo de confirmação](#apagar-personagem--re)); Create (só fora da Battle Zone; → [modo 1](#criação-de-personagem-modo-1--re), `0x00b45510(1)`); Game Start (com seleção e a lista recebida → entrar); Back → desconecta e **cena 2**. Trocar senha: ❓ tratado fora deste método (`0x00b46690`/`0x00b46f00`), próximo marco.
 4. Entrar no jogo (`0x00b48670`, log `Map Server : %s %d`): escurece como na cena 2 (`+0x14c0`, mesma fórmula) e no fim conecta no servidor de mapa e vai para a cena 5. **Fora do marco 2**: a fase C para no escurecimento + log.
 
 ### Slots `0x00b47790`
@@ -202,6 +202,58 @@ Para cada slot com tamer (`+4 ≠ 0`):
 
 ### Sprites `dr2_ch_000`
 `000_000` fundo 800×600 (4 molduras com retrato e quadros TAMER/DIGIMON); `000_001..004` slots ~355×230, 2 quadros (normal, selecionado/sob o mouse); `000_005..009` botões, 3 quadros (normal, sob o mouse, pressionado). Criação (próximo marco): `dr2_ch_001_000` fundo, `001_001/002` botões, `001_003` (107×154) retratos dos 4 iniciais em (73, 188), (254, 188), (439, 188), (619, 188); iniciais = espécies 10, 11, 12 e o 4º pelo `0x03` (0 → 24, 1 → 27, …).
+
+### Criação de personagem (modo 1) ✅ RE
+Offsets de cena (no `0x00b48c60` o ECX é `cena + 0x18`: offset local + 0x18 = offset de cena). Cores são COLORREF.
+
+**Entrada `0x00b45510(1)`** (botão Create, que fica desabilitado nas linhas 7–12 da Battle Zone e nas linhas 0/4/5 quando `[DAT_011584f4]+8 == 1`):
+1. Limpa os dois nomes. Slot alvo `+0x860`: o selecionado se estiver vazio, senão o **menor slot vazio**; sem nenhum → mensagem `0x264` "No empty tamer creation window." (até clicar) e não entra.
+2. Tamer selecionado `+0xc72 = 1`, digimon selecionado `+0xc74 = 10` (Gigimon). Rolagens das descrições `+0x1468/+0x146c = 0` (❓ nada no cliente as altera; ficam 0).
+3. Digimons dos 4 botões `+0xe78[0..3] = 10, 11, 12, X`, com X pelo `[DAT_0135a308]+0x14` (o 4º inicial do `0x03`): 0 → 24 (Chibimon), 1 → 27 (Yarmon), 2 → 31 (Hopmon), 3 → 40 (Dorimon); fora disso o 4º botão não aparece.
+4. Animações: tamer 1 e digimon 10 já em "selecionado" (animação 5, do início); os outros em 1 (parado).
+5. Foco na caixa do nome do tamer; modo `+0x85c = 1`. Sair (`0x00b45510(0)`): modo 0, `+0x860 = −1`.
+
+**Quadro (modo 1, `0x00b48840`)**: GUI (`0x00b48c60` ramo do modo 1) → coluna dos tamers `0x00b46f00` → coluna dos digimons `0x00b46690` → caixas de texto `0x00a19680` → mensagens (as mesmas do modo 0: `0xee4` 160 quadros ou clique; `+0x1464`/`+0x144c` até clicar) → cursor.
+
+**GUI** (`0x00b48c60`, modo 1):
+- Fundo `dr2_ch_001_000` (`_eng`) em (0, 0).
+- **OK** `dr2_ch_001_001` (`_eng`) em (565, 549), habilitado com a lista recebida e tamer e digimon escolhidos. Validação, nesta ordem; o primeiro erro põe a mensagem (centrada em (400, 300), até clicar) e o foco na caixa culpada:
+  1. Algum byte não-ASCII em **qualquer** dos dois nomes → `0xee5` "Please rename it properly in English." (foco no tamer).
+  2. Nome do tamer vazio ou com caractere fora de `0-9A-Za-z` → `0x25e`.
+  3. Nome do tamer contém palavra proibida → `0x25f`. Regra (`0x00b3db80`): **cada substring** do nome, em maiúsculas, procurada no conjunto de `ProhibitedWords_US` (mesmo formato e mesma carga do `TextAttach`: `table\ProhibitedWords_US.dat` e `Language\ProhibitedWords_US.bin`, UTF-8 com BOM, `\r`, `id|PALAVRA`, 399 linhas na v322).
+  4. Tamanho em bytes do nome do tamer ≤ 2 ou ≥ 17 → `0x260` (vale 3..16).
+  5. Os mesmos três para o nome do digimon → `0x261`, `0x262`, `0x263`.
+  6. Tudo certo → envia (`0x00b45990`, abaixo).
+- **Cancel** `dr2_ch_001_002` (`_eng`) em (681, 549) → limpa os nomes e `0x00b45510(0)`.
+- **Caixas de texto** (`0x00a19680`): tamer em (153, 57), digimon em (522, 57), 130×15, até 20 caracteres. ❓ O desenho do texto/cursor da caixa (`0x00a18c20`) não foi lido; aceitam o que o IME manda (por isso existe o erro 1).
+
+**Coluna dos tamers** `0x00b46f00`, para i = 0..3 (botão `dr2_ch_001_003` em (73, 188), (254, 188), (439, 188), (619, 188); tamer do botão = `+0xe98[i]`, 1..4):
+- Atualiza o botão; o do tamer selecionado desenha o quadro 0 fixo (`0x009b71e0(0)`), os outros o do estado.
+- Clique (conectado `+0x863`) → `+0xc72 = tamer`, tamer na animação 5 do início, toca o efeito **5**, rolagem 0. Tamer que deixa de ser o selecionado volta para a animação 1.
+- Animação igual à dos slots: 1 parado / 5 selecionado, direção 0, avança a cada 3 quadros, volta ao início quando `quadro ≥ início + contagem − 1`.
+- Se este é o selecionado (ou nenhum está selecionado, `+0xc72 == 0`, que mostra o texto 0): nome `0xee8[tamer]` centrado em 130 px a partir de x = 18 (`x = 18 + (130 − w) / 2`), y = 60, cor `0x63cbff`, fonte padrão, **sem sombra** (`0x00b55900`: `TextOutA` com fundo transparente); descrição `0xee9[tamer]` em linhas (quebra por `\n`), x = 24, y = 84 + 14·linha, branca sem sombra, recortada ao retângulo (24, 83)–(279, 144) (`0x00b55bb0`).
+- Boneco: `0x0099fb90(tamer, xBotão + 58, yBotão + 126, quadro…)`, ou seja canto superior esquerdo em **(xBotão − 62, yBotão − 36)** pela mesma regra do boneco dos slots (−120, −162).
+
+**Coluna dos digimons** `0x00b46690`, para i = 0..3 (botão `dr2_ch_001_004` em (126, 394), (273, 394), (419, 394), (565, 394); o 4º só existe com o 4º inicial):
+- Botão e clique como os tamers: `+0xc74 = espécie`, animação 5 do início, efeito 5, rolagem 0.
+- Sprite = o `.ani` da espécie (mesmo caminho dos slots, `0x00b47b00`), quadro atual pelo canto superior esquerdo em (xBotão + dx, yBotão + dy): espécie 27 (−156, −148); 31 (−156, −165); 40 (−156, −160); 42 (−106, −82); as outras (10, 11, 12, 24) **(−110, −70)**. Animação 1/5 e avanço como os tamers.
+- Se selecionado: índice n = espécie − 9 (10..12 → 1..3), 24 → 4, 27 → 5, 31 → 6, 40 → 7, 42 → 8. Nome `0xeeb[n]` centrado em 130 px a partir de x = 658, y = 60, cor `0x63cbff`; descrição `0xeec[n]` em linhas, x = 522, y = 84 + 14·linha, branca, recortada a (522, 81)–(780, 144).
+- Nenhum digimon selecionado (`+0xc74 == 0`, não acontece na prática): `0xeec[0]` com `DrawTextA` em (522, 83)–(780, 510), `DT_WORDBREAK`, branco.
+
+**Listas de texto** (init da cena, `0x00b44738..`; o carregador já trocou `†` por `\n`): `+0xf40` = `0xee8` partido por `\n` (nomes; o 0 é vazio), `+0xf4c` = `0xee9` partido por **`-\n`** (0 = "Please select a Tamer", 1..4 descrições), `+0xf58` = `0xeea` (habilidade de carta, carregado mas **não desenhado**), `+0xf64` = `0xeeb` por `\n` (nomes, 0 vazio, 1..8), `+0xf70` = `0xeec` por `-\n` (0 = "Select Digimon", 1..8). ❓ A última descrição de `0xee9` termina em `-` sem `†`: o pedaço fica com o `-` no fim (fiel).
+
+**Envio `0x00b45990`** (só com nome do tamer não vazio, slot ≠ −1, tamer e digimon escolhidos): `CharacterCreateRequest` com `i32 1, i32 0`, cabeçalho **slot = `+0x860`, mapa = 0x4F, A = 62 − rand()%4, B = 55 + rand()%4** (dois `rand()` nessa ordem; bate com 3B..3E e 37..3A das capturas), tamer `+0xc72`, nome do tamer[21], digimon `+0xc74`, nome do digimon[26]. Se o digimon não for 10/11/12/o 4º inicial → `MessageBoxA` e fecha o jogo (antitrapaça; impossível pela GUI).
+
+**Resposta `0x10`** (`0x00b45c30`): só trata o erro **102** (`NameTaken`): mensagem `0xee4` (160 quadros ou clique), limpa a caixa do nome do tamer e põe o foco nela. Sucesso não faz nada aqui: o servidor manda a **lista `0x12`** em seguida, cuja chegada põe o modo 0 e a seleção −1 (✅ o emulador já faz assim).
+
+### Apagar personagem ✅ RE
+**Diálogo** (objeto na cena `+0x24`, classe vtable `0x01035d00`, ctor `0x00c09e00`, base de janela `0x00b613f0`): estado `+0x308`, aberto `+0x30c` (é o `+0x318` local / `+0x330` de cena que trava os botões), caixa de texto `+0x200`, MD5 `+0x208`. Fundo de todos os estados = `0x007dcfb0(x, y, w, h, 0x20)`: 9 partes de `GUI\dr2_in_000_003.spr` (a mesma da caixa de mensagem), cantos de 14×14, laterais de 7 em 7: com `n = (w − 14) / 7` e `m = (h − 28) / 14 + 1`, linha de cima quadro 0 em (x, y), quadro 1 × (n + 1) a partir de x + 14, quadro 2 em x + 14 + 7(n + 1); m linhas do meio em y + 14k com 3, 4 × (n + 1), 5; linha de baixo em y + 14(m + 1) com 6, 7, 8 (❓ conferir os x finais nas linhas 72–172 do `0x007dcfb0`). Botões são retângulos (`0x009b7610`) com o rótulo desenhado no canto (x, y) do botão: branco na fonte padrão; **sob o mouse, laranja `0x4080ff` na fonte `+0x200`** (`0x00b55640`, ❓ qual fonte). Esc fecha (`0x00c0a540`); Enter só age no estado 0.
+- **Botão Delete** (`dr2_ch_000_005` em (26, 565); com seleção, lista recebida e sem diálogo aberto): `+0xa44 = 1` (❓ sem leitor encontrado), abre (`0x00c0a780`, estado 0), cria a caixa de texto (`0x00c0a690`: em (x + 70, y + 45), 100×15, até 15 caracteres, ❓ mascarada), limpa e **vai direto para o estado 2** (`0x00c0a5c0`). ✅ Na v322 o pedido da senha secundária nunca aparece: por isso as capturas trazem o MD5 de "".
+- **Estado 0** (senha, inalcançável na v322): caixa (290, 255) 220×90, `0xf79` "Please enter the secondary password." em (305, 275), Check (345, 325) 45×13 → estado 2, Cancel (428, 325) 45×13 → fecha. Só documentado; não implementar.
+- **Estado 2** (confirmação): caixa **(310, 265) 180×70**; `0xf7d` "Are you sure you want†to delete?" partido no `†`: linha 0 em (340, 285), linha 1 em (370, 300), brancas (`0x00b55900`); **Yes** `0x551` em (355, 315) 45×13; **No** `0x552` em (428, 315) 45×13. Yes → MD5 do texto da caixa (`0x00869140`; vazio → `d41d8cd98f00b204e9800998ecf8427e`, hex minúsculo) e `0x00b46020`: `CharacterDeleteRequest(uid do slot +0x860, md5)` (só se o slot tem nome); fecha. No → fecha.
+- **Estado 1** (senha errada): caixa (295, 265) 210×70, `0xf7c` "Secondary password mismatch." em (310, 285), Check `0x515` em (390, 315) 45×24 → fecha.
+- **Resposta `0x11`** (`0x00b45c30`), com resultado 3 (falha): erro **2000** → estado 1 e recria a caixa; erro **105** → mensagem `0xeb1a` "Your Consignment Store is currently active." (`+0x1464`, até clicar). Sucesso: nada aqui; a lista `0x12` que o servidor manda em seguida atualiza os slots (modo 0, seleção −1). ✅ O emulador já manda resposta + lista. ❓ `CharacterDeleteReply.Read` hoje descarta o código de erro: precisa expô-lo.
+- 🔒 A senha (mesmo vazia) e o MD5 nunca vão para log (`CharacterDeleteRequest.ToString` já esconde).
 
 ## Texto, som e fontes ✅
 - **Textos da interface** `FUN_0091b950(id)` (ANSI) e `FUN_0091ba70(id)` (UTF-16): tabela **`TextAttach`** (loader de tabela 0x1a, `0x0091bf90`; se não carregar: `TextAttach Not Load!`). Id ausente → `Null Text`.
