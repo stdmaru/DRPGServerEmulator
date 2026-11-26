@@ -37,7 +37,7 @@ Proporções tiradas de uma captura da tela antiga enviada pelo dono (era "Digim
 - Painel `dr2_in_003_000` em (243, 151): centrado na horizontal.
 - Mascotes sobre a borda de cima, à direita do título: `003_001` em painel + (225, −10), `003_002` em painel + (270, −10).
 - OK em painel + (148, 170), CANCEL em painel + (206, 170).
-- ❓ Botão sair `000_001_eng` no canto inferior direito, em (697, 550) (não aparece na captura).
+- Sem botão sair: o **CANCEL** fecha o launcher (confirmado pelo dono). `dr2_in_000_001`/`_006` não são usados.
 - Texto dos campos em branco, a 4 px da borda esquerda; a senha aparece como `*` com cursor `_`.
 
 ## Caixa de status
