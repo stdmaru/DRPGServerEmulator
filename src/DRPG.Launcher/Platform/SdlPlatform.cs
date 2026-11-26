@@ -33,6 +33,10 @@ public sealed unsafe class SdlPlatform : IDisposable
         _window = SDL_CreateWindow(title, IRenderer.FrameWidth, IRenderer.FrameHeight, flags);
         if (_window == null)
             throw new InvalidOperationException($"SDL_CreateWindow: {SDL_GetError()}");
+        // min = max tells the compositor the size is fixed: tiling compositors (Hyprland, Sway) float the window
+        // instead of resizing it, which otherwise shows stale frames while they animate the resize.
+        SDL_SetWindowMinimumSize(_window, IRenderer.FrameWidth, IRenderer.FrameHeight);
+        SDL_SetWindowMaximumSize(_window, IRenderer.FrameWidth, IRenderer.FrameHeight);
         if (fullscreen)
             SDL_SetWindowFullscreen(_window, true);
         _renderer = new SdlRenderer(_window);
