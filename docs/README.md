@@ -64,6 +64,8 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 
 ### Cliente
 - [Binário](cliente/binario.md): desempacotamento, RTTI, dispatcher, IPs fixos, renderer.
+- [Formato `.spr`](cliente/formato-spr.md): sprites em RGB565 codificados por linha, sombra opcional.
+- [Tela de login do launcher](cliente/tela-login-launcher.md): sprites antigos, medidas do painel e layout escolhido.
 - [Mapas](cliente/mapas.md): formato do `.map` (grade de células, bit de andável), `grids.bin`.
 - [Arquivos de dados](cliente/arquivos-de-dados.md): `table.pf` e `resource.pf`, `drpg_pack.py`, colunas que o servidor lê na partida, o que falta.
 - [Wine](cliente/wine.md): rodar no Linux, prefixo dedicado, causa e correção da tela congelada no loading (corrida no backbuffer DirectDraw).

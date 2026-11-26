@@ -15,7 +15,10 @@ services:
       start_period: 10s
 
   server:
-    image: mcr.microsoft.com/dotnet/sdk:10.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: drpg-devcontainer:10.0
     tty: true
     volumes:
       - ../:/workspaces/DRPGServer:rw
@@ -25,3 +28,13 @@ services:
         condition: service_healthy
     ports:
       - 127.0.0.1:7000-7003:7000-7003
+
+  # Patch server for the launcher: serves work/web/Patch (DR_Configuration.json, Patch_<n>.zip).
+  # Development only, plain HTTP on localhost; production uses HTTPS.
+  patch:
+    image: nginx:1.29-alpine
+    volumes:
+      - ../../web/Patch:/usr/share/nginx/html:ro
+      - ./nginx-patch.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - 127.0.0.1:8080:80

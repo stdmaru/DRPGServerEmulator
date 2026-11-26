@@ -1,0 +1,14 @@
+; DRPG launcher settings. Copy to drpg-launcher.ini next to the launcher.
+
+[Patch]
+; Entry point of the patch server (official format + LoginServer section, docs/protocolo/launcher.md).
+ConfigUrl=https://patch.example.com/DR_Configuration.json
+
+[Development]
+; true = accept HTTP and skip the LoginServer key fingerprint check (local nginx without a certificate).
+; The status box shows a warning while it is on. Never in production.
+AllowInsecure=false
+
+[Game]
+; Optional program that starts RunExeFileName, e.g. wine on Linux.
+;Runner=wine

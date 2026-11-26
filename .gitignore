@@ -11,3 +11,4 @@ src/DRPG.Server/Resources/Client/
 dead-letter/
 # launcher login private key (Configuration/Options.cs LauncherLoginOptions.KeyPath); never commit
 launcher-login.pem
+.local/

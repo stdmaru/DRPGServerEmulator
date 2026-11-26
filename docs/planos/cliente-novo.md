@@ -116,9 +116,15 @@ Exemplo real: `Patch_240.zip` contém `DigimonRPG.bin`, `patch_240.hf/.pf` (59 M
 
 **Por que é o primeiro marco:** o launcher precisa ler **e gravar** `.hf/.pf`, e esse código (`DRPG.Shared/Formats/Pack`) é o mesmo que o cliente usa para ler os assets. Também precisa dos sprites e da renderização. O cliente (Loading → Login do jogo) passa a ser o marco 2.
 
-**Arte:** os sprites antigos que continuam no `resource.hf`, lidos 1:1: `gui\dr2_in_000_*` a `gui\dr2_in_003_*` (34) e `gui\dr_title_000..007.spr` (10), com as variantes `_eng.spr`. Layout e comportamento vêm dos sprites e da memória do dono (não há código original).
+**Arte:** os sprites antigos que continuam no `resource.hf`, lidos 1:1: `gui\dr2_in_000_*`, `dr2_in_001_*` e `dr2_in_003_*`, com as variantes `_eng.spr`. Os `dr_title_*` são da janela de títulos do jogo, não do login. Layout medido nos sprites e decidido em [tela de login do launcher](../cliente/tela-login-launcher.md) (não há código original).
 
-**Projeto:** `src/DRPG.Launcher` (NativeAOT), com as camadas `Platform/`, `Rendering/` (`IRenderer`) e `Assets/`, que depois o cliente reaproveita. ❓ Elas vão para uma biblioteca comum (`DRPG.Engine`) quando o cliente nascer.
+**Servidor de patch (desenvolvimento):** serviço `patch` (nginx) no `.devcontainer/docker-compose.yml`, com bind mount só leitura de `work/web/Patch` em `http://127.0.0.1:8080/`. Serve apenas `DR_Configuration.json` (sem cache) e `Patch_<n>.zip`; o resto dá 404. Subir sem reiniciar o resto: `docker compose -f .devcontainer/docker-compose.yml -p server_devcontainer up -d patch`. Em produção, HTTPS na frente.
+
+**Leitura da configuração:** `DRPG.Launcher/Patching/PatchConfiguration` lê o JSON oficial (com o erro `LanuncherInfo`) e a seção nova `LoginServer`, valida versões, `%d` e impressão digital, e lista os patches pendentes a partir do `VersionInfo.ini` (UTF-16 LE). Instalação abaixo de `MinPatchVersion` exige reinstalar.
+
+**Cliente de login:** `DRPG.Launcher/Login/LoginClient` faz o handshake, confere a impressão digital (ou não, no modo de desenvolvimento), envia o login selado e, se a conexão caiu (timeout de 30 s do LoginServer), reconecta e repete o handshake uma vez. Cada tentativa usa um handshake novo (o nonce vale uma vez).
+
+**Projeto:** `src/DRPG.Launcher` (NativeAOT; ❓ o devcontainer ainda não tem `clang`, então o `publish` AOT só fecha fora dele), com as camadas `Platform/`, `Rendering/` (`IRenderer`) e `Assets/`, que depois o cliente reaproveita. ❓ Elas vão para uma biblioteca comum (`DRPG.Engine`) quando o cliente nascer.
 
 **Segurança**
 - A senha nunca vai para disco, log ou linha de comando. Só a chave temporária vai para o jogo.

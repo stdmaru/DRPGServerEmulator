@@ -11,7 +11,7 @@ Cada camada só usa as de baixo.
 | Camada | Pasta | Faz | Não faz |
 |---|---|---|---|
 | Plataforma | `Platform/` | **único** lugar que chama SDL3: janela, eventos de input, dispositivo GPU, áudio, DPI | saber o que é jogo |
-| Renderização | `Rendering/` | interface `IRenderer` (texturas, quads, blend, alvo de render) com uma implementação por backend (`SdlGpuRenderer` primeiro); `SpriteBatch`, `Font` (TTF), `Camera` acima dela | saber o que é digimon ou janela; código fora de `Rendering/Backends/` nunca vê SDL_GPU |
+| Renderização | `Rendering/` | interface `IRenderer` (texturas, quads, blend, alvo de render) com uma implementação por backend (no launcher: `SdlRenderer`, renderizador 2D da SDL3 com driver `gpu`; no cliente: `SdlGpuRenderer`); `SpriteBatch`, `Font` (TTF), `Camera` acima dela | saber o que é digimon ou janela; código fora de `Rendering/Backends/` nunca vê SDL_GPU |
 | Assets | `Assets/` | `AssetStore`: lê do `resource.pf` com os leitores do `DRPG.Shared`, carrega fora da thread principal, envia para a GPU na principal, cache | regra, desenho |
 | Rede | `Net/` | uma `Connection` por servidor (login, channel, map, global), framing, parse em pacote tipado, fila para a thread principal, envio de requests | mudar estado |
 | UI | `Ui/` | `Window`, widgets (`Button`, `Label`, `ScrollList`, `TextInput`), âncora e escala, foco, roteamento de input | mandar pacote, guardar estado de jogo |

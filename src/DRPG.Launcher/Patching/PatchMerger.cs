@@ -1,4 +1,6 @@
-namespace DRPG.Shared.Formats.Pack;
+using DRPG.Shared.Formats.Pack;
+
+namespace DRPG.Launcher.Patching;
 
 /// <summary>
 /// Merges a patch pack (<c>patch_&lt;n&gt;.hf/.pf</c>) into a target pack (<c>resource.hf/.pf</c>) the way the
