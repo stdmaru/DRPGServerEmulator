@@ -91,6 +91,14 @@ O visualizador de assets (`.spr`/`.ani`/`.til`/`.obj`/`.map` → PNG) entra em `
 - Dapper usa reflexão: não importa no servidor (não precisa de AOT), mas `DRPG.Shared` deve ser compatível com AOT (sem reflexão).
 - [Legal](../projeto/legal.md): o cliente não leva arte; lê a instalação oficial do usuário.
 
+## Launcher (login + auto-patcher)
+Decisão de 2026-11-26. **Não existe** tela de login com ID e senha no binário v322 (confirmado pelo dono). A autenticação é só pela linha de comando: `0x00aa24b0` exige `<usuário> <hash>` e fecha o jogo com qualquer outra coisa ([dump de RE](../ferramentas/dump-re.md)). A tela de login fica num **launcher próprio**, que imita a tela de login antiga do jogo.
+- **Arte:** os sprites antigos que continuam no `resource.hf`, lidos 1:1: `gui\dr2_in_000_*` a `gui\dr2_in_003_*` (34 arquivos) e `gui\dr_title_000..007.spr` (10). Os dois grupos incluem as variantes `_eng.spr`. Layout, posições e comportamento vêm dos sprites e da memória do dono. ❓ Não há código original para consultar.
+- **Funções:** (1) login com ID e senha, (2) auto-patcher, (3) inicia o jogo com `<usuário> <hash>`. Com esse contrato, o launcher abre **tanto o cliente novo quanto o `DigimonRPG.bin` original**.
+- **Projeto:** `src/DRPG.Launcher` (NativeAOT), com as mesmas camadas `Platform/`, `Rendering/` (`IRenderer`) e `Assets/` do cliente. Elas saem para uma biblioteca comum (❓ `DRPG.Engine`) quando o segundo executável precisar delas.
+- **Segurança:** a senha nunca vai em texto puro na linha de comando nem para o log. O patcher só aplica arquivos assinados e com hash conferido. Os arquivos originais só mudam por patch explícito.
+- ❓ **Em aberto (decisão do dono):** de onde vem o `<hash>` (token de sessão emitido pelo servidor ou hash da senha), qual servidor autentica (o login atual do emulador ou um endpoint HTTP), formato do manifesto de patch e servidor de arquivos, e se o launcher entra no marco 1 ou num marco próprio.
+
 ## Distribuição e assinatura (falso positivo de antivírus)
 O medo é o Defender acusar `Trojan:Win32/Wacatac` e apagar o executável, o que é comum em builds .NET. Essa detecção é uma heurística do **Defender** (aprendizado de máquina) que coloca o arquivo em quarentena. O **SmartScreen** só avisa sobre "aplicativo não reconhecido" e não apaga nada.
 

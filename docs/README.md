@@ -70,8 +70,11 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Cliente Reboot (fãs)](cliente/reboot-analise.md): reescrita do zero em C# .NET 8 NativeAOT + MonoGame que lê a arte original e fala o protocolo; evidências e licença.
 
 ### Planos
-- [Cliente novo](planos/cliente-novo.md): **estacionado até o merge do PR #41**. Source port em C# .NET 10 + SDL3/SDL_GPU (Vulkan/D3D12), Windows/Linux x64/arm64, regras de desempenho, RE de formatos e marcos.
+- [Cliente novo](planos/cliente-novo.md): em andamento (PR #42: marco 1 Loading → Login; launcher de login + patch). Source port em C# .NET 10 + SDL3/SDL_GPU (Vulkan/D3D12), Windows/Linux x64/arm64, regras de desempenho, RE de formatos e marcos.
 - [Cards e Card Slash](planos/card-slash.md): especificação do sistema de cards.
+
+### Ferramentas de RE
+- [Dump de RE](ferramentas/dump-re.md): Ghidra headless → decompilado por função, strings, chamadas e símbolos em `work/re/<versão>/dump`, consultados com `grep`; pontos conhecidos da v322 (WinMain, linha de comando, cenas).
 
 ### Captura
 - [Campanha de captura](captura/campanha.md): checklist do que capturar e em que ordem.
