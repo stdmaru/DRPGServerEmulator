@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using DRPGServer.Network;
 using DRPGServer.Game.Entities;
 using Microsoft.Extensions.Options;
 
@@ -70,7 +71,30 @@ public sealed class NetworkOptionsValidator : IValidateOptions<NetworkOptions>
         var e = new OptionsErrors();
         const string s = NetworkOptions.Section;
         e.Range(o.AccountTicketSeconds, 5, 600, $"{s}:AccountTicketSeconds");
+        e.Range(o.MaxConnections, 1, 100_000, $"{s}:MaxConnections");
+        e.Range(o.MaxConnectionsPerIp, 1, 1000, $"{s}:MaxConnectionsPerIp");
+        e.Check(o.MaxConnectionsPerIp <= o.MaxConnections, $"{s}:MaxConnectionsPerIp maior que {s}:MaxConnections");
+        e.Range(o.AuthTimeoutSeconds, 1, 600, $"{s}:AuthTimeoutSeconds");
+        e.Range(o.IdleTimeoutSeconds, 200, 3600, $"{s}:IdleTimeoutSeconds");       // keepalive de ~167 s
+        e.Range(o.MapIdleTimeoutSeconds, 15, 3600, $"{s}:MapIdleTimeoutSeconds");   // keepalive de ~5 s
+        RateLimit(e, o.Packets, $"{s}:Packets", minPerSecond: 10);
+        foreach (var (role, limits) in o.OpcodeLimits)
+        {
+            e.Check(Enum.IsDefined(role), $"{s}:OpcodeLimits:{role}: servidor desconhecido");
+            foreach (var (opcode, limit) in limits)
+            {
+                e.Check(OpcodeNames.TryParse(role, opcode, out _), $"{s}:OpcodeLimits:{role}:{opcode}: opcode desconhecido em {role}");
+                RateLimit(e, limit, $"{s}:OpcodeLimits:{role}:{opcode}", minPerSecond: 0.01);
+            }
+        }
+        e.Range(o.MaxPendingWorldWork, 8, 10_000, $"{s}:MaxPendingWorldWork");
         return e.Result();
+    }
+
+    private static void RateLimit(OptionsErrors e, RateLimitOptions limit, string name, double minPerSecond)
+    {
+        e.Range(limit.PerSecond, minPerSecond, 10_000, $"{name}:PerSecond");
+        e.Range(limit.Burst, 1, 10_000, $"{name}:Burst");
     }
 }
 

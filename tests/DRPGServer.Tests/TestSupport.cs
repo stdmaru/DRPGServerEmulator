@@ -13,6 +13,7 @@ using DRPGServer.Game.World;
 using DRPGServer.Game;
 using DRPGServer.Network.Handlers;
 using DRPGServer.Network.Protocol;
+using DRPGServer.Network.Traffic;
 using DRPGServer.Network;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -45,8 +46,12 @@ internal static class TestSupport
 
     /// <summary>Sessão sem socket, vinda de <paramref name="address"/> (padrão 127.0.0.1).</summary>
     public static Session NewSession(ServerRole role = ServerRole.Map, string address = "127.0.0.1") =>
-        new(null, role, NullLogger.Instance, new PacketTrace(NullLogger<PacketTrace>.Instance),
+        new(null, role, Traffic().Start(role), NullLogger.Instance, new PacketTrace(NullLogger<PacketTrace>.Instance),
             new IPEndPoint(IPAddress.Parse(address), 50_000));
+
+    /// <summary>Limites de tráfego com as opções padrão (ou ajustadas) sobre <paramref name="time"/>.</summary>
+    public static TrafficLimits Traffic(Action<NetworkOptions>? configure = null, TimeProvider? time = null) =>
+        new(NetworkOptions(configure), time ?? TimeProvider.System);
 
     public static GameWorld NewWorld() => new(NullLogger<GameWorld>.Instance);
 
@@ -129,6 +134,10 @@ internal sealed class ManualTime(DateTimeOffset start) : TimeProvider
 {
     public DateTimeOffset Now { get; set; } = start;
     public override DateTimeOffset GetUtcNow() => Now;
+
+    // o relógio monotônico anda junto com Now
+    public override long GetTimestamp() => Now.UtcTicks;
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 }
 
 internal static class Entities

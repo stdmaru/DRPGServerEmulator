@@ -6,10 +6,10 @@ Como um pacote do cliente entra no servidor. Visão geral em [arquitetura](arqui
 
 ## Caminho de um pacote
 1. `Session` corta o fluxo em quadros (`PacketFramer`: assinatura e tamanho máximo). Quadro inválido fecha a conexão.
-2. Limite de frequência da sessão (token bucket). Estourou: a conexão fecha (**PR #41: S6**).
+2. Limites da sessão (`SessionTraffic.Admit`): teto geral estourado fecha a conexão; teto do opcode estourado ignora o pacote ([limites](seguranca.md#limites-de-recurso)).
 3. `PacketDispatcher` acha o handler do (servidor, opcode).
 4. `ClientPacket.Parse<T>` confere o **tamanho declarado** do request, lê o tipo (`IClientPacket<T>.Read`) e exige que o `Read` consuma o payload inteiro. Tamanho errado, byte faltando ou sobrando: `PacketFormatException`, e a sessão **fecha** (pacote malformado não vem de cliente legítimo).
-5. Handler de sessão roda no laço da sessão. Handler de mundo faz o parse no laço da sessão (`IWorldPacketHandler.Prepare`) e só a ação já tipada é postada na thread do mundo; pacote malformado nunca chega ao mundo. A ação conta no limite de trabalhos pendentes da sessão (**PR #41: S6**).
+5. Handler de sessão roda no laço da sessão. Handler de mundo faz o parse no laço da sessão (`IWorldPacketHandler.Prepare`) e só a ação já tipada é postada na thread do mundo; pacote malformado nunca chega ao mundo. A ação conta no limite de trabalhos pendentes da sessão (`MaxPendingWorldWork`): passou, a sessão fecha.
 6. A base do handler aplica as pré-condições declaradas (autenticado, jogador no mundo, estado) antes de chamar o método do handler.
 7. O handler chama **um** serviço e envia a resposta.
 

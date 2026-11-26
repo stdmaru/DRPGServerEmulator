@@ -3,21 +3,32 @@ using System.Net;
 using System.Net.Sockets;
 using DRPGServer.Configuration;
 using DRPGServer.Network.Handlers;
+using DRPGServer.Network.Traffic;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace DRPGServer.Network;
 
-/// <summary>Abre os quatro servidores TCP e roda uma sessão por conexão.</summary>
+/// <summary>
+/// Abre os quatro servidores TCP e roda uma sessão por conexão. Recusa conexão acima dos limites por IP e no total, e
+/// fecha a cada segundo as sessões que passaram do prazo de autenticação ou de inatividade.
+/// </summary>
 public sealed class NetworkHost(
     IOptions<ServersOptions> options,
     PacketDispatcher dispatcher,
     IEnumerable<ISessionLifecycle> lifecycles,
     PacketTrace trace,
+    ConnectionLimiter connections,
+    TrafficLimits traffic,
+    TimeProvider time,
     ILoggerFactory loggers) : BackgroundService
 {
+    private static readonly TimeSpan SweepInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan RejectionLogInterval = TimeSpan.FromMinutes(1);
+
     private readonly ILogger _log = loggers.CreateLogger<NetworkHost>();
+    private readonly ConcurrentDictionary<IPAddress, long> _rejectionLoggedAt = new();
     private readonly ConcurrentDictionary<long, Session> _sessions = new();
     private readonly ConcurrentDictionary<long, Task> _running = new();
     private readonly ILookup<ServerRole, ISessionLifecycle> _lifecycles = lifecycles.ToLookup(l => l.Role);
@@ -32,7 +43,7 @@ public sealed class NetworkHost(
             (ServerRole.Login, o.Login), (ServerRole.Channel, o.Channel), (ServerRole.Map, o.Map), (ServerRole.Global, o.Global),
         };
         _log.LogInformation("{Count} handlers de pacote registrados", dispatcher.Count);
-        await Task.WhenAll(listeners.Select(l => ListenAsync(l.Role, l.Endpoint, stopping)));
+        await Task.WhenAll(listeners.Select(l => ListenAsync(l.Role, l.Endpoint, stopping)).Append(SweepAsync(stopping)));
     }
 
     private async Task ListenAsync(ServerRole role, EndpointOptions endpoint, CancellationToken stopping)
@@ -54,13 +65,61 @@ public sealed class NetworkHost(
             {
                 break;
             }
+            if (Admit(socket, role) is not { } address) continue;
             socket.NoDelay = true;
-            var session = new Session(socket, role, _log, trace);
-            _running[session.Id] = RunSessionAsync(session, stopping);   // acompanhada: a parada espera o fim de cada sessão
+            var session = new Session(socket, role, traffic.Start(role), _log, trace);
+            _running[session.Id] = RunSessionAsync(session, address, stopping);   // acompanhada: a parada espera o fim de cada sessão
         }
     }
 
-    private async Task RunSessionAsync(Session session, CancellationToken stopping)
+    /// <summary>Confere os limites de conexão. Recusada, o socket é fechado e o resultado é <c>null</c>.</summary>
+    private IPAddress? Admit(Socket socket, ServerRole role)
+    {
+        var address = (socket.RemoteEndPoint as IPEndPoint)?.Address;
+        if (address is { IsIPv4MappedToIPv6: true }) address = address.MapToIPv4();
+        var rejection = address is null ? ConnectionRejection.TooManyTotal : connections.TryAcquire(address);
+        if (rejection == ConnectionRejection.None) return address;
+
+        if (address is not null && ShouldLogRejection(address))
+            _log.LogWarning("Conexão {Role} de {Address} recusada: {Reason} ({Total} abertas)", role, address,
+                rejection == ConnectionRejection.TooManyFromAddress ? "conexões demais deste IP" : "conexões demais no servidor",
+                connections.Total);
+        try { socket.Close(); } catch (SocketException) { }
+        return null;
+    }
+
+    /// <summary>Um log por IP por minuto: quem insiste em conectar não enche o log.</summary>
+    private bool ShouldLogRejection(IPAddress address)
+    {
+        var now = time.GetTimestamp();
+        if (_rejectionLoggedAt.TryGetValue(address, out var last) && time.GetElapsedTime(last, now) < RejectionLogInterval)
+            return false;
+        _rejectionLoggedAt[address] = now;
+        return true;
+    }
+
+    private async Task SweepAsync(CancellationToken stopping)
+    {
+        using var timer = new PeriodicTimer(SweepInterval, time);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stopping))
+            {
+                foreach (var session in _sessions.Values)
+                {
+                    if (session.Traffic.ExpiredReason(authenticated: session.Account is not null) is not { } reason) continue;
+                    _log.LogWarning("Sessão {Session} cortada: {Reason}", session, reason);
+                    session.Close(reason);
+                }
+                var now = time.GetTimestamp();
+                foreach (var (address, last) in _rejectionLoggedAt)
+                    if (time.GetElapsedTime(last, now) >= RejectionLogInterval) _rejectionLoggedAt.TryRemove(address, out _);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task RunSessionAsync(Session session, IPAddress address, CancellationToken stopping)
     {
         await Task.Yield();     // devolve a Task antes de rodar: ela entra em _running antes do TryRemove do fim
         _sessions[session.Id] = session;
@@ -84,6 +143,7 @@ public sealed class NetworkHost(
                 try { lifecycle.OnDisconnected(session); }
                 catch (Exception e) { _log.LogError(e, "Falha ao desconectar {Session}", session); }
             }
+            connections.Release(address);
             _running.TryRemove(session.Id, out _);
         }
     }

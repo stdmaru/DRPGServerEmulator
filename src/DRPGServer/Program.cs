@@ -11,6 +11,7 @@ using DRPGServer.Game.Items;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
 using DRPGServer.Network.Handlers;
+using DRPGServer.Network.Traffic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -113,6 +114,8 @@ services.AddSingleton<ChatCommands>();
 // rede
 services.AddSingleton<AccountRegistry>();
 services.AddSingleton<PacketTrace>();
+services.AddSingleton<ConnectionLimiter>();
+services.AddSingleton<TrafficLimits>();
 services.AddSingleton<CharacterListService>();
 services.AddPacketHandlers();
 

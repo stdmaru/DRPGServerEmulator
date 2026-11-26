@@ -1,3 +1,5 @@
+using DRPGServer.Network;
+
 namespace DRPGServer.Configuration;
 
 public sealed class EndpointOptions
@@ -45,6 +47,65 @@ public sealed class NetworkOptions
     /// conta está aberta (o channel fica aberto durante o jogo), o ticket não vence.
     /// </summary>
     public int AccountTicketSeconds { get; set; } = 60;
+
+    /// <summary>Conexões abertas ao mesmo tempo, somando os quatro servidores. Passou: a conexão nova é recusada.</summary>
+    public int MaxConnections { get; set; } = 4000;
+
+    /// <summary>
+    /// Conexões abertas ao mesmo tempo vindas de um IP, somando os quatro servidores. ✅ Um cliente em jogo mantém 3
+    /// (channel, mapa e global; o login fecha logo); 16 deixa cinco clientes atrás do mesmo NAT.
+    /// </summary>
+    public int MaxConnectionsPerIp { get; set; } = 16;
+
+    /// <summary>
+    /// Prazo para a sessão se autenticar depois de conectar (channel 0x04, mapa 0x01, global 0x64). No login, que não
+    /// autentica a sessão, é o tempo máximo de conexão. ✅ Nas capturas o primeiro pacote chega em até 0,3 s.
+    /// </summary>
+    public int AuthTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Tempo sem receber pacote no login, channel e global. ✅ O cliente manda o keepalive 0xC4 a cada 165–168 s
+    /// nesses servidores (42 intervalos medidos).
+    /// </summary>
+    public int IdleTimeoutSeconds { get; set; } = 600;
+
+    /// <summary>
+    /// Tempo sem receber pacote no mapa. ✅ O keepalive 0xC4 vem a cada 3,7–6,6 s (5 083 intervalos), e o maior
+    /// silêncio medido no mapa foi 5,7 s, incluindo a carga do mapa.
+    /// </summary>
+    public int MapIdleTimeoutSeconds { get; set; } = 60;
+
+    /// <summary>
+    /// Teto geral de pacotes por sessão (balde de fichas). Passou: a sessão fecha. ✅ Pico medido de 7 pacotes em 1 s,
+    /// 40 em 10 s e 195 em 60 s.
+    /// </summary>
+    public RateLimitOptions Packets { get; set; } = new() { PerSecond = 20, Burst = 60 };
+
+    /// <summary>
+    /// Tetos por opcode, por servidor e nome do opcode (<c>Map</c> → <c>ChatNormal</c>). Passou: o pacote é ignorado,
+    /// a sessão continua (o teto geral ainda vale). ✅ Movimento: pico de 2 em 1 s e 12 em 10 s.
+    /// </summary>
+    public Dictionary<ServerRole, Dictionary<string, RateLimitOptions>> OpcodeLimits { get; set; } = new()
+    {
+        [ServerRole.Map] = new()
+        {
+            [nameof(MapOpcode.ChatNormal)] = new() { PerSecond = 1, Burst = 5 },
+            [nameof(MapOpcode.MoveCharacter)] = new() { PerSecond = 10, Burst = 20 },
+        },
+    };
+
+    /// <summary>
+    /// Pacotes de uma sessão esperando a thread do mundo. Passou: a sessão fecha, para um cliente não atrasar o tick
+    /// de todos.
+    /// </summary>
+    public int MaxPendingWorldWork { get; set; } = 64;
+}
+
+/// <summary>Balde de fichas: até <see cref="Burst"/> de uma vez, repostas a <see cref="PerSecond"/> por segundo.</summary>
+public sealed class RateLimitOptions
+{
+    public double PerSecond { get; set; }
+    public int Burst { get; set; }
 }
 
 /// <summary>Seção "Game": regras ajustáveis (antigo ServerConsts.xml).</summary>

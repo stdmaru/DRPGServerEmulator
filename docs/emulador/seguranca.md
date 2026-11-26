@@ -64,13 +64,26 @@ Toda ação com alvo no mundo passa pelo `InteractionGuard`: o alvo existe, est�
 - Janela do dono ✅/❓: o drop fica 60 s no chão e o oficial o anuncia de novo aos 40 s (`Zone.DropOwnerWindow`). O emulador libera a coleta para todos nesse momento; que o reenvio é o fim da exclusividade é inferência, sem captura com dois jogadores. Sem grupo (party) ainda, o dono é o personagem que venceu a batalha.
 - ❓ Cash Depository (`0xCA`): ainda sem evidência de NPC ou de distância; não tem regra de alcance.
 
-## Limites de recurso (**PR #41: S6**)
-Configurados em `Network`, com log de cada conexão cortada:
-- Conexões por IP e conexões totais.
-- Prazo para autenticar depois de conectar e prazo de inatividade (sem pacote).
-- Token bucket de pacotes por sessão, com teto geral e tetos por opcode onde fizer sentido (chat, movimento).
-- Trabalhos pendentes na fila do mundo **por sessão**. Passou do limite: a sessão fecha. Um cliente não consegue atrasar o tick de todos.
-- Fila de envio por sessão (já existe): cheia fecha a sessão.
+## Limites de recurso
+Código em `Network/Traffic/`; opções na seção `Network`, validadas na partida. Toda conexão recusada e toda sessão cortada vai para o log em `Warning` (conexão recusada: um log por IP por minuto, para quem insiste não encher o log).
+
+| Limite | Padrão | Passou | Evidência ✅ |
+|---|---|---|---|
+| Conexões abertas, total (`MaxConnections`) | 4000 | conexão recusada | n/a |
+| Conexões abertas por IP, somando os 4 servidores (`MaxConnectionsPerIp`) | 16 | conexão recusada | um cliente em jogo mantém 3 (channel, mapa, global); o login fecha logo |
+| Prazo para autenticar (`AuthTimeoutSeconds`) | 30 s | sessão fecha | o primeiro pacote chega em até 0,3 s. No login, que não autentica a sessão, é o tempo máximo de conexão |
+| Inatividade no login, channel e global (`IdleTimeoutSeconds`, mín. 200) | 600 s | sessão fecha | keepalive `0xC4` do cliente a cada 165–168 s (42 intervalos) |
+| Inatividade no mapa (`MapIdleTimeoutSeconds`, mín. 15) | 60 s | sessão fecha | o servidor manda `0xC4` a cada ~5 s e o cliente responde: 3,7–6,6 s entre respostas (5 083 intervalos); maior silêncio no mapa 5,7 s, incluindo a carga |
+| Pacotes por sessão (`Packets`, balde de fichas) | 20/s, rajada 60 | sessão fecha | pico de 7 em 1 s, 40 em 10 s e 195 em 60 s |
+| Por opcode (`OpcodeLimits:<Servidor>:<Opcode>`) | `Map:ChatNormal` 1/s, rajada 5; `Map:MoveCharacter` 10/s, rajada 20 | **pacote ignorado**, sessão continua | movimento: pico de 2 em 1 s e 12 em 10 s; chat: só 2 amostras |
+| Trabalhos da sessão esperando a thread do mundo (`MaxPendingWorldWork`) | 64 | sessão fecha | n/a: um cliente não consegue atrasar o tick de todos |
+| Fila de envio por sessão | 4096 quadros | sessão fecha | n/a |
+
+- Ordem no `PacketDispatcher`: o quadro passa primeiro pelos limites (`SessionTraffic.Admit`, que também renova o prazo de inatividade) e só depois vai ao handler. Pacote de opcode sem handler também gasta ficha.
+- O prazo de autenticar conta da conexão: mandar pacotes não o adia. "Autenticada" é a sessão com `Account` (channel `0x04`, mapa `0x01`, global `0x64`).
+- `NetworkHost` confere os prazos de todas as sessões a cada segundo.
+- Opcode do `OpcodeLimits` é o **nome** do enum do servidor (`MapOpcode.ChatNormal`); nome desconhecido, número ou opcode de outro servidor derruba a partida. A configuração troca um opcode e mantém os outros padrões.
+- ❓ O teto do chat é escolha de projeto (há só 2 amostras de chat nas capturas).
 
 ## Persistência (**PR #41: S7**)
 - Gravação que falha é repetida com backoff. Esgotadas as tentativas, o snapshot vai para um **dead-letter** (tabela ou arquivo), o log é crítico e o personagem fica bloqueado para login até a gravação ser reaplicada.
