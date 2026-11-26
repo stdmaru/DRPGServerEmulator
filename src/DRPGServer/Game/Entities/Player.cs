@@ -19,7 +19,6 @@ public enum PlayerStates
 {
     /// <summary>No mapa, livre para agir.</summary>
     Idle = 1,
-    /// <summary>Numa batalha.</summary>
     InBattle = 2,
     /// <summary>
     /// Esperando uma transferência conta ↔ personagem gravar (<see cref="World.CharacterTransfers"/>). Nenhuma outra ação

@@ -160,26 +160,9 @@ public static class CardRecord
         w.WriteU8(card.UnknownCol30);                          // 75
     }
 
+    /// <summary>Card fora do <c>card_info_us</c>: monta o registro com o que o item tiver.</summary>
     private static CardInfo FallbackCard(InventoryItem item)
     {
-        if (item.ItemId == 74)
-        {
-            // ✅ Golden Drill X (fallback para pacotes sintéticos sem card_info_us.dat)
-            return new CardInfo(74, "Golden Drill X")
-            {
-                Type = 4,
-                SubType = 1,
-                UnknownCol19 = 0,
-                Trigger = CardTrigger.Attack,
-                Restriction = 1,
-                MaxStack = 999,
-                BuyPrice = 1,
-                SellPrice = 0,
-                CoinPrice = 32000,
-                LadderPrice = 1_000_000,
-                UnknownCol30 = 0,
-            };
-        }
         var info = item.Info;
         return new CardInfo(item.ItemId, info?.Name ?? "")
         {
@@ -194,24 +177,17 @@ public static class CardRecord
     }
 }
 
-/// <summary>Compatibilidade com código legado: delega para <see cref="CardRecord"/>.</summary>
-public static class BattleItemRecord
-{
-    public const int Length = CardRecord.Length;
-    public static void Write(PacketWriter w, InventoryItem item) => CardRecord.Write(w, item);
-}
-
 /// <summary>As duas bolsas como no 0x03: 24 × 76 (bolsa de batalha) e 24 × 108 (inventário), pela posição.</summary>
 internal static class InventoryLayout
 {
-    public const int Length = Inventory.Size * (BattleItemRecord.Length + ItemRecord.Length);
+    public const int Length = Inventory.Size * (CardRecord.Length + ItemRecord.Length);
 
     public static void Write(PacketWriter w, Inventory inventory)
     {
         for (int slot = 0; slot < Inventory.Size; slot++)
         {
-            if (inventory.Battle[slot] is { } b) BattleItemRecord.Write(w, b);
-            else w.WriteZeros(BattleItemRecord.Length);
+            if (inventory.Battle[slot] is { } b) CardRecord.Write(w, b);
+            else w.WriteZeros(CardRecord.Length);
         }
         for (int slot = 0; slot < Inventory.Size; slot++)
         {
@@ -224,7 +200,7 @@ internal static class InventoryLayout
 /// <summary>0x03: inventário na entrada do mapa (4416 bytes). ✅ sessões 52–56.</summary>
 public sealed class InventoryDataPacket(Inventory inventory) : ServerPacket
 {
-    public const int EvolutionRecord = BattleItemRecord.Length;
+    public const int EvolutionRecord = CardRecord.Length;
 
     public override ushort Opcode => (ushort)MapOpcode.InventoryData;
     protected override void Write(PacketWriter w) => InventoryLayout.Write(w, inventory);
@@ -376,9 +352,9 @@ public sealed class BattleItemReceivePacket(IReadOnlyList<InventoryItem> items) 
             w.WriteU32((uint)ItemPlace.Inventory);
             w.WriteU32((uint)item.Row);
             w.WriteU32((uint)item.Column);
-            BattleItemRecord.Write(w, item);
+            CardRecord.Write(w, item);
         }
-        w.WriteZeros((ItemReceivePacket.MaxEntries - list.Count) * (12 + BattleItemRecord.Length));
+        w.WriteZeros((ItemReceivePacket.MaxEntries - list.Count) * (12 + CardRecord.Length));
     }
 }
 

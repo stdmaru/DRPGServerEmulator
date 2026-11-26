@@ -82,13 +82,11 @@ public sealed record SelfHpCostEffect(int Percent) : ICardAttackEffect
     public void Apply(CardAttackContext ctx) => ctx.SelfHpCostPercent = Math.Max(ctx.SelfHpCostPercent, Percent);
 }
 
-/// <summary>Ataca todos os inimigos.</summary>
 public sealed record AllTargetsEffect : ICardAttackEffect
 {
     public void Apply(CardAttackContext ctx) => ctx.ForceAllTargets = true;
 }
 
-/// <summary>O ataque sempre acerta.</summary>
 public sealed record GuaranteedHitEffect : ICardAttackEffect
 {
     public void Apply(CardAttackContext ctx) => ctx.GuaranteedHit = true;

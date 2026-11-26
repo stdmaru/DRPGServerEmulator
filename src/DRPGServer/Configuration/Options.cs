@@ -19,7 +19,6 @@ public sealed class ServersOptions
     public EndpointOptions Global { get; set; } = new() { Port = 7003 };
 }
 
-/// <summary>Seção "Database".</summary>
 public sealed class DatabaseOptions
 {
     public const string Section = "Database";
