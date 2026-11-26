@@ -3,14 +3,22 @@
 Dados: blocos de status de todas as capturas em `captures.db` (1634 blocos, 434 únicos). O ajuste usa as 80 amostras v322 sem bônus (byte 328 zerado), de in-training a champion (níveis 1–21). Layout em [status de digimon](../protocolo/structs/status-digimon.md). Código em `Game/Stats/StatFormulas.cs`.
 
 ## ✅ Atributos (STR, AGI, CON, INT)
-**atributo = 10 + bônus do estágio + status-base × (L − 1) + pontos distribuídos**
+**In-Training / Rookie:**
+`atributo = 10 + bônus do estágio + status-base × (min(L, teto) − 1) + pontos distribuídos`
+
+**Champion / Ultimate (cumulativo por janela de estágio):**
+`atributo(estágio) = base(estágio anterior, teto anterior) + 20 + status-base(estágio) × max(0, min(L, teto) − nível inicial + 1) + Σ pontos distribuídos (da forma-base até o estágio atual)`
 
 - **Status-base:** crescimento por nível, nas colunas 15..18 da `dex_us` ([arquivos de dados](../cliente/arquivos-de-dados.md)). Exemplo: Gigimon 3/2/2/1, Yuramon 2/2/2/2.
-- **Bônus do estágio:** 0 em in-training e **+20** em rookie.
+- **Bônus do estágio:** 0 em in-training e **+20 por estágio** acima dele (+20 rookie, +20 champion, +20 ultimate, +20 mega).
   - Rookie confirmado no nível 11, sem pontos distribuídos: Monodramon (3/2/2/2) → 60/50/50/50, V-mon (3/2/2/1) → 60/50/50/40, Palmon (3/3/1/1) → 60/60/40/40.
-- ❓ **Champion em diante:** só há uma amostra limpa. XV-mon L21 = 114/98/91/91, que é o V-mon L21 do mesmo jogador (91/76/70/69, com 20 pontos em INT) +21..23 em cada atributo. Não dá para separar bônus de estágio de pontos herdados. Cada forma tem pontos próprios ([evolução](evolucao.md)).
+- **✅ Champion e Ultimate (sessão 56, 0 erros):** cada estágio parte do base acumulado do estágio anterior no teto (L20 para rookie, L30 para champion, L40 para ultimate), soma `+20` e aplica o seu próprio crescimento apenas nos níveis da sua janela (`21..30` champion, `31..40` ultimate). Além disso, **herda todos os pontos de atributo distribuídos nas formas anteriores da linha** (Rookie → Champion → Ultimate → Mega):
+  - **XV-mon L21 (`735`, growth `3/2/1/2`) vindo de V-mon (`635`, growth `3/2/2/1`):** base V-mon L20 `(87,68,68,49)` + alloc V-mon `(4,8,2,20)` + `20` + `1×(3,2,1,2)` = **`(114,98,91,91)`** (exato).
+  - **Gryzmon L160 (`781`, growth `3/2/2/1`) vindo de Bearmon (`674`, growth `3/2/2/1`):** `(87,68,68,49) + 20 + 10×(3,2,2,1) = (137,108,108,79)`; com alloc do rookie `(13,27,0,0)` → **`(150,135,108,79)`** (exato).
+  - **Grappu Leomon L160 (`886`, growth `3/2/2/1`):** `(137,108,108,79) + 20 + 10×(3,2,2,1) = (187,148,148,109)`; com alloc do rookie `(13,27,0,0)` → **`(200,175,148,109)`**; após gastar 20 pts no champion `(9,11,0,0)` e 20 no ultimate `(20,0,0,0)` → **`(229,186,148,109)`** (exato).
+- **❓ Mega (amostra única):** na amostra L160 (`921`, growth `4/3/1/1`), a diferença acima do Ultimate foi `+20 + 120×(6,5,3,3)`, equivalente a `growth + (2,2,2,2)` por nível (além da herança de pontos distribuídos, confirmada em `0x71`/`0x82`). Aguardando mais amostras de Mega para confirmar se `+2/nível` é regra geral de Mega.
 - O nível **não entra direto** nos status: o mesmo digimon com os mesmos atributos tem os mesmos status no nível 10 e 11 (e 20 e 21).
-- A espécie e o estágio também não entram: a fórmula abaixo vale igual de in-training a champion.
+- A espécie e o estágio também não entram: a fórmula abaixo vale igual de in-training a mega.
 
 ## ✅ Status de combate
 **status = ⌊√(192 · (w₁·a + w₂·b))⌋ = ⌊8 · √(3 · (w₁·a + w₂·b))⌋**, com os atributos que o jogo descreve:
