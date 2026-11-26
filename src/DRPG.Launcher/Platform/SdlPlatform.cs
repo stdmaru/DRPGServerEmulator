@@ -26,7 +26,8 @@ public sealed unsafe class SdlPlatform : IDisposable
     {
         if (!SDL_Init(SDL_InitFlags.SDL_INIT_VIDEO))
             throw new InvalidOperationException($"SDL_Init: {SDL_GetError()}");
-        var flags = SDL_WindowFlags.SDL_WINDOW_RESIZABLE | SDL_WindowFlags.SDL_WINDOW_HIGH_PIXEL_DENSITY;
+        // Fixed 800×600 window: not resizable, so sprites are never scaled by a fraction (docs/cliente/tela-login-launcher.md).
+        var flags = SDL_WindowFlags.SDL_WINDOW_HIGH_PIXEL_DENSITY;
         if (hidden)
             flags |= SDL_WindowFlags.SDL_WINDOW_HIDDEN;
         _window = SDL_CreateWindow(title, IRenderer.FrameWidth, IRenderer.FrameHeight, flags);

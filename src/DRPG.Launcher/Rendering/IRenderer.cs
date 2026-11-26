@@ -9,7 +9,7 @@ public interface ITexture : IDisposable
 
 /// <summary>
 /// Everything the launcher draws goes through this interface (docs/arquitetura/cliente.md). Coordinates are in the
-/// fixed 800×600 frame; the backend scales it into the window with black bars and never stretches.
+/// fixed 800×600 frame; the backend scales it into the window only by whole numbers, with black bars, and never stretches.
 /// </summary>
 public interface IRenderer : IDisposable
 {

@@ -23,9 +23,10 @@ public sealed unsafe class SdlRenderer : IRenderer
             throw new InvalidOperationException($"SDL_CreateRenderer: {SDL_GetError()}");
         BackendName = SDL_GetRendererName(_renderer) ?? "?";
         SDL_SetRenderVSync(_renderer, 1);
-        // FixedScreen: 800×600 centered with black bars, mouse events converted to frame coordinates.
+        // FixedScreen: 800×600 centered with black bars, scaled only by whole numbers (HiDPI, fullscreen) so pixels
+        // never deform; mouse events converted to frame coordinates.
         SDL_SetRenderLogicalPresentation(_renderer, IRenderer.FrameWidth, IRenderer.FrameHeight,
-            SDL_RendererLogicalPresentation.SDL_LOGICAL_PRESENTATION_LETTERBOX);
+            SDL_RendererLogicalPresentation.SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
     }
 
     public string BackendName { get; }
