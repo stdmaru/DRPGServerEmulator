@@ -99,7 +99,7 @@ Decisões de 2026-11-26. **Não existe** tela de login com ID e senha no binári
 1. Lê o `DR_Configuration.json` do servidor de patch (o mesmo entrypoint do launcher oficial, abaixo). Se `ServerInfo.Maintenance` for verdadeiro, mostra `Message` e não deixa entrar.
 2. Atualiza os arquivos: compara a versão local (`VersionInfo.ini`, `version=`) com `PatchInfo.PatchVersion` e baixa cada `Patch_<n>.zip` que falta, em ordem, a partir de `max(local + 1, MinPatchVersion)`.
 3. Aplica cada patch: os arquivos soltos do zip (`table.hf/pf`, `Language/*`, `DigimonRPG.bin`…) substituem os locais, e o `patch_<n>.hf/.pf` é **mesclado no `resource.hf/.pf`**, como o launcher oficial faz. Depois grava a versão nova.
-4. O jogador entra com **ID e senha**. Com o login aceito, o servidor gera a **chave do usuário, válida por até 5 h**.
+4. O jogador entra com **ID e senha** no LoginServer ([protocolo abaixo](#protocolo-de-login-no-loginserver)). Com o login aceito, o servidor gera a **chave do usuário, válida por até 5 h**.
 5. Inicia o jogo (`LanuncherInfo.RunExeFileName`, o nosso cliente ou o `DigimonRPG.bin` original) com `<usuário> <chave>`.
 
 **Entrypoint de patch** (`work/web/Patch/DR_Configuration.json`, formato do oficial; o erro de grafia `LanuncherInfo` é do original e é mantido):
@@ -122,11 +122,36 @@ Exemplo real: `Patch_240.zip` contém `DigimonRPG.bin`, `patch_240.hf/.pf` (59 M
 
 **Segurança**
 - A senha nunca vai para disco, log ou linha de comando. Só a chave temporária vai para o jogo.
+- Em produção, o `DR_Configuration.json` e os patches vêm por HTTPS. HTTP só no modo de desenvolvimento.
 - Download por HTTPS em produção. Cada arquivo é conferido por hash antes de ser aplicado (❓ manifesto com SHA-256 por patch: o JSON oficial não tem).
 - Mesclagem transacional: o patch é aplicado numa cópia (ou com journal) e só troca o `resource.*` no fim. Queda no meio não corrompe a instalação.
 - Caminhos dentro do zip e do `.hf` são validados (sem `..`, sem absolutos).
 
-❓ **Em aberto:** qual servidor recebe ID/senha e emite a chave (endpoint HTTP no web ou o login server do emulador); o formato exato do `.hf` de patch e as regras de mesclagem (substitui por nome? remove?), a confirmar com o `drpg_pack.py` e o `Patch_240`.
+**Protocolo de login no LoginServer** (decisão de 2026-11-26)
+Opcodes **novos** no LoginServer, com o mesmo framing do protocolo (`0xCC`, tamanho, opcode). O `DigimonRPG.bin` original nunca os envia. ❓ Os números saem do [catálogo de opcodes](../protocolo/opcodes.md) e do dump, escolhidos entre os que estão livres no LoginServer.
+
+1. **Handshake:** o launcher envia um *hello* com a sua versão. O servidor responde com a **chave pública X25519** do LoginServer e um **nonce** aleatório. Só com essa resposta o launcher libera os campos de ID e senha.
+2. **Verificação da chave:** a impressão digital (SHA-256) da chave pública vem no `DR_Configuration.json`, baixado por **HTTPS** antes do login (campo novo, ❓ nome `LoginKeyFingerprint`). Chave diferente da impressão digital: o launcher não libera o login e mostra erro. A confiança vem do certificado HTTPS do servidor de patch, sem chave embutida no launcher.
+3. **Login:** corpo cifrado em *sealed box*. O launcher gera um par X25519 temporário, combina com a chave pública do servidor (ECDH + HKDF-SHA256) e cifra com AES-256-GCM. O pacote leva:
+   - ID com até 255 bytes UTF-8 (compatível com e-mail);
+   - senha com até 255 bytes UTF-8;
+   - o nonce do handshake (contra reenvio);
+   - uma chave aleatória para a resposta;
+   - a versão do launcher.
+   Os campos levam o tamanho declarado e não são strings fixas com zeros.
+4. **Resposta:** cifrada com a chave da resposta (AES-256-GCM). Traz ok ou erro e a **chave de jogo**: 40 hex aleatórios (160 bits, `RandomNumberGenerator`), do mesmo formato do hash que o `DigimonRPG.bin` aceita, com validade de **5 h**. ❓ Confirmar no pacote de login do cliente o tamanho do campo do hash.
+5. O launcher abre o jogo com `<usuário> <chave>`.
+
+Servidor:
+- **Chave do LoginServer:** o par X25519 é gerado sozinho na primeira partida e gravado num arquivo de configuração fora do git. A impressão digital é publicada no `DR_Configuration.json`. Trocar a chave = gerar outra e atualizar o JSON.
+- **Chave de jogo:** só o hash dela vai para o banco, como a `auth_key` desde o PR #41, junto com a validade. Expirada, ela é recusada.
+- **Senha:** guardada com hash lento (Argon2id ou PBKDF2). Limite de tentativas por IP e por conta. A mesma mensagem de erro serve para usuário inexistente e para senha errada. Senha e chaves nunca vão para o log.
+- Pacote que não decifra, nonce velho ou campo fora do limite: a conexão é fechada.
+- Risco aceito: se a chave privada vazar, logins gravados antes podem ser decifrados (não há sigilo futuro por sessão).
+
+**Modo de desenvolvimento** (pedido do dono): uma opção explícita do launcher (❓ `--dev-insecure` ou `drpg-launcher.ini`) aceita o `DR_Configuration.json` por **HTTP** e **pula a checagem da impressão digital**, para usar o nginx local sem certificado. O launcher mostra um aviso visível enquanto ela está ligada. Do lado do servidor, uma opção (`Login:AllowInsecureLauncher`) só permite o handshake sem impressão digital publicada. As duas ficam **desligadas** por padrão, e a opção do servidor é validada na partida. A criptografia do corpo continua ligada mesmo em desenvolvimento.
+
+❓ **Em aberto:** o formato exato do `.hf` de patch e as regras de mesclagem (substitui por nome? remove?), a confirmar com o `drpg_pack.py` e o `Patch_240`.
 
 ## Distribuição e assinatura (falso positivo de antivírus)
 O medo é o Defender acusar `Trojan:Win32/Wacatac` e apagar o executável, o que é comum em builds .NET. Essa detecção é uma heurística do **Defender** (aprendizado de máquina) que coloca o arquivo em quarentena. O **SmartScreen** só avisa sobre "aplicativo não reconhecido" e não apaga nada.
