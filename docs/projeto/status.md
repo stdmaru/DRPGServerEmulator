@@ -2,7 +2,7 @@
 
 > Atualize ao fim de cada sessão. Mantenha curto: só o estado presente, sem histórico (o histórico fica nas [decisões](decisoes.md)).
 
-**Última atualização:** 2026-11-25. **Cliente oficial: v322** (era 242).
+**Última atualização:** 2026-11-26. **Cliente oficial: v322** (era 242).
 
 ## Feito
 - ✅ Análise de viabilidade e plano: [visão geral](visao-geral.md), [roadmap](roadmap.md).
@@ -32,7 +32,8 @@
 - ✅ **Captura e renomeação** (PR draft #2): Taming Net no mapa (redes de in-training e rookie, `0x41`/`0xEF`/`0xC3`), captura comum na batalha (ícone 1, `0xB3`, 3 tentativas, só in-training, exige rookie+, chance configurável de 10 %), renomeação grátis do `InputName` (`0xF0`). Migração `0004`, 89 testes. Ver [captura](../mecanicas/captura.md). ❓ Sucesso da captura comum é chute; nada testado em jogo.
 - ✅ Tabelas de EXP trocadas por fórmulas exatas (digimon e tamer). Ver [fórmulas de EXP](../mecanicas/formulas-exp.md). ❓ Evento de EXP ainda sem pacote identificado.
 
-- ✅ Cliente de fãs "Digimon Reboot" analisado (estático): reescrita do zero em C# NativeAOT + MonoGame, arte original e protocolo `0xCC`. Plano do cliente próprio em [cliente novo](../planos/cliente-novo.md), **estacionado até o merge do PR #41**.
+- ✅ Cliente de fãs "Digimon Reboot" analisado (estático): reescrita do zero em C# NativeAOT + MonoGame, arte original e protocolo `0xCC`. Plano do cliente próprio em [cliente novo](../planos/cliente-novo.md).
+- ✅ **Base do launcher** (PR #42): `DRPG.Shared` com leitor/escritor `.hf/.pf` e mesclagem de patch, protocolo movido para o Shared, login do launcher no LoginServer ([protocolo](../protocolo/launcher.md)), senha com hash (migração `0015`), servidor renomeado para `DRPG.Server`. 525 testes. Falta o projeto `DRPG.Launcher` (SDL3, leitor `.spr`, patcher) e o nginx no docker-compose.
 
 ## Em andamento / próximo passo
 0. **Refatoração da fundação** (PR #41, merge em 2026-11-26): camadas, segurança, serviços reutilizáveis e dados sem parser de texto. Fase 0 (convenções na wiki e no `AGENTS.md`) e Fase 1 (requests tipados, bases de handler com `[RequiresState]`, `WorldIo`, dependências obrigatórias, `IGameClock`, opções validadas) feitas. Fase 2 (segurança) feita: ticket entre servidores, ciclo de entrada, transferências atômicas, alcance, dono do drop, limites de rede, retry com dead-letter, hash da `auth_key` e auditoria da economia (`economy_log`). Fase 3 (serviços de domínio) feita: `ItemGrant`/`ItemDuration`, `ItemService`, `Wallet`/`CurrencyKind`, `NpcShopService`, `EquipmentService`, `PlayerSystem.FindByAccount` e `MapSequences`. Fase 4 (dados) feita: `StatModifiers` para equipamento e título, `EquipmentEffects.xml` e `DigimonTitles.xml` com `<Modifier>` e geradores em `tools/`, regras de título tipadas (`<Unlock>`), efeitos de card tipados (`CardEffects.xml`) e `ItemUseService` com efeitos de uso (`ItemEffects.xml`: teleporte e Taming Net). Fase 5 (legibilidade) feita: colunas nomeadas das tabelas do cliente (preço em Medals vem do XML), `Battle.Attack` em etapas, comentários redundantes removidos, constantes de domínio fora dos repositórios (`CashDepository`, `ActiveExpEvent`) e `Game/Digimons` (títulos, captura, progressão). Validação: 493 testes, replay da sessão 52 idêntico e da 53 (batalhas) igual ao `main`. ❓ Smoke test no cliente não feito. Ver [arquitetura](../emulador/arquitetura.md), [handlers](../emulador/handlers.md), [dados](../emulador/dados.md) e [segurança](../emulador/seguranca.md).

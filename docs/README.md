@@ -27,6 +27,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 ### Protocolo
 - [Cabeçalho e framing](protocolo/cabecalho.md): os 14 bytes, CRC, limites.
 - [Servidores e conexões](protocolo/servidores.md): IPs, portas, ordem das conexões e de onde o cliente tira os endereços.
+- [Login do launcher](protocolo/launcher.md): opcodes novos 0x0F00..0x0F03, cripto e impressão digital.
 - [Catálogo de opcodes](protocolo/opcodes.md): opcodes tratados pelo cliente, capturados e implementados.
 - Structs:
   - [Status de digimon](protocolo/structs/status-digimon.md): bloco comum aos opcodes 0x02, 0x10, 0x63, 0x70, 0x71…

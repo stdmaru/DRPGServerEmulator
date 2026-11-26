@@ -128,28 +128,28 @@ Exemplo real: `Patch_240.zip` contém `DigimonRPG.bin`, `patch_240.hf/.pf` (59 M
 - Caminhos dentro do zip e do `.hf` são validados (sem `..`, sem absolutos).
 
 **Protocolo de login no LoginServer** (decisão de 2026-11-26)
-Opcodes **novos** no LoginServer, com o mesmo framing do protocolo (`0xCC`, tamanho, opcode). O `DigimonRPG.bin` original nunca os envia. ❓ Os números saem do [catálogo de opcodes](../protocolo/opcodes.md) e do dump, escolhidos entre os que estão livres no LoginServer.
+Opcodes **novos** no LoginServer, com o mesmo framing do protocolo (`0xCC`, tamanho, opcode). O `DigimonRPG.bin` original nunca os envia. Opcodes `0x0F00..0x0F03`, layout em [login do launcher](../protocolo/launcher.md).
 
-1. **Handshake:** o launcher envia um *hello* com a sua versão. O servidor responde com a **chave pública X25519** do LoginServer e um **nonce** aleatório. Só com essa resposta o launcher libera os campos de ID e senha.
-2. **Verificação da chave:** a impressão digital (SHA-256) da chave pública vem no `DR_Configuration.json`, baixado por **HTTPS** antes do login (campo novo, ❓ nome `LoginKeyFingerprint`). Chave diferente da impressão digital: o launcher não libera o login e mostra erro. A confiança vem do certificado HTTPS do servidor de patch, sem chave embutida no launcher.
-3. **Login:** corpo cifrado em *sealed box*. O launcher gera um par X25519 temporário, combina com a chave pública do servidor (ECDH + HKDF-SHA256) e cifra com AES-256-GCM. O pacote leva:
+1. **Handshake:** o launcher envia um *hello* com a sua versão. O servidor responde com a **chave pública P-256** do LoginServer e um **nonce** aleatório. Só com essa resposta o launcher libera os campos de ID e senha.
+2. **Verificação da chave:** a impressão digital (SHA-256) da chave pública vem no `DR_Configuration.json`, baixado por **HTTPS** antes do login (campo novo `LoginServer.KeyFingerprint`). Chave diferente da impressão digital: o launcher não libera o login e mostra erro. A confiança vem do certificado HTTPS do servidor de patch, sem chave embutida no launcher.
+3. **Login:** corpo cifrado em *sealed box*. O launcher gera um par P-256 temporário, combina com a chave pública do servidor (ECDH + HKDF-SHA256) e cifra com AES-256-GCM. O pacote leva:
    - ID com até 255 bytes UTF-8 (compatível com e-mail);
    - senha com até 255 bytes UTF-8;
    - o nonce do handshake (contra reenvio);
    - uma chave aleatória para a resposta;
    - a versão do launcher.
    Os campos levam o tamanho declarado e não são strings fixas com zeros.
-4. **Resposta:** cifrada com a chave da resposta (AES-256-GCM). Traz ok ou erro e a **chave de jogo**: 40 hex aleatórios (160 bits, `RandomNumberGenerator`), do mesmo formato do hash que o `DigimonRPG.bin` aceita, com validade de **5 h**. ❓ Confirmar no pacote de login do cliente o tamanho do campo do hash.
+4. **Resposta:** cifrada com a chave da resposta (AES-256-GCM). Traz ok ou erro e a **chave de jogo**: 40 hex aleatórios (160 bits, `RandomNumberGenerator`), do mesmo formato do hash que o `DigimonRPG.bin` aceita, com validade de **5 h**. O usuário de jogo devolvido tem até 20 bytes (`username[21]`).
 5. O launcher abre o jogo com `<usuário> <chave>`.
 
 Servidor:
-- **Chave do LoginServer:** o par X25519 é gerado sozinho na primeira partida e gravado num arquivo de configuração fora do git. A impressão digital é publicada no `DR_Configuration.json`. Trocar a chave = gerar outra e atualizar o JSON.
+- **Chave do LoginServer:** o par P-256 é gerado sozinho na primeira partida e gravado num arquivo de configuração fora do git. A impressão digital é publicada no `DR_Configuration.json`. Trocar a chave = gerar outra e atualizar o JSON.
 - **Chave de jogo:** só o hash dela vai para o banco, como a `auth_key` desde o PR #41, junto com a validade. Expirada, ela é recusada.
-- **Senha:** guardada com hash lento (Argon2id ou PBKDF2). Limite de tentativas por IP e por conta. A mesma mensagem de erro serve para usuário inexistente e para senha errada. Senha e chaves nunca vão para o log.
+- **Senha:** guardada com hash lento (PBKDF2-SHA256, 600 000 iterações; a coluna `password` saiu na migração `0015`). Limite de tentativas por IP e por conta. A mesma mensagem de erro serve para usuário inexistente e para senha errada. Senha e chaves nunca vão para o log.
 - Pacote que não decifra, nonce velho ou campo fora do limite: a conexão é fechada.
 - Risco aceito: se a chave privada vazar, logins gravados antes podem ser decifrados (não há sigilo futuro por sessão).
 
-**Modo de desenvolvimento** (pedido do dono): uma opção explícita do launcher (❓ `--dev-insecure` ou `drpg-launcher.ini`) aceita o `DR_Configuration.json` por **HTTP** e **pula a checagem da impressão digital**, para usar o nginx local sem certificado. O launcher mostra um aviso visível enquanto ela está ligada. Do lado do servidor, uma opção (`Login:AllowInsecureLauncher`) só permite o handshake sem impressão digital publicada. As duas ficam **desligadas** por padrão, e a opção do servidor é validada na partida. A criptografia do corpo continua ligada mesmo em desenvolvimento.
+**Modo de desenvolvimento** (pedido do dono): uma opção explícita do launcher (`drpg-launcher.ini`, `[Development] AllowInsecure=true`) aceita o `DR_Configuration.json` por **HTTP** e **pula a checagem da impressão digital**, para usar o nginx local sem certificado. O launcher mostra um aviso visível enquanto ela está ligada. Ela fica **desligada** por padrão e só existe no launcher: o servidor não enxerga a checagem. A criptografia do corpo continua ligada mesmo em desenvolvimento.
 
 ❓ **Em aberto:** o formato exato do `.hf` de patch e as regras de mesclagem (substitui por nome? remove?), a confirmar com o `drpg_pack.py` e o `Patch_240`.
 
