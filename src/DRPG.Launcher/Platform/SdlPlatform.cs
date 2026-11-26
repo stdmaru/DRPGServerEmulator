@@ -24,6 +24,11 @@ public sealed unsafe class SdlPlatform : IDisposable
 
     public SdlPlatform(string title, bool fullscreen, bool hidden)
     {
+        // Linux: prefer X11 (XWayland under Wayland). Hyprland honours X11 fixed-size hints, like it does for the
+        // original game under Wine, but ignores them for native Wayland windows. An SDL_VIDEO_DRIVER environment
+        // variable still wins over this hint (offscreen screenshots, users who want Wayland).
+        if (OperatingSystem.IsLinux())
+            SDL_SetHint("SDL_VIDEO_DRIVER", "x11,wayland");
         if (!SDL_Init(SDL_InitFlags.SDL_INIT_VIDEO))
             throw new InvalidOperationException($"SDL_Init: {SDL_GetError()}");
         // Fixed 800×600 window: not resizable, so sprites are never scaled by a fraction (docs/cliente/tela-login-launcher.md).
