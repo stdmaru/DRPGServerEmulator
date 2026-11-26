@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The game client (docs/planos/cliente-novo.md, milestone 2). Drop-in for DigimonRPG.bin: same command line,
+       reads the official install. NativeAOT, no single-file, no compression, no obfuscation (antivirus false positives). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DRPG.Client</RootNamespace>
+    <AssemblyName>DRPG.Client</AssemblyName>
+    <Product>DRPG Client</Product>
+    <Version>0.1.0</Version>
+    <PublishAot>true</PublishAot>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DRPG.Shared\DRPG.Shared.csproj" />
+    <ProjectReference Include="..\DRPG.Engine\DRPG.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="drpg-client.ini.example" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DRPG.Client.Tests" />
+  </ItemGroup>
+
+</Project>

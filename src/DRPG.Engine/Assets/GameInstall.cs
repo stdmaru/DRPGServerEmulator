@@ -7,6 +7,10 @@ public sealed class GameInstall
 
     public string Directory { get; }
     public string ResourcePath => Path.Combine(Directory, "resource.hf");
+    public string TablePath => Path.Combine(Directory, "table.hf");
+    public string LanguageDirectory => Path.Combine(Directory, "Language");
+    public string SoundDirectory => Path.Combine(Directory, "Sound");
+    public string OptionsPath => Path.Combine(Directory, "option.ini");
     public string VersionInfoPath => Path.Combine(Directory, "VersionInfo.ini");
 
     public static GameInstall? Find(string? explicitDirectory)

@@ -56,6 +56,16 @@ public sealed unsafe class SdlPlatform : IDisposable
 
     public static ulong TicksMs => SDL_GetTicks();
 
+    /// <summary>
+    /// A modal error box (<c>SDL_ShowSimpleMessageBox</c>), usable before any window exists: the original shows its
+    /// start-up errors with <c>MessageBoxA</c>.
+    /// </summary>
+    public static void ShowError(string title, string text) =>
+        SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags.SDL_MESSAGEBOX_ERROR, title, text, null);
+
+    /// <summary>Waits without spinning; used to hold a scene to its own frame rate.</summary>
+    public static void Delay(uint milliseconds) => SDL_Delay(milliseconds);
+
     public void Poll(List<InputEvent> events)
     {
         events.Clear();

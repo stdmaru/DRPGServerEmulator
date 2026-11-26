@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace DRPG.Launcher;
+namespace DRPG.Engine.Assets;
 
 /// <summary>
 /// Minimal Windows-style INI reading and in-place editing (<c>drpg-launcher.ini</c>, the game's <c>option.ini</c>).

@@ -1,3 +1,4 @@
+using DRPG.Engine.Assets;
 namespace DRPG.Launcher.Tests;
 
 public sealed class RememberedLoginTests : IDisposable
