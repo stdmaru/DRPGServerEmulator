@@ -1,3 +1,4 @@
+using DRPG.Shared.Formats.Pack;
 using System.Buffers.Binary;
 using System.Collections.Frozen;
 using DRPGServer.Data.GameData;
@@ -398,7 +399,7 @@ public class NpcShopTests
         var packPath = Path.Combine(AppContext.BaseDirectory, "Resources", "Client", "table.hf");
         if (!File.Exists(packPath)) return;
 
-        var data = GameDataLoader.Load(Path.Combine(AppContext.BaseDirectory, "Resources"), ClientPack.Open(packPath));
+        var data = GameDataLoader.Load(Path.Combine(AppContext.BaseDirectory, "Resources"), PackArchive.Open(packPath));
         Assert.Equal(7, data.NpcShops.Count);
         foreach (var shop in data.NpcShops.Values)
         {

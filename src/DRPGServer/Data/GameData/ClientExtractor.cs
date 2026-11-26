@@ -1,3 +1,4 @@
+using DRPG.Shared.Formats.Pack;
 namespace DRPGServer.Data.GameData;
 
 /// <summary>
@@ -12,8 +13,8 @@ public static class ClientExtractor
 
     public static Result Extract(string clientDir, string outDir)
     {
-        var table = ClientPack.Open(Path.Combine(clientDir, "table.hf"));
-        var resource = ClientPack.Open(Path.Combine(clientDir, "resource.hf"));
+        var table = PackArchive.Open(Path.Combine(clientDir, "table.hf"));
+        var resource = PackArchive.Open(Path.Combine(clientDir, "resource.hf"));
         table.CopyTo(outDir);
 
         var maps = ClientTables.Maps(table);

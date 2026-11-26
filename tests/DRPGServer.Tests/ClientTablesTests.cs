@@ -1,3 +1,4 @@
+using DRPG.Shared.Formats.Pack;
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Stats;
 
@@ -66,7 +67,7 @@ public class RealClientTablesTests
         var table = Path.Combine(resources, "Client", "table.hf");
         if (!File.Exists(table)) return;
         var grids = Path.Combine(resources, "Client", ClientExtractor.GridsFile);
-        var data = GameDataLoader.Load(resources, ClientPack.Open(table), File.Exists(grids) ? MapGrid.Load(grids) : null);
+        var data = GameDataLoader.Load(resources, PackArchive.Open(table), File.Exists(grids) ? MapGrid.Load(grids) : null);
         Assert.True(data.Species.Count > 700);
         Assert.True(data.Items.Count > 10_000);
         Assert.True(data.Cards.Count > 400);

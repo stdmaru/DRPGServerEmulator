@@ -1,3 +1,4 @@
+using DRPG.Shared.Formats.Pack;
 using System.Net;
 using System.Reflection;
 using DRPGServer.Configuration;
@@ -28,7 +29,7 @@ internal static class TestSupport
         GameDataLoader.Load(Path.Combine(AppContext.BaseDirectory, "Resources"), Pack));
 
     /// <summary>Pacote sintético em Fixtures/client (gerado de Fixtures/client-src).</summary>
-    public static ClientPack Pack => ClientPack.Open(Path.Combine(AppContext.BaseDirectory, "Fixtures", "client", "table.hf"));
+    public static PackArchive Pack => PackArchive.Open(Path.Combine(AppContext.BaseDirectory, "Fixtures", "client", "table.hf"));
 
     public static GameData Data => LazyData.Value;
 

@@ -1,3 +1,4 @@
+using DRPG.Shared.Formats.Pack;
 using System.Collections.Frozen;
 using System.Globalization;
 using DRPGServer.Game.Stats;
@@ -31,7 +32,7 @@ public static class ClientTables
     /// Espécies: <c>digimon_us</c> (0 id, 1 nome, 2 estágio, 3 atributo, 5 skill 1, 9 skill 2) e o crescimento
     /// de <c>dex_us</c> (0 id, 1 nome, 15..18 STR/AGI/CON/INT).
     /// </summary>
-    public static FrozenDictionary<ushort, DigimonSpecies> Species(ClientPack pack)
+    public static FrozenDictionary<ushort, DigimonSpecies> Species(PackArchive pack)
     {
         var dex = pack.ReadTable(DexTable).Where(f => f.Length > 18 && ushort.TryParse(f[0], out _)).ToList();
         var dexById = new Dictionary<ushort, string[]>();
@@ -61,7 +62,7 @@ public static class ClientTables
     /// ✅ Colunas que o registro de 108 bytes repete (sessões 52–61): 2 tipo, 3 subtipo, 15, 16, 17 preço, 18 venda,
     /// 20 nível, 23, 24, 26 pilha máxima (1..999; &gt; 999 é duração em segundos de item temporário), 32 (ver docs/protocolo/structs/inventario.md).
     /// </summary>
-    public static FrozenDictionary<uint, ItemInfo> Items(ClientPack pack)
+    public static FrozenDictionary<uint, ItemInfo> Items(PackArchive pack)
     {
         var items = new Dictionary<uint, ItemInfo>();
         foreach (var f in pack.ReadTable(ItemTable))
@@ -86,7 +87,7 @@ public static class ClientTables
     /// 0 id, 1 nome, 2 tipo, 3 subtipo, 12 preço, 13 venda, 19 flag, 21 pilha máxima (999), 23 momento de ativação
     /// (1 ataque / 2 defesa), 24 restrição (0 normal, 1 PvE/evento, 3 Battle Zone), 25 descrição, 26..30 flags finais.
     /// </summary>
-    public static FrozenDictionary<uint, CardInfo> Cards(ClientPack pack)
+    public static FrozenDictionary<uint, CardInfo> Cards(PackArchive pack)
     {
         var cards = new Dictionary<uint, CardInfo>();
         if (!pack.Contains(CardTable)) return cards.ToFrozenDictionary();
@@ -122,7 +123,7 @@ public static class ClientTables
     /// ✅ O nível da coluna 1 é o u16 depois do id no bloco de status, a skill passa a nível 1 quando o digimon chega nele,
     /// e o custo é 20 + esse nível em VP (sessão 56). Sem a tabela (pacote de testes antigo), nenhuma skill.
     /// </summary>
-    public static FrozenDictionary<ushort, SkillInfo> Skills(ClientPack pack)
+    public static FrozenDictionary<ushort, SkillInfo> Skills(PackArchive pack)
     {
         var skills = new Dictionary<ushort, SkillInfo>();
         if (!pack.Contains(SkillTable)) return skills.ToFrozenDictionary();
@@ -147,7 +148,7 @@ public static class ClientTables
     /// V-mon → XV-mon). Devolve espécie → próxima forma. ✅ 309 de 319 espécies têm um só sucessor; nas outras vale o
     /// mais frequente.
     /// </summary>
-    public static FrozenDictionary<ushort, ushort> Evolutions(ClientPack pack)
+    public static FrozenDictionary<ushort, ushort> Evolutions(PackArchive pack)
     {
         var counts = new Dictionary<ushort, Dictionary<ushort, int>>();
         if (pack.Contains(TreeTable))
@@ -169,7 +170,7 @@ public static class ClientTables
     /// Mapas: <c>map_us</c> (0 id, 1 nome, 4 arquivo do mapa, 12/13 posição no mapa-múndi, 16..31 quatro portais de
     /// (nome do destino, ?, x, y); "Entire" é slot vazio). Linhas com id 0 são entradas genéricas.
     /// </summary>
-    public static FrozenDictionary<byte, ClientMap> Maps(ClientPack pack)
+    public static FrozenDictionary<byte, ClientMap> Maps(PackArchive pack)
     {
         var maps = new Dictionary<byte, ClientMap>();
         foreach (var f in pack.ReadTable(MapTable))
@@ -185,7 +186,7 @@ public static class ClientTables
     }
 
     /// <summary>✅ NPCs: <c>npc_info_us</c> (0 mapa, 1 id, 2 nome, 4/5 posição, 10 janela, 12 loja). Ver <see cref="NpcInfo"/>.</summary>
-    public static NpcDirectory Npcs(ClientPack pack)
+    public static NpcDirectory Npcs(PackArchive pack)
     {
         var npcs = new List<NpcInfo>();
         foreach (var f in pack.ReadTable(NpcTable))
@@ -204,7 +205,7 @@ public static class ClientTables
     /// ✅ Catálogo do Cash Shop: <c>ingameshop_itempage_us.dat</c> (0 productId, 1 nome, 2 itemDataId, 5 preço, 8 categoria)
     /// combinado com <c>ingameshop_item_data_us.dat</c> (0 itemDataId, 1 tipo [1=Card, 2=Item], 3 itemId, 4 quantidade).
     /// </summary>
-    public static FrozenDictionary<uint, CashShopProduct> CashShopProducts(ClientPack pack)
+    public static FrozenDictionary<uint, CashShopProduct> CashShopProducts(PackArchive pack)
     {
         if (!pack.Contains(CashShopPageTable) || !pack.Contains(CashShopDataTable))
             return FrozenDictionary<uint, CashShopProduct>.Empty;

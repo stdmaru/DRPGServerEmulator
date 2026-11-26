@@ -1,3 +1,4 @@
+using DRPG.Shared.Formats.Pack;
 using System.Collections.Frozen;
 using System.Globalization;
 using System.Xml.Linq;
@@ -24,7 +25,7 @@ public static class GameDataLoader
     /// <param name="root">Pasta Resources/ do servidor.</param>
     /// <param name="pack">Pacote de tabelas do cliente.</param>
     /// <param name="grids">Grades dos mapas (<see cref="MapGrid.Load"/>); null = sem validação de posição.</param>
-    public static GameData Load(string root, ClientPack pack, FrozenDictionary<byte, MapGrid>? grids = null)
+    public static GameData Load(string root, PackArchive pack, FrozenDictionary<byte, MapGrid>? grids = null)
     {
         grids ??= FrozenDictionary<byte, MapGrid>.Empty;
         var species = ClientTables.Species(pack);

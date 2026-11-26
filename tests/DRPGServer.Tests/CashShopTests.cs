@@ -1,3 +1,4 @@
+using DRPG.Shared.Formats.Pack;
 using System.Buffers.Binary;
 using System.Collections.Frozen;
 using DRPGServer.Data.GameData;
@@ -352,7 +353,7 @@ public class CashShopTests
         var packPath = Path.Combine(AppContext.BaseDirectory, "Resources", "Client", "table.hf");
         if (!File.Exists(packPath)) return;
 
-        var products = ClientTables.CashShopProducts(ClientPack.Open(packPath));
+        var products = ClientTables.CashShopProducts(PackArchive.Open(packPath));
         Assert.True(products.Count > 500, $"Esperado > 500 produtos do Cash Shop, encontrado {products.Count}");
         Assert.True(products.TryGetValue(1, out var starter));
         Assert.Equal(100001u, starter!.ProductId);

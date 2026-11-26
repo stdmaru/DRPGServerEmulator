@@ -1,3 +1,4 @@
+using DRPG.Shared.Formats.Pack;
 using DRPGServer.Configuration;
 using DRPGServer.Data;
 using DRPGServer.Data.GameData;
@@ -86,7 +87,7 @@ services.AddSingleton(sp =>
     var resources = Path.IsPathRooted(o.ResourcesPath) ? o.ResourcesPath : Path.Combine(AppContext.BaseDirectory, o.ResourcesPath);
     var table = Path.IsPathRooted(o.ClientTablePath) ? o.ClientTablePath : Path.Combine(AppContext.BaseDirectory, o.ClientTablePath);
     var grids = Path.Combine(Path.GetDirectoryName(table)!, ClientExtractor.GridsFile);
-    return GameDataLoader.Load(resources, ClientPack.Open(table), File.Exists(grids) ? MapGrid.Load(grids) : null);
+    return GameDataLoader.Load(resources, PackArchive.Open(table), File.Exists(grids) ? MapGrid.Load(grids) : null);
 });
 
 // ordem importa: serviços param na ordem inversa (rede → I/O do mundo → mundo → persistência)

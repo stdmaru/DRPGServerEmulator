@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Code shared by the server, the launcher and the client: file formats, protocol, crypto.
+       Base class library only: no network I/O, no database, no SDL (docs/arquitetura/README.md). -->
+  <PropertyGroup>
+    <RootNamespace>DRPG.Shared</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DRPG.Shared.Tests" />
+  </ItemGroup>
+
+</Project>
