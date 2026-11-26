@@ -4,6 +4,7 @@ using DRPGServer.Data;
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game;
+using DRPGServer.Game.Shop;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using MySqlConnector;
@@ -125,14 +126,14 @@ public class AccountTransferDatabaseTests(DatabaseFixture db) : IClassFixture<Da
         _uids.Seed(20_000);
         var (account, character) = await db.NewCharacterAsync(_uids, "Deposit2");
         var (cash, _, transfers) = Repositories();
-        var full = Enumerable.Range(0, CashRepository.DepositoryCapacityPerKind)
+        var full = Enumerable.Range(0, CashDepository.CapacityPerKind)
             .Select(_ => new AccountStorageEntry(CashShopItemKind.Item, 1, 1)).ToList();
         Assert.True(await transfers.DepositAsync(account, full, SnapshotWithBits(character, 10), default));
 
         Assert.False(await transfers.DepositAsync(account, [new AccountStorageEntry(CashShopItemKind.Item, 2, 1)],
             SnapshotWithBits(character, 999), default));
 
-        Assert.Equal(CashRepository.DepositoryCapacityPerKind, (await cash.ListDepositoryAsync(account, default)).Count);
+        Assert.Equal(CashDepository.CapacityPerKind, (await cash.ListDepositoryAsync(account, default)).Count);
         Assert.Equal(10, await BitsAsync(character));
     }
 

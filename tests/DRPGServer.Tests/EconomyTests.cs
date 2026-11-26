@@ -6,6 +6,7 @@ using DRPGServer.Game;
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Items;
+using DRPGServer.Game.Shop;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
 using DRPGServer.Network.Handlers;
@@ -293,7 +294,7 @@ public class EconomyLogDatabaseTests(DatabaseFixture db) : IClassFixture<Databas
         var cash = new CashRepository(db.Database, TestSupport.Clock, new EconomyLogRepository());
         var characters = new CharacterRepository(db.Database, _uids, new EconomyLogRepository());
         var transfers = new AccountTransferRepository(db.Database, cash, characters);
-        var full = Enumerable.Range(0, CashRepository.DepositoryCapacityPerKind)
+        var full = Enumerable.Range(0, CashDepository.CapacityPerKind)
             .Select(_ => new AccountStorageEntry(CashShopItemKind.Item, 1, 1)).ToList();
         var empty = CharacterSnapshot.Of(Entities.Character()) with { Uid = characterUid, Digimons = [], Forms = [], Titles = [] };
         Assert.True(await transfers.DepositAsync(account, full, empty, default));

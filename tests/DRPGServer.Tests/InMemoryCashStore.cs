@@ -1,6 +1,7 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Economy;
+using DRPGServer.Game.Shop;
 
 namespace DRPGServer.Tests;
 
@@ -109,9 +110,9 @@ internal sealed class InMemoryCashStore : ICashStore, IAccountTransferStore
             long startTs = new DateTimeOffset(year, month, 1, 0, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
             long endTs = new DateTimeOffset(year, month, 1, 0, 0, 0, TimeSpan.Zero).AddMonths(1).ToUnixTimeSeconds();
             var filtered = all.Where(e => e.PurchasedAt >= startTs && e.PurchasedAt < endTs).OrderByDescending(e => e.OrderId).ToList();
-            ushort totalPages = (ushort)Math.Max(1, (filtered.Count + CashRepository.HistoryPageSize - 1) / CashRepository.HistoryPageSize);
+            ushort totalPages = (ushort)Math.Max(1, (filtered.Count + CashDepository.HistoryPageSize - 1) / CashDepository.HistoryPageSize);
             int p = Math.Clamp((int)page, 1, totalPages);
-            var slice = filtered.Skip((p - 1) * CashRepository.HistoryPageSize).Take(CashRepository.HistoryPageSize).ToList();
+            var slice = filtered.Skip((p - 1) * CashDepository.HistoryPageSize).Take(CashDepository.HistoryPageSize).ToList();
             return Task.FromResult(new CashShopHistoryPage(slice, totalPages));
         }
     }
@@ -159,7 +160,7 @@ internal sealed class InMemoryCashStore : ICashStore, IAccountTransferStore
         foreach (var entry in entries)
         {
             var slots = used[entry.Kind];
-            int slot = Enumerable.Range(0, CashRepository.DepositoryCapacityPerKind).FirstOrDefault(i => !slots.Contains(i), -1);
+            int slot = Enumerable.Range(0, CashDepository.CapacityPerKind).FirstOrDefault(i => !slots.Contains(i), -1);
             if (slot < 0) return false;
             slots.Add(slot);
             toAdd.Add(new CashDepositoryRow(entry.Kind, (byte)slot, _nextUid++, entry.ItemId, entry.Amount, entry.ExpiresAt));

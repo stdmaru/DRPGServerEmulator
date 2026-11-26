@@ -1,6 +1,7 @@
 using Dapper;
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Economy;
+using DRPGServer.Game.Shop;
 
 namespace DRPGServer.Data.Repositories;
 
@@ -64,9 +65,6 @@ public interface ICashStore
 /// </summary>
 public sealed class CashRepository(Database database, Game.World.IGameClock clock, IAuditLog audit) : ICashStore
 {
-    public const int DepositoryCapacityPerKind = 24;
-    public const int HistoryPageSize = 20;
-
     private const string SelectDepository = """
         SELECT kind, slot, uid, item_id, amount, expires_at
         FROM cash_depository_item
@@ -137,7 +135,7 @@ public sealed class CashRepository(Database database, Game.World.IGameClock cloc
             SelectDepository + " WHERE account_uid = @accountUid ORDER BY kind, slot",
             new { accountUid }, cancellationToken: ct));
         return rows
-            .Where(r => r.Kind is (byte)CashShopItemKind.Card or (byte)CashShopItemKind.Item && r.Slot < DepositoryCapacityPerKind)
+            .Where(r => r.Kind is (byte)CashShopItemKind.Card or (byte)CashShopItemKind.Item && r.Slot < CashDepository.CapacityPerKind)
             .Select(r => r.ToRow())
             .ToList();
     }
@@ -294,9 +292,9 @@ public sealed class CashRepository(Database database, Game.World.IGameClock cloc
             WHERE account_uid = @accountUid AND purchased_at >= @startTs AND purchased_at < @endTs
             """, new { accountUid, startTs, endTs }, cancellationToken: ct));
 
-        ushort totalPages = (ushort)Math.Max(1, (totalCount + HistoryPageSize - 1) / HistoryPageSize);
+        ushort totalPages = (ushort)Math.Max(1, (totalCount + CashDepository.HistoryPageSize - 1) / CashDepository.HistoryPageSize);
         int clampedPage = Math.Clamp((int)page, 1, totalPages);
-        int offset = (clampedPage - 1) * HistoryPageSize;
+        int offset = (clampedPage - 1) * CashDepository.HistoryPageSize;
 
         var rows = await db.QueryAsync<HistoryDbRow>(new CommandDefinition("""
             SELECT id, item_data_id, quantity, unit_price, cash_after, bonus_cash_after, purchased_at
@@ -304,7 +302,7 @@ public sealed class CashRepository(Database database, Game.World.IGameClock cloc
             WHERE account_uid = @accountUid AND purchased_at >= @startTs AND purchased_at < @endTs
             ORDER BY id DESC
             LIMIT @limit OFFSET @offset
-            """, new { accountUid, startTs, endTs, limit = HistoryPageSize, offset }, cancellationToken: ct));
+            """, new { accountUid, startTs, endTs, limit = CashDepository.HistoryPageSize, offset }, cancellationToken: ct));
 
         return new CashShopHistoryPage(
             rows.Select(r => new CashShopHistoryEntry(
@@ -314,7 +312,7 @@ public sealed class CashRepository(Database database, Game.World.IGameClock cloc
 
     private static int FindFreeSlot(HashSet<int> used)
     {
-        for (int i = 0; i < DepositoryCapacityPerKind; i++)
+        for (int i = 0; i < CashDepository.CapacityPerKind; i++)
             if (!used.Contains(i))
                 return i;
         return -1;

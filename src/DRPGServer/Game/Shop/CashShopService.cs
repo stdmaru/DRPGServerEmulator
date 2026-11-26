@@ -141,11 +141,11 @@ public sealed class CashShopService(
             work: ct => store.ListDepositoryAsync(accountUid, ct),
             then: rows =>
             {
-                var cards = new InventoryItem?[CashRepository.DepositoryCapacityPerKind];
-                var items = new InventoryItem?[CashRepository.DepositoryCapacityPerKind];
+                var cards = new InventoryItem?[CashDepository.CapacityPerKind];
+                var items = new InventoryItem?[CashDepository.CapacityPerKind];
                 foreach (var r in rows)
                 {
-                    if (r.Slot >= CashRepository.DepositoryCapacityPerKind) continue;
+                    if (r.Slot >= CashDepository.CapacityPerKind) continue;
                     var item = ToInventoryItem(r);
                     if (r.Kind == CashShopItemKind.Card) cards[r.Slot] = item;
                     else items[r.Slot] = item;
