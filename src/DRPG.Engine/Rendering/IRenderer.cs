@@ -27,6 +27,13 @@ public interface IRenderer : IDisposable
     /// <summary>Draws the columns <paramref name="sourceX"/> .. <paramref name="sourceX"/> + <paramref name="width"/>
     /// of the texture at (x, y): progress bars (left part) and text fields (the tail of a long text).</summary>
     void DrawPart(ITexture texture, int x, int y, int sourceX, int width);
+
+    /// <summary>
+    /// Subtracts <paramref name="amount"/> (0..255) from every colour channel of what is already in the frame, never
+    /// below 0: the fade to black of the scene changes (✅ v322 <c>FUN_00b55f10</c>).
+    /// </summary>
+    void Darken(int amount);
+
     void EndFrame();
 
     /// <summary>Copies the last frame (frame coordinates) to an RGBA8888 buffer, for screenshots and tests.</summary>

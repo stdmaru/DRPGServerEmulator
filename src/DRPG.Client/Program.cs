@@ -1,4 +1,5 @@
 using DRPG.Client.Scenes;
+using DRPG.Client.Ui;
 using DRPG.Engine.Assets;
 using DRPG.Engine.Audio;
 using DRPG.Engine.Platform;
@@ -17,7 +18,7 @@ internal static class Program
     /// <summary>Development only: where the game is when it is not next to the executable. The command line stays at 2 tokens.</summary>
     private const string GameDirectoryVariable = "DRPG_GAME_DIR";
 
-    /// <summary>Development only: <c>path.ppm</c> to save the frame shown after <see cref="ScreenshotDelayVariable"/> ms (hidden window), then quit.</summary>
+    /// <summary>Development only: <c>path.ppm</c> to save the frame shown <see cref="ScreenshotDelayVariable"/> ms after the loading screen ends (hidden window), then quit.</summary>
     private const string ScreenshotVariable = "DRPG_SCREENSHOT";
 
     private const string ScreenshotDelayVariable = "DRPG_SCREENSHOT_MS";
@@ -57,8 +58,11 @@ internal static class Program
         var resource = PackArchive.Open(install.ResourcePath);
         using var sprites = new SpriteStore(resource, renderer);
         using var font = OpenUiFont();
+        using var uiText = new UiText(font);
         using var audio = AudioFactory.Create(Console.Error.WriteLine);
-        var game = new GameContext(install, resource, sprites, font, audio, command, settings);
+        var options = IniFile.Read(install.OptionsPath);
+        using var sounds = new SoundBank(audio, install.SoundDirectory, Volume(options, "bgm.sound"), Volume(options, "bgm.bgm"), Console.Error.WriteLine);
+        var game = new GameContext(install, resource, sprites, uiText, sounds, command, settings, Console.WriteLine);
         using var scenes = new SceneManager(id => CreateScene(id, game));
         game.Scenes = scenes;
         var cursor = new CursorView(sprites);
@@ -66,15 +70,21 @@ internal static class Program
         scenes.Switch(SceneId.Title);
         var events = new List<InputEvent>();
         ulong lastFrameMs = 0;
-        ulong startedMs = SdlPlatform.TicksMs;
-        while (game.FatalError is null)
+        ulong? loadedAtMs = null;                       // development clocks count from the end of the loading screen
+        var script = DevScript.FromEnvironment();
+        while (game.FatalError is null && !game.QuitRequested)
         {
             platform.Poll(events);
+            if (game.Data is not null)
+                loadedAtMs ??= SdlPlatform.TicksMs;
+            if (script is not null && loadedAtMs is { } loaded)
+                events.AddRange(script.Due(SdlPlatform.TicksMs - loaded));
             foreach (var e in events)
             {
                 if (e is QuitEvent)
                     return 0;
                 cursor.Handle(e);
+                game.Mouse.Handle(e, SdlPlatform.TicksMs);
                 scenes.Handle(e);
             }
             ulong now = SdlPlatform.TicksMs;
@@ -88,14 +98,17 @@ internal static class Program
             audio.Update();
             renderer.BeginFrame();
             scenes.Frame(renderer, now);
+            game.Mouse.EndFrame();
             cursor.Draw(renderer, now);
-            if (screenshot is not null && now - startedMs >= screenshotAtMs)
+            if (screenshot is not null && loadedAtMs is { } shotLoaded && now - shotLoaded >= screenshotAtMs)
             {
                 Screenshot.WritePpm(screenshot, renderer.Capture(), IRenderer.FrameWidth, IRenderer.FrameHeight);
                 return 0;
             }
             renderer.EndFrame();
         }
+        if (game.FatalError is null)
+            return 0;
         Console.Error.WriteLine(game.FatalError);
         SdlPlatform.ShowError(GameCommandLine.ErrorTitle, game.FatalError);
         return 3;
@@ -104,10 +117,18 @@ internal static class Program
     private static IScene CreateScene(SceneId id, GameContext game) => id switch
     {
         SceneId.Title => new TitleScene(game),
-        SceneId.Server => new ServerScene(game, Console.WriteLine),
+        SceneId.Server => new ServerScene(game),
         SceneId.CharacterSelect => new CharacterSelectScene(game),
+        SceneId.Game => throw new NotSupportedException("the map scene comes with milestone 3"),
         _ => throw new ArgumentOutOfRangeException(nameof(id), id, "unknown scene"),
     };
+
+    /// <summary>
+    /// ✅ The sound levels of <c>option.ini</c> (<c>[+8]</c> music, <c>[+9]</c> effects of the original). ❓ The keys are
+    /// <c>[BGM] bgm</c> and <c>sound</c> by name; a missing or bad value is the file's default of 1.
+    /// </summary>
+    private static float Volume(Dictionary<string, string> options, string key) =>
+        SoundBank.GainFromOption(options.TryGetValue(key, out var text) && int.TryParse(text, out int level) ? level : 1);
 
     /// <summary>Text is optional: without a usable font the client still runs, only without labels.</summary>
     private static IFont? OpenUiFont()

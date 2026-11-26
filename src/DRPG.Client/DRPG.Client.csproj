@@ -5,7 +5,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RootNamespace>DRPG.Client</RootNamespace>
-    <AssemblyName>DRPG.Client</AssemblyName>
+    <AssemblyName>DigimonRPG</AssemblyName>
     <Product>DRPG Client</Product>
     <Version>0.1.0</Version>
     <PublishAot>true</PublishAot>
@@ -19,8 +19,22 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Startup\preload-*.txt" LogicalName="%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="drpg-client.ini.example" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <!-- The original executable is DigimonRPG.bin on every system (Windows included: it is an .exe renamed). The AOT
+       publish names it DigimonRPG[.exe]; this renames it so the client is a drop-in for the original. -->
+  <Target Name="NameTheBinaryLikeTheOriginal" AfterTargets="Publish" Condition="'$(PublishAot)' == 'true'">
+    <PropertyGroup>
+      <PublishedBinary>$(PublishDir)$(TargetName)$(NativeBinaryExt)</PublishedBinary>
+    </PropertyGroup>
+    <Copy SourceFiles="$(PublishedBinary)" DestinationFiles="$(PublishDir)DigimonRPG.bin" Condition="Exists('$(PublishedBinary)')" />
+    <Delete Files="$(PublishedBinary)" Condition="Exists('$(PublishedBinary)')" />
+  </Target>
 
   <ItemGroup>
     <InternalsVisibleTo Include="DRPG.Client.Tests" />

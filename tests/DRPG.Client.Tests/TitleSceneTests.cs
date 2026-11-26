@@ -6,26 +6,11 @@ namespace DRPG.Client.Tests;
 
 public sealed class TitleSceneTests : IDisposable
 {
-    private readonly FakeInstall _install = new();
-    private readonly FakeRenderer _renderer = new();
-    private readonly PackArchive _resource;
-    private readonly SpriteStore _sprites;
-    private readonly GameContext _game;
+    private readonly SceneFixture _fixture = new();
+    private FakeRenderer _renderer => _fixture.Renderer;
+    private GameContext _game => _fixture.Game;
 
-    public TitleSceneTests()
-    {
-        var install = GameInstall.Find(_install.Directory)!;
-        _resource = PackArchive.Open(install.ResourcePath);
-        _sprites = new SpriteStore(_resource, _renderer);
-        _game = new GameContext(install, _resource, _sprites, null, new DRPG.Engine.Audio.SilentAudio(), new GameCommandLine("u", "k"), ClientSettings.Local);
-        _game.Scenes = new SceneManager(_ => throw new InvalidOperationException("no scene is created in these tests"));
-    }
-
-    public void Dispose()
-    {
-        _sprites.Dispose();
-        _install.Dispose();
-    }
+    public void Dispose() => _fixture.Dispose();
 
     private TitleScene Started()
     {
@@ -41,8 +26,8 @@ public sealed class TitleSceneTests : IDisposable
 
         scene.Frame(_renderer, 0);
 
-        // ✅ docs/cliente/cenas.md#cscenetitle-carga-: background, box, transparent slot, bar
-        Assert.Equal([(0, 0, 800, 600), (289, 140, 222, 215), (224, 258, 352, 60), (293, 305, 213, 18)],
+        // ✅ docs/cliente/cenas.md#cscenetitle-carga-: background, box, transparent slot, bar (frame 0 clipped), outline (frame 1)
+        Assert.Equal([(0, 0, 800, 600), (289, 140, 222, 215), (224, 258, 352, 60), (293, 305, 231, 18), (293, 305, 231, 18)],
             _renderer.Draws.Select(d => (d.X, d.Y, d.Texture.Width, d.Texture.Height)));
     }
 
@@ -55,19 +40,33 @@ public sealed class TitleSceneTests : IDisposable
     }
 
     [Fact]
-    public async Task The_bar_frame_follows_the_displayed_progress()
+    public void The_bar_is_the_clipped_full_frame_and_then_the_whole_outline()
     {
         using var scene = Started();
         scene.Frame(_renderer, 0);
-        var first = _renderer.Draws[^1].Texture;
+
+        var clipped = _renderer.Draws[3];
+        var outline = _renderer.Draws[4];
+
+        Assert.Equal(1, clipped.PartWidth);                // ✅ 1 + 230 × 0 / 100
+        Assert.Null(outline.PartWidth);                    // frame 1 is not clipped
+        Assert.NotSame(clipped.Texture, outline.Texture);  // two different frames of the sprite
+    }
+
+    [Fact]
+    public void The_clip_grows_with_the_displayed_progress()
+    {
+        using var scene = Started();
+        scene.Frame(_renderer, 0);
 
         scene.Progress.Raise(100);
         for (ulong t = 10; scene.Progress.Displayed < 50; t += 33)
+        {
+            _renderer.BeginFrame();
             scene.Frame(_renderer, t);
-        var later = _renderer.Draws[^1].Texture;
+        }
 
-        Assert.NotSame(first, later);
-        await Task.CompletedTask;
+        Assert.InRange(_renderer.Draws[3].PartWidth!.Value, 114, 120);
     }
 
     [Fact]
@@ -92,14 +91,15 @@ public sealed class TitleSceneTests : IDisposable
 
         Assert.Equal("stop here", error.Message);
         Assert.Equal(SceneId.Server, requested);
-        Assert.Equal(["Test_US.bin"], _game.Data!.Language.Keys);
+        Assert.Equal(["TextAttach_US.bin"], _game.Data!.Language.Keys);
         Assert.NotEmpty(_game.Data.Table.Names);
+        Assert.Equal("Net Ocean", _game.Texts[1498]);          // the interface texts are ready for the next scene
     }
 
     [Fact]
     public void A_missing_table_pack_is_a_fatal_error()
     {
-        File.Delete(Path.Combine(_install.Directory, "table.hf"));
+        File.Delete(Path.Combine(_fixture.Install.Directory, "table.hf"));
         using var scene = Started();
 
         WaitFor(() =>

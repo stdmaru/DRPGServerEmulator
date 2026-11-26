@@ -66,7 +66,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Binário](cliente/binario.md): desempacotamento, RTTI, dispatcher, IPs fixos, renderer.
 - [Formato `.spr`](cliente/formato-spr.md): sprites em RGB565 codificados por linha, sombra opcional.
 - [Tela de login do launcher](cliente/tela-login-launcher.md): sprites antigos, medidas do painel e layout escolhido.
-- [Cenas do cliente](cliente/cenas.md): sequência até a seleção de personagens (marco 2): carga, seleção de mundo, seleção de personagens, GUI, texto e som.
+- [Cenas do cliente](cliente/cenas.md): sequência até a seleção de personagens (marco 2): carga, seleção de mundo, seleção de personagens, GUI, texto e som. Inclui o que a fase C implementou e o que ficou ❓.
 - [Carga inicial](cliente/carga-inicial.md): passos da tela de carga e alvo da barra (39/70/90/99/101), as 39 tabelas, listas de pré-carga.
 - [Formato `.ani`](cliente/formato-ani.md): `DCANIMATION0.5`, âncoras por quadro, 20 animações × 8 direções.
 - [Tabelas por espécie](cliente/tabelas-de-especie.md): espécie → sprite e deslocamentos da seleção de personagens.

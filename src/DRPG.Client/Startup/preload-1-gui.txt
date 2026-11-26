@@ -1,0 +1,15 @@
+# Sprites the original loads while the loading bar runs (docs/cliente/carga-inicial.md). One path per line, in the order
+# of the original code; a file that is not in resource.hf is skipped. Sections are named by the original function.
+
+[0x00b34980 loading screen GUI ]
+GUI\game_end_gauge.spr
+GUI\loading_gauge.spr
+GUI\shutdowntext.spr
+GUI\loading_image_ENG.spr
+GUI\loading_image_ENG.spr
+GUI\loading_under_line.spr
+GUI\dr2_in_000_000_ENG.spr
+GUI\dr2_in_000_002.spr
+GUI\dr2_in_001_000.spr
+GUI\dr2_in_001_001.spr
+GUI\dr2_in_001_002.spr

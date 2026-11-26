@@ -102,7 +102,7 @@ internal sealed class FakeServer : IDisposable
 
 /// <summary>
 /// <see cref="AccountSession"/> against fake login and channel servers: the order of the packets of the official
-/// captures, the refusals, a broken server and the keep-alive.
+/// captures, driven step by step like the scenes do, the refusals, a broken server and the keep-alive.
 /// </summary>
 public sealed class AccountSessionTests : IDisposable
 {
@@ -135,13 +135,13 @@ public sealed class AccountSessionTests : IDisposable
         new(Uid: 7, TamerId: 1, Name: "Marcus", Level: 12, X: 5, Y: 6, LeaderSpeciesId: 3, LeaderLevel: 9, LeaderName: "Agumon",
             TotalBattles: 4, TotalWins: 2, Slot: slot, MapId: 0x4F, CheckOffset: 321);
 
-    /// <summary>Answers like the official servers: ✅ the 0x03 and 0x04 replies, then the list and the confirmation.</summary>
-    private void ScriptHappyServers(CharacterListReply list)
+    /// <summary>Answers like the official servers: ✅ the 0x05, 0x03 and 0x04 replies, then the list and the confirmation.</summary>
+    private void ScriptHappyServers(CharacterListReply list, int loginMarker = 0x2710)
     {
         _login.OnFrame = (server, frame) =>
         {
             if (frame.Opcode == (ushort)LoginOpcode.Handshake)
-                server.Send(new LoginHandshakeReply(Username));
+                server.Send(new LoginHandshakeReply(Username, 3, loginMarker));
         };
         _channel.OnFrame = (server, frame) =>
         {
@@ -178,14 +178,29 @@ public sealed class AccountSessionTests : IDisposable
         }
     }
 
+    private void ToStep(AccountSession session, AccountStep step) =>
+        Pump(session, () => session.Step == step || session.Step == AccountStep.Failed);
+
+    /// <summary>The calls the scenes make, in order, until the list is in.</summary>
+    private void ReachTheList(AccountSession session)
+    {
+        session.StartLogin(_now);
+        ToStep(session, AccountStep.LoggedIn);
+        session.SelectChannel(_now);
+        ToStep(session, AccountStep.ChannelSelected);
+        session.Authenticate(_now);
+        ToStep(session, AccountStep.Authenticated);
+        session.RequestCharacterList(_now);
+        Pump(session, () => session.Step == AccountStep.Ready && session.UserConfirmed);
+    }
+
     [Fact]
     public void Reaches_the_character_list_in_the_order_of_the_captures()
     {
         ScriptHappyServers(List(Tamer(0)));
         using var session = NewSession();
 
-        session.Start(_now);
-        Pump(session, () => session.Step == AccountStep.Ready && session.UserConfirmed);
+        ReachTheList(session);
 
         Assert.Equal(AccountStep.Ready, session.Step);
         Assert.Null(session.FailureMessage);
@@ -204,6 +219,51 @@ public sealed class AccountSessionTests : IDisposable
     }
 
     [Fact]
+    public void Nothing_is_sent_until_the_scenes_ask_for_it()
+    {
+        ScriptHappyServers(List());
+        using var session = NewSession();
+
+        session.StartLogin(_now);
+        ToStep(session, AccountStep.LoggedIn);
+        _now += 5_000;
+        session.Update(_now);
+        Thread.Sleep(100);
+
+        // ✅ 0x05 on entering the world selection, and the channel is not touched before the click
+        Assert.Equal(AccountStep.LoggedIn, session.Step);
+        Assert.Equal([(ushort)LoginOpcode.Handshake], _login.Received);
+        Assert.Empty(_channel.Received);
+    }
+
+    [Theory]
+    [InlineData(0x2710, true)]
+    [InlineData(0x68, false)]
+    public void The_login_reply_says_whether_battle_zone_is_open(int marker, bool enabled)
+    {
+        ScriptHappyServers(List(), marker);
+        using var session = NewSession();
+
+        session.StartLogin(_now);
+        ToStep(session, AccountStep.LoggedIn);
+
+        Assert.Equal(enabled, session.BattleZoneEnabled);
+    }
+
+    [Fact]
+    public void The_steps_refuse_to_run_out_of_order()
+    {
+        ScriptHappyServers(List());
+        using var session = NewSession();
+
+        Assert.Throws<InvalidOperationException>(() => session.SelectChannel(_now));
+        Assert.Throws<InvalidOperationException>(() => session.Authenticate(_now));
+        Assert.Throws<InvalidOperationException>(() => session.RequestCharacterList(_now));
+        session.StartLogin(_now);
+        Assert.Throws<InvalidOperationException>(() => session.StartLogin(_now));
+    }
+
+    [Fact]
     public void Sends_the_user_and_the_key_of_the_command_line_and_never_logs_the_key()
     {
         AuthenticateRequest? seen = null;
@@ -217,15 +277,14 @@ public sealed class AccountSessionTests : IDisposable
         };
         using var session = NewSession();
 
-        session.Start(_now);
-        Pump(session, () => session.Step == AccountStep.Ready);
+        ReachTheList(session);
 
         Assert.Equal(new AuthenticateRequest(Username, Key), seen);
         Assert.DoesNotContain(_log, line => line.Contains(Key));
     }
 
     [Fact]
-    public void A_refused_key_fails_and_does_not_ask_for_the_list()
+    public void A_refused_key_goes_back_to_the_channels_with_the_code_and_does_not_ask_for_the_list()
     {
         ScriptHappyServers(List());
         var happy = _channel.OnFrame!;
@@ -237,15 +296,35 @@ public sealed class AccountSessionTests : IDisposable
                 happy(server, frame);
         };
         using var session = NewSession();
+        session.StartLogin(_now);
+        ToStep(session, AccountStep.LoggedIn);
+        session.SelectChannel(_now);
+        ToStep(session, AccountStep.ChannelSelected);
 
-        session.Start(_now);
-        Pump(session, () => session.Step == AccountStep.Failed);
+        session.Authenticate(_now);
+        Pump(session, () => session.AuthenticationRefusal is not null);
 
-        Assert.Equal(AccountStep.Failed, session.Step);
-        Assert.NotNull(session.FailureMessage);
-        Assert.DoesNotContain(Key, session.FailureMessage);
+        Assert.Equal(ChannelError.InvalidCredentials, session.AuthenticationRefusal);
+        Assert.Equal(AccountStep.LoggedIn, session.Step);
+        Assert.Null(session.FailureMessage);
         Assert.DoesNotContain(_log, line => line.Contains(Key));
         Assert.DoesNotContain((ushort)ChannelOpcode.CharacterList, _channel.Received);
+    }
+
+    [Fact]
+    public void Reset_drops_everything_and_the_login_can_start_again()
+    {
+        ScriptHappyServers(List(Tamer(0)));
+        using var session = NewSession();
+        ReachTheList(session);
+
+        session.Reset();
+
+        Assert.Equal(AccountStep.NotStarted, session.Step);
+        Assert.Null(session.Characters);
+        Assert.False(session.UserConfirmed);
+        session.StartLogin(_now);
+        Assert.Equal(AccountStep.ConnectingLogin, session.Step);
     }
 
     [Fact]
@@ -254,8 +333,8 @@ public sealed class AccountSessionTests : IDisposable
         _login.OnFrame = (server, _) => server.SendRaw(new PacketWriter().ToFrame(0x7777));
         using var session = NewSession();
 
-        session.Start(_now);
-        Pump(session, () => session.Step == AccountStep.Failed);
+        session.StartLogin(_now);
+        ToStep(session, AccountStep.Failed);
 
         Assert.Equal(AccountStep.Failed, session.Step);
         Assert.Contains("Invalid packet", session.FailureMessage);
@@ -282,8 +361,7 @@ public sealed class AccountSessionTests : IDisposable
         };
         using var session = NewSession();
 
-        session.Start(_now);
-        Pump(session, () => session.Step == AccountStep.Failed);
+        ReachTheList(session);
 
         Assert.Equal(AccountStep.Failed, session.Step);
         Assert.Null(session.Characters);
@@ -292,12 +370,11 @@ public sealed class AccountSessionTests : IDisposable
     [Fact]
     public void A_packet_out_of_order_fails()
     {
-        ScriptHappyServers(List());
         _login.OnFrame = (server, _) => server.Send(new KeepAliveReply());
         using var session = NewSession();
 
-        session.Start(_now);
-        Pump(session, () => session.Step == AccountStep.Failed);
+        session.StartLogin(_now);
+        ToStep(session, AccountStep.Failed);
 
         Assert.Equal(AccountStep.Failed, session.Step);
     }
@@ -308,8 +385,8 @@ public sealed class AccountSessionTests : IDisposable
         _login.OnFrame = (server, _) => server.CloseClient();
         using var session = NewSession();
 
-        session.Start(_now);
-        Pump(session, () => session.Step == AccountStep.Failed);
+        session.StartLogin(_now);
+        ToStep(session, AccountStep.Failed);
 
         Assert.Equal(AccountStep.Failed, session.Step);
         Assert.NotNull(session.FailureMessage);
@@ -321,12 +398,26 @@ public sealed class AccountSessionTests : IDisposable
         _login.OnFrame = (_, _) => { };
         using var session = NewSession();
 
-        session.Start(_now);
+        session.StartLogin(_now);
         Pump(session, () => session.Step == AccountStep.WaitingLoginReply && _login.Received.Count == 1);
         _now += AccountSession.StepTimeoutMs + 1;
         session.Update(_now);
 
         Assert.Equal(AccountStep.Failed, session.Step);
+    }
+
+    [Fact]
+    public void Waiting_for_a_scene_is_not_a_timeout()
+    {
+        ScriptHappyServers(List());
+        using var session = NewSession();
+        session.StartLogin(_now);
+        ToStep(session, AccountStep.LoggedIn);
+
+        _now += AccountSession.StepTimeoutMs * 10;
+        session.Update(_now);
+
+        Assert.Equal(AccountStep.LoggedIn, session.Step);
     }
 
     [Fact]
@@ -338,8 +429,8 @@ public sealed class AccountSessionTests : IDisposable
         closed.Stop();
         using var session = new AccountSession(new ClientSettings(address, address), new GameCommandLine(Username, Key), _log.Add);
 
-        session.Start(_now);
-        Pump(session, () => session.Step == AccountStep.Failed);
+        session.StartLogin(_now);
+        ToStep(session, AccountStep.Failed);
 
         Assert.Equal(AccountStep.Failed, session.Step);
         Assert.Contains("Could not connect", session.FailureMessage);
@@ -350,8 +441,7 @@ public sealed class AccountSessionTests : IDisposable
     {
         ScriptHappyServers(List());
         using var session = NewSession();
-        session.Start(_now);
-        Pump(session, () => session.Step == AccountStep.Ready);
+        ReachTheList(session);
 
         _now += AccountSession.KeepAliveIntervalMs - 1;
         session.Update(_now);
@@ -368,14 +458,5 @@ public sealed class AccountSessionTests : IDisposable
         var until = DateTime.UtcNow.AddMilliseconds(150);
         Pump(session, () => DateTime.UtcNow > until || session.Step != AccountStep.Ready);
         Assert.Equal(AccountStep.Ready, session.Step);
-    }
-
-    [Fact]
-    public void Start_twice_is_refused()
-    {
-        using var session = NewSession();
-        session.Start(_now);
-
-        Assert.Throws<InvalidOperationException>(() => session.Start(_now));
     }
 }

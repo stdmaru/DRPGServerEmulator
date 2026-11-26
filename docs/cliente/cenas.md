@@ -45,7 +45,7 @@ Cada cena tem **três** vtables (herança múltipla): a principal, uma em `+0x18
   | 4 | `GUI\dr2_in_001_002.spr` (barra cheia) | (293, 305) | ✅ quadro **0** recortado na largura `w = 1 + (231 − 1) × exibido / 100` |
   | 5 | `GUI\dr2_in_001_002.spr` (contorno) | (293, 305) | ✅ quadro **1** inteiro, por cima |
   | 6 | texto `Digimon RPG 3.26` | (0, 1) | branco, com sombra |
-- ✅ **Correção:** o primeiro argumento de `FUN_00b56ff0` é o quadro e o quinto é a largura (ver [desenho](#desenho-e-gui-o-que-as-cenas-usam)). A fórmula `1 + (quadros − 1) × progresso / 100` da versão anterior desta página era a largura (`FUN_00872680` = largura do quadro 0 = 231), não um índice de quadro. O `TitleScene` da fase A desenha errado (sempre o quadro 1 e nunca a barra) e é corrigido na fase C.
+- ✅ **Correção:** o primeiro argumento de `FUN_00b56ff0` é o quadro e o quinto é a largura (ver [desenho](#desenho-e-gui-o-que-as-cenas-usam)). A fórmula `1 + (quadros − 1) × progresso / 100` da versão anterior desta página era a largura (`FUN_00872680` = largura do quadro 0 = 231), não um índice de quadro. O `TitleScene` da fase A desenhava errado (sempre o quadro 1, nunca a barra); ✅ corrigido na fase C.
 - ✅ **Progresso exibido** `+0x64c`: a cada quadro, se passaram ≥ 10 ms desde a última subida e `exibido ≤ alvo`, `exibido += v × 0,01 × 0,18`, onde `v = +0x648` (= 39,0, gravado a cada subida do alvo por `0x00b34d40`) e ×7 quando `v < alvo − 1`. Ou seja: **+0,0702 por quadro enquanto o alvo é 39; +0,4914 por quadro quando o alvo passa de 40** (constantes em `0x0102e35c`, `0x0102e360`, `0x0102e370`, `0x0102e368`).
 - ✅ **Alvo do progresso** (`+0x644`, só sobe; `0x00b34d40`), na ordem da [carga inicial](carga-inicial.md): 39 → 70 → 90 → 99 (no `Game Init`) → 101 (fim de `0x00ad3d30`). A tela termina quando `[DAT_01158504]+0x81 == 1`, gravado no fim de `0x00ad3d30`, **sem esperar a barra encher**: a duração (~10 s no original) é o trabalho real de carga.
 
@@ -205,3 +205,21 @@ Para cada slot com tamer (`+4 ≠ 0`):
 - **Efeitos**: não há tabela fixa id → arquivo. Cada cena registra os seus com `FUN_00a187b0(id, caminho)` (790 posições, `0x00a18890(id, 0)` toca). Barra de carga: 5 = `sound\menu-bt.wav`; seleção de mundo: 2/3/4 (acima); seleção de personagens: 5 = `Sound\menu-1.wav`. ✅ **Correção:** `FUN_00b3a950(n, 0)` **não é som**: copia a linha n da tabela de servidores.
 - **BGM**: `0x00b42500(caminho, 0)` no gerenciador `DAT_0135a1f0`.
 - Fontes GDI criadas em `0x00b563f0`: "굴림체" (GulimChe, charset 0x81) — `+0x1dc` 12 px normal (a padrão), `+0x1e4` 14 px negrito, e outras (14/12/11/10, 13×5, 32×24, 15); `Fonts\123RF_123RF_TTF.ttf` (face "123RF", 16 px). Ver [fonte do launcher](tela-login-launcher.md#fonte).
+
+## Implementação (fase C) ✅
+Código em `src/DRPG.Client` (`Scenes/`, `Ui/`, `Startup/`, `Text/`, `Data/`) e `DRPG.Engine` (`SoundBank`, `Darken`). Tudo acima foi implementado como especificado; abaixo, o que ficou ❓ ou diferente.
+
+- ✅ `SceneId`: Title=1, Server=2, CharacterSelect=4, Game=5 (a cena 5 ainda não existe: "Game Start" faz o fade e registra `Map Server : …`).
+- ✅ Carga: mesmos passos e ordem, alvos 39/70/90/99/101, 39 tabelas, listas de pré-carga embutidas (`Startup/preload-*.txt`), sem espera artificial. O tempo fica na ordem do original (~9 s nesta máquina). ❓ **Paralelismo:** o original lê em uma thread; os 6,3 GB de sprites inflados levariam ~27 s assim, então o pré-carregamento usa 2–4 trabalhadores (`StartupLoader.Parallelism`; 1 = estritamente uma thread) e só guarda sprites de até 1 MiB decodificados (o resto é lido e descartado).
+- ✅ `AccountSession` dirigido pelas cenas: login ao entrar na cena 2, canal ao clicar, `0x04` ao receber o channel, `0x12`/`0x14` ao entrar na cena 4. Chave recusada volta para a seleção de canal com a mensagem.
+- ✅ Fade `FUN_00b55f10` (`Ui/FadeOut`, `IRenderer.Darken` com subtração de blend), caixa de mensagem de 9 partes, botão (estados 0/1/2, duplo clique 500 ms / 2 px), texto GulimChe 12 px com sombra, `TextAttach` (`table\textattach_us.dat` + `Language\TextAttach_US.bin`), `SoundBank` (790 efeitos, BGM em loop, volumes do `option.ini`).
+- Ferramentas só de desenvolvimento: `DRPG_GAME_DIR`, `DRPG_SCREENSHOT`/`DRPG_SCREENSHOT_MS` e `DRPG_SCRIPT` (mouse e Esc roteirizados, tempos contados a partir do fim da carga). `tools/publish-client.sh` publica o AOT como `DigimonRPG.bin`.
+
+### Ainda ❓ (não inventado)
+- **tamerId → `a_%02d`:** usei `id − 1` (a especificação não fecha o deslocamento).
+- **Silhueta do BZ** (modo de mistura `0xc`) e o recuo do colchete dos links do BZ: não implementados.
+- **Chave do `option.ini`** de cada volume: `[BGM] sound` (efeitos) e `bgm` (música), padrão 1.
+- **Overlay de idioma da tabela Map** não aplicado; **animação de 3 s "voltar à cena 2"** não implementada; **`IsNetworkAlive`** não implementado.
+- **Senha fraca:** o diálogo mostra só a primeira linha. **Sombra de sprite** (opção) não aplicada. **Espécie 817** com `+0x80 == 2` (`817_2.ani`) não tratada.
+- **Criar/Apagar/Trocar senha** na seleção de personagens só registram no log (o protocolo desses pedidos não é do marco 2). `Map Server` é registrado sem endereço.
+- **Dados:** `Sprite\033_1.ani` (Gabumon) aponta para `s.spr` (✅ está assim no arquivo do jogo): o sprite não existe e cai no `065_1.ani`, como o fallback do original ❓.

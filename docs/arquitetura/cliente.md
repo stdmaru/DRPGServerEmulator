@@ -77,7 +77,7 @@ Handlers (`[PacketHandler]`) e janelas (`[Window]`) são achados por um **gerado
 - `ClientConnection` (`Net/`): um TCP por servidor; a tarefa de recepção corta com `PacketFramer`, decodifica em pacote **tipado** (`AccountDecoder` por servidor: opcode fora da lista = erro) e põe na fila; a thread do jogo esvazia com `TryReceive`. Envio por fila, sem bloquear o frame. Pacote inválido, mais de 1024 pacotes na fila, socket fechado ou erro de I/O terminam a conexão com uma mensagem (`Failure`).
 - `AccountSession` (`Net/`): máquina de estados chamada **uma vez por frame** (sem `await` no frame, as conexões são `Task` consultadas). Ordem das capturas ✅ (sessão 56): login `0x05` → fecha → channel `0x03` → `0x04` (usuário + chave) → `0x12` e `0x14` pedidos juntos → lista. Depois da lista, keep-alive `0xC4` a cada 166,5 s ✅. Timeout de 15 s por passo ❓ (o do original é desconhecido). A chave nunca vai para o log nem para a mensagem de falha.
 - Endereços: `drpg-client.ini` ([decisões](../projeto/decisoes.md)).
-- **As cenas de seleção de mundo e de personagens são provisórias ❓** (`ServerScene`, `CharacterSelectScene`): a fase C as substitui pela especificação do RE da fase B.
+- ✅ **Fase C:** `ServerScene` e `CharacterSelectScene` seguem a especificação do RE ([cenas](../cliente/cenas.md#implementação-fase-c-)). O `AccountSession` virou uma máquina por passos (`StartLogin`, `SelectChannel`, `Authenticate`, `RequestCharacterList`, `Reset`) e **as cenas** decidem quando cada passo roda, como o original.
 
 ## Teste de ponta a ponta
 - `AccountSessionTests` e `AccountDecoderTests`: servidores falsos em loopback (ordem dos pacotes, chave recusada, opcode desconhecido, lista forjada, servidor que fecha ou não responde, keep-alive) e entradas hostis. Rodam no CI.

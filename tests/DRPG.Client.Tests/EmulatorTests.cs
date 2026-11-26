@@ -48,7 +48,14 @@ public sealed class EmulatorTests
         using var session = new AccountSession(EmulatorEnvironment.Settings, new GameCommandLine(EmulatorEnvironment.User!, EmulatorEnvironment.Key!), log.Add);
         ulong now = 0;
 
-        session.Start(now);
+        // the calls of the scenes: 0x05, then a channel click, 0x04 on its reply, 0x12 + 0x14 in the character selection
+        session.StartLogin(now);
+        Pump(session, ref now, () => session.Step is AccountStep.LoggedIn or AccountStep.Failed);
+        session.SelectChannel(now);
+        Pump(session, ref now, () => session.Step is AccountStep.ChannelSelected or AccountStep.Failed);
+        session.Authenticate(now);
+        Pump(session, ref now, () => session.Step is AccountStep.Authenticated or AccountStep.Failed);
+        session.RequestCharacterList(now);
         Pump(session, ref now, () => session.Step == AccountStep.Ready && session.UserConfirmed);
 
         Console.WriteLine(string.Join(Environment.NewLine, log));
@@ -65,10 +72,14 @@ public sealed class EmulatorTests
         using var session = new AccountSession(EmulatorEnvironment.Settings, new GameCommandLine(EmulatorEnvironment.User!, new string('0', 40)), log.Add);
         ulong now = 0;
 
-        session.Start(now);
-        Pump(session, ref now, () => session.Step == AccountStep.Failed);
+        session.StartLogin(now);
+        Pump(session, ref now, () => session.Step is AccountStep.LoggedIn or AccountStep.Failed);
+        session.SelectChannel(now);
+        Pump(session, ref now, () => session.Step is AccountStep.ChannelSelected or AccountStep.Failed);
+        session.Authenticate(now);
+        Pump(session, ref now, () => session.AuthenticationRefusal is not null || session.Step == AccountStep.Failed);
 
-        Assert.Equal(AccountStep.Failed, session.Step);
+        Assert.NotNull(session.AuthenticationRefusal);
         Assert.Null(session.Characters);
     }
 }

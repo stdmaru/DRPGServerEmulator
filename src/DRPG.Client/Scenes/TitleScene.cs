@@ -19,6 +19,9 @@ public sealed class TitleScene(GameContext game) : IScene
     /// <summary>✅ <c>FUN_00867ed0(0x1e)</c>: 30 frames per second.</summary>
     private const int FramesPerSecond = 30;
 
+    private const int MenuButtonSound = 5;
+    private const string MenuButtonFile = "sound\\menu-bt.wav";
+
     private readonly LoadingProgress _progress = new();
     private readonly CancellationTokenSource _cancel = new();
     private Task<GameData>? _load;
@@ -36,8 +39,9 @@ public sealed class TitleScene(GameContext game) : IScene
         _box = sprites.Gui("dr2_in_001_000")[0];          // "Loading" box
         _slot = sprites.Gui("dr2_in_001_001")[0];         // transparent
         _bar = sprites.Gui("dr2_in_001_002");
+        game.Sounds.Register(MenuButtonSound, MenuButtonFile); // ✅ 0x00b34980
         // ✅ the loader reports to the progress from a pool thread, like the original's load runs apart from the bar
-        _load = new StartupLoader(game.Install, game.Resource, _progress).RunAsync(_cancel.Token);
+        _load = new StartupLoader(game.Install, game.Resource, _progress, game.Log).RunAsync(_cancel.Token);
     }
 
     public void Handle(InputEvent input)
@@ -50,9 +54,10 @@ public sealed class TitleScene(GameContext game) : IScene
         renderer.Draw(_background, 0, 0);
         renderer.Draw(_box, BoxX, BoxY);
         renderer.Draw(_slot, SlotX, SlotY);
-        renderer.Draw(_bar[_progress.BarFrame(_bar.Length)], BarX, BarY);
-        // ❓ The original draws the bar again in "mode 1" at the same place (an overlay such as additive blend);
-        // not drawn until the mode is understood.
+        // ✅ the full bar clipped to the progress, then the outline (frame 1) whole on top
+        renderer.DrawPart(_bar[0], BarX, BarY, 0, _progress.BarFillWidth());
+        if (_bar.Length > 1)
+            renderer.Draw(_bar[1], BarX, BarY);
         game.DrawVersion(renderer, 0);
         Finish();
     }
@@ -68,6 +73,7 @@ public sealed class TitleScene(GameContext game) : IScene
         else
         {
             game.Data = load.Result;
+            game.Sprites.Adopt(load.Result.Sprites);
             game.Scenes.Switch(SceneId.Server);
         }
         _load = null;

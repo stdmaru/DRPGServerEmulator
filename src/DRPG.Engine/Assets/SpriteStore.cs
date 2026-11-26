@@ -8,6 +8,13 @@ namespace DRPG.Engine.Assets;
 public sealed class SpriteStore(PackArchive pack, IRenderer renderer) : IDisposable
 {
     private readonly Dictionary<string, ITexture[]> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyDictionary<string, SpriteFile>? _preloaded;
+
+    /// <summary>
+    /// Sprites already read and parsed (the start-up load): <see cref="Load(string)"/> uses them instead of reading
+    /// the pack again. Keys are pack paths, compared ignoring case.
+    /// </summary>
+    public void Adopt(IReadOnlyDictionary<string, SpriteFile> preloaded) => _preloaded = preloaded;
 
     /// <summary>All frames of <c>gui\&lt;name&gt;.spr</c>; prefers the <c>_eng</c> variant when it exists.</summary>
     public ITexture[] Gui(string name) => Load(GuiPath(name), disabled: false);
@@ -88,7 +95,9 @@ public sealed class SpriteStore(PackArchive pack, IRenderer renderer) : IDisposa
         var key = disabled ? path + "|disabled" : path;
         if (_cache.TryGetValue(key, out var frames))
             return frames;
-        var sprite = SpriteFile.Parse(pack.ReadEntry(path));
+        var sprite = _preloaded is not null && _preloaded.TryGetValue(PackPath.Normalize(path), out var parsed)
+            ? parsed
+            : SpriteFile.Parse(pack.ReadEntry(path));
         frames = new ITexture[sprite.Frames.Count];
         for (int i = 0; i < frames.Length; i++)
         {

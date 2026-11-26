@@ -70,20 +70,41 @@ public sealed class LoadingProgressTests
         progress.Raise(20);
         progress.Raise(500);
 
-        Assert.Equal(100, progress.TargetPercent);
+        Assert.Equal(LoadingProgress.MaxTarget, progress.TargetPercent);
     }
 
     [Theory]
-    [InlineData(0f, 11, 1)]
-    [InlineData(50f, 11, 6)]
-    [InlineData(100f, 11, 10)]
-    [InlineData(0f, 1, 0)]
-    [InlineData(0f, 0, 0)]
-    public void The_bar_frame_follows_the_formula_and_stays_inside_the_sprite(float displayed, int frames, int expected)
+    [InlineData(0f, 1)]
+    [InlineData(50f, 116)]
+    [InlineData(100f, 231)]
+    public void The_bar_width_is_one_plus_the_fraction_of_230(float displayed, int expected)
     {
         var progress = Displayed(displayed);
 
-        Assert.Equal(expected, progress.BarFrame(frames));
+        // ✅ 1 + 230 × displayed / 100, truncated (docs/cliente/cenas.md#cscenetitle-carga-); the chase overshoots a hair
+        Assert.InRange(progress.BarFillWidth(), expected, expected + 2);
+    }
+
+    [Fact]
+    public void The_bar_is_never_wider_than_its_sprite_even_past_the_hundred()
+    {
+        var progress = new LoadingProgress();
+        progress.Raise(StartupLoader.AfterTitle);
+        progress.Tick(0);
+        for (ulong t = 10; t < 20_000; t += 10)
+            progress.Tick(t);
+
+        Assert.True(progress.Displayed > 100);
+        Assert.Equal(LoadingProgress.BarWidth, progress.BarFillWidth());
+    }
+
+    [Fact]
+    public void The_last_target_is_one_hundred_and_one()
+    {
+        var progress = new LoadingProgress();
+        progress.Raise(StartupLoader.AfterTitle);
+
+        Assert.Equal(101, progress.TargetPercent);
     }
 
     private static LoadingProgress Displayed(float value)

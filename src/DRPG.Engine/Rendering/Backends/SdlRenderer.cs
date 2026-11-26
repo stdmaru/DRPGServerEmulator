@@ -101,6 +101,28 @@ public sealed unsafe class SdlRenderer : IRenderer
         SDL_RenderTexture(_renderer, t.Handle, &src, &dst);
     }
 
+    public void Darken(int amount)
+    {
+        amount = Math.Clamp(amount, 0, 255);
+        if (amount == 0)
+            return;
+        // result = destination − source on the colour channels; the alpha of the frame is left alone
+        var subtract = SDL_ComposeCustomBlendMode(
+            SDL_BlendFactor.SDL_BLENDFACTOR_ONE, SDL_BlendFactor.SDL_BLENDFACTOR_ONE, SDL_BlendOperation.SDL_BLENDOPERATION_REV_SUBTRACT,
+            SDL_BlendFactor.SDL_BLENDFACTOR_ZERO, SDL_BlendFactor.SDL_BLENDFACTOR_ONE, SDL_BlendOperation.SDL_BLENDOPERATION_ADD);
+        SDL_SetRenderDrawBlendMode(_renderer, subtract);
+        SDL_SetRenderDrawColor(_renderer, (byte)amount, (byte)amount, (byte)amount, 255);
+        var area = new SDL_FRect
+        {
+            x = _layout.OffsetX,
+            y = _layout.OffsetY,
+            w = IRenderer.FrameWidth * _layout.Scale,
+            h = IRenderer.FrameHeight * _layout.Scale,
+        };
+        SDL_RenderFillRect(_renderer, &area);
+        SDL_SetRenderDrawBlendMode(_renderer, SDL_BlendMode.SDL_BLENDMODE_NONE);
+    }
+
     public void EndFrame() => SDL_RenderPresent(_renderer);
 
     public uint[] Capture()

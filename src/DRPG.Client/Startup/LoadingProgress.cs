@@ -17,6 +17,12 @@ public sealed class LoadingProgress
     private const float StepFactor = 0.18f;      // ✅ _DAT_0102e360
     private const float FastMultiplier = 7f;     // ✅ _DAT_0102e370
     private const float FastMargin = 1f;         // ✅ DAT_01006ce8
+    /// <summary>✅ The last target of the original is 101, one more than the bar's 100 (end of <c>0x00ad3d30</c>).</summary>
+    public const float MaxTarget = 101f;
+
+    /// <summary>✅ The bar sprite is 231 px wide (frame 0 of <c>dr2_in_001_002</c>); it grows from 1 px (<c>0x00b35560</c>).</summary>
+    public const int BarWidth = 231;
+
     private const float Full = 100f;             // ✅ DAT_01006cec
 
     private sealed record Target(float Percent, float Boost);
@@ -35,7 +41,7 @@ public sealed class LoadingProgress
     {
         var current = Volatile.Read(ref _target);
         if (current.Percent < percent)
-            Volatile.Write(ref _target, new Target(Math.Min(percent, Full), BoostOnRaise));
+            Volatile.Write(ref _target, new Target(Math.Min(percent, MaxTarget), BoostOnRaise));
     }
 
     /// <summary>
@@ -61,15 +67,8 @@ public sealed class LoadingProgress
     }
 
     /// <summary>
-    /// ✅ Frame of the bar sprite: <c>1 + (frames − 1) × displayed / 100</c>, truncated (<c>0x00b35560</c>).
-    /// ❓ Whether the original counts frames from 1 or 0 is not confirmed; this is the index into the sprite's frame
-    /// list, clamped to it.
+    /// ✅ Width of the part of the full bar to draw: <c>1 + (231 − 1) × displayed / 100</c> (<c>0x00b35560</c>, the fifth
+    /// argument of the sprite call). Never wider than the sprite, never below 1.
     /// </summary>
-    public int BarFrame(int frameCount)
-    {
-        if (frameCount <= 0)
-            return 0;
-        var frame = (int)(1 + (frameCount - 1) * _displayed / Full);
-        return Math.Clamp(frame, 0, frameCount - 1);
-    }
+    public int BarFillWidth() => Math.Clamp((int)(1 + (BarWidth - 1) * _displayed / Full), 1, BarWidth);
 }

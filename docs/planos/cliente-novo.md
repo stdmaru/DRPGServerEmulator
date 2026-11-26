@@ -71,7 +71,7 @@ DRPG.Client   loop SDL3 + SDL_GPU
 ## Marcos (cada um jogável contra o emulador)
 0. **Monorepo** ([arquitetura](../arquitetura/README.md#repositório)): `DRPG.Shared` (protocolo, pacotes de mão dupla, `ClientPack`), `DRPG.Client`, `DRPG.Architecture.Tests`, `.editorconfig`, analyzers e `BannedSymbols.txt` ([garantias](../arquitetura/padroes-de-codigo.md#como-as-regras-são-garantidas)). A renomeação `DRPG.Server` → `DRPG.Server` pode ficar para um PR próprio. O cliente segue a [arquitetura do cliente](../arquitetura/cliente.md).
 1. **Launcher** ([acima](#launcher-login--auto-patcher-marco-1)): leitura e gravação de `.hf/.pf` no `DRPG.Shared`, patch a partir do `DR_Configuration.json`, mesclagem no `resource`, tela de login antiga, login com chave de 5 h e início do jogo. Valida SDL_GPU + NativeAOT em Windows e Linux.
-2. **Cliente: Loading → Login do jogo**: o executável na pasta do jogo abre a janela e mostra o loading e a tela seguinte, idênticos ao original, lendo `.spr` direto do `resource.pf`.
+2. **Cliente: Loading → Login do jogo**: o executável na pasta do jogo abre a janela e mostra o loading e a tela seguinte, idênticos ao original, lendo `.spr` direto do `resource.pf`. ✅ **Fases A–C feitas** (PR #46): janela, carga real, `ServerScene` e `CharacterSelectScene` 1:1 com a v322 e a sequência login → channel → lista; falta só a comparação lado a lado no Wine e a cena de jogo (marco 3). Ver [cenas](../cliente/cenas.md#implementação-fase-c-).
 3. Servidor → channel → mapa; andar, ver jogadores e selvagens. Primeira medição de desempenho.
 4. HUD e chat com TTF; resolução, tela cheia e escala de UI.
 5. Batalha PvE completa.
