@@ -27,20 +27,20 @@ public class ItemTeleportTests
     public void ItemTeleportHandler_moves_player_consumes_907_and_sends_official_sequence()
     {
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
-        var character = new Character(Entities.Digimon(), new Inventory(999))
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
+        var character = new Character(Entities.Digimon(), new Inventory(TestSupport.Data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Teleporter", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };
-        var teleport = character.Inventory.Main.Add(ItemTeleportHandler.TeleportXItemId, 2)[0];
+        var teleport = character.Inventory.Main.Add(907u, 2)[0];
         var session = TestSupport.NewSession();
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
         session.Player = player;
         zones.Find(79)!.Enter(player);
         session.DrainOutgoing();
 
-        var handler = new ItemTeleportHandler(world);
-        handler.Handle(session, new PacketReader(TeleportPayload(70, 80, ItemPlace.Inventory, teleport.Uid, 907)));
+        var handler = new ItemTeleportHandler(TestSupport.NewItemUse(world));
+        handler.Dispatch(session, new PacketReader(TeleportPayload(70, 80, ItemPlace.Inventory, teleport.Uid, 907)));
 
         Assert.Equal((short)70, character.X);
         Assert.Equal((short)80, character.Y);
@@ -55,7 +55,7 @@ public class ItemTeleportTests
         Assert.Equal(604, frames[2].Length - PacketHeader.Length);
 
         // Última carga: consome e esvazia o slot
-        handler.Handle(session, new PacketReader(TeleportPayload(56, 56, ItemPlace.Inventory, teleport.Uid, 907)));
+        handler.Dispatch(session, new PacketReader(TeleportPayload(56, 56, ItemPlace.Inventory, teleport.Uid, 907)));
         Assert.Null(character.Inventory.Main.FindByUid(teleport.Uid));
         Assert.Equal(3, session.DrainOutgoing().Count);
     }
@@ -66,8 +66,8 @@ public class ItemTeleportTests
         var grid = new DRPGServer.Data.GameData.MapGrid(10, 10, new byte[(10 * 10 + 7) / 8]);
         var data = Grids.DataWithGrid(1, grid);
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(data, world, NullLogger<ZoneSystem>.Instance);
-        var character = new Character(Entities.Digimon(), new Inventory(999))
+        var zones = new ZoneSystem(data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
+        var character = new Character(Entities.Digimon(), new Inventory(data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Teleporter", TamerId = 1, MapId = 1, X = 56, Y = 56,
         };
@@ -79,16 +79,16 @@ public class ItemTeleportTests
         zones.Find(1)!.Enter(player);
         session.DrainOutgoing();
 
-        var handler = new ItemTeleportHandler(world);
+        var handler = new ItemTeleportHandler(TestSupport.NewItemUse(world));
 
         // Item comum (41) não pode ser usado como teleporte
-        handler.Handle(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Inventory, seed.Uid, 41)));
+        handler.Dispatch(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Inventory, seed.Uid, 41)));
         // Place inválido (Ground)
-        handler.Handle(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Ground, teleport.Uid, 907)));
+        handler.Dispatch(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Ground, teleport.Uid, 907)));
         // Célula não-andável no grid (todos 0)
-        handler.Handle(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Inventory, teleport.Uid, 907)));
+        handler.Dispatch(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Inventory, teleport.Uid, 907)));
         // UID / ItemId trocados
-        handler.Handle(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Inventory, seed.Uid, 907)));
+        handler.Dispatch(session, new PacketReader(TeleportPayload(5, 5, ItemPlace.Inventory, seed.Uid, 907)));
 
         Assert.Empty(session.DrainOutgoing());
         Assert.Equal(5u, teleport.Amount);

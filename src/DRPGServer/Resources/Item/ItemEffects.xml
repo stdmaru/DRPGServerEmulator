@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Efeitos de uso de item. Mantido à mão: o texto do item não é lido. Cada <Effect Type> é uma classe em
+  Game/Items/ItemUseEffects.cs, e todos os efeitos de um item usam a mesma entrada (0x41 no alvo ou 0x85 na posição).
+
+  TeleportInMap: ✅ Teleport 900 / Teleport X 907 (0x85, conn=125/234/469).
+  TamingNet: rede usada no selvagem (0x41), fora de batalha. Stage = estágio que a rede captura. Chance em %.
+    ✅ 10022 e 10026: capturaram de primeira nas amostras (item_packet/*.pcapng, sessões 6 e 8 do captures.db).
+    ❓ As outras genéricas do item_info_us v322 com a mesma regra. As "Special Taming Net" (só certas espécies)
+    ainda não entram. O cliente v322 não tem rede genérica de champion em diante.
+-->
+<ItemEffects>
+  <Item ID="557" Name="Taming Net : In-Training">
+    <Effect Type="TamingNet" Stage="InTraining" Chance="100" />
+  </Item>
+  <Item ID="900" Name="Teleport">
+    <Effect Type="TeleportInMap" />
+  </Item>
+  <Item ID="907" Name="Teleport X">
+    <Effect Type="TeleportInMap" />
+  </Item>
+  <Item ID="10022" Name="Taming Net : In-Training X">
+    <Effect Type="TamingNet" Stage="InTraining" Chance="100" />
+  </Item>
+  <Item ID="10025" Name="Taming Net : Rookie">
+    <Effect Type="TamingNet" Stage="Rookie" Chance="100" />
+  </Item>
+  <Item ID="10026" Name="Taming Net : Rookie X">
+    <Effect Type="TamingNet" Stage="Rookie" Chance="100" />
+  </Item>
+  <Item ID="10027" Name="Taming Net : Rookie S">
+    <Effect Type="TamingNet" Stage="Rookie" Chance="100" />
+  </Item>
+  <Item ID="23730" Name="Taming Net : Rookie S (X)">
+    <Effect Type="TamingNet" Stage="Rookie" Chance="100" />
+  </Item>
+</ItemEffects>

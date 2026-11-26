@@ -22,7 +22,7 @@ public class PacketSizeTests
         var digimon = character.Leader;
         var combatant = new Combatant(digimon, BattleSide.A, null, null);
         var drop = new ItemDrop(10_001, 41, 50, 50, TimeSpan.Zero, null);
-        var item = new Inventory(999).Add(41, 1)!;
+        var item = TestSupport.EmptyInventory(999).Add(41, 1)!;
         var header = new ItemMoveHeader(ItemPlace.Ground, ItemPlace.Inventory, 64, 27, 0, 0);
         var wild = new WildDigimon(TestSupport.Data, TestSupport.Data.SpawnsOf(79)[0], 27, 65);
 
@@ -34,8 +34,8 @@ public class PacketSizeTests
             (new CharacterCreatePacket(0, new CharacterCreateHeader(3, 0x4F, 0x3E, 0x38), 1, "a", 10, "b"), 64),
             (new CharacterListPacket([null, null, null, null], new Random(1)), 500),
             (new UserCheckPacket("user"), 22),
-            (new CharacterDataPacket(character), 7600),                // ✅ v322 (sessão 52)
-            (new InventoryDataPacket(new Inventory(999)), 4416),
+            (new CharacterDataPacket(character, TestSupport.Clock.UnixNow), 7600),                // ✅ v322 (sessão 52)
+            (new InventoryDataPacket(TestSupport.EmptyInventory(999)), 4416),
             (new Unknown05Packet(), 164),
             (new HelloPacket(0x0E), 16),
             (new RefreshCharacterInfoPacket(character), 204),          // ✅ v322
@@ -115,12 +115,12 @@ public class PacketSizeTests
     public void Battle_create_has_ten_status_blocks()
     {
         var world = TestSupport.NewWorld();
-        var zones = new DRPGServer.Game.World.ZoneSystem(TestSupport.Data, world, Microsoft.Extensions.Logging.Abstractions.NullLogger<DRPGServer.Game.World.ZoneSystem>.Instance);
-        var battles = new BattleSystem(world, TestSupport.Data, TestSupport.GameOptions(), Microsoft.Extensions.Logging.Abstractions.NullLogger<BattleSystem>.Instance);
+        var zones = new DRPGServer.Game.World.ZoneSystem(TestSupport.Data, world, TestSupport.Clock, Microsoft.Extensions.Logging.Abstractions.NullLogger<DRPGServer.Game.World.ZoneSystem>.Instance);
+        var battles = TestSupport.NewBattles(world, TestSupport.Data, TestSupport.GameOptions());
         var session = TestSupport.NewSession();
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), Entities.Character());
         zones.Find(79)!.Enter(player);
-        var battle = battles.StartPve(player, zones.Find(79)!.WildDigimons.First().Serial)!;
+        var battle = battles.StartPve(player, player.StandBy(zones.Find(79)!.WildDigimons.First()))!;
         Assert.Equal(6960, new BattleCreatePacket   /* ✅ v322: 10 blocos de 696 (sessão 56) */(battle).EncodePayload().Length);
     }
 
@@ -151,7 +151,7 @@ public class PacketSizeTests
     public void Inventory_items_go_to_their_slot_with_amount_and_check()
     {
         // ✅ sessões 52–56: 24 × 76 bytes e depois 24 registros de 108; checagem = uid + item
-        var inventory = new Inventory(999);
+        var inventory = TestSupport.EmptyInventory(999);
         inventory.Add(41, 3);
         var payload = new InventoryDataPacket(inventory).EncodePayload();
         var record = payload.AsSpan(24 * 76, 108);
@@ -184,7 +184,7 @@ public class PacketSizeTests
         var character = Entities.Character();
         var card0 = character.Inventory.CardSlots.Add(74, 50)[0];
         var card1 = character.Inventory.CardSlots.Add(19, 2)[0];
-        var payload = new CharacterDataPacket(character).EncodePayload();
+        var payload = new CharacterDataPacket(character, TestSupport.Clock.UnixNow).EncodePayload();
 
         Assert.Equal(7600, payload.Length);
         var slot0 = payload.AsSpan(784, CardRecord.Length);

@@ -4,6 +4,7 @@ using DRPGServer.Configuration;
 using DRPGServer.Data.GameData;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
@@ -20,13 +21,13 @@ public class TimedItemTests
     private static readonly ItemInfo Aura718 = new(718, "Aura T of Deva (for New Tamers)")
     {
         Type = 27, SubType = 2, Level = 1, MaxStack = 1, DurationSeconds = 2_593_000,
-        EquipmentBonus = new EquipmentBonus(HpRecovery: 8, EvpRecovery: 13, MaintainEvolution: true),
+        Modifiers = StatModifiers.Of([new(StatModifierKind.HpRecovery, 8), new(StatModifierKind.EvpRecovery, 13), new(StatModifierKind.MaintainEvolution, 1)]),
     };
 
     private static readonly ItemInfo Crest1 = new(1, "Crest of Courage +1")
     {
         Type = 1, SubType = 1, Level = 1, MaxStack = 1, DurationSeconds = 0,
-        EquipmentBonus = new EquipmentBonus(BonusAtk: 15, BonusDef: 10, BonusBr: 50),
+        Modifiers = StatModifiers.Of([new(StatModifierKind.Atk, 15), new(StatModifierKind.Def, 10), new(StatModifierKind.Br, 50)]),
     };
 
     private static readonly ItemInfo Bread25 = new(25, "Bread")
@@ -41,9 +42,11 @@ public class TimedItemTests
         [25] = Bread25,
     };
 
+    private static readonly ItemService Items = TestSupport.Items();
+
     private static (Player Player, Session Session) MakePlayer()
     {
-        var inv = new Inventory(id => TestItems.GetValueOrDefault(id), 99);
+        var inv = new Inventory(id => TestItems.GetValueOrDefault(id), 99, _ => null, TestSupport.Clock);
         var species = TestSupport.Data.Species.Values.First(s => s.Stage == StatFormulas.InTraining);
         var leader = new Digimon(TestSupport.Data, species, 10);
         var character = new Character(leader, inv)
@@ -57,38 +60,64 @@ public class TimedItemTests
     }
 
     [Fact]
+    public void Timed_item_expiry_follows_the_game_clock()
+    {
+        var time = new ManualTime(DateTimeOffset.FromUnixTimeSeconds(1_800_000_000));
+        IGameClock clock = new GameClock(time);
+        var inv = new Inventory(id => TestItems.GetValueOrDefault(id), 99, _ => null, clock);
+
+        var aura = inv.Main.Add(718, 1).Single();
+        Assert.Equal(1_800_000_000u + Aura718.DurationSeconds, aura.ExpiresAt);
+        Assert.False(inv.IsExpired(aura));
+
+        time.Now = time.Now.AddSeconds(Aura718.DurationSeconds - 1);
+        Assert.False(inv.IsExpired(aura));
+        time.Now = time.Now.AddSeconds(1);
+        Assert.True(inv.IsExpired(aura));
+        Assert.False(EquipmentSlots.CanEquip(ItemPlace.Aura, aura, 10, clock.UnixNow));
+    }
+
+    [Fact]
+    public void Character_data_writes_the_given_server_time()
+    {
+        var (player, _) = MakePlayer();
+        var payload = new CharacterDataPacket(player.Character, 1_800_000_123).EncodePayload();
+        Assert.Equal(1_800_000_123u, BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0x19B0)));
+    }
+
+    [Fact]
     public void GiveItems_supports_arbitrary_duration_permanent_and_default_duration()
     {
         var (player, _) = MakePlayer();
         long before = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
         // 1. Período arbitrário: 1 dia (86400 s) de Aura #718
-        Assert.True(player.GiveItems([(718, 86400)]));
+        Assert.True(Items.GiveItems(player, [new(718, Duration: ItemDuration.FromDays(1))], TestSupport.Reason));
         var oneDay = player.Character.Inventory.Main[0]!;
         Assert.True(oneDay.IsTimed);
         Assert.InRange(oneDay.ExpiresAt, (uint)(before + 86395), (uint)(before + 86410));
 
-        // 2. Permanente (-1): mesmo item #718 (que tem col 26 = 2593000) vira permanente
-        Assert.True(player.GiveItems([(718, -1)]));
+        // 2. Permanente: mesmo item #718 (que tem col 26 = 2593000) vira permanente
+        Assert.True(Items.GiveItems(player, [new(718, Duration: ItemDuration.Permanent)], TestSupport.Reason));
         var permanent = player.Character.Inventory.Main[1]!;
         Assert.False(permanent.IsTimed);
         Assert.Equal(0u, permanent.ExpiresAt);
 
-        // 3. Padrão (1): usa a duração padrão do ItemInfo (2593000 s)
-        Assert.True(player.GiveItems([(718, 1)]));
+        // 3. Padrão: usa a duração padrão do ItemInfo (2593000 s)
+        Assert.True(Items.GiveItems(player, [new(718)], TestSupport.Reason));
         var defaultTimed = player.Character.Inventory.Main[2]!;
         Assert.True(defaultTimed.IsTimed);
         Assert.InRange(defaultTimed.ExpiresAt, (uint)(before + 2_592_995), (uint)(before + 2_593_010));
 
         // 4. Item não empilhável originalmente permanente (#1) pode receber período arbitrário (3600 s)
-        Assert.True(player.GiveItems([(1, 3600)]));
+        Assert.True(Items.GiveItems(player, [new(1, Duration: ItemDuration.FromSeconds(3600))], TestSupport.Reason));
         var timedCrest = player.Character.Inventory.Main[3]!;
         Assert.True(timedCrest.IsTimed);
         Assert.InRange(timedCrest.ExpiresAt, (uint)(before + 3595), (uint)(before + 3610));
 
-        // 5. Item empilhável (#25) trata o valor como quantidade normal (e rejeita -1)
-        Assert.False(player.GiveItems([(25, -1)]));
-        Assert.True(player.GiveItems([(25, 10)]));
+        // 5. Item empilhável (#25) recebe quantidade e não aceita prazo
+        Assert.False(Items.GiveItems(player, [new(25, Duration: ItemDuration.Permanent)], TestSupport.Reason));
+        Assert.True(Items.GiveItems(player, [new(25, 10)], TestSupport.Reason));
         var bread = player.Character.Inventory.Main[4]!;
         Assert.False(bread.IsTimed);
         Assert.Equal(10u, bread.Amount);
@@ -98,7 +127,7 @@ public class TimedItemTests
     public void ItemRecord_and_CharacterData_0x02_encode_timestamps_at_official_offsets()
     {
         var (player, _) = MakePlayer();
-        Assert.True(player.GiveItems([(718, 86400), (718, -1)]));
+        Assert.True(Items.GiveItems(player, [new(718, Duration: ItemDuration.FromDays(1)), new(718, Duration: ItemDuration.Permanent)], TestSupport.Reason));
         var timed = player.Character.Inventory.Main[0]!;
         var perm = player.Character.Inventory.Main[1]!;
 
@@ -119,7 +148,7 @@ public class TimedItemTests
 
         // S2C 0x02 (7600 B): offset 0x19B0 (6576) contém o Unix timestamp UTC atual do servidor
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var p02 = new CharacterDataPacket(player.Character).EncodePayload();
+        var p02 = new CharacterDataPacket(player.Character, TestSupport.Clock.UnixNow).EncodePayload();
         Assert.Equal(7600, p02.Length);
         uint serverTime = BinaryPrimitives.ReadUInt32LittleEndian(p02.AsSpan(0x19B0));
         Assert.InRange(serverTime, (uint)(now - 5), (uint)(now + 5));
@@ -136,16 +165,16 @@ public class TimedItemTests
         // 1. Guarda de segurança: item já expirado não pode ser equipado
         var expiredBagItem = inv.Create(718, 0, 1, expiresAt: pastTs);
         inv.Main.Place(expiredBagItem);
-        Assert.False(EquipmentSlots.CanEquip(ItemPlace.Aura, expiredBagItem, player.Character.Level));
+        Assert.False(EquipmentSlots.CanEquip(ItemPlace.Aura, expiredBagItem, player.Character.Level, TestSupport.Clock.UnixNow));
 
         // 2. Expiração em tempo real no tick da zona: remove item vencido equipado e recalcula status
         var expiredEquip = inv.Create(1, (int)ItemPlace.Crest1, 1, expiresAt: pastTs);
         inv.Equipment.Place(expiredEquip);
-        player.Character.SyncEquipmentBonuses();
+        player.Character.SyncEquipmentModifiers();
         int boostedAtk = player.Leader.Stats.Atk;
 
         var world = TestSupport.NewWorld();
-        var zone = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance).Find(79)!;
+        var zone = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance).Find(79)!;
         zone.Enter(player);
         session.SentOpcodes(); // limpa entrada
 
@@ -154,9 +183,10 @@ public class TimedItemTests
         Assert.Null(inv.EquippedAt(ItemPlace.Crest1));
         Assert.Equal(boostedAtk - 15, player.Leader.Stats.Atk);
         var ops = session.SentOpcodes();
-        Assert.Contains((ushort)MapOpcode.InventoryRefresh, ops);
-        Assert.Contains((ushort)MapOpcode.TamerExp, ops);
-        Assert.Contains((ushort)MapOpcode.BattleDigimonStatus, ops);
+        // EquipmentService: 0xFC da mochila, depois a sequência de troca de equipamento (0xB1 → 0xB4 por Digimon → 0x10)
+        ushort[] sequence = [(ushort)MapOpcode.InventoryRefresh, (ushort)MapOpcode.TamerExp,
+            (ushort)MapOpcode.BattleDigimonStatus, (ushort)MapOpcode.RefreshCharacterInfo];
+        Assert.Equal(sequence, ops.Where(sequence.Contains));
 
         // 3. Persistência e recarga: item válido permanece com ExpiresAt; item vencido é descartado no login
         var validTimed = inv.Create(718, (int)ItemPlace.Aura, 1, expiresAt: futureTs);
@@ -175,13 +205,12 @@ public class TimedItemTests
             Maps = TestSupport.Data.Maps,
             Grids = TestSupport.Data.Grids,
             DropGroups = TestSupport.Data.DropGroups,
-            TamingNets = TestSupport.Data.TamingNets,
             Portals = TestSupport.Data.Portals,
             Spawns = TestSupport.Data.Spawns,
             ZoneIds = TestSupport.Data.ZoneIds,
         };
         var species = TestSupport.Data.Species.Values.First(s => s.Stage == StatFormulas.InTraining);
-        var factory = new CharacterFactory(data, Options.Create(new GameOptions()));
+        var factory = new CharacterFactory(data, Options.Create(new GameOptions()), TestSupport.Clock);
         var record = new CharacterRecord(
             new CharacterRow { Uid = 10, AccountUid = 1, Slot = 0, Name = "Tamer", TamerId = 1, Level = 10, MapId = 79, PosX = 30, PosY = 30 },
             [new DigimonRow { Uid = 100, Slot = 0, DigimonId = species.Id, Name = species.Name, Level = 10 }],
@@ -199,11 +228,11 @@ public class TimedItemTests
     public void ExchangeItems_supports_timed_and_permanent_and_GiveCards_accepts_batch()
     {
         var (player, session) = MakePlayer();
-        Assert.True(player.GiveItem(25, 5, refresh: false));
+        Assert.True(Items.GiveItems(player, [new(25, 5)], TestSupport.Reason, refresh: false));
         session.SentOpcodes();
 
-        // ExchangeItems aceita -1 (permanente) e período arbitrário (86400 s) no mesmo lote
-        Assert.True(player.ExchangeItems(25, 5, [(718, -1), (1, 86400)]));
+        // a troca aceita permanente e prazo arbitrário no mesmo lote
+        Assert.True(Items.Exchange(player, 25, 5, [new(718, Duration: ItemDuration.Permanent), new(1, Duration: ItemDuration.FromDays(1))], TestSupport.Reason));
         Assert.Equal(0u, player.Character.Inventory.Main.Count(25));
         var permAura = player.Character.Inventory.Main.Find(718)!;
         var timedCrest = player.Character.Inventory.Main.Find(1)!;
@@ -212,13 +241,56 @@ public class TimedItemTests
 
         // GiveCards entrega múltiplos cards em um único pacote 0xC8
         session.SentOpcodes();
-        Assert.True(player.GiveCards([(74, 50), (19, 10)], refresh: false));
+        Assert.True(Items.GiveCards(player, [new(74, 50), new(19, 10)], TestSupport.Reason, refresh: false));
         Assert.Equal(50u, player.Character.Inventory.Battle.Count(74));
         Assert.Equal(10u, player.Character.Inventory.Battle.Count(19));
         Assert.Equal([(ushort)MapOpcode.BattleItemReceive], session.SentOpcodes());
 
         // GiveCards rejeita quantidade 0 sem alterar nada
-        Assert.False(player.GiveCards([(74, 1), (19, 0)], refresh: false));
+        Assert.False(Items.GiveCards(player, [new(74), new(19, 0)], TestSupport.Reason, refresh: false));
         Assert.Equal(50u, player.Character.Inventory.Battle.Count(74));
+    }
+
+    [Fact]
+    public void Non_stackable_grant_amount_is_one_slot_each_with_the_same_duration()
+    {
+        var (player, _) = MakePlayer();
+        Assert.True(Items.GiveItems(player, [new(718, 3, ItemDuration.FromDays(1))], TestSupport.Reason, refresh: false));
+
+        var auras = player.Character.Inventory.Main.Items.Where(i => i.ItemId == 718).ToList();
+        Assert.Equal(3, auras.Count);
+        Assert.All(auras, a => Assert.Equal((1u, auras[0].ExpiresAt), (a.Amount, a.ExpiresAt)));
+    }
+
+    [Fact]
+    public void Invalid_or_oversized_grant_changes_nothing()
+    {
+        var (player, session) = MakePlayer();
+        var bag = player.Character.Inventory.Main;
+        Assert.True(Items.GiveItems(player, [new(1, (uint)bag.Capacity - 1)], TestSupport.Reason, refresh: false));
+        session.SentOpcodes();
+
+        Assert.False(Items.GiveItems(player, [new(718, 2)], TestSupport.Reason));          // uma posição livre
+        Assert.False(Items.GiveItems(player, [new(25, 0)], TestSupport.Reason));
+        Assert.False(Items.GiveCards(player, [new(74, 1, ItemDuration.Permanent)], TestSupport.Reason));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ItemDuration.FromSeconds(0));
+
+        Assert.Equal(bag.Capacity - 1, bag.Items.Count());
+        Assert.Empty(session.SentOpcodes());
+        Assert.Equal(bag.Capacity - 1, player.Character.Economy.Pending.Single().Amount);
+    }
+
+    [Fact]
+    public void Exchange_can_use_the_slot_it_frees_and_rolls_back_when_it_does_not_fit()
+    {
+        var (player, _) = MakePlayer();
+        var bag = player.Character.Inventory.Main;
+        Assert.True(Items.GiveItems(player, [new(1, (uint)bag.Capacity - 1), new(25, 5)], TestSupport.Reason, refresh: false));
+
+        Assert.False(Items.Exchange(player, 25, 5, [new(718, 2)], TestSupport.Reason));   // só a posição do pão
+        Assert.Equal(5u, bag.Count(25));
+
+        Assert.True(Items.Exchange(player, 25, 5, [new(718)], TestSupport.Reason));
+        Assert.Equal((0u, 1u), (bag.Count(25), bag.Count(718)));
     }
 }

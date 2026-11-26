@@ -1,6 +1,12 @@
 using System.Collections.Frozen;
 using System.Globalization;
 using System.Xml.Linq;
+using DRPGServer.Game.Battle.Cards;
+using DRPGServer.Game.Digimons;
+using DRPGServer.Game.Economy;
+using DRPGServer.Game.Items;
+using DRPGServer.Game.Stats;
+using DRPGServer.Game.World;
 
 namespace DRPGServer.Data.GameData;
 
@@ -23,6 +29,7 @@ public static class GameDataLoader
         grids ??= FrozenDictionary<byte, MapGrid>.Empty;
         var species = ClientTables.Species(pack);
         var items = ApplyEquipmentEffects(ClientTables.Items(pack), LoadEquipmentEffects(Path.Combine(root, "Item/EquipmentEffects.xml")));
+        items = ApplyItemUseEffects(items, LoadItemUseEffects(Path.Combine(root, "Item/ItemEffects.xml")));
         var maps = ClientTables.Maps(pack);
 
         var drops = new Dictionary<uint, IReadOnlyList<DropEntry>>();
@@ -36,16 +43,6 @@ public static class GameDataLoader
                 if (entry.Rate > 100) throw new GameDataException($"DropGroup {id}: taxa {entry.Rate} fora de 0..100");
             }
             if (!drops.TryAdd(id, entries)) throw new GameDataException($"DropGroup {id} duplicado");
-        }
-
-        var nets = new Dictionary<uint, TamingNet>();
-        foreach (var e in Elements(root, "Item/TamingNets.xml", "TamingNets", "Net"))
-        {
-            var net = new TamingNet(U32(e, "ItemID"), U8(e, "Stage"), U8(e, "Chance"));
-            if (!items.ContainsKey(net.ItemId)) throw new GameDataException($"TamingNets.xml: item {net.ItemId} não existe");
-            if (net.Stage is < 1 or > 5) throw new GameDataException($"TamingNets.xml: item {net.ItemId} com estágio {net.Stage} fora de 1..5");
-            if (net.Chance > 100) throw new GameDataException($"TamingNets.xml: item {net.ItemId} com chance {net.Chance} fora de 0..100");
-            if (!nets.TryAdd(net.ItemId, net)) throw new GameDataException($"TamingNets.xml: item {net.ItemId} duplicado");
         }
 
         var arrivals = new Dictionary<(byte, short, short), PortalInfo>();
@@ -91,8 +88,14 @@ public static class GameDataLoader
 
         var zoneIds = maps.Keys.Order().ToList();
 
-        var cards = ClientTables.Cards(pack);
+        var cards = ApplyCardEffects(ClientTables.Cards(pack), LoadCardEffects(Path.Combine(root, "Card/CardEffects.xml")));
         var npcShops = LoadNpcShops(root);
+        var npcs = ClientTables.Npcs(pack);
+        // toda loja tem dono: o InteractionGuard confere que o jogador está perto dele
+        var orphanShops = npcShops.Keys.Where(id => npcs.OwnersOf(id).Count == 0).ToList();
+        if (orphanShops.Count > 0)
+            throw new InvalidDataException(
+                $"NpcShop.xml: loja(s) {string.Join(", ", orphanShops)} sem NPC dono em npc_info_us (coluna 12)");
 
         return new GameData
         {
@@ -100,12 +103,12 @@ public static class GameDataLoader
             Items = items,
             Cards = cards,
             NpcShops = npcShops,
+            Npcs = npcs,
             CashShopProducts = ClientTables.CashShopProducts(pack),
-            DigimonTitles = ClientTables.DigimonTitles(pack),
+            DigimonTitles = LoadDigimonTitles(Path.Combine(root, "Digimon/DigimonTitles.xml")),
             Skills = ClientTables.Skills(pack),
             Evolutions = ClientTables.Evolutions(pack),
             DropGroups = drops.ToFrozenDictionary(),
-            TamingNets = nets.ToFrozenDictionary(),
             Maps = maps,
             Grids = grids,
             Portals = portals,
@@ -154,48 +157,78 @@ public static class GameDataLoader
     /// Carrega os efeitos estruturados de equipamentos de <c>Resources/Item/EquipmentEffects.xml</c>
     /// (fonte autoritativa server-side, sem parsear texto de descrição do cliente em runtime).
     /// </summary>
-    public static FrozenDictionary<uint, EquipmentBonus> LoadEquipmentEffects(string path)
+    public static FrozenDictionary<uint, StatModifiers> LoadEquipmentEffects(string path)
     {
-        if (!File.Exists(path)) return FrozenDictionary<uint, EquipmentBonus>.Empty;
+        if (!File.Exists(path)) return FrozenDictionary<uint, StatModifiers>.Empty;
         var doc = XDocument.Load(path);
         var top = doc.Element("EquipmentEffects") ?? throw new GameDataException($"{path}: falta a raiz <EquipmentEffects>");
-        var effects = new Dictionary<uint, EquipmentBonus>();
+        var effects = new Dictionary<uint, StatModifiers>();
         foreach (var e in top.Elements("Equipment"))
         {
             uint id = U32(e, "ItemID");
-            var bonus = new EquipmentBonus(
-                Attributes: new Game.Stats.Attributes(OptI32(e, "Str"), OptI32(e, "Agi"), OptI32(e, "Con"), OptI32(e, "Int")),
-                BonusHp: OptI32(e, "Hp"),
-                BonusVp: OptI32(e, "Vp"),
-                BonusAtk: OptI32(e, "Atk"),
-                BonusDef: OptI32(e, "Def"),
-                BonusBr: OptI32(e, "Br"),
-                BonusAtkPercent: OptI32(e, "AtkPercent"),
-                BonusDefPercent: OptI32(e, "DefPercent"),
-                BonusBrPercent: OptI32(e, "BrPercent"),
-                CardSlashLimit: OptI32(e, "CardSlashLimit"),
-                ExtraCardSlashes: OptI32(e, "ExtraCardSlashes"),
-                DigimonExpPercent: OptI32(e, "DigimonExpPercent"),
-                TamerExpFlat: OptI32(e, "TamerExp"),
-                HpRecovery: OptI32(e, "HpRecovery"),
-                VpRecovery: OptI32(e, "VpRecovery"),
-                EvpRecovery: OptI32(e, "EvpRecovery"),
-                MaintainEvolution: (bool?)e.Attribute("MaintainEvolution") ?? false,
-                AutoSummonPartners: OptI32(e, "AutoSummonPartners"),
-                BonusDamagePercent: OptI32(e, "DamagePercent"),
-                SingleSkillDamagePercent: OptI32(e, "SingleSkillDamagePercent"),
-                MultiSkillDamagePercent: OptI32(e, "MultiSkillDamagePercent"),
-                MeleeSkillDamagePercent: OptI32(e, "MeleeSkillDamagePercent"),
-                RangedSkillDamagePercent: OptI32(e, "RangedSkillDamagePercent"),
-                OnHitHealHp: OptI32(e, "OnHitHealHp"),
-                OnHitHealVp: OptI32(e, "OnHitHealVp"));
-            if (!effects.TryAdd(id, bonus))
+            foreach (var attr in e.Attributes())
+            {
+                if (attr.Name.LocalName is not ("ItemID" or "Name"))
+                    throw new GameDataException($"EquipmentEffects.xml: ItemID {id}: atributo {attr.Name} desconhecido (use <Modifier>)");
+            }
+            var modifiers = ModifierXml.Read(e, $"EquipmentEffects.xml: ItemID {id}");
+            if (modifiers.IsEmpty)
+                throw new GameDataException($"EquipmentEffects.xml: ItemID {id} sem <Modifier>");
+            if (!effects.TryAdd(id, modifiers))
                 throw new GameDataException($"EquipmentEffects.xml: ItemID {id} duplicado");
         }
         return effects.ToFrozenDictionary();
     }
 
-    private static FrozenDictionary<uint, NpcShop> LoadNpcShops(string root)
+    public static FrozenDictionary<uint, DigimonTitleInfo> LoadDigimonTitles(string path)
+    {
+        if (!File.Exists(path)) throw new GameDataException($"tabela {path} não encontrada");
+        var doc = XDocument.Load(path);
+        var top = doc.Element("DigimonTitles") ?? throw new GameDataException($"{path}: falta a raiz <DigimonTitles>");
+        var titles = new Dictionary<uint, DigimonTitleInfo>();
+        foreach (var e in top.Elements("Title"))
+        {
+            uint id = U32(e, "ID");
+            string where = $"DigimonTitles.xml: título {id}";
+            if (id == 0) throw new GameDataException($"{where}: id 0 é reservado (sem título)");
+            foreach (var attr in e.Attributes())
+            {
+                if (attr.Name.LocalName is not ("ID" or "Name"))
+                    throw new GameDataException($"{where}: atributo {attr.Name} desconhecido");
+            }
+            foreach (var child in e.Elements())
+            {
+                if (child.Name.LocalName is not ("Modifier" or "Unlock"))
+                    throw new GameDataException($"{where}: elemento <{child.Name}> desconhecido");
+            }
+            var title = new DigimonTitleInfo(id, Attr(e, "Name"))
+            {
+                Modifiers = ModifierXml.Read(e.Elements("Modifier"), where),
+                Unlocks = e.Elements("Unlock").Select(u => ReadUnlock(u, where)).ToArray(),
+            };
+            if (!titles.TryAdd(id, title))
+                throw new GameDataException($"{where} duplicado");
+        }
+        return titles.ToFrozenDictionary();
+    }
+
+    private static ITitleUnlockRule ReadUnlock(XElement e, string where)
+    {
+        foreach (var attr in e.Attributes())
+        {
+            if (attr.Name.LocalName is not ("Condition" or "Value"))
+                throw new GameDataException($"{where}: <Unlock> com atributo {attr.Name} desconhecido");
+        }
+        string conditionText = Attr(e, "Condition");
+        if (int.TryParse(conditionText, out _) || !Enum.TryParse<TitleUnlockCondition>(conditionText, out var condition)
+            || !Enum.IsDefined(condition))
+            throw new GameDataException($"{where}: Condition \"{conditionText}\" desconhecida");
+        string value = Attr(e, "Value");
+        return TitleUnlockRules.Create(condition, value)
+            ?? throw new GameDataException($"{where}: <Unlock Condition=\"{condition}\"> com valor \"{value}\" inválido");
+    }
+
+    internal static FrozenDictionary<uint, NpcShop> LoadNpcShops(string root)
     {
         var path = Path.Combine(root, "Item/NpcShop.xml");
         if (!File.Exists(path)) return FrozenDictionary<uint, NpcShop>.Empty;
@@ -214,10 +247,10 @@ public static class GameDataLoader
             string name = (string?)s.Attribute("Name") ?? "";
             var currency = (string?)s.Attribute("Currency") switch
             {
-                null or "" or "Bits" => NpcShopCurrency.Bits,
-                "Medals" => NpcShopCurrency.Medals,
-                "Coins" => NpcShopCurrency.Coins,
-                "LadderPoints" => NpcShopCurrency.LadderPoints,
+                null or "" or "Bits" => CurrencyKind.Bits,
+                "Medals" => CurrencyKind.Medals,
+                "Coins" => CurrencyKind.Coins,
+                "LadderPoints" => CurrencyKind.LadderPoints,
                 var other => throw new GameDataException($"NpcShop {id}: Currency '{other}' inválido (esperado Bits, Medals, Coins ou LadderPoints)"),
             };
             var deliverTo = (string?)s.Attribute("DeliverTo") switch
@@ -231,6 +264,8 @@ public static class GameDataLoader
                     U32(e, "ID"),
                     e.Attribute("Price") is not null ? U32(e, "Price") : null))
                 .ToList();
+            if (currency == CurrencyKind.Medals && entries.FirstOrDefault(e => e.PriceOverride is null) is { } unpriced)
+                throw new GameDataException($"NpcShop {id}: loja de Medals sem Price no item {unpriced.ItemId} (a tabela do cliente não tem preço em Medals)");
             if (entries.Count > NpcShop.MaxSlots)
                 throw new GameDataException($"NpcShop {id}: {entries.Count} itens excede o máximo de {NpcShop.MaxSlots}");
             if (!shops.TryAdd(id, new NpcShop(id, kind, name, entries, currency, deliverTo)))
@@ -239,13 +274,106 @@ public static class GameDataLoader
         return shops.ToFrozenDictionary();
     }
 
+    public static FrozenDictionary<uint, IReadOnlyList<ICardEffect>> LoadCardEffects(string path)
+    {
+        if (!File.Exists(path)) throw new GameDataException($"tabela {path} não encontrada");
+        var doc = XDocument.Load(path);
+        var top = doc.Element("CardEffects") ?? throw new GameDataException($"{path}: falta a raiz <CardEffects>");
+        var effects = new Dictionary<uint, IReadOnlyList<ICardEffect>>();
+        foreach (var e in top.Elements("Card"))
+        {
+            uint id = U32(e, "ID");
+            string where = $"CardEffects.xml: card {id}";
+            foreach (var attr in e.Attributes())
+            {
+                if (attr.Name.LocalName is not ("ID" or "Name"))
+                    throw new GameDataException($"{where}: atributo {attr.Name} desconhecido");
+            }
+            var list = new List<ICardEffect>();
+            foreach (var child in e.Elements())
+            {
+                if (child.Name.LocalName != "Effect")
+                    throw new GameDataException($"{where}: elemento <{child.Name}> desconhecido");
+                list.Add(CardEffectTypes.Create(new EffectParams(child, where)));
+            }
+            if (list.Count == 0) throw new GameDataException($"{where} sem <Effect>");
+            if (!effects.TryAdd(id, list)) throw new GameDataException($"{where} duplicado");
+        }
+        return effects.ToFrozenDictionary();
+    }
+
+    /// <summary>Liga os efeitos aos cards da tabela. Efeito que não vale no gatilho do card derruba a carga.</summary>
+    private static FrozenDictionary<uint, CardInfo> ApplyCardEffects(
+        FrozenDictionary<uint, CardInfo> cards, FrozenDictionary<uint, IReadOnlyList<ICardEffect>> effects)
+    {
+        var merged = new Dictionary<uint, CardInfo>(cards.Count);
+        foreach (var (id, info) in cards)
+        {
+            if (!effects.TryGetValue(id, out var list))
+            {
+                merged[id] = info;
+                continue;
+            }
+            foreach (var effect in list)
+            {
+                bool fits = info.Trigger == CardTrigger.Defense ? effect is ICardDefenseEffect : effect is ICardAttackEffect;
+                if (!fits)
+                    throw new GameDataException($"CardEffects.xml: card {id} ({info.Trigger}) com efeito {effect.GetType().Name} que não vale nesse gatilho");
+            }
+            merged[id] = info with { Effects = list };
+        }
+        return merged.ToFrozenDictionary();
+    }
+
+    public static FrozenDictionary<uint, IReadOnlyList<IItemUseEffect>> LoadItemUseEffects(string path)
+    {
+        if (!File.Exists(path)) throw new GameDataException($"tabela {path} não encontrada");
+        var doc = XDocument.Load(path);
+        var top = doc.Element("ItemEffects") ?? throw new GameDataException($"{path}: falta a raiz <ItemEffects>");
+        var effects = new Dictionary<uint, IReadOnlyList<IItemUseEffect>>();
+        foreach (var e in top.Elements("Item"))
+        {
+            uint id = U32(e, "ID");
+            string where = $"ItemEffects.xml: item {id}";
+            foreach (var attr in e.Attributes())
+            {
+                if (attr.Name.LocalName is not ("ID" or "Name"))
+                    throw new GameDataException($"{where}: atributo {attr.Name} desconhecido");
+            }
+            var list = new List<IItemUseEffect>();
+            foreach (var child in e.Elements())
+            {
+                if (child.Name.LocalName != "Effect")
+                    throw new GameDataException($"{where}: elemento <{child.Name}> desconhecido");
+                list.Add(ItemUseEffectTypes.Create(new EffectParams(child, where)));
+            }
+            if (list.Count == 0) throw new GameDataException($"{where} sem <Effect>");
+            if (list.Select(x => x.Entry).Distinct().Count() > 1)
+                throw new GameDataException($"{where}: efeitos de entradas diferentes (0x41 e 0x85) no mesmo item");
+            if (!effects.TryAdd(id, list)) throw new GameDataException($"{where} duplicado");
+        }
+        return effects.ToFrozenDictionary();
+    }
+
+    private static FrozenDictionary<uint, ItemInfo> ApplyItemUseEffects(
+        FrozenDictionary<uint, ItemInfo> items, FrozenDictionary<uint, IReadOnlyList<IItemUseEffect>> effects)
+    {
+        var missing = effects.Keys.Where(id => !items.ContainsKey(id)).Order().ToList();
+        if (missing.Count > 0)
+            throw new GameDataException($"ItemEffects.xml: item(ns) {string.Join(", ", missing)} não existe(m) no item_info_us");
+        var merged = new Dictionary<uint, ItemInfo>(items.Count);
+        foreach (var (id, info) in items)
+            merged[id] = effects.TryGetValue(id, out var list) ? info with { UseEffects = list } : info;
+        return merged.ToFrozenDictionary();
+    }
+
     private static FrozenDictionary<uint, ItemInfo> ApplyEquipmentEffects(
-        FrozenDictionary<uint, ItemInfo> items, FrozenDictionary<uint, EquipmentBonus> effects)
+        FrozenDictionary<uint, ItemInfo> items, FrozenDictionary<uint, StatModifiers> effects)
     {
         if (effects.Count == 0) return items;
         var merged = new Dictionary<uint, ItemInfo>(items.Count);
         foreach (var (id, info) in items)
-            merged[id] = effects.TryGetValue(id, out var bonus) ? info with { EquipmentBonus = bonus } : info;
+            merged[id] = effects.TryGetValue(id, out var modifiers) ? info with { Modifiers = modifiers } : info;
         return merged.ToFrozenDictionary();
     }
 

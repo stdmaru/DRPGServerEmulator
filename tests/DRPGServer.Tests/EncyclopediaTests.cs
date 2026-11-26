@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game;
+using DRPGServer.Game.Digimons;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
@@ -89,7 +90,7 @@ public class EncyclopediaTests
         var character = Entities.Character();
         var uids = new DigimonUids();
         uids.Seed(50);
-        var taming = new Taming(TestSupport.Data, uids, TestSupport.GameOptions());
+        var taming = TestSupport.NewTaming(uids);
         var tamed = taming.Tame(character, TestSupport.Data.FindSpecies(14)!)!;
 
         // Evolução na árvore de teste: In-Training (14) -> Rookie (50) -> Champion (80)
@@ -113,20 +114,21 @@ public class EncyclopediaTests
     [Fact]
     public async Task Global_handlers_reply_with_live_character_party_and_echoed_uid()
     {
-        var accounts = new AccountRegistry(TestSupport.GameOptions(), TimeProvider.System);
+        var accounts = new AccountRegistry(TestSupport.NetworkOptions(), TimeProvider.System);
         var world = TestSupport.NewWorld();
         var account = new AuthenticatedAccount(1, "tester", Authority.None);
 
         var channelSession = TestSupport.NewSession(ServerRole.Channel);
         accounts.SignIn(account, channelSession);
 
-        var character = new Character(Entities.Digimon(species: 50, level: 11), new Inventory(TestSupport.Data.FindItem, 999))
+        var character = new Character(Entities.Digimon(species: 50, level: 11), new Inventory(TestSupport.Data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };
         var mapSession = TestSupport.NewSession(ServerRole.Map);
         accounts.Claim("tester", mapSession);
-        mapSession.Player = new Player(mapSession, account, character);
+        var players = TestSupport.NewPlayers(world);
+        players.EnterNow(mapSession, account, character);
 
         var globalSession = TestSupport.NewSession(ServerRole.Global);
         var lifecycle = new GlobalLifecycle(accounts);
@@ -144,14 +146,14 @@ public class EncyclopediaTests
         BinaryPrimitives.WriteUInt32LittleEndian(req7BPlain, character.Leader.Uid);
         var req7BCipher = GlobalSessionCipher.EncryptBlocks(key, req7BPlain);
 
-        var dataHandler = new EncyclopediaDataHandler(accounts, world);
-        var collectionHandler = new EncyclopediaCollectionHandler(accounts, world);
+        var dataHandler = new EncyclopediaDataHandler(players, world);
+        var collectionHandler = new EncyclopediaCollectionHandler(players, world);
 
         await world.StartAsync(CancellationToken.None);
         try
         {
-            await dataHandler.HandleAsync(globalSession, new PacketReader(req7BCipher), CancellationToken.None);
-            await collectionHandler.HandleAsync(globalSession, new PacketReader(new byte[64]), CancellationToken.None);
+            await dataHandler.DispatchAsync(globalSession, new PacketReader(req7BCipher), CancellationToken.None);
+            await collectionHandler.DispatchAsync(globalSession, new PacketReader(new byte[64]), CancellationToken.None);
             await world.InvokeAsync(() => true);
         }
         finally

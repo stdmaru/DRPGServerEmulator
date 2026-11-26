@@ -1,7 +1,5 @@
-using System.Security.Cryptography;
-using DRPGServer.Game.World;
+using DRPGServer.Network.Packets;
 using DRPGServer.Network.Packets.Map;
-using DRPGServer.Network.Packets.Login;
 using DRPGServer.Network.Protocol;
 
 namespace DRPGServer.Network.Handlers;
@@ -12,9 +10,9 @@ namespace DRPGServer.Network.Handlers;
 /// </summary>
 [PacketHandler(ChannelOpcode.KeepAlive)]
 [PacketHandler(GlobalOpcode.KeepAlive)]
-public sealed class KeepAliveHandler : ISessionPacketHandler
+public sealed class KeepAliveHandler : SessionHandler<KeepAliveRequest>
 {
-    public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
+    protected override ValueTask HandleAsync(Session session, KeepAliveRequest request, CancellationToken ct)
     {
         session.Send(new KeepAlivePacket((ushort)ChannelOpcode.KeepAlive));
         return ValueTask.CompletedTask;
@@ -28,61 +26,7 @@ public sealed class KeepAliveHandler : ISessionPacketHandler
 [PacketHandler(ChannelOpcode.ClientHardwareInfo)]
 [PacketHandler(GlobalOpcode.CharacterJoin)]
 [PacketHandler(MapOpcode.KeepAlive)]                 // resposta do cliente ao ping do servidor
-public sealed class IgnoreHandler : ISessionPacketHandler
+public sealed class IgnoreHandler : SessionHandler<IgnoredPayload>
 {
-    public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct) => ValueTask.CompletedTask;
-}
-
-/// <summary>0x05 (login): primeiro contato; responde com o usuário.</summary>
-[PacketHandler(LoginOpcode.Handshake)]
-public sealed class LoginHandshakeHandler : ISessionPacketHandler
-{
-    public ValueTask HandleAsync(Session session, PacketReader packet, CancellationToken ct)
-    {
-        packet.ReadU32();                       // 1
-        packet.ReadU32();                       // 0
-        var username = packet.ReadFixedString(20);
-        session.Send(new HandshakePacket(username));
-        return ValueTask.CompletedTask;
-    }
-}
-
-/// <summary>Boas-vindas (0x0E) no mapa e no global; ao desconectar, tira do mundo e solta a conta.</summary>
-public sealed class MapLifecycle(GameWorld world, PlayerSystem players, AccountRegistry accounts) : ISessionLifecycle
-{
-    public ServerRole Role => ServerRole.Map;
-
-    public void OnConnected(Session session)
-    {
-        var seed = RandomNumberGenerator.GetBytes(GlobalSessionCipher.BlockSize);
-        session.MapAesKey = GlobalSessionCipher.DeriveKey(seed);
-        session.Send(new HelloPacket((ushort)MapOpcode.Hello, seed));
-    }
-
-    public void OnDisconnected(Session session)
-    {
-        world.Post(() => players.Leave(session));
-        accounts.Release(session);
-    }
-}
-
-public sealed class GlobalLifecycle(AccountRegistry accounts) : ISessionLifecycle
-{
-    public ServerRole Role => ServerRole.Global;
-
-    public void OnConnected(Session session)
-    {
-        var seed = RandomNumberGenerator.GetBytes(GlobalSessionCipher.BlockSize);
-        session.GlobalAesKey = GlobalSessionCipher.DeriveKey(seed);
-        session.Send(new HelloPacket((ushort)GlobalOpcode.Hello, seed));
-    }
-
-    public void OnDisconnected(Session session) => accounts.Release(session);
-}
-
-public sealed class ChannelLifecycle(AccountRegistry accounts) : ISessionLifecycle
-{
-    public ServerRole Role => ServerRole.Channel;
-    public void OnConnected(Session session) { }
-    public void OnDisconnected(Session session) => accounts.Release(session);
+    protected override ValueTask HandleAsync(Session session, IgnoredPayload request, CancellationToken ct) => ValueTask.CompletedTask;
 }

@@ -154,11 +154,11 @@ public static class EquipmentSlots
     };
 
     /// <summary>Validação server-side completa: slot válido, tipo compatível, não expirado, quantidade 1 e nível mínimo do Tamer.</summary>
-    public static bool CanEquip(ItemPlace place, InventoryItem item, ushort tamerLevel)
+    public static bool CanEquip(ItemPlace place, InventoryItem item, ushort tamerLevel, long unixNow)
     {
         if (!IsEquipmentPlace(place)) return false;
         if (item.Amount != 1 || item.Info is not { } info) return false;
-        if (item.IsExpired()) return false;
+        if (item.IsExpired(unixNow)) return false;
         if (!AcceptsType(place, info.Type)) return false;
         if (info.Level > 1 && tamerLevel < info.Level) return false;
         return true;

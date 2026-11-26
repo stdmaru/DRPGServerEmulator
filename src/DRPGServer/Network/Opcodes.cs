@@ -146,4 +146,31 @@ public static class OpcodeNames
         };
         return name is null ? $"0x{opcode:X}" : $"{name}(0x{opcode:X})";
     }
+
+    /// <summary>Opcode pelo nome do enum do servidor (ex.: <c>Map</c> + <c>ChatNormal</c>), para configuração.</summary>
+    public static bool TryParse(ServerRole role, string name, out ushort opcode)
+    {
+        opcode = 0;
+        bool ok = role switch
+        {
+            ServerRole.Login => TryParse<LoginOpcode>(name, out opcode),
+            ServerRole.Channel => TryParse<ChannelOpcode>(name, out opcode),
+            ServerRole.Map => TryParse<MapOpcode>(name, out opcode),
+            ServerRole.Global => TryParse<GlobalOpcode>(name, out opcode),
+            _ => false,
+        };
+        return ok;
+    }
+
+    private static bool TryParse<TOpcode>(string name, out ushort opcode) where TOpcode : struct, Enum
+    {
+        // só nomes declarados: Enum.TryParse aceitaria também "33" ou "0x21"
+        if (Enum.GetNames<TOpcode>().Contains(name) && Enum.TryParse<TOpcode>(name, out var value))
+        {
+            opcode = Convert.ToUInt16(value);
+            return true;
+        }
+        opcode = 0;
+        return false;
+    }
 }

@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.Npcs;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
@@ -13,28 +14,28 @@ public class NpcTests
     private sealed class DuplicateScriptA : NpcScriptBase
     {
         public override byte MapId => 1;
-        public DuplicateScriptA() => RegisterChoice(42, _ => true);
+        public DuplicateScriptA() : base(TestSupport.Items()) => RegisterChoice(42, DigitalBureauNpcs.NyangNpc, _ => true);
     }
 
     private sealed class DuplicateScriptB : NpcScriptBase
     {
-        public override byte MapId => 2;
-        public DuplicateScriptB() => RegisterChoice(42, _ => true);
+        public override byte MapId => 1;
+        public DuplicateScriptB() : base(TestSupport.Items()) => RegisterChoice(42, DigitalBureauNpcs.NyangNpc, _ => true);
     }
 
     [Fact]
     public void Registry_rejects_duplicate_choice_ids_at_startup()
     {
         Assert.Throws<InvalidOperationException>(() =>
-            new NpcScriptRegistry([new DuplicateScriptA(), new DuplicateScriptB()]));
+            TestSupport.NewNpcRegistry(new DuplicateScriptA(), new DuplicateScriptB()));
     }
 
     [Fact]
     public void Registry_enforces_map_guard_for_choices()
     {
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
-        var registry = new NpcScriptRegistry([new VillageOfBeginningNpcs(zones), new DigitalBureauNpcs()]);
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
+        var registry = TestSupport.NewNpcRegistry(new VillageOfBeginningNpcs(zones, TestSupport.Items()), new DigitalBureauNpcs(TestSupport.Items()));
 
         var session = TestSupport.NewSession(ServerRole.Map);
         var character = Entities.Character(map: 1); // no Mapa 1, não pode executar escolha do Mapa 79
@@ -47,9 +48,9 @@ public class NpcTests
     [Fact]
     public void Nyang_choice_10_exchanges_tunomon_letter_and_replies_99_on_failure_or_repeat()
     {
-        var registry = new NpcScriptRegistry([new DigitalBureauNpcs()]);
+        var registry = TestSupport.NewNpcRegistry(new DigitalBureauNpcs(TestSupport.Items()));
         var session = TestSupport.NewSession(ServerRole.Map);
-        var character = Entities.Character(map: DigitalBureauNpcs.BureauMapId);
+        var character = Entities.Character().AtNpc(DigitalBureauNpcs.BureauMapId, DigitalBureauNpcs.NyangNpc);
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
 
         // Sem a carta do Tunomon -> falha e envia S2C 0x56 = 99 (fecha janela 0x38)

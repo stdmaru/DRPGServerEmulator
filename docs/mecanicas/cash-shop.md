@@ -132,6 +132,6 @@ Em caso de sucesso (`result == 1`), o servidor envia `S2C 0x00DD` (com o registr
 4. **Pacotes e Handlers (`Map`)**:
    - `CashShopPackets.cs` / `CashShopHandlers.cs`: `0x0159` (abrir/saldo), `0x0160` (comprar), `0x0161` (histórico).
    - `CashDepositoryPackets.cs` / `CashDepositoryHandlers.cs`: `0x00CA` (abrir), `0x00DE` (listar), `0x00DD` (retirar).
-   - Guards server-side: bloquear compra/retirada em batalha, validar `productId` no catálogo, `quantity >= 1` sem overflow, saldo suficiente, espaço suficiente no Cash Depository (24 cards / 24 items) e na mochila do personagem, além de comando GM `/cash <valor>` para testes.
+   - Guards server-side: bloquear compra/retirada em batalha, validar `productId` no catálogo, `quantity >= 1` sem overflow, saldo suficiente, espaço suficiente no Cash Depository (24 cards / 24 items, `Game/Shop/CashDepository.CapacityPerKind`; 20 por página no histórico, `CashDepository.HistoryPageSize`) e na mochila do personagem, além de comando GM `/cash <valor>` para testes.
 5. **Testes Unitários (`CashShopTests.cs`)**:
    - Serialização/tamanhos de todos os pacotes (`0x0159`, `0x0160`, `0x0161`, `0x00CA`, `0x00DE`, `0x00DD`), fluxo de compra → depósito → retirada, e guards de segurança (saldo insuficiente, depósito cheio, inventário cheio, em batalha, produto inexistente, quantidade inválida).

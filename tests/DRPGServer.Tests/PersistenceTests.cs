@@ -23,11 +23,11 @@ public class PersistenceTests
         for (int v = 1; v <= 5; v++)
         {
             int version = v;
-            queue.EnqueueCharacterSave(7, _ => { executed.Add((7, version)); return Task.CompletedTask; });
+            queue.EnqueueCharacterSave(TestSupport.Job(7, _ => { executed.Add((7, version)); return Task.CompletedTask; }));
         }
-        queue.EnqueueCharacterSave(8, _ => { executed.Add((8, 1)); return Task.CompletedTask; });
+        queue.EnqueueCharacterSave(TestSupport.Job(8, _ => { executed.Add((8, 1)); return Task.CompletedTask; }));
 
-        var service = new PersistenceService(queue, NullLogger<PersistenceService>.Instance);
+        var service = TestSupport.NewPersistenceService(queue);
         await service.StartAsync(CancellationToken.None);
         await queue.FlushAsync();
         await service.StopAsync(CancellationToken.None);
@@ -43,20 +43,20 @@ public class PersistenceTests
         var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var executed = new List<int>();
 
-        queue.EnqueueCharacterSave(7, async _ =>
+        queue.EnqueueCharacterSave(TestSupport.Job(7, async _ =>
         {
             startedFirst.TrySetResult();
             await releaseFirst.Task;
             executed.Add(1);
-        });
+        }));
 
-        var service = new PersistenceService(queue, NullLogger<PersistenceService>.Instance);
+        var service = TestSupport.NewPersistenceService(queue);
         await service.StartAsync(CancellationToken.None);
         await startedFirst.Task;
 
         // Enquanto a gravação #1 está em andamento, chegam #2 e #3 -> devem coalescer para #3 logo após #1
-        queue.EnqueueCharacterSave(7, _ => { executed.Add(2); return Task.CompletedTask; });
-        queue.EnqueueCharacterSave(7, _ => { executed.Add(3); return Task.CompletedTask; });
+        queue.EnqueueCharacterSave(TestSupport.Job(7, _ => { executed.Add(2); return Task.CompletedTask; }));
+        queue.EnqueueCharacterSave(TestSupport.Job(7, _ => { executed.Add(3); return Task.CompletedTask; }));
         releaseFirst.TrySetResult();
 
         await queue.FlushAsync();
@@ -69,14 +69,14 @@ public class PersistenceTests
     public void PlayerSystem_saves_immediately_on_critical_events_and_periodically_only_when_dirty()
     {
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
-        var battles = new BattleSystem(world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
+        var battles = TestSupport.NewBattles(world, TestSupport.Data, TestSupport.GameOptions());
         var queue = new PersistenceQueue();
         var options = TestSupport.GameOptions(o => o.AutosaveSeconds = 60);
-        var players = new PlayerSystem(world, zones, battles, queue, null!, options, NullLogger<PlayerSystem>.Instance);
+        var players = new PlayerSystem(world, zones, battles, queue, new RecordingSnapshotStore(), options, NullLogger<PlayerSystem>.Instance);
 
         var session1 = TestSupport.NewSession(ServerRole.Map);
-        var player1 = players.Enter(session1, new AuthenticatedAccount(1, "u1", Authority.None), Entities.Character())!;
+        var player1 = players.EnterNow(session1, new AuthenticatedAccount(1, "u1", Authority.None), Entities.Character());
 
         // Jogador limpo não dispara gravação mesmo após 120 s
         players.Update(TimeSpan.FromSeconds(120), TimeSpan.FromSeconds(120));
@@ -95,11 +95,11 @@ public class PersistenceTests
         Assert.Equal(TimeSpan.FromSeconds(60), player1.LastSavedAt);
 
         // RequestImmediateSave (Tier 1): salva imediatamente no próximo tick (50 ms) sem esperar AutosaveSeconds
-        var char2 = new Character(Entities.Digimon(), new Inventory(TestSupport.Data.FindItem, 999))
+        var char2 = new Character(Entities.Digimon(), new Inventory(TestSupport.Data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 2, AccountUid = 2, Slot = 0, Name = "Tester2", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };
-        var player2 = players.Enter(TestSupport.NewSession(ServerRole.Map), new AuthenticatedAccount(2, "u2", Authority.None), char2)!;
+        var player2 = players.EnterNow(TestSupport.NewSession(ServerRole.Map), new AuthenticatedAccount(2, "u2", Authority.None), char2);
         player2.RequestImmediateSave();
         players.Update(TimeSpan.FromSeconds(60.05), TimeSpan.FromMilliseconds(50));
         Assert.True(queue.Reader.TryRead(out _));
@@ -112,7 +112,7 @@ public class PersistenceTests
     public void Handlers_distinguish_immediate_save_from_dirty_save()
     {
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
         var session = TestSupport.NewSession(ServerRole.Map);
         var character = Entities.Character();
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
@@ -124,7 +124,7 @@ public class PersistenceTests
         character.Inventory.Main.Place(character.Inventory.Create(41, 2, 1, 10));
         var sortPayload = new byte[12];
         sortPayload[8] = (byte)InventorySortHandler.MainInventoryType;
-        new InventorySortHandler().Handle(session, new PacketReader(sortPayload));
+        new InventorySortHandler().Dispatch(session, new PacketReader(sortPayload));
         Assert.True(player.IsDirty);
         Assert.False(player.NeedsImmediateSave);
 
@@ -134,7 +134,7 @@ public class PersistenceTests
         new ItemMoveHeader(ItemPlace.Ground, ItemPlace.Inventory, 56, 56, 0, 0).Write(w);
         w.WriteU32(drop.Uid);
         w.WriteU32(drop.ItemId);
-        new ItemMoveHandler().Handle(session, new PacketReader(w.Payload.ToArray()));
+        new ItemMoveHandler(TestSupport.Guard()).Dispatch(session, new PacketReader(w.Payload.ToArray()));
         Assert.True(player.NeedsImmediateSave);
     }
 
@@ -147,7 +147,7 @@ public class PersistenceTests
         leader.SpendVp(30);
         ally.TakeDamage(ally.Stats.MaxHp); // nocauteado (HP = 0)
 
-        var character = new Character(leader, new Inventory(TestSupport.Data.FindItem, 999))
+        var character = new Character(leader, new Inventory(TestSupport.Data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 42, AccountUid = 1, Slot = 0, Name = "Hero", TamerId = 1, Level = 10, MapId = 79, X = 50, Y = 50,
         };
@@ -158,7 +158,7 @@ public class PersistenceTests
         Assert.Equal((leader.Hp, leader.Vp, leader.Evp), (snap.Digimons[0].Hp, snap.Digimons[0].Vp, snap.Digimons[0].Evp));
         Assert.Equal(0, snap.Digimons[1].Hp);
 
-        var factory = new CharacterFactory(TestSupport.Data, TestSupport.GameOptions());
+        var factory = new CharacterFactory(TestSupport.Data, TestSupport.GameOptions(), TestSupport.Clock);
         var record = new CharacterRecord(
             new CharacterRow { Uid = 42, AccountUid = 1, Slot = 0, Name = "Hero", TamerId = 1, Level = 10, MapId = 79, PosX = 50, PosY = 50, DepositorySlots = 10 },
             [

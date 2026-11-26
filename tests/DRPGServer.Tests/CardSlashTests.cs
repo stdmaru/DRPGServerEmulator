@@ -16,27 +16,34 @@ namespace DRPGServer.Tests;
 
 public class CardSlashTests
 {
+    private static readonly FrozenDictionary<uint, IReadOnlyList<ICardEffect>> RealEffects =
+        GameDataLoader.LoadCardEffects(Path.Combine(AppContext.BaseDirectory, "Resources", "Card", "CardEffects.xml"));
+
+    private static ActivatedCard Activated(uint cardId, uint remaining) => new(cardId, remaining, RealEffects[cardId]);
+
     private static readonly FrozenDictionary<uint, CardInfo> SampleCards = new Dictionary<uint, CardInfo>
     {
+        [41] = new(41, "Slot Return") { Trigger = CardTrigger.Attack },
+        [81] = new(81, "Haste") { Trigger = CardTrigger.Attack },
         [5] = new(5, "Defense Plug-In C")
         {
-            Type = 1, SubType = 2, BuyPrice = 500, SellPrice = 250, Flag19 = 1,
+            Type = 1, SubType = 2, BuyPrice = 500, SellPrice = 250, UnknownCol19 = 1,
             MaxStack = 999, Trigger = CardTrigger.Defense, Restriction = 0,
-            Col26 = 32000, Col27 = 1, Col28 = 1_000_000, Col29 = 1, Col30 = 1,
+            CoinPrice = 32000, UnknownCol27 = 1, LadderPrice = 1_000_000, UnknownCol29 = 1, UnknownCol30 = 1,
         },
         [19] = new(19, "Recovery Floppy L")
         {
-            Type = 2, SubType = 1, BuyPrice = 500, SellPrice = 250, Flag19 = 1,
+            Type = 2, SubType = 1, BuyPrice = 500, SellPrice = 250, UnknownCol19 = 1,
             MaxStack = 999, Trigger = CardTrigger.Attack, Restriction = 0,
-            Col26 = 32000, Col27 = 1, Col28 = 1_000_000, Col29 = 1, Col30 = 1,
+            CoinPrice = 32000, UnknownCol27 = 1, LadderPrice = 1_000_000, UnknownCol29 = 1, UnknownCol30 = 1,
         },
         [74] = new(74, "Golden Drill X")
         {
-            Type = 4, SubType = 1, BuyPrice = 1, SellPrice = 0, Flag19 = 0,
+            Type = 4, SubType = 1, BuyPrice = 1, SellPrice = 0, UnknownCol19 = 0,
             MaxStack = 999, Trigger = CardTrigger.Attack, Restriction = 1,
-            Col26 = 32000, Col27 = 1, Col28 = 1_000_000, Col29 = 1, Col30 = 0,
+            CoinPrice = 32000, UnknownCol27 = 1, LadderPrice = 1_000_000, UnknownCol29 = 1, UnknownCol30 = 0,
         },
-    }.ToFrozenDictionary();
+    }.ToFrozenDictionary(kv => kv.Key, kv => kv.Value with { Effects = RealEffects.GetValueOrDefault(kv.Key) ?? [] });
 
     private static byte[] CardMovePayload(ItemPlace from, ItemPlace to, int fromA, int fromB, int toA, int toB, uint uid, uint cardId)
     {
@@ -50,7 +57,7 @@ public class CardSlashTests
 
     private static (Player Player, Session Session) NewPlayerWithCards()
     {
-        var inventory = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id));
+        var inventory = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id), TestSupport.Clock);
         var character = new Character(Entities.Digimon(), inventory)
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "CardTester", TamerId = 1, MapId = 79,
@@ -68,10 +75,10 @@ public class CardSlashTests
         var inv = player.Character.Inventory;
         var drill = inv.Battle.Add(74, 50)[0];    // slot 0 (row 0, col 0)
         var defense = inv.Battle.Add(5, 10)[0];   // slot 1 (row 0, col 1)
-        var handler = new CardMoveHandler();
+        var handler = new CardMoveHandler(TestSupport.Guard());
 
         // 3 → 2: equipar Golden Drill X no Card Slot 0
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 0, 0, drill.Uid, 74)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 0, 0, drill.Uid, 74)));
         Assert.Null(inv.Battle[0]);
         Assert.Same(drill, inv.CardSlots[0]);
         Assert.Equal(0, drill.Slot);
@@ -80,7 +87,7 @@ public class CardSlashTests
         Assert.Equal(172, frame1.Length - PacketHeader.Length);
 
         // 3 → 2: equipar Defense Plug-In C no Card Slot 0 já ocupado (troca com Golden Drill X)
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 1, 0, 0, defense.Uid, 5)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 1, 0, 0, defense.Uid, 5)));
         Assert.Same(defense, inv.CardSlots[0]);
         Assert.Same(drill, inv.Battle[1]);
         Assert.Equal(1, drill.Slot);
@@ -90,21 +97,21 @@ public class CardSlashTests
         Assert.Equal(74u, BitConverter.ToUInt32(payload2[(ItemMoveHeader.Length + CardRecord.Length + 4)..]));
 
         // 2 → 2: mover dentro dos 6 Card Slots (slot 0 → slot 5)
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.CardSlots, ItemPlace.CardSlots, 0, 0, 0, 5, defense.Uid, 5)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.CardSlots, ItemPlace.CardSlots, 0, 0, 0, 5, defense.Uid, 5)));
         Assert.Null(inv.CardSlots[0]);
         Assert.Same(defense, inv.CardSlots[5]);
         Assert.Equal(5, defense.Slot);
         Assert.Single(session.DrainOutgoing());
 
         // 2 → 3: desequipar do Card Slot 5 para a mochila (row 2, col 3 = slot 15)
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.CardSlots, ItemPlace.Inventory, 0, 5, 2, 3, defense.Uid, 5)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.CardSlots, ItemPlace.Inventory, 0, 5, 2, 3, defense.Uid, 5)));
         Assert.Null(inv.CardSlots[5]);
         Assert.Same(defense, inv.Battle[15]);
         Assert.Equal(15, defense.Slot);
         Assert.Single(session.DrainOutgoing());
 
         // 3 → 3: mover na mochila (slot 15 → slot 23)
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.Inventory, 2, 3, 3, 5, defense.Uid, 5)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.Inventory, 2, 3, 3, 5, defense.Uid, 5)));
         Assert.Null(inv.Battle[15]);
         Assert.Same(defense, inv.Battle[23]);
         Assert.Single(session.DrainOutgoing());
@@ -115,11 +122,11 @@ public class CardSlashTests
     {
         var (player, session) = NewPlayerWithCards();
         var drill = player.Character.Inventory.Battle.Add(74, 10)[0];
-        var handler = new CardMoveHandler();
+        var handler = new CardMoveHandler(TestSupport.Guard());
 
         // row != 0 ou col >= 6 nos Card Slots são inválidos
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 1, 0, drill.Uid, 74)));
-        handler.Handle(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 0, 6, drill.Uid, 74)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 1, 0, drill.Uid, 74)));
+        handler.Dispatch(session, new PacketReader(CardMovePayload(ItemPlace.Inventory, ItemPlace.CardSlots, 0, 0, 0, 6, drill.Uid, 74)));
         Assert.Empty(session.DrainOutgoing());
         Assert.Same(drill, player.Character.Inventory.Battle[0]);
     }
@@ -127,7 +134,7 @@ public class CardSlashTests
     [Fact]
     public void CardRecord_matches_captured_76_byte_layout()
     {
-        var inv = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id));
+        var inv = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id), TestSupport.Clock);
         var defense = inv.CardSlots.Add(5, 3)[0];
         var w = new PacketWriter();
         CardRecord.Write(w, defense);
@@ -138,7 +145,7 @@ public class CardSlashTests
         Assert.Equal(5u, BitConverter.ToUInt32(buf[4..]));
         Assert.Equal((byte)1, buf[8]);                           // Type
         Assert.Equal((byte)2, buf[9]);                           // SubType
-        Assert.Equal((byte)1, buf[10]);                          // Flag19
+        Assert.Equal((byte)1, buf[10]);                          // UnknownCol19
         Assert.Equal((byte)CardTrigger.Defense, buf[11]);        // Trigger = Defense (2)
         Assert.Equal((byte)0, buf[12]);                          // Restriction
         Assert.Equal((ushort)3, BitConverter.ToUInt16(buf[14..]));// Amount
@@ -170,12 +177,11 @@ public class CardSlashTests
             Maps = TestSupport.Data.Maps,
             Grids = TestSupport.Data.Grids,
             DropGroups = TestSupport.Data.DropGroups,
-            TamingNets = TestSupport.Data.TamingNets,
             Portals = TestSupport.Data.Portals,
             Spawns = TestSupport.Data.Spawns,
             ZoneIds = TestSupport.Data.ZoneIds,
         };
-        var inv = new Inventory(data.FindItem, 999, data.FindCard);
+        var inv = new Inventory(data.FindItem, 999, data.FindCard, TestSupport.Clock);
         var drill = inv.CardSlots.Add(74, 50)[0];
         var def = inv.Battle.Add(5, 12)[0];
         var digimon = new Digimon(data, data.Species[10], 1) { Uid = 100 };
@@ -190,7 +196,7 @@ public class CardSlashTests
 
         var row = new CharacterRow { Uid = 7, AccountUid = 1, Slot = 0, Name = "RoundTrip", TamerId = 1, Level = 1, MapId = 79 };
         var dRow = new DigimonRow { Uid = 100, Slot = 0, DigimonId = 10, Name = "A", Level = 1 };
-        var loaded = new CharacterFactory(data, TestSupport.GameOptions()).Build(
+        var loaded = new CharacterFactory(data, TestSupport.GameOptions(), TestSupport.Clock).Build(
             new CharacterRecord(row, [dRow], [], snap.Items, []))!;
 
         Assert.Equal((74u, 50u, drill.Uid), (loaded.Inventory.CardSlots[0]!.ItemId, loaded.Inventory.CardSlots[0]!.Amount, loaded.Inventory.CardSlots[0]!.Uid));
@@ -213,10 +219,10 @@ public class CardSlashTests
         Func<Inventory, Action>? setupInventory = null)
     {
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(TestSupport.Data, world, NullLogger<ZoneSystem>.Instance);
-        var battles = new BattleSystem(world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
+        var battles = TestSupport.NewBattles(world, TestSupport.Data, TestSupport.GameOptions());
 
-        var inv = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id));
+        var inv = new Inventory(TestSupport.Data.FindItem, 999, id => SampleCards.GetValueOrDefault(id), TestSupport.Clock);
         setupInventory?.Invoke(inv)();
         var leader = new Digimon(TestSupport.Data, TestSupport.Data.Species[10], 1) { Uid = 10, Name = "Guilmon" };
         var character = new Character(leader, inv)
@@ -229,7 +235,7 @@ public class CardSlashTests
         zones.Find(79)!.Enter(player);
 
         var wild = zones.Find(79)!.WildDigimons.First();
-        var battle = battles.StartPve(player, wild.Serial)!;
+        var battle = battles.StartPve(player, player.StandBy(wild))!;
         battle.SendTeams(player);
         battle.ClientReady(player);
         session.DrainOutgoing();
@@ -251,7 +257,7 @@ public class CardSlashTests
         var unequip = new BattleCardUnequipHandler();
 
         // Card nos 6 CardSlots equipa normalmente no slot 1 (sem resposta S2C)
-        equip.Handle(session, new PacketReader(BattleCardPayload(1, equippedDrill!.Uid, 74)));
+        equip.Dispatch(session, new PacketReader(BattleCardPayload(1, equippedDrill!.Uid, 74)));
         Assert.Empty(session.DrainOutgoing());
 
         // Card apenas na mochila (não nos 6 CardSlots) é rejeitado
@@ -265,7 +271,7 @@ public class CardSlashTests
         Assert.False(battle.EquipCard(player, 0, equippedDrill.Uid, 5));
 
         // Desequipar slot 1 via 0xA1 (sem resposta S2C)
-        unequip.Handle(session, new PacketReader(BattleCardPayload(1, equippedDrill.Uid, 74)));
+        unequip.Dispatch(session, new PacketReader(BattleCardPayload(1, equippedDrill.Uid, 74)));
         Assert.Empty(session.DrainOutgoing());
         Assert.Equal(CardBattleState.MaxCardSlashesPerBattle, battle.CardSlashesRemaining(player));
     }
@@ -370,29 +376,29 @@ public class CardSlashTests
     }
 
     [Fact]
-    public void CardEffectRegistry_evaluates_attack_defense_slot_return_and_haste()
+    public void Card_effects_evaluate_attack_defense_slot_return_and_haste()
     {
         // Ataque combinado: Offense Plug-In A (+20%) + Boost Chip (+50%) + Golden Drill X (AoE)
         var atk = new ActivatedCards();
-        atk[0] = new ActivatedCard(3, 9);
-        atk[1] = new ActivatedCard(7, 4);
-        atk[2] = new ActivatedCard(74, 49);
-        var atkCtx = CardEffectRegistry.EvaluateAttack(atk);
+        atk[0] = Activated(3, 9);
+        atk[1] = Activated(7, 4);
+        atk[2] = Activated(74, 49);
+        var atkCtx = CardEffectEvaluator.EvaluateAttack(atk);
         Assert.Equal(1.70, atkCtx.DamageMultiplier, 6);
         Assert.True(atkCtx.ForceAllTargets);
 
         // Defesa: Defense Plug-In C (+20% DEF) + Holy Orb (-50% dano)
         var def = new ActivatedCards();
-        def[0] = new ActivatedCard(5, 2);
-        def[1] = new ActivatedCard(15, 1);
-        var defCtx = CardEffectRegistry.EvaluateDefense(def);
+        def[0] = Activated(5, 2);
+        def[1] = Activated(15, 1);
+        var defCtx = CardEffectEvaluator.EvaluateDefense(def);
         Assert.Equal(1.20, defCtx.DefenseMultiplier, 6);
         Assert.Equal(0.50, defCtx.IncomingDamageMultiplier, 6);
 
         // White Wings (-100% dano) reduz dano final para 0 mesmo em acerto
         var wings = new ActivatedCards();
-        wings[0] = new ActivatedCard(63, 1);
-        var wingsCtx = CardEffectRegistry.EvaluateDefense(wings);
+        wings[0] = Activated(63, 1);
+        var wingsCtx = CardEffectEvaluator.EvaluateDefense(wings);
         var hit = BattleFormulas.Attack(Entities.Digimon(50, 20), Entities.Digimon(10, 1), new Random(1),
             damageMultiplier: wingsCtx.IncomingDamageMultiplier);
         Assert.True(hit.Landed);
@@ -420,5 +426,45 @@ public class CardSlashTests
         Assert.Equal(4u, haste.Amount);
         Assert.True(hasteState.TryActivate(player, CardTrigger.Attack, out _));
         Assert.Equal(3u, haste.Amount);
+    }
+
+    [Fact]
+    public void CardEffects_xml_maps_every_card_to_typed_effects()
+    {
+        Assert.True(RealEffects.Count > 90);
+        Assert.Equal([new AllTargetsEffect(), new GuaranteedHitEffect(), new DamageEffect(50)], RealEffects[125]); // Fenrir Sword SS
+        Assert.Equal([new HealHpEffect(100, 0), new HealVpEffect(30, 0)], RealEffects[69]);                      // Restoration Program M
+        Assert.Equal([new AttackerAttributeEffect(DigimonAttribute.Data)], RealEffects[8]);                      // Supreme Training Manual
+        Assert.Equal([new DamageReductionEffect(35)], RealEffects[10000]);                                        // Silver Robe
+        Assert.Equal([new HasteEffect()], RealEffects[119]);
+        Assert.Equal([new SlotReturnEffect()], RealEffects[41]);
+    }
+
+    [Theory]
+    [InlineData("""<Effect Type="Explode" />""")]                               // tipo desconhecido
+    [InlineData("""<Effect Type="Damage" />""")]                                // falta parâmetro
+    [InlineData("""<Effect Type="Damage" Percent="0" />""")]                    // zero
+    [InlineData("""<Effect Type="Damage" Percent="-5" />""")]                   // negativo
+    [InlineData("""<Effect Type="Damage" Percent="20" Amount="1" />""")]        // parâmetro que o efeito não declara
+    [InlineData("""<Effect Type="HealHp" Amount="1" Percent="1" />""")]         // as duas formas
+    [InlineData("""<Effect Type="HealHp" />""")]                                // nenhuma forma
+    [InlineData("""<Effect Type="DamageReduction" Percent="150" />""")]         // acima de 100%
+    [InlineData("""<Effect Type="AttackerAttribute" Attribute="Fire" />""")]    // enum desconhecido
+    [InlineData("""<Effect Type="AttackerAttribute" Attribute="2" />""")]       // número no lugar do nome
+    [InlineData("""<Effect Type="AllTargets" Count="2" />""")]                  // efeito sem parâmetro com parâmetro
+    [InlineData("""<Bonus Type="Damage" Percent="20" />""")]                    // elemento estranho
+    [InlineData("")]                                                             // card sem efeito
+    public void CardEffects_xml_rejects_malformed_effects(string effect)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"cards-{Guid.NewGuid():N}.xml");
+        File.WriteAllText(path, $"""<CardEffects><Card ID="3" Name="x">{effect}</Card></CardEffects>""");
+        try
+        {
+            Assert.Throws<GameDataException>(() => GameDataLoader.LoadCardEffects(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 }

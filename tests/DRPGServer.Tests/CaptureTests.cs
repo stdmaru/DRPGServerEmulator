@@ -3,6 +3,7 @@ using System.Text;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game;
 using DRPGServer.Game.Battle;
+using DRPGServer.Game.Digimons;
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
@@ -26,18 +27,18 @@ public class CaptureTests
     public CaptureTests()
     {
         _uids.Seed(100);
-        _zones = new ZoneSystem(TestSupport.Data, _world, NullLogger<ZoneSystem>.Instance);
+        _zones = new ZoneSystem(TestSupport.Data, _world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
     }
 
     private Taming NewTaming(double chance = 0.10) =>
-        new(TestSupport.Data, _uids, TestSupport.GameOptions(o => o.CaptureChance = chance));
+        TestSupport.NewTaming(_uids, TestSupport.GameOptions(o => o.CaptureChance = chance));
 
     private static Digimon NewDigimon(ushort species, ushort level, uint uid) =>
         new(TestSupport.Data, TestSupport.Data.Species[species], level) { Uid = uid };
 
     private Player Join(params Digimon[] party)
     {
-        var c = new Character(party[0], new Inventory(TestSupport.Data.FindItem, 999))
+        var c = new Character(party[0], new Inventory(TestSupport.Data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };
@@ -72,7 +73,7 @@ public class CaptureTests
     }
 
     private void UseItem(Player player, Taming taming, InventoryItem item, Serial target) =>
-        new ItemUseHandler(taming, _world).Handle(player.Session, new PacketReader(ItemUsePayload(item.Uid, target)));
+        new ItemUseHandler(TestSupport.NewItemUse(_world, taming)).Dispatch(player.Session, new PacketReader(ItemUsePayload(item.Uid, target)));
 
     // ---------- Taming Net ----------
 
@@ -83,7 +84,7 @@ public class CaptureTests
         var net = player.Character.Inventory.Main.Add(InTrainingNet, 2)[0];
         var wild = Wild;
 
-        UseItem(player, NewTaming(), net, wild.Serial);
+        UseItem(player, NewTaming(), net, player.StandBy(wild));
 
         // ✅ 0xEF (bloco do novo) e 0x41 (rede consumida)
         Assert.Equal([(ushort)0xEF, (ushort)0x41], player.Session.SentOpcodes());
@@ -103,7 +104,7 @@ public class CaptureTests
         var player = Join(NewDigimon(50, 15, 1));
         var net = player.Character.Inventory.Main.Add(RookieNet, 1)[0];
 
-        UseItem(player, NewTaming(), net, Wild.Serial);
+        UseItem(player, NewTaming(), net, player.StandBy(Wild));
 
         Assert.Equal([(ushort)0xC3], player.Session.SentOpcodes());
         Assert.Single(player.Character.Digimons);
@@ -116,7 +117,7 @@ public class CaptureTests
         var player = Join(Enumerable.Range(1, Character.PartySize).Select(i => NewDigimon(50, 15, (uint)i)).ToArray());
         var net = player.Character.Inventory.Main.Add(InTrainingNet, 1)[0];
 
-        UseItem(player, NewTaming(), net, Wild.Serial);
+        UseItem(player, NewTaming(), net, player.StandBy(Wild));
 
         Assert.Equal([(ushort)0xC3], player.Session.SentOpcodes());
         Assert.Equal(1u, player.Character.Inventory.Main.Count(InTrainingNet));
@@ -127,12 +128,12 @@ public class CaptureTests
     {
         var player = Join(NewDigimon(50, 15, 1));
         var net = player.Character.Inventory.Main.Add(InTrainingNet, 1)[0];
-        var battles = new BattleSystem(_world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        var battles = TestSupport.NewBattles(_world, TestSupport.Data, TestSupport.GameOptions());
         var wild = Wild;
-        Assert.NotNull(battles.StartPve(player, wild.Serial));
+        Assert.NotNull(battles.StartPve(player, player.StandBy(wild)));
         player.Session.DrainOutgoing();
 
-        UseItem(player, NewTaming(), net, _zones.Find(79)!.WildDigimons.First().Serial);
+        UseItem(player, NewTaming(), net, player.StandBy(_zones.Find(79)!.WildDigimons.First()));
 
         Assert.Equal([(ushort)0xC3], player.Session.SentOpcodes());
         Assert.Single(player.Character.Digimons);
@@ -147,10 +148,10 @@ public class CaptureTests
         var tamed = NewTaming().Tame(player.Character, TestSupport.Data.Species[14])!;
         var handler = new RenameHandler();
 
-        handler.Handle(player.Session, new PacketReader(RenamePayload(tamed.Uid, "")));
-        handler.Handle(player.Session, new PacketReader(RenamePayload(tamed.Uid, "Tuno")));
-        handler.Handle(player.Session, new PacketReader(RenamePayload(tamed.Uid, "")));
-        handler.Handle(player.Session, new PacketReader(RenamePayload(tamed.Uid, "Other")));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(tamed.Uid, "")));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(tamed.Uid, "Tuno")));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(tamed.Uid, "")));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(tamed.Uid, "Other")));
 
         var results = player.Session.DrainOutgoing().Select(f => f[PacketHeader.Length]).ToArray();
         // ✅ 1 = grátis, 3 = renomeado, 2 = sem renomeação
@@ -167,9 +168,9 @@ public class CaptureTests
         var tamed = NewTaming().Tame(player.Character, TestSupport.Data.Species[14])!;
         var handler = new RenameHandler();
 
-        handler.Handle(player.Session, new PacketReader(RenamePayload(starter.Uid, "Name")));
-        handler.Handle(player.Session, new PacketReader(RenamePayload(tamed.Uid, "bad name!")));
-        handler.Handle(player.Session, new PacketReader(RenamePayload(tamed.Uid, "x", kind: 1)));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(starter.Uid, "Name")));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(tamed.Uid, "bad name!")));
+        handler.Dispatch(player.Session, new PacketReader(RenamePayload(tamed.Uid, "x", kind: 1)));
 
         var results = player.Session.DrainOutgoing().Select(f => f[PacketHeader.Length]).ToArray();
         Assert.Equal([(byte)2, (byte)2, (byte)2], results);
@@ -182,9 +183,8 @@ public class CaptureTests
     private (Battle battle, Player player, Digimon actor) StartBattle(double chance, params Digimon[] party)
     {
         var player = Join(party);
-        var battles = new BattleSystem(_world, TestSupport.Data, TestSupport.GameOptions(o => o.CaptureChance = chance),
-            NullLogger<BattleSystem>.Instance, NewTaming(chance));
-        var battle = battles.StartPve(player, Wild.Serial)!;
+        var battles = TestSupport.NewBattles(_world, TestSupport.Data, TestSupport.GameOptions(o => o.CaptureChance = chance), taming: NewTaming(chance));
+        var battle = battles.StartPve(player, player.StandBy(Wild))!;
         battle.SendTeams(player);
         battle.ClientReady(player);
         player.Session.DrainOutgoing();

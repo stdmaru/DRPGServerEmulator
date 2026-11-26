@@ -1,17 +1,17 @@
 using DRPGServer.Game.Entities;
 using DRPGServer.Game.Npcs;
-using DRPGServer.Network.Protocol;
+using DRPGServer.Network.Packets.Map;
 
 namespace DRPGServer.Network.Handlers;
 
 /// <summary>0x56: escolha num diálogo de NPC (<see cref="NpcScriptRegistry"/>).</summary>
 [PacketHandler(MapOpcode.NpcDialogChoice)]
-public sealed class NpcChoiceHandler(NpcScriptRegistry scripts) : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class NpcChoiceHandler(NpcScriptRegistry scripts) : PlayerHandler<NpcChoiceRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, NpcChoiceRequest request)
     {
-        uint choice = packet.ReadU32();
-        if (!player.InBattle && scripts.Choose(player, choice))
+        if (scripts.Choose(player, request.Choice))
             player.RequestImmediateSave();
     }
 }

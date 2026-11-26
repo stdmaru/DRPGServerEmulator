@@ -1,4 +1,7 @@
 using DRPGServer.Data.GameData;
+using DRPGServer.Game.Items;
+using DRPGServer.Game.Stats;
+using DRPGServer.Game.World;
 
 namespace DRPGServer.Game.Entities;
 
@@ -76,11 +79,28 @@ public sealed class InventoryItem
 
     public bool IsTimed => ExpiresAt > 0;
     public bool IsExpired(long unixNow) => ExpiresAt > 0 && unixNow >= ExpiresAt;
-    public bool IsExpired() => IsExpired(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
     /// <summary>A grade tem 6 colunas (✅ 0x91/0x90: linha 3, coluna 5 é a última posição).</summary>
     public int Row => Slot / Inventory.Columns;
     public int Column => Slot % Inventory.Columns;
+}
+
+/// <summary>O que um <see cref="Bag.Grant"/> mudou, para <see cref="Bag.Revert"/>.</summary>
+public sealed class BagGrant
+{
+    internal readonly record struct Part(InventoryItem Item, uint Put, bool Created);
+
+    internal BagGrant(Bag bag, IReadOnlyList<Part> parts)
+    {
+        Bag = bag;
+        Parts = parts;
+    }
+
+    internal Bag Bag { get; }
+    internal IReadOnlyList<Part> Parts { get; }
+
+    /// <summary>Posições alteradas (para o pacote de recebimento).</summary>
+    public IReadOnlyList<InventoryItem> Changed => Parts.Select(p => p.Item).ToList();
 }
 
 /// <summary>Uma bolsa de itens ou cards (24 posições nas mochilas; 6 nos Card Slots equipados).</summary>
@@ -117,15 +137,20 @@ public sealed class Bag
 
     /// <summary>
     /// Empilha nas pilhas existentes e depois ocupa posições livres. Devolve as posições alteradas (vazio se não
-    /// coube nada; nada é adicionado se não couber tudo).
-    /// Para itens não empilháveis (<c>MaxStack == 1</c>), <paramref name="durationSeconds"/> pode ser:
-    /// <c>null</c> (usa duração padrão do <see cref="ItemInfo"/>), <c>-1</c> (permanente) ou <c>&gt; 0</c> (duração arbitrária em segundos).
+    /// coube nada; nada é adicionado se não couber tudo). <paramref name="duration"/> só vale para não empilháveis.
     /// </summary>
-    public IReadOnlyList<InventoryItem> Add(uint itemId, uint amount, long? durationSeconds = null)
+    public IReadOnlyList<InventoryItem> Add(uint itemId, uint amount, ItemDuration duration = default) =>
+        Grant(itemId, amount, duration)?.Changed ?? [];
+
+    /// <summary>
+    /// Como <see cref="Add"/>, mas devolve o que mudou de forma que <see cref="Revert"/> desfaça exatamente (rollback de
+    /// transferência). Null se não couber tudo.
+    /// </summary>
+    public BagGrant? Grant(uint itemId, uint amount, ItemDuration duration = default)
     {
-        if (amount == 0 || Room(itemId) < amount) return [];
+        if (amount == 0 || Room(itemId) < amount) return null;
         uint max = _owner.MaxStackOf(itemId, IsCardBag);
-        var changed = new List<InventoryItem>();
+        var parts = new List<BagGrant.Part>();
         if (max > 1)
         {
             foreach (var stack in _slots.Where(s => s?.ItemId == itemId && s.Amount < max).Cast<InventoryItem>())
@@ -133,11 +158,11 @@ public sealed class Bag
                 uint put = Math.Min(amount, max - stack.Amount);
                 stack.Amount += put;
                 amount -= put;
-                changed.Add(stack);
-                if (amount == 0) return changed;
+                parts.Add(new(stack, put, Created: false));
+                if (amount == 0) return new BagGrant(this, parts);
             }
         }
-        uint expiresAt = ResolveExpiresAt(itemId, max, durationSeconds);
+        uint expiresAt = ResolveExpiresAt(itemId, max, duration);
         while (amount > 0)
         {
             int slot = Array.IndexOf(_slots, null);
@@ -145,25 +170,51 @@ public sealed class Bag
             var item = _owner.Create(itemId, slot, put, isCard: IsCardBag, expiresAt: expiresAt);
             _slots[slot] = item;
             amount -= put;
-            changed.Add(item);
+            parts.Add(new(item, put, Created: true));
         }
-        return changed;
+        return new BagGrant(this, parts);
     }
 
-    private uint ResolveExpiresAt(uint itemId, uint maxStack, long? durationSeconds)
+    /// <summary>Desfaz um <see cref="Grant"/> desta bolsa: tira as quantidades postas e as posições criadas.</summary>
+    public void Revert(BagGrant grant)
+    {
+        if (grant.Bag != this) throw new ArgumentException("o grant é de outra bolsa", nameof(grant));
+        for (int i = grant.Parts.Count - 1; i >= 0; i--)
+        {
+            var (item, put, created) = grant.Parts[i];
+            int slot = Array.IndexOf(_slots, item);
+            if (slot < 0) continue;
+            item.Amount -= Math.Min(put, item.Amount);
+            if (created || item.Amount == 0) _slots[slot] = null;
+        }
+    }
+
+    /// <summary>Se tudo cabe junto (pilhas existentes e posições livres), sem mudar nada.</summary>
+    public bool CanFit(IEnumerable<(uint ItemId, uint Amount)> entries)
+    {
+        int slotsNeeded = 0;
+        foreach (var group in entries.GroupBy(e => e.ItemId))
+        {
+            uint max = _owner.MaxStackOf(group.Key, IsCardBag);
+            long total = group.Sum(e => (long)e.Amount);
+            long room = max <= 1 ? 0 : Items.Where(i => i.ItemId == group.Key).Sum(i => (long)(max - Math.Min(max, i.Amount)));
+            long overflow = Math.Max(0, total - room);
+            slotsNeeded += (int)Math.Min(int.MaxValue, (overflow + max - 1) / max);
+        }
+        return slotsNeeded <= _slots.Count(s => s is null);
+    }
+
+    private uint ResolveExpiresAt(uint itemId, uint maxStack, ItemDuration duration)
     {
         if (IsCardBag || maxStack > 1) return 0;
-        if (durationSeconds == Inventory.PermanentDuration) return 0;
-
-        uint effectiveDuration;
-        if (durationSeconds is > 0)
-            effectiveDuration = (uint)Math.Min(durationSeconds.Value, uint.MaxValue);
-        else
-            effectiveDuration = _owner.FindInfo(itemId)?.DurationSeconds ?? 0u;
-
-        if (effectiveDuration == 0) return 0;
-        long expires = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + effectiveDuration;
-        return (uint)Math.Clamp(expires, 1, uint.MaxValue);
+        uint seconds = duration.Kind switch
+        {
+            ItemDurationKind.Permanent => 0,
+            ItemDurationKind.Seconds => duration.Seconds,
+            _ => _owner.FindInfo(itemId)?.DurationSeconds ?? 0u,
+        };
+        if (seconds == 0) return 0;
+        return (uint)Math.Clamp(_owner.Clock.UnixNow + seconds, 1, uint.MaxValue);
     }
 
     /// <summary>Remove todos os itens cujo <see cref="InventoryItem.ExpiresAt"/> já venceu em <paramref name="unixNow"/>.</summary>
@@ -320,8 +371,6 @@ public sealed class Inventory
     public const int Size = 24;
     public const int Columns = 6;
     public const int CardSlotCount = 6;
-    /// <summary>Valor sentinela para entregar um item não empilhável como permanente (sem expiração).</summary>
-    public const int PermanentDuration = -1;
     /// <summary>O cliente interpreta +12 como timestamp de expiração somente quando +16 &gt; 999.</summary>
     public const uint MinClientDurationSeconds = 1000;
 
@@ -332,11 +381,13 @@ public sealed class Inventory
 
     /// <param name="lookup">Linha do item em <c>item_info_us</c>.</param>
     /// <param name="maxStackCap">Teto de pilha (configuração).</param>
-    /// <param name="cardLookup">Linha do card em <c>card_info_us</c> (opcional em testes sintéticos).</param>
-    public Inventory(Func<uint, ItemInfo?> lookup, uint maxStackCap, Func<uint, CardInfo?>? cardLookup = null)
+    /// <param name="cardLookup">Linha do card em <c>card_info_us</c>.</param>
+    /// <param name="clock">Calendário para a expiração dos itens de período.</param>
+    public Inventory(Func<uint, ItemInfo?> lookup, uint maxStackCap, Func<uint, CardInfo?> cardLookup, IGameClock clock)
     {
+        Clock = clock;
         _lookup = lookup;
-        _cardLookup = cardLookup ?? (_ => null);
+        _cardLookup = cardLookup;
         _maxStackCap = Math.Max(1, maxStackCap);
         Main = new Bag(this, BagKind.Inventory, Size);
         Battle = new Bag(this, BagKind.Battle, Size);
@@ -344,8 +395,10 @@ public sealed class Inventory
         Equipment = new Bag(this, BagKind.Equipment, EquipmentSlots.BagCapacity);
     }
 
-    /// <summary>Sem tabela de itens: toda pilha vai até <paramref name="maxStack"/>.</summary>
-    public Inventory(uint maxStack) : this(_ => null, maxStack, null) { }
+    public IGameClock Clock { get; }
+
+    /// <summary>True se o item é de período e já venceu agora.</summary>
+    public bool IsExpired(InventoryItem item) => item.IsExpired(Clock.UnixNow);
 
     public Bag Main { get; }
     /// <summary>✅ Aba Cards (24 slots, registros de 76 bytes no 0x03/0xFC; recebe pelo 0xC8; move pelo 0x90).</summary>
@@ -369,16 +422,8 @@ public sealed class Inventory
         EquipmentSlots.IsEquipmentPlace(place) ? Equipment[(int)place] : null;
 
     /// <summary>Soma dos bônus de todos os equipamentos atualmente equipados pelo Tamer.</summary>
-    public EquipmentBonus TotalEquipmentBonus()
-    {
-        var total = EquipmentBonus.Empty;
-        foreach (var place in EquipmentSlots.All)
-        {
-            if (Equipment[(int)place]?.Info is { } info && !info.EquipmentBonus.IsEmpty)
-                total += info.EquipmentBonus;
-        }
-        return total;
-    }
+    public StatModifiers EquipmentModifiers() =>
+        StatModifiers.Combine(EquipmentSlots.All.Select(place => Equipment[(int)place]?.Info?.Modifiers ?? StatModifiers.None));
 
     internal uint MaxStackOf(uint itemId, bool isCard = false)
     {
@@ -414,7 +459,7 @@ public sealed class Inventory
     // atalhos do inventário principal
     public InventoryItem? Find(uint itemId) => Main.Find(itemId);
     public bool HasFreeSlot => Main.HasFreeSlot;
-    public InventoryItem? Add(uint itemId, uint amount, long? durationSeconds = null) =>
-        Main.Add(itemId, amount, durationSeconds) is [.., var last] ? last : null;
+    public InventoryItem? Add(uint itemId, uint amount, ItemDuration duration = default) =>
+        Main.Add(itemId, amount, duration) is [.., var last] ? last : null;
     public bool Remove(uint itemId, uint amount) => Main.Remove(itemId, amount).Count > 0;
 }

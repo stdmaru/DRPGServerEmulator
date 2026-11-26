@@ -1,5 +1,6 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Stats;
 using DRPGServer.Network.Protocol;
 
 namespace DRPGServer.Network.Packets.Map;
@@ -46,23 +47,30 @@ public static class ItemRecord
         w.WriteU32(info.SellPrice);              // 24
         w.WriteU32(Unknown28(itemId));           // 28 ❓
         w.WriteU32(info.Level);                  // 32
-        WriteEffectTriplets(w, info.EquipmentBonus); // 36..87 (52 B): até 4 triplas (id, statCode, value) + 4 zeros
-        w.WriteU16(info.Type == 7 ? (ushort)32000 : (ushort)9999); // 88 ❓
-        w.WriteU16(info.Col16);                  // 90
-        w.WriteU32(info.Col17);                  // 92
-        w.WriteU8(info.Flag24);                  // 96
-        w.WriteU8(info.Flag25);
+        WriteEffectTriplets(w, info.Modifiers);      // 36..87 (52 B): até 4 triplas (id, statCode, value) + 4 zeros
+        w.WriteU16(Unknown88(info));                // 88 ❓
+        w.WriteU16(info.CoinPrice);                  // 90
+        w.WriteU32(info.LadderPrice);                  // 92
+        w.WriteU8(info.UnknownCol23);                  // 96
+        w.WriteU8(info.UnknownCol24);
         w.WriteU8(0);
-        w.WriteU8(info.Flag33);
+        w.WriteU8(info.UnknownCol32);
         w.WriteU32(uid + itemId);                // 100 checagem
         w.WriteU32(0);                           // 104
     }
 
     /// <summary>
+    /// ❓ <c>+88</c> (<c>u16</c>): 9999 ou 32000 nas capturas, sem coluna da tabela que explique. Não segue o tipo: há
+    /// tipo 7 com 9999 (Taming Net #10022) e com 32000 (#23798); a coluna 13 = 6 bate com 32000 em quase todos.
+    /// Mantido o valor antigo por tipo até achar a fonte. Não é preço: a loja de Medals usa o <c>Price</c> do XML.
+    /// </summary>
+    private static ushort Unknown88(ItemInfo info) => info.Type == 7 ? (ushort)32000 : (ushort)9999;
+
+    /// <summary>
     /// ✅ Capturas v322 (<c>conn=234/238/428</c>): offsets +36..83 guardam até 4 triplas <c>(effectId, statCode, value)</c>:
     /// 1=STR, 2=AGI, 3=CON, 4=INT (Digimental #215), 301=ATK, 302=DEF, 303=BR (Crest #107), 304=HP, 305=VP.
     /// </summary>
-    private static void WriteEffectTriplets(PacketWriter w, EquipmentBonus bonus)
+    private static void WriteEffectTriplets(PacketWriter w, StatModifiers bonus)
     {
         if (bonus.IsEmpty)
         {
@@ -73,15 +81,18 @@ public static class ItemRecord
         Span<(uint Id, uint Code, int Value)> triplets = stackalloc (uint, uint, int)[4];
         int count = 0;
 
-        AddTriplet(triplets, ref count, (uint)bonus.Attributes.Str, 1, bonus.Attributes.Str);
-        AddTriplet(triplets, ref count, (uint)bonus.Attributes.Agi, 2, bonus.Attributes.Agi);
-        AddTriplet(triplets, ref count, (uint)bonus.Attributes.Con, 3, bonus.Attributes.Con);
-        AddTriplet(triplets, ref count, (uint)bonus.Attributes.Int, 4, bonus.Attributes.Int);
-        AddTriplet(triplets, ref count, (uint)(10_000 + bonus.BonusAtk), 301, bonus.BonusAtk);
-        AddTriplet(triplets, ref count, (uint)(20_000 + bonus.BonusDef), 302, bonus.BonusDef);
-        AddTriplet(triplets, ref count, (uint)(30_000 + bonus.BonusBr), 303, bonus.BonusBr);
-        AddTriplet(triplets, ref count, (uint)(40_000 + bonus.BonusHp), 304, bonus.BonusHp);
-        AddTriplet(triplets, ref count, (uint)(50_000 + bonus.BonusVp), 305, bonus.BonusVp);
+        var attributes = bonus.Attributes;
+        int atk = bonus.Flat(StatModifierKind.Atk), def = bonus.Flat(StatModifierKind.Def), br = bonus.Flat(StatModifierKind.Br);
+        int hp = bonus.Flat(StatModifierKind.Hp), vp = bonus.Flat(StatModifierKind.Vp);
+        AddTriplet(triplets, ref count, (uint)attributes.Str, 1, attributes.Str);
+        AddTriplet(triplets, ref count, (uint)attributes.Agi, 2, attributes.Agi);
+        AddTriplet(triplets, ref count, (uint)attributes.Con, 3, attributes.Con);
+        AddTriplet(triplets, ref count, (uint)attributes.Int, 4, attributes.Int);
+        AddTriplet(triplets, ref count, (uint)(10_000 + atk), 301, atk);
+        AddTriplet(triplets, ref count, (uint)(20_000 + def), 302, def);
+        AddTriplet(triplets, ref count, (uint)(30_000 + br), 303, br);
+        AddTriplet(triplets, ref count, (uint)(40_000 + hp), 304, hp);
+        AddTriplet(triplets, ref count, (uint)(50_000 + vp), 305, vp);
 
         for (int i = 0; i < count; i++)
         {
@@ -128,7 +139,7 @@ public static class CardRecord
         w.WriteU32(item.ItemId);                        // 4
         w.WriteU8(card.Type);                           // 8
         w.WriteU8(card.SubType);                        // 9
-        w.WriteU8(card.Flag19);                         // 10
+        w.WriteU8(card.UnknownCol19);                         // 10
         w.WriteU8((byte)card.Trigger);                  // 11
         w.WriteU8(card.Restriction);                    // 12
         w.WriteU8(0);                                   // 13
@@ -141,34 +152,17 @@ public static class CardRecord
         w.WriteU32(value);                              // 36
         w.WriteZeros(24);                               // 40..63
         w.WriteU16(9999);                               // 64
-        w.WriteU16(card.Col26);                         // 66
-        w.WriteU32(card.Col28);                         // 68
-        w.WriteU8(card.Col30 != 0 ? card.Col27 : (byte)0); // 72
-        w.WriteU8(card.Col30 != 0 ? card.Col29 : (byte)0); // 73
+        w.WriteU16(card.CoinPrice);                         // 66
+        w.WriteU32(card.LadderPrice);                         // 68
+        w.WriteU8(card.UnknownCol30 != 0 ? card.UnknownCol27 : (byte)0); // 72
+        w.WriteU8(card.UnknownCol30 != 0 ? card.UnknownCol29 : (byte)0); // 73
         w.WriteU8(0);                                   // 74
-        w.WriteU8(card.Col30);                          // 75
+        w.WriteU8(card.UnknownCol30);                          // 75
     }
 
+    /// <summary>Card fora do <c>card_info_us</c>: monta o registro com o que o item tiver.</summary>
     private static CardInfo FallbackCard(InventoryItem item)
     {
-        if (item.ItemId == 74)
-        {
-            // ✅ Golden Drill X (fallback para pacotes sintéticos sem card_info_us.dat)
-            return new CardInfo(74, "Golden Drill X")
-            {
-                Type = 4,
-                SubType = 1,
-                Flag19 = 0,
-                Trigger = CardTrigger.Attack,
-                Restriction = 1,
-                MaxStack = 999,
-                BuyPrice = 1,
-                SellPrice = 0,
-                Col26 = 32000,
-                Col28 = 1_000_000,
-                Col30 = 0,
-            };
-        }
         var info = item.Info;
         return new CardInfo(item.ItemId, info?.Name ?? "")
         {
@@ -177,30 +171,23 @@ public static class CardRecord
             MaxStack = info?.MaxStack ?? 999,
             BuyPrice = info?.BuyPrice ?? 0,
             SellPrice = info?.SellPrice ?? 0,
-            Col26 = info?.Col16 ?? 32000,
-            Col28 = info?.Col17 ?? 1_000_000,
+            CoinPrice = info?.CoinPrice ?? 32000,
+            LadderPrice = info?.LadderPrice ?? 1_000_000,
         };
     }
-}
-
-/// <summary>Compatibilidade com código legado: delega para <see cref="CardRecord"/>.</summary>
-public static class BattleItemRecord
-{
-    public const int Length = CardRecord.Length;
-    public static void Write(PacketWriter w, InventoryItem item) => CardRecord.Write(w, item);
 }
 
 /// <summary>As duas bolsas como no 0x03: 24 × 76 (bolsa de batalha) e 24 × 108 (inventário), pela posição.</summary>
 internal static class InventoryLayout
 {
-    public const int Length = Inventory.Size * (BattleItemRecord.Length + ItemRecord.Length);
+    public const int Length = Inventory.Size * (CardRecord.Length + ItemRecord.Length);
 
     public static void Write(PacketWriter w, Inventory inventory)
     {
         for (int slot = 0; slot < Inventory.Size; slot++)
         {
-            if (inventory.Battle[slot] is { } b) BattleItemRecord.Write(w, b);
-            else w.WriteZeros(BattleItemRecord.Length);
+            if (inventory.Battle[slot] is { } b) CardRecord.Write(w, b);
+            else w.WriteZeros(CardRecord.Length);
         }
         for (int slot = 0; slot < Inventory.Size; slot++)
         {
@@ -213,7 +200,7 @@ internal static class InventoryLayout
 /// <summary>0x03: inventário na entrada do mapa (4416 bytes). ✅ sessões 52–56.</summary>
 public sealed class InventoryDataPacket(Inventory inventory) : ServerPacket
 {
-    public const int EvolutionRecord = BattleItemRecord.Length;
+    public const int EvolutionRecord = CardRecord.Length;
 
     public override ushort Opcode => (ushort)MapOpcode.InventoryData;
     protected override void Write(PacketWriter w) => InventoryLayout.Write(w, inventory);
@@ -226,7 +213,7 @@ public sealed class InventoryRefreshPacket(Character character) : ServerPacket
 
     protected override void Write(PacketWriter w)
     {
-        w.WriteF64(character.Bits);
+        w.WriteF64(character.Wallet.Bits);
         InventoryLayout.Write(w, character.Inventory);
     }
 }
@@ -247,8 +234,8 @@ public sealed class ItemDropPacket(ItemDrop drop, bool removed = false) : Server
 
 /// <summary>
 /// Cabeçalho comum do 0x91 e do 0xBD (20 bytes): ✅ u8 origem, u8 destino (<see cref="ItemPlace"/>), u16 0,
-/// i32 × 2 da origem (linha e coluna; x e y quando é o chão) e i32 × 2 do destino (o pedido de pegar do chão
-/// manda 4, 6 = "qualquer lugar"; a resposta traz a posição usada).
+/// i32 × 2 da origem (linha e coluna; do chão, ✅ y e x do item, nas 27 coletas capturadas) e i32 × 2 do destino
+/// (o pedido de pegar do chão manda 4, 6 = "qualquer lugar"; a resposta traz a posição usada).
 /// </summary>
 public readonly record struct ItemMoveHeader(ItemPlace From, ItemPlace To, int FromA, int FromB, int ToA, int ToB)
 {
@@ -365,9 +352,9 @@ public sealed class BattleItemReceivePacket(IReadOnlyList<InventoryItem> items) 
             w.WriteU32((uint)ItemPlace.Inventory);
             w.WriteU32((uint)item.Row);
             w.WriteU32((uint)item.Column);
-            BattleItemRecord.Write(w, item);
+            CardRecord.Write(w, item);
         }
-        w.WriteZeros((ItemReceivePacket.MaxEntries - list.Count) * (12 + BattleItemRecord.Length));
+        w.WriteZeros((ItemReceivePacket.MaxEntries - list.Count) * (12 + CardRecord.Length));
     }
 }
 

@@ -2,7 +2,9 @@ using System.Buffers.Binary;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game;
 using DRPGServer.Game.Battle;
+using DRPGServer.Game.Digimons;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
@@ -26,8 +28,8 @@ public class TutorialTests
 
     public TutorialTests()
     {
-        _zones = new ZoneSystem(TestSupport.Data, _world, NullLogger<ZoneSystem>.Instance);
-        _battles = new BattleSystem(_world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        _zones = new ZoneSystem(TestSupport.Data, _world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
+        _battles = TestSupport.NewBattles(_world, TestSupport.Data, TestSupport.GameOptions());
         _player = new Player(_session, new AuthenticatedAccount(1, "u", Authority.GameMaster), Entities.Character());
         _session.Player = _player;
         _zones.Find(79)!.Enter(_player);
@@ -39,7 +41,7 @@ public class TutorialTests
 
     private static Character NewCharacter(params Digimon[] party)
     {
-        var c = new Character(party[0], new Inventory(TestSupport.Data.FindItem, 999))
+        var c = new Character(party[0], new Inventory(TestSupport.Data.FindItem, 999, _ => null, TestSupport.Clock))
         {
             Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79, X = 56, Y = 56,
         };
@@ -172,8 +174,10 @@ public class TutorialTests
     {
         var zone = _zones.Find(79)!;
         var drop = zone.Drop(41, 64, 27);
+        _player.Character.X = 64;
+        _player.Character.Y = 27;
         _session.DrainOutgoing();
-        new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, drop.X, drop.Y, 4, 6, drop.Uid, 41)));
+        new ItemMoveHandler(TestSupport.Guard()).Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, drop.Y, drop.X, 4, 6, drop.Uid, 41)));
         // ✅ o oficial tira do chão (0x13 com 108 zeros + x, y) antes do 0x91
         var pickFrames = _session.DrainOutgoing();
         Assert.Equal([(ushort)0x13, (ushort)0x91], pickFrames.Select(f => PacketHeader.Read(f).Opcode).ToArray());
@@ -183,12 +187,12 @@ public class TutorialTests
         var seed = bag[0]!;
         Assert.Equal(1u, seed.Amount);
 
-        new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Inventory, ItemPlace.Inventory, 0, 0, 3, 5, seed.Uid, 41)));
+        new ItemMoveHandler(TestSupport.Guard()).Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Inventory, ItemPlace.Inventory, 0, 0, 3, 5, seed.Uid, 41)));
         Assert.Equal([(ushort)0x91], _session.SentOpcodes());
         Assert.Same(seed, bag[23]);
         Assert.Null(bag[0]);
 
-        new ItemDestroyHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Inventory, ItemPlace.Ground, 3, 5, 0, 0, seed.Uid, 41)));
+        new ItemDestroyHandler().Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Inventory, ItemPlace.Ground, 3, 5, 0, 0, seed.Uid, 41)));
         Assert.Equal([(ushort)0xBD], _session.SentOpcodes());
         Assert.Empty(bag.Items);
     }
@@ -198,6 +202,8 @@ public class TutorialTests
     {
         var zone = _zones.Find(79)!;
         var drop = zone.Drop(41, 64, 27);
+        _player.Character.X = 64;
+        _player.Character.Y = 27;
         _session.DrainOutgoing();
 
         // antes do DropLifetime o item continua no chão e sem spam de 0x13
@@ -253,10 +259,12 @@ public class TutorialTests
         var zone = _zones.Find(79)!;
         var d1 = zone.Drop(41, 64, 27);
         var d2 = zone.Drop(41, 64, 27);
+        _player.Character.X = 64;
+        _player.Character.Y = 27;
         _session.DrainOutgoing();
 
-        new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d1.X, d1.Y, 4, 6, d1.Uid, 41)));
-        new ItemMoveHandler().Handle(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d2.X, d2.Y, 4, 6, d2.Uid, 41)));
+        new ItemMoveHandler(TestSupport.Guard()).Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d1.Y, d1.X, 4, 6, d1.Uid, 41)));
+        new ItemMoveHandler(TestSupport.Guard()).Dispatch(_session, new PacketReader(MovePayload(ItemPlace.Ground, ItemPlace.Inventory, d2.Y, d2.X, 4, 6, d2.Uid, 41)));
 
         var bag = _player.Character.Inventory.Main;
         Assert.Single(bag.Items);
@@ -277,7 +285,7 @@ public class TutorialTests
 
         var payload = new byte[38];
         BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), 1); // bagType 1 = Main Inventory
-        new InventorySortHandler().Handle(_session, new PacketReader(payload));
+        new InventorySortHandler().Dispatch(_session, new PacketReader(payload));
 
         Assert.Equal([(ushort)0xFC], _session.SentOpcodes());
         // ordenado por Type (74: Type 4, 41: Type 5 [8 + 2], 22004: Type 26) nos slots 0..3
@@ -296,7 +304,7 @@ public class TutorialTests
         inv.Battle.Place(inv.Create(74, slot: 8, amount: 3));
         inv.Battle.Place(inv.Create(74, slot: 15, amount: 4));
         BinaryPrimitives.WriteUInt16LittleEndian(payload.AsSpan(8), 2);
-        new InventorySortHandler().Handle(_session, new PacketReader(payload));
+        new InventorySortHandler().Dispatch(_session, new PacketReader(payload));
 
         Assert.Equal([(ushort)0xFC], _session.SentOpcodes());
         Assert.Equal(74u, inv.Battle[0]!.ItemId);
@@ -307,14 +315,21 @@ public class TutorialTests
 
     // ---------- NPCs ----------
 
-    private DRPGServer.Game.Npcs.NpcScriptRegistry Npcs => new([new DRPGServer.Game.Npcs.VillageOfBeginningNpcs(_zones)]);
+    private DRPGServer.Game.Npcs.NpcScriptRegistry Npcs => TestSupport.NewNpcRegistry(new DRPGServer.Game.Npcs.VillageOfBeginningNpcs(_zones, TestSupport.Items()));
+
+    /// <summary>Escolha <paramref name="choice"/> falando com o NPC <paramref name="npcId"/> do mapa 79, de perto.</summary>
+    private bool Talk(uint choice, ushort npcId)
+    {
+        _player.Character.AtNpc(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TutorialMapId, npcId);
+        return Npcs.Choose(_player, choice);
+    }
 
     [Fact]
     public void Manuals_are_given_once()
     {
-        Assert.True(Npcs.Choose(_player, 1));
+        Assert.True(Talk(1, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.PatamonNpc));
         Assert.Equal([(ushort)0x56, (ushort)0xC9, (ushort)0xFC], _session.SentOpcodes());
-        Assert.False(Npcs.Choose(_player, 1));
+        Assert.False(Talk(1, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.PatamonNpc));
         Assert.Empty(_session.SentOpcodes());
         Assert.Equal(1u, _player.Character.Inventory.Main.Count(22004));
         Assert.True(_player.Character.HasFlag(1));
@@ -324,15 +339,15 @@ public class TutorialTests
     public void Tunomon_takes_five_seeds_and_the_end_of_the_tutorial_needs_it()
     {
         var c = _player.Character;
-        Assert.False(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice));
-        Assert.False(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice));   // sem sementes
+        Assert.False(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.ElecmonNpc));
+        Assert.False(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonNpc));   // sem sementes
         c.Inventory.Main.Add(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.YuramonSeed, 8);
-        Assert.True(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice));
+        Assert.True(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonNpc));
         Assert.Equal([(ushort)0x56, (ushort)0xC9, (ushort)0xFC], _session.SentOpcodes());
         Assert.Equal(3u, c.Inventory.Main.Count(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.YuramonSeed));
         Assert.Equal(1u, c.Inventory.Main.Count(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonCard));
 
-        Assert.True(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice));
+        Assert.True(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.ElecmonNpc));
         var sent = _session.SentOpcodes();
         Assert.Equal([(ushort)0xB0, (ushort)0x56, (ushort)0xC8, (ushort)0xC9, (ushort)0xFC], sent.Take(5));
         Assert.Equal(7, sent.Count(o => o == 0x7E));
@@ -346,16 +361,16 @@ public class TutorialTests
     {
         var c = _player.Character;
         c.Inventory.Main.Add(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.YuramonSeed, 5);
-        Assert.True(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice));
+        Assert.True(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonChoice, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.TunomonNpc));
         _session.DrainOutgoing();
 
-        Assert.True(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoicePerfect));
+        Assert.True(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoicePerfect, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.ElecmonNpc));
         Assert.Equal(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalMap, c.MapId);
         Assert.Equal(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.GoldenDrillAtEndPerfect,
             c.Inventory.Battle.Count(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.GoldenDrillX));
 
         // Não pode reivindicar a escolha 8 após já ter concluído pela escolha 7
-        Assert.False(Npcs.Choose(_player, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice));
+        Assert.False(Talk(DRPGServer.Game.Npcs.VillageOfBeginningNpcs.FinalChoice, DRPGServer.Game.Npcs.VillageOfBeginningNpcs.ElecmonNpc));
     }
 
     // ---------- recompensas ----------
@@ -367,7 +382,7 @@ public class TutorialTests
         var second = NewDigimon(50, 5, 2);
         var player = Join(NewCharacter(first, second));
         var wild = _zones.Find(79)!.WildDigimons.First();
-        var battle = _battles.StartPve(player, wild.Serial)!;
+        var battle = _battles.StartPve(player, player.StandBy(wild))!;
         battle.SendTeams(player);
         battle.ClientReady(player);
         battle.RequestAction(player, BattleIcon.Summon, first.Serial, second.Serial);
@@ -378,13 +393,13 @@ public class TutorialTests
         battle.ClientReady(player);
         player.Session.DrainOutgoing();
 
-        double before = player.Character.Bits;
+        double before = player.Character.Wallet.Bits;
         battle.KnockOut(BattleSide.B);
         var frames = player.Session.DrainOutgoing();
         var rewards = frames.Where(f => PacketHeader.Read(f).Opcode == 0x6E).ToList();
         Assert.Equal(2 * battle.TeamB.Count, rewards.Count);
         double bits = rewards.Sum(f => BitConverter.ToDouble(f, PacketHeader.Length + 16 + 8));
-        Assert.Equal(player.Character.Bits - before, bits);
+        Assert.Equal(player.Character.Wallet.Bits - before, bits);
         // ✅ só o primeiro 0x6E de cada inimigo leva bits; Yuramon do tutorial: 5 a 7
         for (int k = 0; k < rewards.Count; k += 2)
         {
@@ -427,7 +442,7 @@ public class TutorialTests
             Uid = d.Uid, Slot = d.Slot, DigimonId = d.DigimonId, Name = d.Name, Level = d.Level, Exp = d.Exp,
             UnlockedStage = d.UnlockedStage,
         }).ToList();
-        var factory = new CharacterFactory(TestSupport.Data, TestSupport.GameOptions());
+        var factory = new CharacterFactory(TestSupport.Data, TestSupport.GameOptions(), TestSupport.Clock);
         var loaded = factory.Build(new CharacterRecord(row, digimons, s.Forms, s.Items, s.Flags))!;
 
         Assert.Equal(11u, loaded.Leader.Uid);
@@ -442,7 +457,7 @@ public class TutorialTests
         Assert.Equal(3u, loaded.Inventory.Main.Count(41));
         Assert.Equal(50u, loaded.Inventory.Battle.Count(74));
         Assert.True(loaded.HasFlag(5));
-        Assert.Equal(123.0, loaded.Bits);
+        Assert.Equal(123.0, loaded.Wallet.Bits);
         // o uid novo não repete os carregados
         Assert.DoesNotContain(loaded.Inventory.Main.Add(41, 8)[^1].Uid, s.Items.Select(i => i.Uid));
     }

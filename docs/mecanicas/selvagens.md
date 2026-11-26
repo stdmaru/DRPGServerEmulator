@@ -48,7 +48,10 @@ Dados: 592 grupos e 72 mil pacotes `0x11` nas sessões 53–58 (v322).
 - **EXP (`0x6E`):**
   - ✅ **Beginner:** amostras v322 revelam a EXP base oficial por nível (L1 = 10, L3 = 12, L4 = 14, L6 = 18, L7 = 20, L10 = 28, L11 = 32, L12 = 36, L13 = 40, L14 = 45, L15 = 50, L16 = 56, L17 = 62, L18 = 69, L19 = 77, L20 = 86, L26 = 159), com redução por diferença de nível. EXP do Yuramon do tutorial: 0.
   - ✅ **Veteran:** exatamente **`2×` a EXP base do Beginner** (`ExpFormulas.ApplyEnemyCountBonus` aplica automaticamente `+5 %` em batalhas com 4 inimigos e `+10 %` com 5 inimigos — 7/7 amostras L11–L15, L19, L20 exatas com 0 erro).
-- Drop: cada item do grupo é sorteado à parte (o Yuramon do tutorial dá duas Yuramon's Seeds).
+- Drop: cada item do grupo é sorteado à parte (o Yuramon do tutorial dá duas Yuramon's Seeds). O item cai perto do dono da batalha (`0x13`), com ele como dono.
+  - ✅ Fica no chão 60 s (10 amostras, 60,1–60,5 s); a remoção (`0x13` zerado) só chega a quem está perto.
+  - ✅ Aos 40 s o oficial manda o mesmo `0x13` de novo, também para quem está longe (12 amostras, 40,1–40,5 s). ❓ O emulador trata isso como o fim da janela do dono: até lá só ele coleta (sem captura com dois jogadores).
+  - ✅ A coleta vem de perto: 26 de 27 a até 1 casa, uma a 3 (`Game:DropPickupRange`, padrão 4). Regras em [seguranca.md](../emulador/seguranca.md#interação-e-alcance).
 
 ## Mapas populados (`Resources/Map/DigimonSpawns.xml`)
 - ✅ **Mapa 79 (`Village of Beginning`)**: 3 grupos (Yuramon L2 do tutorial).

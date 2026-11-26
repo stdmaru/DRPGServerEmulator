@@ -1,7 +1,7 @@
 # Equipamentos do Tamer
 
 Dados: engenharia reversa de `DigimonRPG.bin` (`0x00AF030C`, `0x00B0E740..0x00B0FEFD`, `0x00B5BB50`, `0x00B5C170`) e capturas v322 em `captures.db` (`conn=234`, `conn=238`, `conn=428`).
-Código em `Game/Entities/EquipmentSlots.cs`, `Game/Entities/Inventory.cs`, `Network/Handlers/Map/ItemHandlers.cs`, `Network/Packets/Map/CharacterPackets.cs` (`0x02`) e `Network/Packets/Map/BattlePackets.cs` (`0xB1`).
+Código em `Game/Entities/EquipmentSlots.cs`, `Game/Entities/Inventory.cs`, `Game/Items/EquipmentService.cs`, `Network/Handlers/Map/ItemHandlers.cs`, `Network/Packets/Map/CharacterPackets.cs` (`0x02`) e `Network/Packets/Map/BattlePackets.cs` (`0xB1`).
 
 ---
 
@@ -53,12 +53,14 @@ Confirmado em `captures.db` (`conn=234`, `pid=115772..115794`):
    2. **`S2C 0xB4` (696 B) × N**: um bloco atualizado por Digimon da party.
    3. **`S2C 0x10` (204 B)**: atualização do Tamer no mapa.
    4. **`S2C 0x91` (236 B)**: eco da movimentação com o item movido e o item trocado (ou zeros).
+3. Os passos 1 a 3 (bônus, evolução sem Aura, gravação, `0xB1`/`0xB4`/`0x10`) ficam em `Game/Items/EquipmentService.Changed`, que o `0x91` e o vencimento de prazo no tick da zona (`EquipmentService.RemoveExpired`, com `0xFC` antes se a mochila também perdeu itens) usam igual.
 
 ---
 
 ## ✅ Bônus de Status e Auras (`Resources/Item/EquipmentEffects.xml`)
 
-Os efeitos de equipamentos são carregados diretamente de **`src/DRPGServer/Resources/Item/EquipmentEffects.xml`** (`GameDataLoader.LoadEquipmentEffects`, 9.152 itens extraídos offline de `item_info_us.dat` v322 via `work/tools/extract_equipment_effects.py`), sem parsear texto de UI em runtime:
+Os efeitos de equipamentos são carregados diretamente de **`src/DRPGServer/Resources/Item/EquipmentEffects.xml`** (`GameDataLoader.LoadEquipmentEffects`, 9.152 itens gerados offline de `item_info_us.dat` v322 por [`tools/extract_equipment_effects.py`](../ferramentas/extract-equipment-effects.md), um `<Modifier>` por bônus), sem parsear texto de UI em runtime:
+- **Modelo:** cada item tem `ItemInfo.Modifiers` (`StatModifiers`, ver [dados](../emulador/dados.md#modificadores-de-status-gamestatsstatmodifierscs)); o tamer soma os equipados em `Character.EquipmentModifiers`.
 - **Atributos (`STR`, `AGI`, `CON`, `INT`, `All stats`):** somam antes de `StatFormulas.Combat` (✅ exato em `conn=234`: `Digimental #215` `+6 STR/AGI/CON` eleva `InputName L1` de `145/87/131/115/115` para `183/105/139/146/125`).
 - **Status flat (`ATK`, `DEF`, `BR`, `HP`, `VP`) e `%` (`ATK%`, `DEF%`, `BR%`):** somam após `StatFormulas.Combat` (✅ exato em `conn=234`: `Crest #107` `+75 ATK / +40 DEF / +350 BR` leva `InputName L1` a `258/145/489/146/125` com 1 Crest + 1 Digimental e `333/185/839/146/125` com 2 Crests + 1 Digimental).
 - **Auras (`Type 8` e `Type 27`, 29 itens):**
@@ -83,5 +85,5 @@ Confirmado em `DigimonRPG.bin @ 0x00ABE028` e `captures.db` (`conn=238`, `conn=4
 - **`item_info_us.dat` (col. 26):** valores `1..999` são `MaxStack`; valores `> 999` são a duração padrão em segundos (ex.: `2.593.000 s` ≈ 30 dias em `#107`/`#215`).
 - **`ItemRecord` (108 B):** quando o item é de período (`ExpiresAt > 0`), `+12` envia o **Unix timestamp UTC de expiração** e `+16` envia a **duração em segundos (`≥ 1000`)**. Quando permanente (`ExpiresAt = 0`), `+12` envia `Amount` (`1`) e `+16` envia `MaxStack` (`1`).
 - **`S2C 0x02` offset `0x19B0` (`6576`):** envia o Unix timestamp UTC atual do servidor (`u32`) para o cliente sincronizar o cronômetro de expiração independente do relógio local.
-- **API de entrega (`Player.GiveItems` / `Bag.Add`):** para qualquer item não empilhável (`MaxStack == 1`), aceita duração arbitrária em segundos (ex.: `player.GiveItems([(718, 86400)])` = 1 dia), `-1` para permanente (`player.GiveItems([(718, -1)])`) ou `0`/`1` para a duração padrão do `ItemInfo`.
+- **API de entrega (`ItemService.GiveItems` com `ItemGrant`):** item não empilhável (`MaxStack == 1`) aceita `ItemDuration.FromSeconds`/`FromDays` (ex.: `new ItemGrant(718, Duration: ItemDuration.FromDays(1))`), `ItemDuration.Permanent` ou `ItemDuration.Default` (duração do `ItemInfo`). A quantidade de um não empilhável é o número de posições, todas com o mesmo prazo. Empilháveis e cards não aceitam prazo.
 - **Persistência (`sql/upgrade/0009_item_expiration.sql`):** coluna `expires_at` em `inventory_item` (`0` = permanente). Itens vencidos são descartados na carga (`CharacterFactory.Build`), bloqueados em `EquipmentSlots.CanEquip` e removidos automaticamente no tick da zona (`Zone.AutoRecovery`).

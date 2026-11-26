@@ -1,4 +1,5 @@
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Items;
 
 namespace DRPGServer.Game.Npcs;
 
@@ -12,6 +13,8 @@ public sealed class DigitalBureauNpcs : NpcScriptBase
 {
     public const byte BureauMapId = 1;
     public const uint NyangIntroLetterChoice = 10;
+    /// <summary>✅ Nyang (<c>npc_info_us</c> 1:33, (66, 86)).</summary>
+    public const ushort NyangNpc = 33;
 
     public const uint TeleportXItemId = 907;
     public const uint BeginnerCrestItemId = 107;
@@ -19,20 +22,20 @@ public sealed class DigitalBureauNpcs : NpcScriptBase
 
     public override byte MapId => BureauMapId;
 
-    public DigitalBureauNpcs()
+    public DigitalBureauNpcs(ItemService items) : base(items)
     {
-        RegisterChoice(NyangIntroLetterChoice, DeliverIntroLetter);
+        RegisterChoice(NyangIntroLetterChoice, NyangNpc, DeliverIntroLetter);
     }
 
-    private static bool DeliverIntroLetter(Player player)
+    private bool DeliverIntroLetter(Player player)
     {
         bool ok = ExchangeItemsOnce(
             player,
             NyangIntroLetterChoice,
             VillageOfBeginningNpcs.TunomonCard, 1,
-            (TeleportXItemId, 1),
-            (BeginnerCrestItemId, 1),
-            (RookieNetItemId, 1));
+            new ItemGrant(TeleportXItemId),
+            new ItemGrant(BeginnerCrestItemId),
+            new ItemGrant(RookieNetItemId));
 
         if (!ok) ReplyError(player);
         return ok;

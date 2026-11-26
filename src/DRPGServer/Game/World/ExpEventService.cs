@@ -12,7 +12,7 @@ namespace DRPGServer.Game.World;
 /// jogadores online recebam o pacote <c>Map 0xE6</c>.
 /// </summary>
 public sealed class ExpEventService(
-    ExpEventRepository? repository,
+    IExpEventStore store,
     IOptions<GameOptions> options,
     ILogger<ExpEventService> log) : BackgroundService
 {
@@ -30,8 +30,7 @@ public sealed class ExpEventService(
     /// <summary>Consulta o banco de dados e, se o evento mudou (ou <paramref name="forceNotify"/>), notifica os ouvintes.</summary>
     public async Task<ActiveExpEvent?> ReloadAsync(bool forceNotify = false, CancellationToken ct = default)
     {
-        if (repository is null) return _current;
-        var next = await repository.FindActiveAsync(ct);
+        var next = await store.FindActiveAsync(ct);
         Apply(next, forceNotify);
         return next;
     }
@@ -57,9 +56,7 @@ public sealed class ExpEventService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (repository is null) return;
-        int intervalSeconds = Math.Max(5, options.Value.EventPollSeconds);
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(options.Value.EventPollSeconds));
 
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {

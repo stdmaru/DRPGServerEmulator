@@ -1,7 +1,7 @@
 using DRPGServer.Configuration;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;
-using DRPGServer.Network.Protocol;
 using Microsoft.Extensions.Options;
 
 namespace DRPGServer.Network.Handlers;
@@ -11,21 +11,16 @@ namespace DRPGServer.Network.Handlers;
 /// Ver <c>docs/mecanicas/depository.md</c>.
 /// </summary>
 [PacketHandler(MapOpcode.DepositoryAction)]
-public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class DepositoryActionHandler(IOptions<GameOptions> options, InteractionGuard guard) : PlayerHandler<DepositoryActionRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, DepositoryActionRequest request)
     {
-        if (player.InBattle) return;
-
-        ushort page = packet.ReadU16();
-        var action = (DepositoryAction)packet.ReadU8();
-        packet.ReadU8();
-        uint partyDigimonUid = packet.ReadU32();
-        uint depositoryDigimonUid = packet.ReadU32();
-
+        if (!guard.CanUseDigimonCenter(player)) return;
+        var (page, action, partyDigimonUid, depositoryDigimonUid) = request;
         var character = player.Character;
         ushort clampedPage = Math.Clamp(page, (ushort)1, character.DepositoryTotalPages);
-        double depositoryFee = options.Value.DigimonDepositoryFee;
+        long depositoryFee = options.Value.DigimonDepositoryFee;
 
         switch (action)
         {
@@ -33,7 +28,7 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
             {
                 var result = character.DepositorySlots > 0 ? DepositoryResult.OpenOk : DepositoryResult.OpenFailed;
                 player.Send(new DepositoryListPacket(clampedPage, character));
-                player.Send(new DepositoryActionPacket(clampedPage, action, 0, 0, character.Bits, result));
+                player.Send(new DepositoryActionPacket(clampedPage, action, 0, 0, character.Wallet.Bits, result));
                 break;
             }
             case DepositoryAction.Deposit:
@@ -44,7 +39,7 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
                     player.RequestImmediateSave();
                     player.Send(new DepositoryListPacket(clampedPage, character));
                 }
-                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, 0, character.Bits, result));
+                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, 0, character.Wallet.Bits, result));
                 break;
             }
             case DepositoryAction.Withdraw:
@@ -55,7 +50,7 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
                     player.RequestImmediateSave();
                     player.Send(new DepositoryListPacket(clampedPage, character));
                 }
-                player.Send(new DepositoryActionPacket(clampedPage, action, 0, depositoryDigimonUid, character.Bits, result, withdrawn));
+                player.Send(new DepositoryActionPacket(clampedPage, action, 0, depositoryDigimonUid, character.Wallet.Bits, result, withdrawn));
                 break;
             }
             case DepositoryAction.Swap:
@@ -66,30 +61,30 @@ public sealed class DepositoryActionHandler(IOptions<GameOptions> options) : Pla
                     player.RequestImmediateSave();
                     player.Send(new DepositoryListPacket(clampedPage, character));
                 }
-                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, depositoryDigimonUid, character.Bits, result, withdrawn));
+                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, depositoryDigimonUid, character.Wallet.Bits, result, withdrawn));
                 break;
             }
             default:
-                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, depositoryDigimonUid, character.Bits, DepositoryResult.OpenCheckError));
+                player.Send(new DepositoryActionPacket(clampedPage, action, partyDigimonUid, depositoryDigimonUid, character.Wallet.Bits, DepositoryResult.OpenCheckError));
                 break;
         }
     }
 }
 
 /// <summary>
-/// ✅ Map 0x94 (C2S 15 B): expande +1 slot no Digimon Depository consumindo o item 901 (0x385) ou 929 (0x3A1).
+/// ✅ Map 0x94 (C2S 15 B, ❓ não capturado na v322): expande +1 slot no Digimon Depository consumindo o item 901 (0x385) ou 929 (0x3A1).
 /// Confirmado em <c>DigimonRPG.bin @ 0x00B7BBDA / 0x00B7BBEC / 0x00AC2883</c>.
 /// </summary>
 [PacketHandler(MapOpcode.DepositoryExpand)]
-public sealed class DepositoryExpandHandler : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class DepositoryExpandHandler(InteractionGuard guard) : PlayerHandler<DepositoryExpandRequest>
 {
     public const uint ExpansionItemId = 901;        // 0x385
     public const uint EventExpansionItemId = 929;   // 0x3A1
 
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, DepositoryExpandRequest request)
     {
-        if (player.InBattle) return;
-
+        if (!guard.CanUseDigimonCenter(player)) return;   // ✅ enviado de dentro da janela do Depository
         var character = player.Character;
         if (character.DepositorySlots >= Character.MaxDepositorySlots)
         {

@@ -6,7 +6,7 @@ using DRPGServer.Network.Protocol;
 namespace DRPGServer.Network.Packets.Map;
 
 /// <summary>0x02: dados completos do personagem e do digimon líder. Obrigatório para carregar o mapa.</summary>
-public sealed class CharacterDataPacket(Character character) : ServerPacket
+public sealed class CharacterDataPacket(Character character, long serverUnixTime) : ServerPacket
 {
     public override ushort Opcode => (ushort)MapOpcode.CharacterData;
 
@@ -24,7 +24,7 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
         w.WriteI32(0);                          // EXP do tamer ❓ não persistido
         w.WriteI32((int)ExpFormulas.TamerExpToNext(c.Level)); // EXP para o próximo nível do tamer ✅ 5·(L + 1)
         w.WriteZeros(4);
-        w.WriteF64(c.Bits);
+        w.WriteF64(c.Wallet.Bits);
         w.WriteI32(c.TotalWins);
         w.WriteI32(c.TotalBattles);
         w.WriteI16(0);                          // vitórias ranqueadas
@@ -32,7 +32,7 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
         w.WriteI32(1800);                       // pontos ranqueados (84..87 = 0x54)
         w.WriteU16((ushort)Rank.ChromeDigizoid);// 88..89 (0x58) ✅ WORD [player+0x12AC]
         w.WriteZeros(2);                        // 90..91 (0x5A)
-        w.WriteU32(c.LadderPoints);             // 92..95 (0x5C) ✅ DWORD [player+0x12B0] (DigimonRPG.bin @ 0x00B5C119)
+        w.WriteU32(c.Wallet.LadderPoints);            // 92..95 (0x5C) ✅ DWORD [player+0x12B0] (DigimonRPG.bin @ 0x00B5C119)
         w.WriteZeros(4);                        // 96..99 (0x60)
         // 100..747: ✅ 6 equipamentos primários (Crests 4..6 + Digimentals 7..9; 6 × 108 = 648 B, conn=238/428)
         foreach (var place in EquipmentSlots.PrimarySlots)
@@ -59,10 +59,10 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
         w.WriteI16(c.Y);
         // 4724..7599 (2876 B): ✅ 23 slots de equipamento do Tamer (DigimonRPG.bin @ 0x00B5BF21..0x00B5C150)
         // + Medals (0x19A8), Coins (0x19AA) e serverTime UTC (0x19B0)
-        WriteEquipmentTail(w, c);
+        WriteEquipmentTail(w, c, serverUnixTime);
     }
 
-    private static void WriteEquipmentTail(PacketWriter w, Character character)
+    private static void WriteEquipmentTail(PacketWriter w, Character character, long serverUnixTime)
     {
         const int tailLength = 2876;
         // ✅ DigimonRPG.bin @ 0x00B5C028 / 0x00B5C044 / 0x00ABE028 & captures.db (conn=238/428):
@@ -80,10 +80,10 @@ public sealed class CharacterDataPacket(Character character) : ServerPacket
             {
                 if (currenciesTailOffset > cursor)
                     w.WriteZeros(currenciesTailOffset - cursor);
-                w.WriteU16(character.Medals);
-                w.WriteU16(character.Coins);
+                w.WriteU16(character.Wallet.Medals);
+                w.WriteU16(character.Wallet.Coins);
                 w.WriteZeros(4); // 0x19AC..0x19AF
-                w.WriteU32((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                w.WriteU32((uint)serverUnixTime);
                 cursor = currenciesTailOffset + 12; // 1856 = 0x19B4 - 4724
                 wroteCurrenciesAndTime = true;
             }

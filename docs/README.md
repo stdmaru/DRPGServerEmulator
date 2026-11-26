@@ -35,7 +35,10 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
   - [Resumo do tamer (0x10)](protocolo/structs/tamer-resumo.md): nível, posição/destino, líder; 204 bytes na v322.
 
 ### Emulador
-- [Arquitetura](emulador/arquitetura.md): como rodar, migrações, estrutura, modelo de threads, handlers, autenticação entre servidores, testes.
+- [Arquitetura](emulador/arquitetura.md): como rodar, migrações, camadas, onde fica cada coisa, modelo de threads, dependências, testes.
+- [Handlers](emulador/handlers.md): caminho de um pacote, request tipado (C2S), bases de handler, pré-condições, I/O pelo `WorldIo`, checklist de handler novo.
+- [Dados de jogo](emulador/dados.md): fontes, regras (texto de UI nunca define dado), modificadores de status e efeitos tipados em XML.
+- [Segurança](emulador/seguranca.md): modelo de ameaça, tickets entre servidores, entrada/saída do mundo, transferências conta ↔ personagem, alcance, limites, persistência e auditoria.
 
 ### Mecânicas (lógica do servidor)
 - [Fórmulas de status](mecanicas/formulas-status.md): atributos = 10 + bônus do estágio + status-base × (L − 1) + pontos; ATK/DEF/BR/HP/VP = ⌊c₁√a + c₂√b⌋; MaxEVP L(L − 1).
@@ -66,3 +69,5 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [patch_client.py](ferramentas/patch-cliente.md): remove o XIGNCODE, corrige o loading e troca IPs e portas (`--server`) por assinatura. Fluxo para quando o oficial atualizar.
 - [extract_status.py](ferramentas/extract-status.md): extrai amostras de status dos pcaps.
 - [drpg_replay.py](ferramentas/replay.md): reproduz uma sessão capturada contra o emulador e compara as respostas com as do oficial.
+- [extract_equipment_effects.py](ferramentas/extract-equipment-effects.md): gera o `EquipmentEffects.xml` (bônus de equipamento em `<Modifier>`) a partir do `item_info_us.dat`.
+- [extract_digimon_titles.py](ferramentas/extract-digimon-titles.md): gera o `DigimonTitles.xml` (nome, bônus e regra de desbloqueio) a partir do `digimon_title_us.dat`.

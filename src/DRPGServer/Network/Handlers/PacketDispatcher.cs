@@ -3,6 +3,7 @@ using System.Collections.Frozen;
 using System.Reflection;
 using DRPGServer.Game.World;
 using DRPGServer.Network.Protocol;
+using DRPGServer.Network.Traffic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -34,6 +35,16 @@ public sealed class PacketDispatcher
 
     public async ValueTask DispatchAsync(Session session, IncomingFrame frame, CancellationToken ct)
     {
+        switch (session.Traffic.Admit(frame.Opcode))
+        {
+            case TrafficVerdict.Close:
+                Cut(session, "pacotes por segundo acima do teto");
+                return;
+            case TrafficVerdict.Drop:
+                _log.LogDebug("{Opcode} de {Session} acima do teto do opcode: ignorado", OpcodeNames.Of(session.Role, frame.Opcode), session);
+                return;
+        }
+
         if (!_handlers.TryGetValue((session.Role, frame.Opcode), out var handler))
         {
             var level = _reportedUnknown.TryAdd((session.Role, frame.Opcode), true) ? LogLevel.Information : LogLevel.Debug;
@@ -49,7 +60,7 @@ public sealed class PacketDispatcher
             case ISessionPacketHandler sessionHandler:
                 try
                 {
-                    await sessionHandler.HandleAsync(session, new PacketReader(frame.Payload), ct);
+                    await sessionHandler.HandleAsync(session, frame.Payload, ct);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                 catch (Exception e)
@@ -59,27 +70,56 @@ public sealed class PacketDispatcher
                 break;
 
             case IWorldPacketHandler worldHandler:
+                Action work;
+                try
+                {
+                    work = worldHandler.Prepare(session, frame.Payload);
+                }
+                catch (Exception e)
+                {
+                    Report(session, frame, e);
+                    break;
+                }
+                if (!session.Traffic.TryBeginWorldWork())
+                {
+                    Cut(session, "fila do mundo cheia");
+                    break;
+                }
                 _world.Post(() =>
                 {
-                    if (session.IsClosed) return;
                     try
                     {
-                        worldHandler.Handle(session, new PacketReader(frame.Payload));
+                        if (!session.IsClosed) work();
                     }
                     catch (Exception e)
                     {
                         Report(session, frame, e);
+                    }
+                    finally
+                    {
+                        session.Traffic.EndWorldWork();
                     }
                 });
                 break;
         }
     }
 
+    /// <summary>Fecha a sessão por limite de recurso, com log de quem foi cortado.</summary>
+    private void Cut(Session session, string reason)
+    {
+        _log.LogWarning("Sessão {Session} cortada: {Reason}", session, reason);
+        session.Close(reason);
+    }
+
     private void Report(Session session, IncomingFrame frame, Exception e)
     {
         var opcode = OpcodeNames.Of(session.Role, frame.Opcode);
         if (e is PacketFormatException)
+        {
+            // o cliente oficial nunca manda pacote fora do layout: é cliente modificado ou fluxo corrompido
             _log.LogWarning("Pacote {Opcode} malformado de {Session}: {Message}", opcode, session, e.Message);
+            session.Close($"pacote {opcode} malformado");
+        }
         else
             _log.LogError(e, "Erro tratando {Opcode} de {Session}", opcode, session);
     }

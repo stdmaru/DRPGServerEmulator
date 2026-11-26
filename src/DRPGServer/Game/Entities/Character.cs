@@ -1,3 +1,6 @@
+using DRPGServer.Game.Economy;
+using DRPGServer.Game.Stats;
+
 namespace DRPGServer.Game.Entities;
 
 /// <summary>✅ Códigos de resultado do Map 0x89 (offset 32) confirmados em DigimonRPG.bin @ 0x00AC2498.</summary>
@@ -36,21 +39,23 @@ public sealed class Character
     {
         _party[0] = leader;
         Inventory = inventory;
-        SyncEquipmentBonuses();
+        Economy = new EconomyLedger(this);
+        Wallet = new Wallet(Economy);
+        SyncEquipmentModifiers();
     }
 
-    /// <summary>Soma dos bônus de todos os equipamentos atualmente equipados pelo Tamer.</summary>
-    public Data.GameData.EquipmentBonus TotalEquipmentBonus => Inventory.TotalEquipmentBonus();
+    /// <summary>Bônus juntos de todos os equipamentos do Tamer.</summary>
+    public StatModifiers EquipmentModifiers => Inventory.EquipmentModifiers();
 
     /// <summary>
     /// Recalcula o bônus total de equipamentos do Tamer e propaga para todos os Digimons do time
     /// (✅ confirmado em <c>captures.db conn=234</c>: Crests e Digimentals aplicam a todos os Digimons da party).
     /// </summary>
-    public void SyncEquipmentBonuses()
+    public void SyncEquipmentModifiers()
     {
-        var bonus = Inventory.TotalEquipmentBonus();
+        var modifiers = Inventory.EquipmentModifiers();
         foreach (var d in Digimons)
-            d.SetEquipmentBonus(bonus);
+            d.SetEquipmentModifiers(modifiers);
     }
 
     public required uint Uid { get; init; }
@@ -63,14 +68,6 @@ public sealed class Character
     public byte MapId { get; set; }
     public short X { get; set; }
     public short Y { get; set; }
-    public double Bits { get; private set; }
-    /// <summary>✅ Moeda Medals (WORD [player+0x4070], 0x0053 action 3 / S2C 0x00CB +0x08).</summary>
-    public ushort Medals { get; private set; }
-    /// <summary>✅ Moeda Coins / DR's Earned Coin (WORD [player+0x4072], máx. 20.000 em 0x00AE8094, 0x0053 action 4 / S2C 0x00CB +0x0C).</summary>
-    public ushort Coins { get; private set; }
-    /// <summary>✅ Moeda Ladder Points (DWORD [player+0x12B0], 0x0053 action 5).</summary>
-    public uint LadderPoints { get; private set; }
-    public const ushort MaxCoins = 20_000;
     public int TotalWins { get; set; }
     public int TotalBattles { get; set; }
 
@@ -92,45 +89,11 @@ public sealed class Character
     public bool HasFlag(ushort flag) => _flags.Contains(flag);
     public bool SetFlag(ushort flag) => _flags.Add(flag);
 
-    public void SetBits(double bits) => Bits = Math.Max(0, bits);
-    public void AddBits(double amount) => SetBits(Bits + amount);
-    public bool TrySpendBits(double amount)
-    {
-        if (amount <= 0) return true;
-        if (Bits < amount) return false;
-        Bits -= amount;
-        return true;
-    }
+    /// <summary>Movimentações de moeda e item que ainda não chegaram ao banco (<see cref="EconomyLedger"/>).</summary>
+    public EconomyLedger Economy { get; }
 
-    public void SetMedals(ushort medals) => Medals = medals;
-    public void AddMedals(uint amount) => Medals = (ushort)Math.Min((uint)Medals + amount, ushort.MaxValue);
-    public bool TrySpendMedals(uint amount)
-    {
-        if (amount == 0) return true;
-        if (Medals < amount) return false;
-        Medals -= (ushort)amount;
-        return true;
-    }
-
-    public void SetCoins(ushort coins) => Coins = Math.Min(coins, MaxCoins);
-    public void AddCoins(uint amount) => Coins = (ushort)Math.Min((uint)Coins + amount, MaxCoins);
-    public bool TrySpendCoins(uint amount)
-    {
-        if (amount == 0) return true;
-        if (Coins < amount) return false;
-        Coins -= (ushort)amount;
-        return true;
-    }
-
-    public void SetLadderPoints(uint points) => LadderPoints = points;
-    public void AddLadderPoints(uint amount) => LadderPoints = (uint)Math.Min((ulong)LadderPoints + amount, uint.MaxValue);
-    public bool TrySpendLadderPoints(uint amount)
-    {
-        if (amount == 0) return true;
-        if (LadderPoints < amount) return false;
-        LadderPoints -= amount;
-        return true;
-    }
+    /// <summary>Moedas, auditadas em <see cref="Economy"/>.</summary>
+    public Wallet Wallet { get; }
 
     public Digimon? FindDigimon(uint uid) => uid == 0 ? null : Digimons.FirstOrDefault(d => d.Uid == uid);
     public Digimon? FindDigimon(Serial serial) => Digimons.FirstOrDefault(d => d.Serial == serial);
@@ -185,7 +148,7 @@ public sealed class Character
     }
 
     /// <summary>✅ Taxa oficial em Bits por nível do Digimon (DigimonRPG.bin @ 0x00BDFF10).</summary>
-    public static double DepositoryFeeForLevel(ushort level) => level switch
+    public static long DepositoryFeeForLevel(ushort level) => level switch
     {
         0 => 0,
         <= 10 => 1_000,
@@ -203,11 +166,11 @@ public sealed class Character
     /// Resolve a taxa em Bits de um Digimon no Depository: <c>&lt; 0</c> usa a tabela oficial por nível;
     /// <c>0</c> é gratuito; <c>&gt; 0</c> usa o valor fixo configurado.
     /// </summary>
-    public static double ResolveDepositoryFee(ushort level, double configuredFee) =>
+    public static long ResolveDepositoryFee(ushort level, long configuredFee) =>
         configuredFee < 0 ? DepositoryFeeForLevel(level) : configuredFee;
 
     /// <summary>Move um digimon do time (nunca o líder na posição 0) para a página escolhida do Depository.</summary>
-    public DepositoryResult Deposit(uint partyDigimonUid, ushort page, double configuredFee)
+    public DepositoryResult Deposit(uint partyDigimonUid, ushort page, long configuredFee)
     {
         if (page < 1 || page > DepositoryTotalPages)
             return DepositoryResult.DepositFailed;
@@ -231,18 +194,18 @@ public sealed class Character
         if (freeDepSlot < 0)
             return DepositoryResult.DepositFailed;
 
-        double fee = ResolveDepositoryFee(digimon.Level, configuredFee);
-        if (!TrySpendBits(fee))
+        long fee = ResolveDepositoryFee(digimon.Level, configuredFee);
+        if (!Wallet.TrySpend(CurrencyKind.Bits, fee, new(EconomySource.DigimonDepository, "deposit-fee", $"digimon {digimon.Uid}")))
             return DepositoryResult.DepositNotEnoughBits;
 
         _party[partySlot] = null;
         _depository[freeDepSlot] = digimon;
-        digimon.SetEquipmentBonus(Data.GameData.EquipmentBonus.Empty);
+        digimon.SetEquipmentModifiers(StatModifiers.None);
         return DepositoryResult.DepositOk;
     }
 
     /// <summary>Retira um digimon do Depository para a primeira posição livre do time (recusa se o grupo estiver cheio).</summary>
-    public (DepositoryResult Result, Digimon? Digimon) Withdraw(uint depositoryDigimonUid, double configuredFee)
+    public (DepositoryResult Result, Digimon? Digimon) Withdraw(uint depositoryDigimonUid, long configuredFee)
     {
         if (FindInDepository(depositoryDigimonUid) is not { } digimon)
             return (DepositoryResult.WithdrawFailed, null);
@@ -250,18 +213,18 @@ public sealed class Character
         int freePartySlot = Array.IndexOf(_party, null);
         if (depSlot < 0 || freePartySlot < 0)
             return (DepositoryResult.WithdrawFailed, null);
-        double fee = ResolveDepositoryFee(digimon.Level, configuredFee);
-        if (!TrySpendBits(fee))
+        long fee = ResolveDepositoryFee(digimon.Level, configuredFee);
+        if (!Wallet.TrySpend(CurrencyKind.Bits, fee, new(EconomySource.DigimonDepository, "withdraw-fee", $"digimon {digimon.Uid}")))
             return (DepositoryResult.WithdrawNotEnoughBits, null);
 
         _depository[depSlot] = null;
         _party[freePartySlot] = digimon;
-        digimon.SetEquipmentBonus(TotalEquipmentBonus);
+        digimon.SetEquipmentModifiers(EquipmentModifiers);
         return (DepositoryResult.WithdrawOk, digimon);
     }
 
     /// <summary>Troca um digimon do time (nunca o líder na posição 0) com um digimon do Depository.</summary>
-    public (DepositoryResult Result, Digimon? Withdrawn) Swap(uint partyDigimonUid, uint depositoryDigimonUid, double configuredFee)
+    public (DepositoryResult Result, Digimon? Withdrawn) Swap(uint partyDigimonUid, uint depositoryDigimonUid, long configuredFee)
     {
         if (FindDigimon(partyDigimonUid) is not { } partyDigimon)
             return (DepositoryResult.SwapFailed, null);
@@ -271,14 +234,14 @@ public sealed class Character
         int depSlot = Array.IndexOf(_depository, storedDigimon);
         if (partySlot <= 0 || depSlot < 0)
             return (DepositoryResult.SwapFailed, null);
-        double fee = ResolveDepositoryFee(partyDigimon.Level, configuredFee)
+        long fee = ResolveDepositoryFee(partyDigimon.Level, configuredFee)
                    + ResolveDepositoryFee(storedDigimon.Level, configuredFee);
-        if (!TrySpendBits(fee))
+        if (!Wallet.TrySpend(CurrencyKind.Bits, fee, new(EconomySource.DigimonDepository, "swap-fee", $"digimon {partyDigimon.Uid} ↔ {storedDigimon.Uid}")))
             return (DepositoryResult.SwapNotEnoughBits, null);
 
         _party[partySlot] = storedDigimon;
         _depository[depSlot] = partyDigimon;
-        storedDigimon.SetEquipmentBonus(TotalEquipmentBonus);
+        storedDigimon.SetEquipmentModifiers(EquipmentModifiers);
         return (DepositoryResult.SwapOk, storedDigimon);
     }
 
@@ -287,7 +250,7 @@ public sealed class Character
     {
         if (slot is < 0 or >= PartySize || (_party[slot] is not null && slot != 0) || _party.Contains(digimon)) return false;
         _party[slot] = digimon;
-        digimon.SetEquipmentBonus(TotalEquipmentBonus);
+        digimon.SetEquipmentModifiers(EquipmentModifiers);
         return true;
     }
 

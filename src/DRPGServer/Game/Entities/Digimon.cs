@@ -87,14 +87,24 @@ public sealed class Digimon
     public IReadOnlyList<uint> Titles => _titles;
     public DigimonTitleInfo? EquippedTitle => TitleId == 0 ? null : _data.FindDigimonTitle(TitleId);
     public string? FindTitleName(uint titleId) => _data.FindDigimonTitle(titleId)?.Name;
-    public Attributes TitleAttributeBonus => EquippedTitle?.AttributeBonus ?? default;
 
-    /// <summary>✅ Bônus acumulado dos equipamentos do Tamer (sincronizado via <see cref="Character.SyncEquipmentBonuses"/>).</summary>
-    public EquipmentBonus EquipmentBonus { get; private set; }
+    /// <summary>Títulos que se ganham sozinhos (regras em <c>DigimonTitles.xml</c>).</summary>
+    public IReadOnlyList<DigimonTitleInfo> AutoUnlockTitles => _data.AutoUnlockTitles;
+    public Attributes TitleAttributeBonus => EquippedTitle?.Modifiers.Attributes ?? default;
 
-    public void SetEquipmentBonus(EquipmentBonus bonus)
+    /// <summary>✅ Bônus dos equipamentos do Tamer (vem de <see cref="Character.SyncEquipmentModifiers"/>).</summary>
+    public StatModifiers EquipmentModifiers { get; private set; } = StatModifiers.None;
+
+    private StatModifiers? _modifiers;
+
+    /// <summary>Todas as fontes ativas (equipamento do tamer e título), em cache até uma delas mudar.</summary>
+    public StatModifiers Modifiers =>
+        _modifiers ??= StatModifiers.Combine(EquipmentModifiers, EquippedTitle?.Modifiers ?? StatModifiers.None);
+
+    public void SetEquipmentModifiers(StatModifiers modifiers)
     {
-        EquipmentBonus = bonus;
+        EquipmentModifiers = modifiers;
+        _modifiers = null;
         var s = Stats;
         Hp = Math.Min(Hp, s.MaxHp);
         Vp = Math.Min(Vp, s.MaxVp);
@@ -127,6 +137,7 @@ public sealed class Digimon
     {
         if (titleId != 0 && !HasTitle(titleId)) return false;
         TitleId = titleId;
+        _modifiers = null;
         var s = Stats;
         Hp = Math.Min(Hp, s.MaxHp);
         Vp = Math.Min(Vp, s.MaxVp);
@@ -141,32 +152,28 @@ public sealed class Digimon
         foreach (uint tid in unlockedTitles)
             UnlockTitle(tid);
         TitleId = equippedTitleId != 0 && HasTitle(equippedTitleId) ? equippedTitleId : 0;
+        _modifiers = null;
     }
 
     private CombatStats ComputePlayerStats()
     {
-        var title = EquippedTitle;
-        var equip = EquipmentBonus;
-        var effectiveAttrs = Attributes + (title?.AttributeBonus ?? default) + equip.Attributes;
-        var baseStats = StatFormulas.Combat(effectiveAttrs, Level);
-        if (title is null && equip.IsEmpty) return baseStats;
+        var m = Modifiers;
+        var baseStats = StatFormulas.Combat(Attributes + m.Attributes, Level);
+        if (m.IsEmpty) return baseStats;
 
-        int bonusHp = (title?.BonusHp ?? 0) + equip.BonusHp;
-        int bonusVp = (title?.BonusVp ?? 0) + equip.BonusVp;
-        int bonusAtk = (title?.BonusAtk ?? 0) + equip.BonusAtk;
-        int bonusDef = (title?.BonusDef ?? 0) + equip.BonusDef;
-        int bonusBr = (title?.BonusBr ?? 0) + equip.BonusBr;
-        int atkPct = (title?.BonusAtkPercent ?? 0) + equip.BonusAtkPercent;
-        int defPct = (title?.BonusDefPercent ?? 0) + equip.BonusDefPercent;
-        int brPct = (title?.BonusBrPercent ?? 0) + equip.BonusBrPercent;
-
-        int maxHp = baseStats.MaxHp + bonusHp;
-        int maxVp = baseStats.MaxVp + bonusVp;
-        int atk = (int)Math.Floor((baseStats.Atk + bonusAtk) * (1.0 + atkPct / 100.0));
-        int def = (int)Math.Floor((baseStats.Def + bonusDef) * (1.0 + defPct / 100.0));
-        int br = (int)Math.Floor((baseStats.Br + bonusBr) * (1.0 + brPct / 100.0));
-        return new CombatStats(maxHp, maxVp, baseStats.MaxEvp, atk, def, br, baseStats.MaxActionGauge);
+        return new CombatStats(
+            baseStats.MaxHp + m.Flat(StatModifierKind.Hp),
+            baseStats.MaxVp + m.Flat(StatModifierKind.Vp),
+            baseStats.MaxEvp,
+            Apply(baseStats.Atk, m, StatModifierKind.Atk),
+            Apply(baseStats.Def, m, StatModifierKind.Def),
+            Apply(baseStats.Br, m, StatModifierKind.Br),
+            baseStats.MaxActionGauge);
     }
+
+    /// <summary>(base + plano) × (1 + %), arredondado para baixo.</summary>
+    private static int Apply(int value, StatModifiers m, StatModifierKind kind) =>
+        (int)Math.Floor((value + m.Flat(kind)) * (1.0 + m.Percent(kind) / 100.0));
 
     /// <summary>✅ Pontos de atributo livres da forma atual: os ganhos na janela do estágio menos os distribuídos.</summary>
     public ushort AbilityPoints => PointsOf(Current);

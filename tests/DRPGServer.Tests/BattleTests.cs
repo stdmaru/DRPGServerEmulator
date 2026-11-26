@@ -20,8 +20,8 @@ public class BattleTests
 
     public BattleTests()
     {
-        _zones = new ZoneSystem(TestSupport.Data, _world, NullLogger<ZoneSystem>.Instance);
-        _battles = new BattleSystem(_world, TestSupport.Data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        _zones = new ZoneSystem(TestSupport.Data, _world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
+        _battles = TestSupport.NewBattles(_world, TestSupport.Data, TestSupport.GameOptions());
         _player = new Player(_session, new AuthenticatedAccount(1, "u", Authority.GameMaster), Entities.Character());
         _zones.Find(79)!.Enter(_player);
         _session.DrainOutgoing();
@@ -39,7 +39,7 @@ public class BattleTests
     private Battle Open()
     {
         var wild = _zones.Find(79)!.WildDigimons.First();
-        var battle = _battles.StartPve(_player, wild.Serial)!;
+        var battle = _battles.StartPve(_player, _player.StandBy(wild))!;
         Assert.Equal([(ushort)0x62], _session.SentOpcodes());
         battle.SendTeams(_player);
         battle.ClientReady(_player);
@@ -56,7 +56,7 @@ public class BattleTests
         Assert.Same(battle, _player.Battle);
         Assert.NotEqual(WildState.InBattle, wild.State);
         Assert.DoesNotContain(battle.TeamB, c => wild.Members.Any(m => m.Digimon == c.Digimon));
-        Assert.Null(_battles.StartPve(_player, wild.Serial));   // já em batalha
+        Assert.Null(_battles.StartPve(_player, _player.StandBy(wild)));   // já em batalha
     }
 
     [Fact]
@@ -259,25 +259,24 @@ public class BattleTests
             Maps = TestSupport.Data.Maps,
             Grids = TestSupport.Data.Grids,
             DropGroups = TestSupport.Data.DropGroups,
-            TamingNets = TestSupport.Data.TamingNets,
             Portals = TestSupport.Data.Portals,
             Spawns = spawns,
             ZoneIds = TestSupport.Data.ZoneIds,
         };
 
         var world = TestSupport.NewWorld();
-        var zones = new ZoneSystem(data, world, NullLogger<ZoneSystem>.Instance);
-        var battles = new BattleSystem(world, data, TestSupport.GameOptions(), NullLogger<BattleSystem>.Instance);
+        var zones = new ZoneSystem(data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
+        var battles = TestSupport.NewBattles(world, data, TestSupport.GameOptions());
         var session = TestSupport.NewSession();
         var leader = new Digimon(data, baseSpecies, 50) { Uid = 7, Name = "Testermon" };
-        var character = new Character(leader, new Inventory(data.FindItem, 999)) { Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79 };
+        var character = new Character(leader, new Inventory(data.FindItem, 999, _ => null, TestSupport.Clock)) { Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79 };
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
         var zone = zones.Find(79)!;
         zone.Enter(player);
         session.DrainOutgoing();
 
         var wild = zone.WildDigimons.First();
-        var battle = battles.StartPve(player, wild.Serial)!;
+        var battle = battles.StartPve(player, player.StandBy(wild))!;
         battle.SendTeams(player);
         battle.ClientReady(player);
         session.DrainOutgoing();

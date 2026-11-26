@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Globalization;
-using System.Text.RegularExpressions;
 using DRPGServer.Game.Stats;
 
 namespace DRPGServer.Data.GameData;
@@ -21,12 +20,12 @@ public static class ClientTables
     public const string DexTable = @"table\dex_us.dat";
     public const string ItemTable = @"table\item_info_us.dat";
     public const string CardTable = @"table\card_info_us.dat";
-    public const string DigimonTitleTable = @"table\digimon_title_us.dat";
     public const string MapTable = @"table\map_us.dat";
     public const string SkillTable = @"table\digimon_skill_us.dat";
     public const string TreeTable = @"table\tree_us.dat";
     public const string CashShopPageTable = @"table\ingameshop_itempage_us.dat";
     public const string CashShopDataTable = @"table\ingameshop_item_data_us.dat";
+    public const string NpcTable = @"table\npc_info_us.dat";
 
     /// <summary>
     /// Espécies: <c>digimon_us</c> (0 id, 1 nome, 2 estágio, 3 atributo, 5 skill 1, 9 skill 2) e o crescimento
@@ -72,11 +71,11 @@ public static class ClientTables
                 items.TryAdd(id, new ItemInfo(id, f[1])
                 {
                     Type = Byte(f, 2), SubType = Byte(f, 3),
-                    Col16 = UShort(f, 15), Col17 = UInt(f, 16), BuyPrice = UInt(f, 17), SellPrice = UInt(f, 18),
-                    Level = UInt(f, 20), Flag24 = Byte(f, 23), Flag25 = Byte(f, 24),
+                    CoinPrice = UShort(f, 15), LadderPrice = UInt(f, 16), BuyPrice = UInt(f, 17), SellPrice = UInt(f, 18),
+                    Level = UInt(f, 20), UnknownCol23 = Byte(f, 23), UnknownCol24 = Byte(f, 24),
                     MaxStack = col26 is >= 1 and <= 999 ? col26 : 1u,
                     DurationSeconds = col26 > 999 ? col26 : 0u,
-                    Flag33 = Byte(f, 32),
+                    UnknownCol32 = Byte(f, 32),
                 });
             }
         return items.ToFrozenDictionary();
@@ -103,89 +102,20 @@ public static class ClientTables
                     SubType = Byte(f, 3),
                     BuyPrice = UInt(f, 12),
                     SellPrice = UInt(f, 13),
-                    Flag19 = Byte(f, 19),
+                    UnknownCol19 = Byte(f, 19),
                     MaxStack = col21 is >= 1 and <= 999 ? col21 : 999u,
                     Trigger = trigger == (byte)CardTrigger.Defense ? CardTrigger.Defense : CardTrigger.Attack,
                     Restriction = Byte(f, 24),
-                    Col26 = UShort(f, 26),
-                    Col27 = Byte(f, 27),
-                    Col28 = UInt(f, 28),
-                    Col29 = Byte(f, 29),
-                    Col30 = Byte(f, 30),
+                    CoinPrice = UShort(f, 26),
+                    UnknownCol27 = Byte(f, 27),
+                    LadderPrice = UInt(f, 28),
+                    UnknownCol29 = Byte(f, 29),
+                    UnknownCol30 = Byte(f, 30),
                     Description = description,
                 });
             }
         return cards.ToFrozenDictionary();
     }
-
-    /// <summary>
-    /// Títulos de Digimon: <c>digimon_title_us</c> (0 id, 1 nome, 3..13 descrição e linhas de bônus "※ ...").
-    /// ✅ Extrai bônus de atributos (STR/AGI/CON/INT/All stats) e combate (HP/VP/ATK/DEF/BR flat e %).
-    /// </summary>
-    public static FrozenDictionary<uint, DigimonTitleInfo> DigimonTitles(ClientPack pack)
-    {
-        var titles = new Dictionary<uint, DigimonTitleInfo>();
-        if (!pack.Contains(DigimonTitleTable)) return titles.ToFrozenDictionary();
-        foreach (var f in pack.ReadTable(DigimonTitleTable))
-        {
-            if (f.Length < 4 || !uint.TryParse(f[0], CultureInfo.InvariantCulture, out var id) || id == 0) continue;
-            int str = 0, agi = 0, con = 0, intl = 0;
-            int hp = 0, vp = 0, atk = 0, def = 0, br = 0;
-            int atkPct = 0, defPct = 0, brPct = 0;
-
-            int end = Math.Min(f.Length, 14);
-            for (int col = 3; col < end; col++)
-            {
-                string line = f[col];
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                foreach (Match m in TitleStatRegex.Matches(line))
-                {
-                    string stat = m.Groups[1].Value.Trim().ToUpperInvariant();
-                    int val = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
-                    bool isPercent = m.Groups[3].Value == "%";
-                    switch (stat)
-                    {
-                        case "ALL STATS":
-                            str += val; agi += val; con += val; intl += val;
-                            break;
-                        case "STR": str += val; break;
-                        case "AGI": agi += val; break;
-                        case "CON": con += val; break;
-                        case "INT": intl += val; break;
-                        case "HP" or "MAX HP": hp += val; break;
-                        case "VP" or "MAX VP": vp += val; break;
-                        case "ATK":
-                            if (isPercent) atkPct += val; else atk += val;
-                            break;
-                        case "DEF":
-                            if (isPercent) defPct += val; else def += val;
-                            break;
-                        case "BR" or "BATTLE RATING":
-                            if (isPercent) brPct += val; else br += val;
-                            break;
-                    }
-                }
-            }
-
-            titles.TryAdd(id, new DigimonTitleInfo(id, f[1])
-            {
-                AttributeBonus = new Attributes(str, agi, con, intl),
-                BonusHp = hp,
-                BonusVp = vp,
-                BonusAtk = atk,
-                BonusDef = def,
-                BonusBr = br,
-                BonusAtkPercent = atkPct,
-                BonusDefPercent = defPct,
-                BonusBrPercent = brPct,
-            });
-        }
-        return titles.ToFrozenDictionary();
-    }
-
-    private static readonly Regex TitleStatRegex = new(
-        @"(All stats|Max HP|Max VP|Battle Rating|STR|AGI|CON|INT|HP|VP|ATK|DEF|BR)\s*\+?\s*(\d+)\s*(%?)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
     /// Skills: <c>digimon_skill_us</c> (0 id, 1 nível para aprender, 3 nome, 4 tipo [1 melee / 2 ranged], 5 alvos [1 / 2 / 5]).
@@ -252,6 +182,22 @@ public static class ClientTables
             maps.TryAdd(id, new ClientMap(id, f[1], f[4], Short(f, 12), Short(f, 13), portals));
         }
         return maps.ToFrozenDictionary();
+    }
+
+    /// <summary>✅ NPCs: <c>npc_info_us</c> (0 mapa, 1 id, 2 nome, 4/5 posição, 10 janela, 12 loja). Ver <see cref="NpcInfo"/>.</summary>
+    public static NpcDirectory Npcs(ClientPack pack)
+    {
+        var npcs = new List<NpcInfo>();
+        foreach (var f in pack.ReadTable(NpcTable))
+        {
+            if (f.Length < 13 || !byte.TryParse(f[0], CultureInfo.InvariantCulture, out var map)
+                || !ushort.TryParse(f[1], CultureInfo.InvariantCulture, out var id))
+                continue;
+            ushort.TryParse(f[10], CultureInfo.InvariantCulture, out var window);
+            uint.TryParse(f[12], CultureInfo.InvariantCulture, out var shop);
+            npcs.Add(new NpcInfo(map, id, f[2], Short(f, 4), Short(f, 5), (NpcWindow)window, shop));
+        }
+        return new NpcDirectory(npcs);
     }
 
     /// <summary>

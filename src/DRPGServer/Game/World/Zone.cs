@@ -1,5 +1,7 @@
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Items;
+using DRPGServer.Game.Stats;
 using DRPGServer.Network;
 using DRPGServer.Network.Packets.Map;
 using DRPGServer.Network.Protocol;
@@ -17,9 +19,14 @@ public sealed class Zone
     public static readonly TimeSpan RecoveryInterval = TimeSpan.FromMilliseconds(5200);
     /// <summary>✅ Primeira recuperação depois da batalha: mediana 0,2 s depois do 0x6D (41 batalhas, 0,04–0,34 s).</summary>
     public static readonly TimeSpan RecoveryAfterBattle = TimeSpan.FromMilliseconds(200);
-    /// <summary>✅ Itens no chão expiram em ~60 s nas capturas v322 (sessões 56 e 61: 60,3–60,5 s).</summary>
+    /// <summary>✅ Itens no chão expiram em ~60 s nas capturas v322 (sessões 56, 61 e 64: 60,1–60,5 s, 10 amostras).</summary>
     public static readonly TimeSpan DropCleanInterval = TimeSpan.FromSeconds(1);
     public static readonly TimeSpan DropLifetime = TimeSpan.FromSeconds(60);
+    /// <summary>
+    /// ✅ O oficial manda o mesmo 0x13 de novo ~40 s depois do drop (12 amostras, 40,1–40,5 s), também para quem está
+    /// longe. ❓ Tratado como o fim da janela do dono: as capturas têm um jogador só, sem tentativa de terceiro.
+    /// </summary>
+    public static readonly TimeSpan DropOwnerWindow = TimeSpan.FromSeconds(40);
     /// <summary>✅ Chance por tick de um selvagem parado começar a andar: 3276 de 65 462 ticks parados (5 %).</summary>
     public const double WildMoveChance = 0.05;
     /// <summary>
@@ -33,17 +40,19 @@ public sealed class Zone
 
     private readonly GameData _data;
     private readonly GameWorld _world;
+    private readonly IGameClock _clock;
     private readonly List<Player> _players = [];
     private readonly Dictionary<Serial, WildDigimon> _wild = [];
     private readonly Dictionary<uint, ItemDrop> _drops = [];
     private TimeSpan _wildTimer, _recoveryTimer, _cleanTimer;
     private uint _nextDropUid = 10_000;
 
-    public Zone(byte mapId, GameData data, GameWorld world)
+    public Zone(byte mapId, GameData data, GameWorld world, IGameClock clock)
     {
         MapId = mapId;
         _data = data;
         _world = world;
+        _clock = clock;
         Portals = data.PortalsOf(mapId);
         Grid = data.GridOf(mapId);
         SpawnAll();
@@ -72,8 +81,7 @@ public sealed class Zone
         AutoRecovery(now);
 
         if (Every(ref _cleanTimer, dt, DropCleanInterval))
-            foreach (var drop in _drops.Values.Where(d => now - d.DroppedAt >= DropLifetime).ToList())
-                RemoveDrop(drop);
+            UpdateDrops(now);
     }
 
     private static bool Every(ref TimeSpan timer, TimeSpan dt, TimeSpan interval)
@@ -138,16 +146,16 @@ public sealed class Zone
     /// </summary>
     private void AutoRecovery(TimeSpan now)
     {
-        long unixNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        long unixNow = _clock.UnixNow;
         foreach (var player in _players)
         {
             if (player.InBattle || now < player.NextRecoveryAt) continue;
             player.NextRecoveryAt = now + RecoveryInterval;
-            ExpireTimedItems(player, unixNow);
-            var equip = player.Character.TotalEquipmentBonus;
-            int hpGain = 5 + equip.HpRecovery;
-            int vpGain = 3 + equip.VpRecovery;
-            int evpGain = 10 + equip.EvpRecovery;
+            EquipmentService.RemoveExpired(player, unixNow);
+            var equip = player.Character.EquipmentModifiers;
+            int hpGain = 5 + equip.Flat(StatModifierKind.HpRecovery);
+            int vpGain = 3 + equip.Flat(StatModifierKind.VpRecovery);
+            int evpGain = 10 + equip.Flat(StatModifierKind.EvpRecovery);
             foreach (var digimon in player.Character.Digimons)
             {
                 // ✅ conn=408: digimons nocauteados (HP = 0) não regeneram automaticamente no mapa
@@ -157,30 +165,6 @@ public sealed class Zone
                 if ((digimon.Hp, digimon.Vp, digimon.Evp) != before)
                     player.Send(new RefreshDigimonStatusPacket(digimon));
             }
-        }
-    }
-
-    /// <summary>Remove itens de período vencidos no inventário e nos equipamentos do jogador fora de batalha.</summary>
-    private void ExpireTimedItems(Player player, long unixNow)
-    {
-        var c = player.Character;
-        int expiredBag = c.Inventory.Main.RemoveExpired(unixNow);
-        int expiredEquip = c.Inventory.Equipment.RemoveExpired(unixNow);
-        if (expiredBag == 0 && expiredEquip == 0) return;
-
-        player.RequestImmediateSave();
-        if (expiredBag > 0)
-            player.RefreshInventory();
-        if (expiredEquip > 0)
-        {
-            c.SyncEquipmentBonuses();
-            if (!c.TotalEquipmentBonus.MaintainEvolution)
-                foreach (var d in c.Digimons)
-                    if (d.IsEvolved) d.Devolve();
-            player.Send(new TamerExpPacket(c));
-            foreach (var d in c.Digimons)
-                player.Send(new BattleDigimonStatusPacket(d));
-            Broadcast(new RefreshCharacterInfoPacket(c));
         }
     }
 
@@ -320,6 +304,18 @@ public sealed class Zone
                     return (cx, cy);
             }
         return (x, y);
+    }
+
+    private void UpdateDrops(TimeSpan now)
+    {
+        foreach (var drop in _drops.Values.Where(d => now - d.DroppedAt >= DropLifetime).ToList())
+            RemoveDrop(drop);
+        foreach (var drop in _drops.Values)
+        {
+            if (drop.Released || drop.OwnerCharacterUid is null || now - drop.DroppedAt < DropOwnerWindow) continue;
+            drop.Released = true;
+            Broadcast(new ItemDropPacket(drop));
+        }
     }
 
     public ItemDrop? FindDrop(uint uid) => _drops.GetValueOrDefault(uid);

@@ -1,79 +1,70 @@
-using DRPGServer.Game;
 using DRPGServer.Game.Battle;
+using DRPGServer.Game.Battle.Cards;
 using DRPGServer.Game.Entities;
-using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;
-using DRPGServer.Network.Protocol;
 
 namespace DRPGServer.Network.Handlers;
 
 /// <summary>0x61: o jogador encostou num digimon selvagem.</summary>
 [PacketHandler(MapOpcode.BattleStartReq)]
-public sealed class BattleStartHandler(BattleSystem battles) : PlayerHandler
+[RequiresState(PlayerStates.Idle)]
+public sealed class BattleStartHandler(BattleSystem battles) : PlayerHandler<BattleStartRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
-    {
-        packet.ReadI32();
-        battles.StartPve(player, Serial.Read(packet));
-    }
+    protected override void Handle(Player player, BattleStartRequest request) => battles.StartPve(player, request.Wild);
 }
 
 /// <summary>0x62 (C2S): o cliente confirma o serial da batalha; o servidor manda os times.</summary>
 [PacketHandler(MapOpcode.BattleStartRes)]
-public sealed class BattleConfirmHandler : PlayerHandler
+[RequiresState(PlayerStates.InBattle)]
+public sealed class BattleConfirmHandler : PlayerHandler<BattleConfirmRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, BattleConfirmRequest request)
     {
-        var serial = Serial.Read(packet);
-        if (player.Battle is { } battle && battle.Serial == serial)
+        if (player.Battle is { } battle && battle.Serial == request.Battle)
             battle.SendTeams(player);
     }
 }
 
 /// <summary>0x69: o cliente está pronto (no começo e depois de cada animação).</summary>
 [PacketHandler(MapOpcode.BattleBegin)]
-public sealed class BattleReadyHandler : PlayerHandler
+[RequiresState(PlayerStates.InBattle)]
+public sealed class BattleReadyHandler : PlayerHandler<BattleReadyRequest>
 {
-    protected override void Handle(Player player, PacketReader packet) => player.Battle?.ClientReady(player);
+    protected override void Handle(Player player, BattleReadyRequest request) => player.Battle!.ClientReady(player);
 }
 
-/// <summary>0x35 (50 bytes): u8 ação (2), u16 ícone (0x0A ataque, 0x04 fuga), u8 0, quem age, alvo.</summary>
+/// <summary>0x35: escolher (ou desmarcar) a ação de um digimon.</summary>
 [PacketHandler(MapOpcode.BattleActionReq)]
-public sealed class BattleActionHandler : PlayerHandler
+[RequiresState(PlayerStates.InBattle)]
+public sealed class BattleActionHandler : PlayerHandler<BattleActionRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, BattleActionRequest request)
     {
-        if (packet.ReadU8() != (byte)BattleAction.Choose) return;
-        var icon = (BattleIcon)packet.ReadU16();
-        packet.ReadU8();
-        var requester = Serial.Read(packet);
-        var target = Serial.Read(packet);
-        player.Battle?.RequestAction(player, icon, requester, target);
+        if (request.Action != BattleAction.Choose) return;
+        player.Battle!.RequestAction(player, request.Icon, request.Requester, request.Target);
     }
 }
 
-/// <summary>0xA0 (C2S 98 B): ✅ equipa um card dos 6 CardSlots no slot de batalha 0..2 (sem resposta S2C).</summary>
+/// <summary>0xA0: ✅ equipa um card dos 6 CardSlots no slot de batalha 0..2 (sem resposta S2C).</summary>
 [PacketHandler(MapOpcode.BattleCardEquip)]
-public sealed class BattleCardEquipHandler : PlayerHandler
+[RequiresState(PlayerStates.InBattle)]
+public sealed class BattleCardEquipHandler : PlayerHandler<BattleCardEquipRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, BattleCardEquipRequest request)
     {
-        uint slot = packet.ReadU32();
-        uint uid = packet.ReadU32();
-        uint cardId = packet.ReadU32();
-        if (slot >= DRPGServer.Game.Battle.Cards.CardBattleState.SlotCount) return;
-        player.Battle?.EquipCard(player, (int)slot, uid, cardId);
+        if (request.Slot >= CardBattleState.SlotCount) return;
+        player.Battle!.EquipCard(player, (int)request.Slot, request.Uid, request.CardId);
     }
 }
 
-/// <summary>0xA1 (C2S 98 B): ✅ desequipa o card do slot de batalha 0..2 (sem resposta S2C).</summary>
+/// <summary>0xA1: ✅ desequipa o card do slot de batalha 0..2 (sem resposta S2C).</summary>
 [PacketHandler(MapOpcode.BattleCardUnequip)]
-public sealed class BattleCardUnequipHandler : PlayerHandler
+[RequiresState(PlayerStates.InBattle)]
+public sealed class BattleCardUnequipHandler : PlayerHandler<BattleCardUnequipRequest>
 {
-    protected override void Handle(Player player, PacketReader packet)
+    protected override void Handle(Player player, BattleCardUnequipRequest request)
     {
-        uint slot = packet.ReadU32();
-        if (slot >= DRPGServer.Game.Battle.Cards.CardBattleState.SlotCount) return;
-        player.Battle?.UnequipCard(player, (int)slot);
+        if (request.Slot >= CardBattleState.SlotCount) return;
+        player.Battle!.UnequipCard(player, (int)request.Slot);
     }
 }

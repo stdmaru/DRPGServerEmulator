@@ -2,7 +2,7 @@
 
 > Atualize ao fim de cada sessão. Mantenha curto: só o estado presente, sem histórico (o histórico fica nas [decisões](decisoes.md)).
 
-**Última atualização:** 2026-11-22. **Cliente oficial: v322** (era 242).
+**Última atualização:** 2026-11-25. **Cliente oficial: v322** (era 242).
 
 ## Feito
 - ✅ Análise de viabilidade e plano: [visão geral](visao-geral.md), [roadmap](roadmap.md).
@@ -33,6 +33,7 @@
 - ✅ Tabelas de EXP trocadas por fórmulas exatas (digimon e tamer). Ver [fórmulas de EXP](../mecanicas/formulas-exp.md). ❓ Evento de EXP ainda sem pacote identificado.
 
 ## Em andamento / próximo passo
+0. **Refatoração da fundação** (PR #41, merge em 2026-11-26): camadas, segurança, serviços reutilizáveis e dados sem parser de texto. Fase 0 (convenções na wiki e no `AGENTS.md`) e Fase 1 (requests tipados, bases de handler com `[RequiresState]`, `WorldIo`, dependências obrigatórias, `IGameClock`, opções validadas) feitas. Fase 2 (segurança) feita: ticket entre servidores, ciclo de entrada, transferências atômicas, alcance, dono do drop, limites de rede, retry com dead-letter, hash da `auth_key` e auditoria da economia (`economy_log`). Fase 3 (serviços de domínio) feita: `ItemGrant`/`ItemDuration`, `ItemService`, `Wallet`/`CurrencyKind`, `NpcShopService`, `EquipmentService`, `PlayerSystem.FindByAccount` e `MapSequences`. Fase 4 (dados) feita: `StatModifiers` para equipamento e título, `EquipmentEffects.xml` e `DigimonTitles.xml` com `<Modifier>` e geradores em `tools/`, regras de título tipadas (`<Unlock>`), efeitos de card tipados (`CardEffects.xml`) e `ItemUseService` com efeitos de uso (`ItemEffects.xml`: teleporte e Taming Net). Fase 5 (legibilidade) feita: colunas nomeadas das tabelas do cliente (preço em Medals vem do XML), `Battle.Attack` em etapas, comentários redundantes removidos, constantes de domínio fora dos repositórios (`CashDepository`, `ActiveExpEvent`) e `Game/Digimons` (títulos, captura, progressão). Validação: 493 testes, replay da sessão 52 idêntico e da 53 (batalhas) igual ao `main`. ❓ Smoke test no cliente não feito. Ver [arquitetura](../emulador/arquitetura.md), [handlers](../emulador/handlers.md), [dados](../emulador/dados.md) e [segurança](../emulador/seguranca.md).
 1. **Corrigir o que existe, do começo do fluxo para o fim** (login → channel → entrada no mapa → mapa → batalha), com amostras novas do oficial (v322). Só depois implementar coisas novas. Status e batalha entram nesse caminho.
 2. **Protocolo v322:** confirmar a hipótese do bloco de status +4 bytes (sessão 52 tem `0x02`, `0x10`, `0xB4`). Capturar sessões mais longas na v322: troca de mapa, batalha, level up (`0x70`/`0x71`).
 3. Experimento de status (ver [campanha](../captura/campanha.md), item 1).

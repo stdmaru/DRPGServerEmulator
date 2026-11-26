@@ -7,3 +7,5 @@ bin/
 appsettings.Local.json
 # pacote de tabelas do cliente: copie o table.hf/table.pf do cliente para cá (não é publicado, docs/projeto/legal.md)
 src/DRPGServer/Resources/Client/
+# snapshots que não chegaram ao banco (Persistence:DeadLetterPath, docs/emulador/seguranca.md#persistência)
+dead-letter/

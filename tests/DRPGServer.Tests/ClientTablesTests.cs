@@ -71,8 +71,8 @@ public class RealClientTablesTests
         Assert.True(data.Items.Count > 10_000);
         Assert.True(data.Cards.Count > 400);
         Assert.True(data.DigimonTitles.Count > 200);
-        Assert.Equal(new Attributes(1, 0, 0, 0), data.DigimonTitles[20100].AttributeBonus); // First Win
-        Assert.Equal(new Attributes(15, 15, 15, 15), data.DigimonTitles[20030].AttributeBonus); // Endless Journey
+        Assert.Equal(new Attributes(1, 0, 0, 0), data.DigimonTitles[20100].Modifiers.Attributes); // First Win
+        Assert.Equal(new Attributes(15, 15, 15, 15), data.DigimonTitles[20030].Modifiers.Attributes); // Endless Journey
         Assert.Equal(("Golden Drill X", CardTrigger.Attack), (data.Cards[74].Name, data.Cards[74].Trigger));
         Assert.Equal(CardTrigger.Attack, data.Cards[19].Trigger);
         Assert.Equal(CardTrigger.Defense, data.Cards[5].Trigger);

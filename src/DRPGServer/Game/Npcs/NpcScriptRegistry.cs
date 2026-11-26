@@ -1,22 +1,30 @@
+using DRPGServer.Data.GameData;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.World;
 
 namespace DRPGServer.Game.Npcs;
 
 /// <summary>
 /// Roteador central das escolhas de NPC (<c>Map 0x56</c>). Coleta todos os <see cref="NpcScriptBase"/> registrados
-/// no DI, detecta conflitos de <c>choiceId</c> na partida e valida se o jogador está no mapa correto antes de executar.
+/// no DI e, na partida, recusa <c>choiceId</c> duplicado e NPC que não existe no mapa do script. Antes de executar,
+/// confere pelo <see cref="InteractionGuard"/> que o jogador está perto do NPC da escolha.
 /// </summary>
 public sealed class NpcScriptRegistry
 {
-    private readonly Dictionary<uint, (NpcScriptBase Script, Func<Player, bool> Handler)> _routes = [];
+    private readonly Dictionary<uint, (NpcScriptBase Script, NpcScriptBase.Choice Choice)> _routes = [];
+    private readonly InteractionGuard _guard;
 
-    public NpcScriptRegistry(IEnumerable<NpcScriptBase> scripts)
+    public NpcScriptRegistry(IEnumerable<NpcScriptBase> scripts, GameData data, InteractionGuard guard)
     {
+        _guard = guard;
         foreach (var script in scripts)
         {
-            foreach (var (choiceId, handler) in script.Choices)
+            foreach (var (choiceId, choice) in script.Choices)
             {
-                if (!_routes.TryAdd(choiceId, (script, handler)))
+                if (data.Npcs.Find(script.MapId, choice.NpcId) is null)
+                    throw new InvalidOperationException(
+                        $"{script.GetType().Name}: escolha 0x56 #{choiceId} aponta para o NPC {script.MapId}:{choice.NpcId}, que não está em npc_info_us.");
+                if (!_routes.TryAdd(choiceId, (script, choice)))
                 {
                     var existing = _routes[choiceId].Script.GetType().Name;
                     throw new InvalidOperationException(
@@ -26,7 +34,7 @@ public sealed class NpcScriptRegistry
         }
     }
 
-    /// <summary>Executa a escolha <paramref name="choice"/> se ela existir e o jogador estiver no mapa correspondente.</summary>
+    /// <summary>Executa a escolha <paramref name="choice"/> se ela existir e o jogador estiver perto do NPC dela.</summary>
     public bool Choose(Player player, uint choice)
     {
         if (choice > ushort.MaxValue || !_routes.TryGetValue(choice, out var route))
@@ -34,11 +42,11 @@ public sealed class NpcScriptRegistry
             player.SendDebug($"NPC Choice ID {choice} not registered (map={player.Character.MapId})");
             return false;
         }
-        if (player.Character.MapId != route.Script.MapId)
+        if (!_guard.CanTalkTo(player, route.Script.MapId, route.Choice.NpcId))
         {
-            player.SendDebug($"NPC Choice ID {choice} requires map {route.Script.MapId} (current={player.Character.MapId})");
+            player.SendDebug($"NPC Choice ID {choice} requires NPC {route.Script.MapId}:{route.Choice.NpcId} nearby");
             return false;
         }
-        return route.Handler(player);
+        return route.Choice.Handler(player);
     }
 }

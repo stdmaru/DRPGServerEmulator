@@ -1,4 +1,5 @@
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Items;
 using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;
 
@@ -26,9 +27,13 @@ public sealed class VillageOfBeginningNpcs : NpcScriptBase
     public const uint TunomonCard = 22008;
 
     /// <summary>✅ Escolhas 7/8 (fim do tutorial): 24171 e 24172 na aba Items + teleporte para o Mapa 1 (58, 82).</summary>
-    private static readonly (uint ItemId, int Amount)[] FinalItems = [(24171, 1), (24172, 1)];
+    private static readonly ItemGrant[] FinalItems = [new(24171), new(24172)];
     public const byte FinalMap = 1;
     public const short FinalX = 58, FinalY = 82;
+
+    /// <summary>✅ NPCs do mapa 79 que oferecem as escolhas (<c>npc_info_us</c>; posição de cada escolha nas capturas).</summary>
+    public const ushort PatamonNpc = 123, YukimiBotamonNpc = 124, MochimonNpc = 125, PyocomonNpc = 126,
+        TunomonNpc = 127, ElecmonNpc = 128;
 
     public const uint TunomonChoice = 5;
     public const uint FinalChoicePerfect = 7;
@@ -38,19 +43,20 @@ public sealed class VillageOfBeginningNpcs : NpcScriptBase
 
     public override byte MapId => TutorialMapId;
 
-    public VillageOfBeginningNpcs(ZoneSystem zones)
+    public VillageOfBeginningNpcs(ZoneSystem zones, ItemService items) : base(items)
     {
         _zones = zones;
 
         // ✅ Escolhas 1–4: um manual cada (22004 a 22007)
-        RegisterChoice(1, p => GiveItemOnce(p, 1, 22004));
-        RegisterChoice(2, p => GiveItemOnce(p, 2, 22005));
-        RegisterChoice(3, p => GiveItemOnce(p, 3, 22006));
-        RegisterChoice(4, p => GiveItemOnce(p, 4, 22007));
+        RegisterChoice(1, PatamonNpc, p => GiveItemsOnce(p, 1, new ItemGrant(22004)));
+        RegisterChoice(2, YukimiBotamonNpc, p => GiveItemsOnce(p, 2, new ItemGrant(22005)));
+        RegisterChoice(3, MochimonNpc, p => GiveItemsOnce(p, 3, new ItemGrant(22006)));
+        RegisterChoice(4, PyocomonNpc, p => GiveItemsOnce(p, 4, new ItemGrant(22007)));
 
-        RegisterChoice(TunomonChoice, p => ExchangeItemsOnce(p, TunomonChoice, YuramonSeed, SeedsForTunomon, (TunomonCard, 1)));
-        RegisterChoice(FinalChoicePerfect, p => FinishTutorial(p, FinalChoicePerfect, GoldenDrillAtEndPerfect));
-        RegisterChoice(FinalChoice, p => FinishTutorial(p, FinalChoice, GoldenDrillAtEndNormal));
+        RegisterChoice(TunomonChoice, TunomonNpc,
+            p => ExchangeItemsOnce(p, TunomonChoice, YuramonSeed, SeedsForTunomon, new ItemGrant(TunomonCard)));
+        RegisterChoice(FinalChoicePerfect, ElecmonNpc, p => FinishTutorial(p, FinalChoicePerfect, GoldenDrillAtEndPerfect));
+        RegisterChoice(FinalChoice, ElecmonNpc, p => FinishTutorial(p, FinalChoice, GoldenDrillAtEndNormal));
     }
 
     private bool FinishTutorial(Player player, uint choiceId, uint drillAmount)
@@ -59,18 +65,17 @@ public sealed class VillageOfBeginningNpcs : NpcScriptBase
             return false;
 
         var inventory = player.Character.Inventory;
-        if (FinalItems.Any(i => inventory.Main.Room(i.ItemId) < i.Amount) || inventory.Battle.Room(GoldenDrillX) < drillAmount)
+        if (!inventory.Main.CanFit(FinalItems.Select(i => (i.ItemId, i.Amount))) || inventory.Battle.Room(GoldenDrillX) < drillAmount)
             return false;
 
         _zones.Teleport(player, FinalMap, FinalX, FinalY);
         player.Send(new NpcChoicePacket(choiceId));
         MarkDone(player, FinalChoice);
-        player.GiveCard(GoldenDrillX, drillAmount, refresh: false);
-        player.GiveItems(FinalItems, refresh: true);
+        Items.GiveCards(player, [new(GoldenDrillX, drillAmount)], ChoiceReason(choiceId), refresh: false);
+        Items.GiveItems(player, FinalItems, ChoiceReason(choiceId));
 
         // ✅ o oficial repete aqui os 0x7E e 0x7F da entrada
-        for (int i = 0x29; i <= 0x2F; i++) player.Send(new Unknown7EPacket(i));
-        for (int i = 0x3D; i <= 0x43; i++) player.Send(new Unknown7FPacket(i));
+        player.Send(MapSequences.ListPages());
         return true;
     }
 }

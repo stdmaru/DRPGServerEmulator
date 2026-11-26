@@ -75,3 +75,4 @@ Evidência: `DigimonRPG.bin` — 46 chamadores em par de `0x00AE3E10` (C2S `0x7B
   - Após captura, evolução, remoção/troca de Digimon e outras mutações de time no mapa.
 - O servidor não precisa empurrar `0x7B`/`0x7C` de forma não solicitada; basta responder com o estado atualizado do personagem sempre que receber `C2S 0x7B` e `C2S 0x7C`.
 - ✅ No emulador, não há tabela própria de enciclopédia: `0x7C` é derivado diretamente dos 5 slots atuais do time e `0x7B` ecoa o `uid` com `owned[speciesId] = 1` para as espécies (base e formas desbloqueadas) guardadas no [Digimon Depository](depository.md).
+- O global chega no personagem por `PlayerSystem.FindByAccount` (na thread do mundo), não pelas sessões da conta. Sem personagem no mapa, `0x7B` vai sem espécies e `0x7C` com o time vazio.

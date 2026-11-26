@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace DRPGServer.Game.World;
 
 /// <summary>Monta as entidades a partir das linhas do banco.</summary>
-public sealed class CharacterFactory(GameData data, IOptions<GameOptions> options)
+public sealed class CharacterFactory(GameData data, IOptions<GameOptions> options, IGameClock clock)
 {
     /// <summary>Monta o personagem. Null se o líder não tem espécie válida.</summary>
     public Character? Build(CharacterRecord record)
@@ -16,8 +16,8 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
         var row = record.Character;
 
         // 1. Monta o inventário e equipamentos primeiro para que os Digimons da party já nasçam com os bônus certos
-        long unixNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var inventory = new Inventory(data.FindItem, (uint)options.Value.MaxStackPerItem, data.FindCard);
+        long unixNow = clock.UnixNow;
+        var inventory = new Inventory(data.FindItem, (uint)options.Value.MaxStackPerItem, data.FindCard, clock);
         foreach (var i in record.Items)
         {
             if (i.Amount == 0) continue;
@@ -35,13 +35,13 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
                 : data.FindItem(i.ItemId) is not null;
             if (!valid) continue;
             var created = inventory.Create(i.ItemId, i.Slot, i.Amount, i.Uid, isCard, i.ExpiresAt);
-            if (bagKind == BagKind.Equipment && !EquipmentSlots.CanEquip((ItemPlace)i.Slot, created, row.Level))
+            if (bagKind == BagKind.Equipment && !EquipmentSlots.CanEquip((ItemPlace)i.Slot, created, row.Level, unixNow))
                 continue;
             inventory.BagOf(bagKind).Place(created);
         }
 
         // 2. Monta todos os Digimons (party recebe o bônus de equipamentos; Depository recebe vazio) e carrega os vitais uma única vez
-        var equipBonus = inventory.TotalEquipmentBonus();
+        var equipModifiers = inventory.EquipmentModifiers();
         var formsByDigimon = record.Forms.ToLookup(f => f.DigimonUid);
         var titlesByDigimon = (record.Titles ?? []).ToLookup(t => t.DigimonUid, t => t.TitleId);
         var digimons = record.Digimons
@@ -49,7 +49,7 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
                 r,
                 formsByDigimon[r.Uid],
                 titlesByDigimon[r.Uid],
-                r.InDepository ? EquipmentBonus.Empty : equipBonus)))
+                r.InDepository ? StatModifiers.None : equipModifiers)))
             .Where(d => d.Digimon is not null)
             .ToList();
         var leader = digimons.FirstOrDefault(d => !d.Row.InDepository && d.Row.Slot == 0).Digimon
@@ -81,14 +81,11 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
                 character.Place(character.Party.ToList().IndexOf(null), d!);   // posição repetida: primeira livre
         }
         foreach (var flag in record.Flags) character.SetFlag(flag);
-        character.SetBits(row.Bits);
-        character.SetMedals(row.Medals);
-        character.SetCoins(row.Coins);
-        character.SetLadderPoints(row.LadderPoints);
+        character.Wallet.Load(row.Bits, row.Medals, row.Coins, row.LadderPoints);
         return character;
     }
 
-    private Digimon? BuildDigimon(DigimonRow r, IEnumerable<FormRow> forms, IEnumerable<uint> titles, EquipmentBonus equipBonus)
+    private Digimon? BuildDigimon(DigimonRow r, IEnumerable<FormRow> forms, IEnumerable<uint> titles, StatModifiers equipModifiers)
     {
         if (data.FindSpecies(r.DigimonId) is not { } species) return null;
         var digimon = new Digimon(data, species, r.Level)
@@ -102,8 +99,8 @@ public sealed class CharacterFactory(GameData data, IOptions<GameOptions> option
                 digimon.LoadForm(formSpecies, new Attributes(f.AllocStr, f.AllocAgi, f.AllocCon, f.AllocInt),
                     f.Skill1Level, f.Skill2Level);
         digimon.LoadTitles(r.TitleId, titles);
-        if (!equipBonus.IsEmpty)
-            digimon.SetEquipmentBonus(equipBonus);
+        if (!equipModifiers.IsEmpty)
+            digimon.SetEquipmentModifiers(equipModifiers);
         digimon.Load(r.Exp, r.UnlockedStage, r.TotalWins, r.TotalBattles, r.Hp, r.Vp, r.Evp);
         return digimon;
     }

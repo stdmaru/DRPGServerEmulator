@@ -1,4 +1,5 @@
 using DRPGServer.Data.GameData;
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using DRPGServer.Network.Protocol;
 
@@ -10,8 +11,20 @@ public enum NpcShopAction : uint
     Buy = 1,             // Bits (0xDD9)
     Sell = 2,            // Venda por Bits (0xDDD)
     BuyMedals = 3,       // Medals (0xDDA, ItemRecord +88)
-    BuyCoins = 4,        // Coins / DR's Earned Coin (0xDDB, ItemRecord +90 = Col16)
-    BuyLadderPoints = 5, // Ladder Points (0xDDC, ItemRecord +92 = Col17)
+    BuyCoins = 4,        // Coins / DR's Earned Coin (0xDDB, ItemRecord +90 = CoinPrice)
+    BuyLadderPoints = 5, // Ladder Points (0xDDC, ItemRecord +92 = LadderPrice)
+}
+
+public static class NpcShopActions
+{
+    /// <summary>✅ A ação de compra que o 0x53 usa para cada moeda.</summary>
+    public static NpcShopAction BuyWith(CurrencyKind currency) => currency switch
+    {
+        CurrencyKind.Medals => NpcShopAction.BuyMedals,
+        CurrencyKind.Coins => NpcShopAction.BuyCoins,
+        CurrencyKind.LadderPoints => NpcShopAction.BuyLadderPoints,
+        _ => NpcShopAction.Buy,
+    };
 }
 
 /// <summary>
@@ -24,9 +37,9 @@ public sealed class CurrencyUpdatePacket(Character character) : ServerPacket
 
     protected override void Write(PacketWriter w)
     {
-        w.WriteF64(character.Bits);        // +0x00
-        w.WriteU32(character.Medals);      // +0x08
-        w.WriteU32(character.Coins);       // +0x0C (16 B total)
+        w.WriteF64(character.Wallet.Bits); // +0x00
+        w.WriteU32(character.Wallet.Medals); // +0x08
+        w.WriteU32(character.Wallet.Coins);  // +0x0C (16 B total)
     }
 }
 
@@ -69,13 +82,13 @@ public sealed class CardShopListPacket(NpcShop shop, GameData data) : ServerPack
 /// ✅ Map 0x0052 (4320 B = 40 × 108 B): lista de itens de uma loja de NPC.
 /// Confirmado em <c>captures.db</c> (conn 145/150/158/221) e <c>DigimonRPG.bin @ 0x00ABF416</c>.
 /// </summary>
-public sealed class ItemShopListPacket(NpcShop shop, GameData data) : ServerPacket
+public sealed class ItemShopListPacket(NpcShop shop, GameData data, long unixNow) : ServerPacket
 {
     public override ushort Opcode => (ushort)MapOpcode.ItemShopList;
 
     protected override void Write(PacketWriter w)
     {
-        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        long now = unixNow;
         int written = 0;
         foreach (var entry in shop.Entries)
         {
@@ -86,8 +99,8 @@ public sealed class ItemShopListPacket(NpcShop shop, GameData data) : ServerPack
             {
                 info = shop.Currency switch
                 {
-                    NpcShopCurrency.Coins => info with { Col16 = (ushort)Math.Min(price, ushort.MaxValue) },
-                    NpcShopCurrency.LadderPoints => info with { Col17 = price },
+                    CurrencyKind.Coins => info with { CoinPrice = (ushort)Math.Min(price, ushort.MaxValue) },
+                    CurrencyKind.LadderPoints => info with { LadderPrice = price },
                     _ => info with { BuyPrice = price },
                 };
             }

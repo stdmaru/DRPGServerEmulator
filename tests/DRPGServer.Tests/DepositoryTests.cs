@@ -13,6 +13,9 @@ namespace DRPGServer.Tests;
 
 public class DepositoryTests
 {
+    /// <summary>Digimon Center do mapa 79 no pacote de teste.</summary>
+    private const ushort DigimonCenterNpc = 129;
+
     private static byte[] BuildActionRequest(ushort npcId, DepositoryAction action, uint partyUid = 0, uint depUid = 0)
     {
         var buf = new byte[750];
@@ -27,14 +30,14 @@ public class DepositoryTests
     [Fact]
     public void Open_fails_when_zero_slots_and_succeeds_when_slots_available()
     {
-        var character = Entities.Character();
+        var character = Entities.Character().AtNpc(79, DigimonCenterNpc);
         character.DepositorySlots = 0;
         var session = TestSupport.NewSession(ServerRole.Map);
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
         session.Player = player;
 
-        var handler = new DepositoryActionHandler(TestSupport.GameOptions());
-        handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Open)));
+        var handler = new DepositoryActionHandler(TestSupport.GameOptions(), TestSupport.Guard());
+        handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Open)));
 
         var frames = session.DrainOutgoing();
         Assert.Equal(2, frames.Count);
@@ -44,7 +47,7 @@ public class DepositoryTests
         Assert.Equal((byte)DepositoryResult.OpenFailed, frames[1][14 + 32]); // result = 2 (precisa expandir)
 
         character.DepositorySlots = 10;
-        handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Open)));
+        handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Open)));
 
         frames = session.DrainOutgoing();
         Assert.Equal(2, frames.Count);
@@ -55,7 +58,7 @@ public class DepositoryTests
     [Fact]
     public void Deposit_withdraw_and_swap_round_trip_with_official_bits_fee()
     {
-        var character = Entities.Character();
+        var character = Entities.Character().AtNpc(79, DigimonCenterNpc);
         character.DepositorySlots = 15; // 2 páginas (10 na pág 1, 5 na pág 2)
         character.SetBits(500);
 
@@ -65,27 +68,27 @@ public class DepositoryTests
         var session = TestSupport.NewSession(ServerRole.Map);
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
         session.Player = player;
-        var handler = new DepositoryActionHandler(TestSupport.GameOptions(o => o.DigimonDepositoryFee = 1000));
+        var handler = new DepositoryActionHandler(TestSupport.GameOptions(o => o.DigimonDepositoryFee = 1000), TestSupport.Guard());
 
         // Sem Bits suficientes (lv 5 custa 1000 Bits) -> DepositNotEnoughBits (5)
-        handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: 42)));
+        handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: 42)));
         var poorFail = Assert.Single(session.DrainOutgoing());
         Assert.Equal((byte)DepositoryResult.DepositNotEnoughBits, poorFail[14 + 32]);
-        Assert.Equal(500, character.Bits);
+        Assert.Equal(500, character.Wallet.Bits);
 
         // Com 5000 Bits: não pode depositar o líder (slot 0)
         character.SetBits(5_000);
-        handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: character.Leader.Uid)));
+        handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: character.Leader.Uid)));
         var leaderFail = Assert.Single(session.DrainOutgoing());
         Assert.Equal((byte)DepositoryResult.DepositFailed, leaderFail[14 + 32]);
-        Assert.Equal(5_000, character.Bits);
+        Assert.Equal(5_000, character.Wallet.Bits);
 
         // Deposita o slot 1 (uid 42, lv 5 -> 1000 Bits)
-        handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: 42)));
+        handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Deposit, partyUid: 42)));
         var depFrames = session.DrainOutgoing();
         Assert.Equal(2, depFrames.Count);
         Assert.Equal((byte)DepositoryResult.DepositOk, depFrames[1][14 + 32]);
-        Assert.Equal(4_000, character.Bits);
+        Assert.Equal(4_000, character.Wallet.Bits);
         Assert.Null(character.Party[1]);
         var stored = Assert.Single(character.Depository);
         Assert.Equal(42u, stored.Uid);
@@ -103,36 +106,36 @@ public class DepositoryTests
         Assert.True(second.Hp > 0);
 
         // Abre página 2 -> 5 slots disponíveis na página 2
-        handler.Handle(session, new PacketReader(BuildActionRequest(2, DepositoryAction.Open)));
+        handler.Dispatch(session, new PacketReader(BuildActionRequest(2, DepositoryAction.Open)));
         var page2Frames = session.DrainOutgoing();
         Assert.Equal(2, BinaryPrimitives.ReadUInt16LittleEndian(page2Frames[0].AsSpan(14, 2)));     // currentPage = 2
         Assert.Equal(2, BinaryPrimitives.ReadUInt16LittleEndian(page2Frames[0].AsSpan(14 + 2, 2))); // totalPages = 2
         Assert.Equal(5, page2Frames[0][14 + 4]);                                                     // availableSlotsOnPage = 5
 
         // Troca (Swap) o líder (slot 0, uid 7) é recusada pelo guard do servidor
-        handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Swap, partyUid: 7, depUid: 42)));
+        handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Swap, partyUid: 7, depUid: 42)));
         var swapLeaderFail = Assert.Single(session.DrainOutgoing());
         Assert.Equal((byte)DepositoryResult.SwapFailed, swapLeaderFail[14 + 32]);
-        Assert.Equal(4_000, character.Bits);
+        Assert.Equal(4_000, character.Wallet.Bits);
 
         // Coloca um segundo digimon no slot 1 (uid 43) e troca (Swap) slot 1 (lv 1 -> 1000) com uid 42 (lv 5 -> 1000) = 2000 Bits
         var third = new Digimon(TestSupport.Data, TestSupport.Data.FindSpecies(10)!, 1) { Uid = 43, Name = "Testmon2" };
         Assert.True(character.Place(1, third));
-        handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Swap, partyUid: 43, depUid: 42)));
+        handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Swap, partyUid: 43, depUid: 42)));
         var swapFrames = session.DrainOutgoing();
         Assert.Equal(2, swapFrames.Count);
         Assert.Equal((byte)DepositoryResult.SwapOk, swapFrames[1][14 + 32]);
-        Assert.Equal(2_000, character.Bits);
+        Assert.Equal(2_000, character.Wallet.Bits);
         Assert.Equal(42u, character.Party[1]!.Uid);
         Assert.Equal(43u, Assert.Single(character.Depository).Uid);
         Assert.Equal(42u, BinaryPrimitives.ReadUInt32LittleEndian(swapFrames[1].AsSpan(14 + 40, 4))); // DigimonStatusBlock @ 40
 
         // Deposita o uid 42 na página 2 -> vai para a página 2 (slot 10), não para a página 1
-        handler.Handle(session, new PacketReader(BuildActionRequest(2, DepositoryAction.Deposit, partyUid: 42)));
+        handler.Dispatch(session, new PacketReader(BuildActionRequest(2, DepositoryAction.Deposit, partyUid: 42)));
         var depPage2Frames = session.DrainOutgoing();
         Assert.Equal(2, depPage2Frames.Count);
         Assert.Equal((byte)DepositoryResult.DepositOk, depPage2Frames[1][14 + 32]);
-        Assert.Equal(1_000, character.Bits);
+        Assert.Equal(1_000, character.Wallet.Bits);
         Assert.Equal(43u, Assert.Single(character.DepositoryPage(1)).Uid);
         Assert.Equal(42u, Assert.Single(character.DepositoryPage(2)).Uid);
         Assert.Equal(42u, BinaryPrimitives.ReadUInt32LittleEndian(depPage2Frames[0].AsSpan(14 + 8, 4)));
@@ -140,10 +143,10 @@ public class DepositoryTests
         // Preenche todos os 5 slots do time -> Withdraw é recusado pelo guard do servidor (grupo cheio)
         for (int s = 1; s < Character.PartySize; s++)
             Assert.True(character.Place(s, new Digimon(TestSupport.Data, TestSupport.Data.FindSpecies(10)!, 1) { Uid = (uint)(60 + s), Name = $"P{s}" }));
-        handler.Handle(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Withdraw, depUid: 43)));
+        handler.Dispatch(session, new PacketReader(BuildActionRequest(1, DepositoryAction.Withdraw, depUid: 43)));
         var fullPartyFail = Assert.Single(session.DrainOutgoing());
         Assert.Equal((byte)DepositoryResult.WithdrawFailed, fullPartyFail[14 + 32]);
-        Assert.Equal(1_000, character.Bits);
+        Assert.Equal(1_000, character.Wallet.Bits);
     }
 
     [Fact]
@@ -159,15 +162,15 @@ public class DepositoryTests
     [Fact]
     public void Expand_consumes_item_901_or_929_and_enforces_max_ten_slots()
     {
-        var character = Entities.Character();
+        var character = Entities.Character().AtNpc(79, DigimonCenterNpc);
         character.DepositorySlots = 0;
         var session = TestSupport.NewSession(ServerRole.Map);
         var player = new Player(session, new AuthenticatedAccount(1, "u", Authority.None), character);
         session.Player = player;
-        var handler = new DepositoryExpandHandler();
+        var handler = new DepositoryExpandHandler(TestSupport.Guard());
 
         // Sem item no inventário -> MissingItem (1)
-        handler.Handle(session, new PacketReader(new byte[15]));
+        handler.Dispatch(session, new PacketReader(new byte[15]));
         var noItem = Assert.Single(session.DrainOutgoing());
         Assert.Equal((ushort)MapOpcode.DepositoryExpand, PacketHeader.Read(noItem).Opcode);
         Assert.Equal((byte)DepositoryExpandResult.MissingItem, noItem[14]);
@@ -175,7 +178,7 @@ public class DepositoryTests
 
         // Com item 901 -> consome 1, sobe para 1 slot, envia 0xFC + 0x8A + 0x94(0)
         character.Inventory.Main.Place(character.Inventory.Create(DepositoryExpandHandler.ExpansionItemId, 0, 1, 100));
-        handler.Handle(session, new PacketReader(new byte[15]));
+        handler.Dispatch(session, new PacketReader(new byte[15]));
         var okFrames = session.DrainOutgoing();
         Assert.Equal(3, okFrames.Count);
         Assert.Equal((ushort)MapOpcode.InventoryRefresh, PacketHeader.Read(okFrames[0]).Opcode);
@@ -188,7 +191,7 @@ public class DepositoryTests
         // No máximo (10) -> MaxSlots (2), não consome item 929
         character.DepositorySlots = Character.MaxDepositorySlots;
         character.Inventory.Main.Place(character.Inventory.Create(DepositoryExpandHandler.EventExpansionItemId, 0, 1, 101));
-        handler.Handle(session, new PacketReader(new byte[15]));
+        handler.Dispatch(session, new PacketReader(new byte[15]));
         var maxFrame = Assert.Single(session.DrainOutgoing());
         Assert.Equal((byte)DepositoryExpandResult.MaxSlots, maxFrame[14]);
         Assert.Single(character.Inventory.Main.Items);
@@ -197,14 +200,14 @@ public class DepositoryTests
     [Fact]
     public async Task Global_0x7B_lights_up_species_stored_in_depository()
     {
-        var accounts = new AccountRegistry(TestSupport.GameOptions(), TimeProvider.System);
+        var accounts = new AccountRegistry(TestSupport.NetworkOptions(), TimeProvider.System);
         var world = TestSupport.NewWorld();
         var account = new AuthenticatedAccount(1, "tester", Authority.None);
 
         var channelSession = TestSupport.NewSession(ServerRole.Channel);
         accounts.SignIn(account, channelSession);
 
-        var character = Entities.Character();
+        var character = Entities.Character().AtNpc(79, DigimonCenterNpc);
         character.DepositorySlots = 10;
         var stored = new Digimon(TestSupport.Data, TestSupport.Data.FindSpecies(50)!, 21) { Uid = 99, Name = "Rookiemon" };
         stored.UnlockStage(); // libera Champion (80)
@@ -212,7 +215,8 @@ public class DepositoryTests
 
         var mapSession = TestSupport.NewSession(ServerRole.Map);
         accounts.Claim("tester", mapSession);
-        mapSession.Player = new Player(mapSession, account, character);
+        var players = TestSupport.NewPlayers(world);
+        players.EnterNow(mapSession, account, character);
 
         var globalSession = TestSupport.NewSession(ServerRole.Global);
         new GlobalLifecycle(accounts).OnConnected(globalSession);
@@ -224,11 +228,11 @@ public class DepositoryTests
         BinaryPrimitives.WriteUInt32LittleEndian(reqPlain, character.Leader.Uid);
         var reqCipher = GlobalSessionCipher.EncryptBlocks(key, reqPlain);
 
-        var handler = new EncyclopediaDataHandler(accounts, world);
+        var handler = new EncyclopediaDataHandler(players, world);
         await world.StartAsync(CancellationToken.None);
         try
         {
-            await handler.HandleAsync(globalSession, new PacketReader(reqCipher), CancellationToken.None);
+            await handler.DispatchAsync(globalSession, new PacketReader(reqCipher), CancellationToken.None);
             await world.InvokeAsync(() => true);
         }
         finally

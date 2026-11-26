@@ -1,6 +1,9 @@
 using DRPGServer.Configuration;
 using DRPGServer.Data.GameData;
+using DRPGServer.Game.Digimons;
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
 using DRPGServer.Network.Packets.Map;
 using Microsoft.Extensions.Logging;
@@ -15,18 +18,20 @@ public sealed class BattleSystem : IWorldSystem
     private readonly GameWorld _world;
     private readonly GameData _data;
     private readonly GameOptions _options;
-    private readonly ExpEventService? _expEvents;
+    private readonly ExpEventService _expEvents;
+    private readonly InteractionGuard _guard;
     private readonly ILogger<BattleSystem> _log;
 
     public BattleSystem(GameWorld world, GameData data, IOptions<GameOptions> options, ILogger<BattleSystem> log,
-        Taming? taming = null, ExpEventService? expEvents = null)
+        Taming taming, ExpEventService expEvents, InteractionGuard guard)
     {
+        _guard = guard;
         _world = world;
         _data = data;
         _options = options.Value;
         _expEvents = expEvents;
         _log = log;
-        Taming = taming ?? new Taming(data, new Game.DigimonUids(), options);
+        Taming = taming;
         world.AddSystem(this);
     }
 
@@ -43,7 +48,7 @@ public sealed class BattleSystem : IWorldSystem
     public Battle? StartPve(Player player, Serial wildSerial)
     {
         if (player.InBattle || player.Zone is not { } zone) return null;
-        if (zone.FindWild(wildSerial) is not { CanBattle: true } wild) return null;
+        if (zone.FindWild(wildSerial) is not { } wild || !_guard.CanEngage(player, wild)) return null;
 
         bool exclusive = wild.Spawn.Exclusive;
         Func<WildMember, Digimon> enemyOf = exclusive
@@ -102,10 +107,10 @@ public sealed class BattleSystem : IWorldSystem
     /// </summary>
     internal void GrantRewards(Player owner, Combatant killer, IReadOnlyList<Combatant> participants, WildMember defeated, int enemyCount = 1)
     {
-        double eventMultiplier = _expEvents?.ExpMultiplier ?? 1.0;
-        double equipExpMultiplier = 1.0 + Math.Max(0, owner.Character.TotalEquipmentBonus.DigimonExpPercent) / 100.0;
+        double eventMultiplier = _expEvents.ExpMultiplier;
+        double equipExpMultiplier = 1.0 + Math.Max(0, owner.Character.EquipmentModifiers.Percent(StatModifierKind.DigimonExp)) / 100.0;
         double bits = RollBits(defeated.Option.BitReward) * _options.BitRate;
-        owner.Character.AddBits(bits);
+        owner.Character.Wallet.CreditBits(bits, new EconomyReason(EconomySource.BattleReward, "kill", $"digimon {defeated.Digimon.Species.Id}"));
 
         var order = participants.Where(c => c != killer).Prepend(killer).Select(c => c.Digimon).Distinct();
         bool first = true;

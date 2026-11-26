@@ -27,7 +27,8 @@ Evidências: `captures.db` (sessão 56, marca 72 — `conn=55, 57, 76, 112, 141,
 
 ## 3. Desbloqueio Automático e Persistência
 
-- **Marcos automáticos (`Game/World/DigimonTitles.cs`):**
+- **Catálogo:** `Resources/Digimon/DigimonTitles.xml` (235 títulos, gerado por [`tools/extract_digimon_titles.py`](../ferramentas/extract-digimon-titles.md)): nome, bônus em `<Modifier>` e regra em `<Unlock>` ([dados](../emulador/dados.md#regras-de-desbloqueio-gamedigimonstitleunlockscs)).
+- **Marcos automáticos (`<Unlock>`, avaliados por `Game/Digimons/DigimonTitles.CheckUnlocks` em ordem de id):**
   - **Vitórias (`TotalWins`):** `20100` (1), `20110` (10), `20120` (100), `20130` (1000), `20140` (10000).
   - **Derrotas (`TotalBattles - TotalWins`, incluindo fuga):** `20200` (1), `20210` (100), `20220` (1000), `20230` (10000).
   - **Nível / Mega:** `20000` (Mega / Lv. 41), `20010` (Lv. 100), `20020` (Lv. 110), `20030` (Lv. 120), `20040` (Lv. 130), `20050` (Lv. 140), `30402` (Lv. 150 — *Best Partner*), `30444` (Lv. 160 — *Beyond Evolution*).

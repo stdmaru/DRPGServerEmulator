@@ -1,4 +1,5 @@
 using Dapper;
+using DRPGServer.Game.Economy;
 using DRPGServer.Game.Entities;
 using MySqlConnector;
 
@@ -79,39 +80,35 @@ public sealed record CharacterSnapshot(
     uint Uid, ushort Level, byte MapId, short X, short Y, double Bits, ushort Medals, ushort Coins, uint LadderPoints,
     int TotalWins, int TotalBattles, byte DepositorySlots,
     IReadOnlyList<DigimonSnapshot> Digimons, IReadOnlyList<FormRow> Forms, IReadOnlyList<ItemRow> Items,
-    IReadOnlyList<ushort> Flags, IReadOnlyList<TitleRow> Titles)
+    IReadOnlyList<ushort> Flags, IReadOnlyList<TitleRow> Titles, IReadOnlyList<EconomyEntry> Economy)
 {
     public static CharacterSnapshot Of(Character c)
     {
         var digimons = new List<DigimonSnapshot>();
         var forms = new List<FormRow>();
         var titles = new List<TitleRow>();
+        // time e Digimon Depository: mesma linha, só a posição e a flag mudam
         for (int slot = 0; slot < Character.PartySize; slot++)
-        {
-            if (c.Party[slot] is not { Uid: > 0 } d) continue;
-            digimons.Add(new DigimonSnapshot(d.Uid, (byte)slot, slot == 0, false, d.BaseForm.Species.Id, d.Name, d.Level, d.Exp,
-                d.UnlockedStage, d.PointsOf(d.BaseForm), d.SkillPoints, d.TotalWins, d.TotalBattles, d.FreeRename, d.TitleId,
-                d.Hp, d.Vp, d.Evp));
-            forms.AddRange(d.Forms.Select(f => new FormRow(d.Uid, f.Species.Id, f.Allocated.Str, f.Allocated.Agi,
-                f.Allocated.Con, f.Allocated.Int, (byte)f.SkillLevels[0], (byte)f.SkillLevels[1])));
-            titles.AddRange(d.Titles.Select(t => new TitleRow(d.Uid, t)));
-        }
+            Add(c.Party[slot], slot, inDepository: false);
         for (int slot = 0; slot < Character.MaxDepositorySlots; slot++)
-        {
-            if (c.DepositoryGrid[slot] is not { Uid: > 0 } d) continue;
-            digimons.Add(new DigimonSnapshot(d.Uid, (byte)slot, false, true, d.BaseForm.Species.Id, d.Name, d.Level, d.Exp,
-                d.UnlockedStage, d.PointsOf(d.BaseForm), d.SkillPoints, d.TotalWins, d.TotalBattles, d.FreeRename, d.TitleId,
-                d.Hp, d.Vp, d.Evp));
-            forms.AddRange(d.Forms.Select(f => new FormRow(d.Uid, f.Species.Id, f.Allocated.Str, f.Allocated.Agi,
-                f.Allocated.Con, f.Allocated.Int, (byte)f.SkillLevels[0], (byte)f.SkillLevels[1])));
-            titles.AddRange(d.Titles.Select(t => new TitleRow(d.Uid, t)));
-        }
+            Add(c.DepositoryGrid[slot], slot, inDepository: true);
         var items = new[] { c.Inventory.Main, c.Inventory.Battle, c.Inventory.CardSlots, c.Inventory.Equipment }
             .SelectMany(b => b.Items.Select(i => new ItemRow((byte)b.Kind, (byte)i.Slot, i.Uid, i.ItemId, i.Amount, i.ExpiresAt)))
             .ToList();
-        return new(c.Uid, c.Level, c.MapId, c.X, c.Y, c.Bits, c.Medals, c.Coins, c.LadderPoints,
+        return new(c.Uid, c.Level, c.MapId, c.X, c.Y, c.Wallet.Bits, c.Wallet.Medals, c.Wallet.Coins, c.Wallet.LadderPoints,
             c.TotalWins, c.TotalBattles, c.DepositorySlots,
-            digimons, forms, items, c.Flags.Order().ToList(), titles);
+            digimons, forms, items, c.Flags.Order().ToList(), titles, c.Economy.Pending.ToList());
+
+        void Add(Digimon? d, int slot, bool inDepository)
+        {
+            if (d is not { Uid: > 0 }) return;
+            digimons.Add(new DigimonSnapshot(d.Uid, (byte)slot, IsLeader: !inDepository && slot == 0, inDepository,
+                d.BaseForm.Species.Id, d.Name, d.Level, d.Exp, d.UnlockedStage, d.PointsOf(d.BaseForm), d.SkillPoints,
+                d.TotalWins, d.TotalBattles, d.FreeRename, d.TitleId, d.Hp, d.Vp, d.Evp));
+            forms.AddRange(d.Forms.Select(f => new FormRow(d.Uid, f.Species.Id, f.Allocated.Str, f.Allocated.Agi,
+                f.Allocated.Con, f.Allocated.Int, (byte)f.SkillLevels[0], (byte)f.SkillLevels[1])));
+            titles.AddRange(d.Titles.Select(t => new TitleRow(d.Uid, t)));
+        }
     }
 }
 
@@ -124,7 +121,13 @@ public sealed record NewCharacter(
     uint AccountUid, byte Slot, string Name, byte TamerId, ushort DigimonId, string DigimonName, byte MapId, short X, short Y,
     byte DepositorySlots = 0);
 
-public sealed class CharacterRepository(Database database, Game.DigimonUids uids)
+/// <summary>Gravação do snapshot do personagem, a única coisa que o mundo pede ao banco do personagem.</summary>
+public interface ICharacterSnapshotStore
+{
+    Task SaveAsync(CharacterSnapshot snapshot, CancellationToken ct);
+}
+
+public sealed class CharacterRepository(Database database, Game.DigimonUids uids, IAuditLog audit) : ICharacterSnapshotStore
 {
     private const string SelectWithLeader = """
         SELECT c.uid, c.account_uid, c.slot, c.name, c.tamer_id, c.level, c.map_id, c.pos_x, c.pos_y,
@@ -225,8 +228,20 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
 
     public async Task SaveAsync(CharacterSnapshot s, CancellationToken ct)
     {
-        await using var db = await database.OpenAsync(ct);
-        await using var tx = await db.BeginTransactionAsync(ct);
+        await using var uow = await database.BeginAsync(ct);
+        await SaveAsync(uow, s, ct);
+        await uow.CommitAsync(ct);
+    }
+
+    /// <summary>
+    /// Grava o snapshot dentro de <paramref name="uow"/> (transferências conta ↔ personagem), junto com as movimentações
+    /// de economia que ele leva.
+    /// </summary>
+    public async Task SaveAsync(UnitOfWork uow, CharacterSnapshot s, CancellationToken ct)
+    {
+        var db = uow.Connection;
+        var tx = uow.Transaction;
+        await audit.WriteAsync(uow, s.Economy, ct);
         await db.ExecuteAsync(new CommandDefinition("""
             UPDATE `character`
             SET level = @Level, map_id = @MapId, pos_x = @X, pos_y = @Y, bits = @Bits,
@@ -279,6 +294,5 @@ public sealed class CharacterRepository(Database database, Game.DigimonUids uids
         await db.ExecuteAsync(new CommandDefinition(
             "INSERT IGNORE INTO character_flag (character_uid, flag) VALUES (@CharacterUid, @Flag)",
             s.Flags.Select(f => new { CharacterUid = s.Uid, Flag = f }), tx, cancellationToken: ct));
-        await tx.CommitAsync(ct);
     }
 }

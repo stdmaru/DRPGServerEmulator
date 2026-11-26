@@ -14,6 +14,7 @@ INSERT INTO account(username,password,auth_key,authority) VALUES('replay','x','R
 INSERT INTO `character`(account_uid,name,tamer_id,level,map_id,pos_x,pos_y,slot) VALUES(LAST_INSERT_ID(),'Replayer',1,1,79,56,56,0);
 INSERT INTO digimon(character_uid,digimon_id,name,level,is_leader) VALUES(LAST_INSERT_ID(),10,'Agumon',1,1);
 ```
+A `auth_key` em texto puro é convertida em hash no primeiro login ou na próxima partida ([segurança](../emulador/seguranca.md#auth_key)); o script continua mandando `REPLAYKEY`.
 
 ## Usar
 ```bash
@@ -40,5 +41,10 @@ python3 drpg_replay.py 4 --ignore 0x11,0xb2
 | **52 v322 login até o mapa** | ✅ | ✅ | ✅ | ✅ |
 
 Desde a mudança para v322, as sessões v242 diferem de propósito no tamanho de `0x02`, `0x10` e `0xB4`.
+
+## Resultado em 2026-11-26 (fim do PR #41)
+- **52:** idêntico nas quatro conexões.
+- **53 (sessão com batalhas):** não dá para comparar com o oficial (seriais). Com personagem novo, `main` (`d011f61`) e a branch dão a mesma sequência (login ✅, channel 4, map 30/31, global 5): o mapa para de responder logo depois da entrada nas duas (❓ estado do personagem novo, já em `main`). A diferença é que a branch fecha o mapa parado após 60 s de inatividade (S6).
+- Para comparar com `main`, use outro banco (`DRPG_Database__Name=drpg_replay_main`) e crie a conta de teste nele: o `auth_key` de um banco migrado já está em hash.
 
 ❓ O oficial parece mandar 0xC4 e 0xB2 por conta própria (timer), não em resposta. Só 2 saídas capturadas: uma com 0xC4, outra sem.
