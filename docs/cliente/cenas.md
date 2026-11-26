@@ -1,59 +1,207 @@
 # Cenas do cliente (até a seleção de personagens)
 
-Levantamento para o marco 2 do [cliente novo](../planos/cliente-novo.md): abrir com `<usuário> <chave>` e chegar na **seleção de personagens** com o comportamento do original. Endereços da v322 ([dump de RE](../ferramentas/dump-re.md)).
+Especificação para o marco 2 do [cliente novo](../planos/cliente-novo.md): abrir com `<usuário> <chave>` e chegar na **seleção de personagens** com o comportamento do original. Endereços da v322 ([dump de RE](../ferramentas/dump-re.md)). Páginas de apoio: [carga inicial](carga-inicial.md) (o que a tela de carga carrega), [formato `.ani`](formato-ani.md), [tabelas por espécie](tabelas-de-especie.md), [formato `.spr`](formato-spr.md).
 
 ## Sequência
-`WinMain` (`0x00aa4a90`) → linha de comando (`0x00aa24b0`) → `Game Init` (`0x00aa2c10`) → **`CSceneTitle`** (carga) → **`CSceneServer`** (seleção de mundo) → **`CSceneCharSel`** → `CSceneGame`.
+`WinMain` (`0x00aa4a90`) → linha de comando (`0x00aa24b0`) → abre `Resource` e `Table` → janela → DirectDraw → **`Game Init`** (`0x00aa2c10`, com a tela de carga já na tela) → cena **1** `CSceneTitle` → cena **2** `CSceneServer` → cena **4** `CSceneCharSel` → cena **5** `CSceneGame`.
 
 - Linha de comando: separa por espaço e exige **exatamente 2** tokens (usuário, chave); senão, caixa de erro e sai. Guarda em `[DAT_01158504+0xb8]` e `[+0xd0]`.
-- Troca de cena: `FUN_00b500a0(n)` (o `CSceneTitle` chama com `2` ao terminar). ❓ Números das outras cenas.
+- ✅ **Troca de cena** `FUN_00b500a0(n)`: 1 = `CSceneTitle` (ctor `0x00b54ae0`), 2 = `CSceneServer` (`0x00b504b0`), 4 = `CSceneCharSel` (`0x00b43f20`, vtable `0x0102ebc4`), 5 = `CSceneGame` (`0x00b494f0`). ❓ 3 não é criada aqui.
+  - Ao pedir a cena 2: escolhe a linha 1 da tabela de servidores (`FUN_00b3a950(1, 0)`), conecta (`FUN_00b52460`) e, se conectou, envia o **login `0x05`** com o usuário (`FUN_00b54150`). Ou seja: **o login é feito ao entrar na seleção de mundo**, antes de qualquer clique.
+  - Se a cena 2 for pedida com `[DAT_0135b150]+0x690 == 0` (volta do jogo/da seleção de personagens), antes desenha 30 quadros de `FUN_00b34250(i % 12)` com `Sleep(100)` entre eles (3 s). Na primeira vez (`Game Init` põe `+0x690 = 1`) isso é pulado.
 - Toda cena desenha o texto `Digimon RPG 3.26` no canto (`FUN_00b55270(0, texto, x, 1, 0xffffff, 1, 0)`; x = 0 na carga, 1 na seleção de mundo).
-- `FUN_00b3e3d0` aparece no fim do quadro das cenas: ❓ provavelmente o cursor (`Interface\cursor_*.spr`, carregados em `0x00b3ebf0`; ver [tela de login do launcher](tela-login-launcher.md#desabilitado-e-cursor)).
-- `FUN_00b56010` + `FUN_007dbf10`: fim do quadro (apresentação).
+- `FUN_00b3e3d0`: cursor (`Interface\cursor_*.spr`, carregados em `0x00b3ebf0`). `FUN_00b56010` + `FUN_007dbf10`: fim do quadro (apresentação).
+- ✅ 30 quadros por segundo em todas as cenas (`FUN_00867ed0(0x1e)` no `WinMain` e no fim do `Game Init`).
 
 ## Interface das cenas (vtables)
-| Cena | vtable | [0] dtor | [1] init | [2] quadro | [3] | outros |
-|---|---|---|---|---|---|---|
-| `CSceneTitle` | `0x0102f968` | `0x00b54c20` | `0x00b54c60` | `0x00b54cc0` | `0x00b54c50` | — |
-| `CSceneServer` | `0x0102f62c` | `0x00b514c0` | `0x00b53120` | `0x00b54240` | `0x00b52da0` | `0x00b53d40`, `0x00b54310`, `0x00b51950` |
-| `CSceneCharSel` | `0x0102ebc4` | `0x00b454d0` | `0x00b47b30` | `0x00b48840` | `0x00b47a80` | `0x00b48410`, `0x00b48c60`, `0x00b45500` |
-| `CSceneGame` | `0x0102ee7c` | `0x00b498a0` | `0x00b4bab0` | `0x00b4e550` | `0x00b4b4d0` | |
+Cada cena tem **três** vtables (herança múltipla): a principal, uma em `+0x18` (interface de GUI) e uma em `+0x1c` (teclado). Métodos chamados pela interface `+0x18` recebem `this = cena + 0x18`; por isso, no decompilado, os campos aparecem com 0x18 a menos (ex.: flags `+0x26a8` = cena `+0x26c0`). Nesta página os campos são sempre **da cena**.
 
-❓ O 5º item das vtables de `CSceneServer`/`CSceneCharSel` (`0x10e23b8`, `0x10e21ec`) não é código: provável início de uma segunda base (entrada de mouse/teclado).
+| Cena | principal: dtor, init, quadro, liberar | `+0x18`: ?, desenhar GUI, evento(id) | `+0x1c`: tecla |
+|---|---|---|---|
+| `CSceneTitle` `0x0102f968` | `0x00b54c20`, `0x00b54c60`, `0x00b54cc0`, `0x00b54c50` | — | — |
+| `CSceneServer` `0x0102f62c` | `0x00b514c0`, `0x00b53120`, `0x00b54240`, `0x00b52da0` | `0x0102f640`: `0x00b53d40`, `0x00b54310`, `0x00b51950` | `0x0102f650`: `0x00b537a0` |
+| `CSceneCharSel` `0x0102ebc4` | `0x00b454d0`, `0x00b47b30`, `0x00b48840`, `0x00b47a80` | `0x0102ebd8`: `0x00b48410`, `0x00b48c60`, `0x00b45500` | `0x0102ebe8`: `0x00b33960` (padrão, sem teclas) |
+| `CSceneGame` `0x0102ee7c` | `0x00b498a0`, `0x00b4bab0`, `0x00b4e550`, `0x00b4b4d0` | | |
+
+## Desenho e GUI (o que as cenas usam)
+- ✅ **Sprite**: `FUN_00b56ff0(quadro, sprite, x, y, w, h, flags)` (thiscall no renderer `DAT_0135ad88`). `w`/`h` = −1 usam o tamanho do quadro; um `w` menor **recorta** o quadro na largura (é assim que a barra de carga cresce). Quadro fora do intervalo não desenha nada (log `Frame Error`). `FUN_00b569f0(quadro, sprite, x, y, ?, alpha?, …)`: desenho com mistura (❓ modo; usado nas sombras das artes de digimon com `0xc`).
+- ✅ **Cache de sprites** `FUN_00b21be0(nome)`; `FUN_008e54c0` acrescenta o sufixo de idioma: `dr2_in_000_006` → `GUI\dr2_in_000_006_ENG.spr` quando existe a versão `_eng` (todos os `dr2_*` com variante `_eng` no `resource` seguem isso).
+- ✅ **Texto** `FUN_00b55270(fonte, texto, x, y, cor, sombra, corSombra)`: GDI `TextOutA` alinhado no canto superior esquerdo, fundo transparente; com `sombra = 1` desenha antes o texto em `(x+1, y+1)` na `corSombra` (0 = preto). Cor é **COLORREF** (`0x00BBGGRR`): `0xffffff` branco, `0xffff` **amarelo**, `0x4080ff` laranja. Fonte 0 = a padrão `+0x1dc`: **GulimChe 12 px, normal, charset 0x81** (`0x00b563f0`). `FUN_00b55320` é o mesmo para texto UTF-16 (`FUN_0091ba70`).
+- ✅ **Caixa de mensagem** `FUN_007dd610(texto, x, y, modo, cor)`: mede o texto (`FUN_00b561f0` → w, h); se `modo` ∉ {1, 2}, centra: `x0 = x − 14 − w/2`, `y0 = y − 14 − h/2`. Com `n = (w − 24) / 7 + 2`, desenha `GUI\dr2_in_000_003.spr` em 9 partes: linha de cima quadro 0 em `(x0, y0)`, quadro 1 repetido `n + 1` vezes a partir de `x0 + 14` de 7 em 7, quadro 2 em `(x0 + 14 + 7n, y0)`; linha de baixo em `y0 + 14` com os quadros 6, 7 (repetido), 8. Texto em `(x0 + (7n − w + 28) / 2, y0 + 9)` com sombra.
+- ✅ **Botão** (classe `0x009b6fc0`, 0x40 bytes): `+8/+0xc` x, y; `+0x10/+0x14` w, h (do quadro 0); `+0x20` estado (0 normal, 1 sob o mouse, 2 pressionado); `+0x28..+0x34` quadro por estado (padrão 0, 1, 2, 3, `0x009b7670`); `+0x1e` "clicou" (vale 1 no quadro do clique; zerado por `0x009b7550`); `+0x39` duplo clique.
+  - `0x009b75a0(x, y, sprite)` / `0x009b76b0(sprite)` + `0x009b7570(x, y)`: posição e sprite. `0x009b7610(x, y, w, h)`: retângulo sem sprite (links de texto).
+  - `0x009b7140` → `0x009b7040(mouseX, mouseY)`: teste do retângulo `[x, x+w) × [y, y+h)`; fora → estado 0; dentro com botão solto → 1; dentro e o clique foi solto em cima → `+0x1e = 1`, estado 2. ❓ Detalhe do par aperta/solta (`+0x18` vem do tratador de mouse `DAT_0135a1e4`).
+  - `0x009b7260`: desenha o quadro do estado; `0x009b71e0(q)`: desenha o quadro `q` fixo; `0x009b7400`: está sob o mouse.
 
 ## CSceneTitle (carga) ✅
 - **init** `0x00b54c60`: estado `+0x50 = 0x16`.
-- **quadro** `0x00b54cc0`: no estado `0x16` chama a carga `0x00ad3d30` (tabelas, recursos) e passa a `0x17`. Quando a thread da barra marca o fim (`[0x135b150]+0x654 == 1`), troca para a cena **2** (`CSceneServer`).
-- **Tela de carga**, desenhada pela "PreLoadingBar Thread" (`0x00b35560`), **30 quadros por segundo** (`FUN_00867ed0(0x1e)`):
-  | Ordem | Sprite | Posição | Quadro |
+- **quadro** `0x00b54cc0`: no estado `0x16` chama `0x00ad3d30` (última parte da carga) e passa a `0x17`. Quando a thread da barra marca o fim (`[0x135b150]+0x654 == 1`), troca para a cena **2**.
+- **Tela de carga** desenhada pela "PreLoadingBar Thread" (`0x00b35560`, criada em `0x00b34ba0` **no começo do `Game Init`**), 30 quadros/s:
+  | Ordem | Sprite | Posição | Desenho |
   |---|---|---|---|
-  | 1 | `GUI\dr2_in_000_000_ENG.spr` (fundo) | (0, 0) | 0 |
-  | 2 | `GUI\dr2_in_001_000.spr` (caixa "Loading") | (289, 140) | 0 |
-  | 3 | `GUI\dr2_in_001_001.spr` | (224, 258) | 0 (é transparente) |
-  | 4 | `GUI\dr2_in_001_002.spr` (barra) | (293, 305) | `1 + (quadros − 1) × progresso / 100` |
-  | 5 | `GUI\dr2_in_001_002.spr` | (293, 305) | modo 1 (primeiro argumento de `FUN_00b56ff0` = 1) ❓ |
-  | 6 | texto `Digimon RPG 3.26` | (0, 1) | branco |
-- `FUN_00b56ff0(modo, sprite, x, y, quadro, ?, ?)` desenha um sprite; `FUN_00b21be0` busca o sprite no cache por nome.
-- **Progresso exibido** (`+0x64c`) persegue o alvo (`+0x644`, gravado pela carga) a cada 10 ms ou mais: `exibido += alvo × 0,01 × 0,18`, ×7 quando o alvo ainda está bem à frente (`+0x648 < alvo − 1`). A carga termina quando `[DAT_01158504]+0x81 == 1`.
-- ✅ **Implementado** em `DRPG.Client/Scenes/TitleScene.cs` (fase A): sprites e posições da tabela, 30 FPS, texto da versão em (0, 1), progresso por `LoadingProgress` e carga real em segundo plano (`StartupLoader`: abre `table`, lê `Language/`; a barra recebe o progresso por etapa). Conferido com screenshot da instalação real: igual à tela do original.
-- ✅ Descoberta no `0x00b34d40`: o multiplicador ×7 da perseguição usa o campo `+0x648` = 39,0, gravado ao subir o alvo, e não o alvo em si; implementado assim.
-- ✅ `dr2_in_001_002` tem **2 quadros** de 231×23 (conferido na `resource.hf` real). Com a fórmula `1 + (quadros − 1) × progresso / 100` o quadro é sempre o de índice 1 (o contorno vazio, como a screenshot mostra); o avanço visível da barra vem então do **desenho "modo 1"** do item 5, que continua ❓ e **não é desenhado** no cliente novo. ❓ Se a contagem do original parte de 0 ou de 1 não está confirmado.
-- ❓ Como a carga real é rápida (centenas de milissegundos), a tela dura pouco: o original só termina quando a carga acaba (`+0x81 == 1`), sem esperar a barra encher, e o cliente novo faz igual.
+  | 1 | `GUI\dr2_in_000_000_ENG.spr` (fundo) | (0, 0) | quadro 0 |
+  | 2 | `GUI\dr2_in_001_000.spr` (caixa "Loading") | (289, 140) | quadro 0 |
+  | 3 | `GUI\dr2_in_001_001.spr` | (224, 258) | quadro 0 |
+  | 4 | `GUI\dr2_in_001_002.spr` (barra cheia) | (293, 305) | ✅ quadro **0** recortado na largura `w = 1 + (231 − 1) × exibido / 100` |
+  | 5 | `GUI\dr2_in_001_002.spr` (contorno) | (293, 305) | ✅ quadro **1** inteiro, por cima |
+  | 6 | texto `Digimon RPG 3.26` | (0, 1) | branco, com sombra |
+- ✅ **Correção:** o primeiro argumento de `FUN_00b56ff0` é o quadro e o quinto é a largura (ver [desenho](#desenho-e-gui-o-que-as-cenas-usam)). A fórmula `1 + (quadros − 1) × progresso / 100` da versão anterior desta página era a largura (`FUN_00872680` = largura do quadro 0 = 231), não um índice de quadro. O `TitleScene` da fase A desenha errado (sempre o quadro 1 e nunca a barra) e é corrigido na fase C.
+- ✅ **Progresso exibido** `+0x64c`: a cada quadro, se passaram ≥ 10 ms desde a última subida e `exibido ≤ alvo`, `exibido += v × 0,01 × 0,18`, onde `v = +0x648` (= 39,0, gravado a cada subida do alvo por `0x00b34d40`) e ×7 quando `v < alvo − 1`. Ou seja: **+0,0702 por quadro enquanto o alvo é 39; +0,4914 por quadro quando o alvo passa de 40** (constantes em `0x0102e35c`, `0x0102e360`, `0x0102e370`, `0x0102e368`).
+- ✅ **Alvo do progresso** (`+0x644`, só sobe; `0x00b34d40`), na ordem da [carga inicial](carga-inicial.md): 39 → 70 → 90 → 99 (no `Game Init`) → 101 (fim de `0x00ad3d30`). A tela termina quando `[DAT_01158504]+0x81 == 1`, gravado no fim de `0x00ad3d30`, **sem esperar a barra encher**: a duração (~10 s no original) é o trabalho real de carga.
 
-## CSceneServer (seleção de mundo) ❓
-- **Pré-carga** (construtor `0x00b504b0`): `dr2_in_000_000`, `000_006`, `002_000..010`, `003_000..004` (os do login antigo também).
-- **quadro** `0x00b54240`: limpa, desenha a interface (objeto em `+0x18`, método 1), o texto da versão em (1, 1) e o **texto de idioma `0x5eb`** (`FUN_0091b950(id)`) em (5, 585), branco. Depois `FUN_00b641b0` se `[DAT_0135b154]+8`, e o cursor.
-- `0x00b54310`: desenha mensagens centradas (x = 400) com os textos `0x5ee` e `0x5ef` e contadores de tempo (80 e 100 quadros); usa `FUN_009b7570(0x2b5, 0x221)`.
-- `0x00b51950` (513 linhas): entrada; toca sons com `FUN_00b3a950(n, 0)` (ids 5, 6, 7, 9, 10, 0xf, 0x10, 0x11, 0x12).
-- `0x00b53120` (init): carrega `dr2_in_003_003/004` (OK/CANCEL).
-- **Falta:** layout dos widgets (`dr2_in_002_*`: DIGITAL WORLD / BATTLE ZONE), a sequência de rede (quando conecta no login `0x05` e no channel `0x03`/`0x04`), BGM e o que leva à `CSceneCharSel`.
+## CSceneServer (seleção de mundo) ✅
+Construtor `0x00b504b0` (lista de pré-carga `dr2_in_002_005`, `000_006`, `000_000`, `003_000..004`, `002_000`, `002_001`, `002_006`, `002_007`, `002_010`, `002_008`, `002_009`, `002_002..004`, carregados no fim do init `0x00b53120`). Sprites desenhados em [figura dos sprites](#sprites-dr2_in_002).
 
-## CSceneCharSel ❓
-- Sprites: fundo `dr2_ch_000_000` (800×600, 4 slots "Empty Slot" com quadros TAMER/DIGIMON), slots `dr2_ch_000_001..004` (2 quadros, ~355×230), botões `dr2_ch_000_005..009` (3 quadros), criação `dr2_ch_001_000..004`. Também `GUI\dr2_main_001_013.spr`, `GUI\dr2_sub_011_001.spr`, `Sound\menu-1.wav` e o texto `Map Server : %s %d`.
-- init `0x00b47b30` (2256 bytes), quadro `0x00b48840`, `0x00b48c60` (2144 bytes, provável entrada).
-- **Falta:** posições, o que aparece em cada slot (imagem do tamer e do digimon: ❓ formato `.ani`/sprites de personagem), textos (nome, nível), botões, sons e BGM.
+### init `0x00b53120`
+1. `FUN_00917e00(idioma)`.
+2. **BGM**: para a atual e toca `Sound\title.ogg` em laço (`0x00b424a0`, `0x00b42500("Sound\title.ogg", 0)`, volume `option.ini` `[+8]` via `0x00b42460`, `0x00b42670(1)`).
+3. **Efeitos** (`FUN_00a187b0(id, arquivo)` registra; `FUN_00a18890(id, 0)` toca): **2 = `sound\menu-bt.wav`**, **3 = `sound\menu-1.wav`**, **4 = `sound\menu-dark.wav`**; volume dos efeitos `option.ini` `[+9]` (`0x00a18910`: 0 = mudo, senão `(v − 4) × 400` centésimos de dB).
+4. Duas caixas de edição Win32 (ID em (389, 217) 130×16 até 20 caracteres; senha em (389, 263) 130×16, máscara, até 8) e o texto `0xef3` em `+0x2480`. ❓ São da tela de login antiga dentro do cliente (`0x00b538f0`); com o launcher elas não aparecem. **Não implementar.**
+5. `0x00b53c40`: botão **DIGITAL WORLD** (`+0x854`) = `GUI\dr2_in_002_000.spr` em **(120, 144)**; botão **BATTLE ZONE** (`+0x894`) = `GUI\dr2_in_002_001.spr` em **(430, 144)**. ❓ `FUN_00b569f0(2, superfície +0x58, 430, 171, −1, 12, …)` logo antes: efeito desconhecido.
+6. Botão **Close/종료** (`+0x794`) = `dr2_in_000_006` (`_ENG`: "Close", 3 quadros) em **(693, 545)**. ❓ `dr2_in_003_003/004` (OK/CANCEL) em (464, 130) e (448, 305): do login antigo, não desenhados.
+7. Estado: flags `+0x26c0 = 0`, `+0x78d` (quadro do painel) = 0, posições das artes em `+0x8d4/+0x8d8 = (−800, 800)`, `+0x8e4/+0x8e8 = (−800, 800)`, `+0x8dc/+0x8e0 = (800, −800)` (construtor).
 
-## Texto, som e fontes
-- Textos da interface por id: `FUN_0091b950(id)` → tabela de idioma (❓ qual arquivo de `table/language/`).
-- Fontes GDI criadas em `0x00b563f0`: "굴림체" (GulimChe, cp949) em 14/12/11/10 px normal e negrito, 13×5, 32×24, 15; e `Fonts\123RF_123RF_TTF.ttf` (face "123RF", 16 px). Ver [fonte do launcher](tela-login-launcher.md#fonte).
-- Som: `Sound\*.wav` (efeitos) e `*.ogg` (BGM, por exemplo `title.ogg`). `FUN_00b3a950(id, 0)` toca um efeito por id: ❓ tabela id → arquivo.
+### Flags `+0x26c0`
+| Bit | Significado |
+|---|---|
+| 0 `0x1` | painel aberto: as artes deslizam para dentro; zerado, deslizam para fora |
+| 1 `0x2` | mundo DIGITAL WORLD (arte `002_002`, painel `002_006`) |
+| 2 `0x4` | mundo BATTLE ZONE (artes `002_003` + `002_004`, painel `002_007`) |
+| 3 `0x8` | mundo escolhido: os dois botões grandes somem |
+| 5 `0x20` | `0x03` enviado, esperando resposta |
+| 6 `0x40` | canal aceito (resposta `0x03` = 2): passa para `0x00b546c0` (autenticação e saída da cena) |
+| 7 `0x80` | mostra a mensagem `+0x2468` por 20 quadros |
+| 8 `0x100` | `0x04` enviado |
+| 9 `0x200` | `0x04` aceito: escurece e vai para a cena 4 |
+| 10 `0x400` | resposta `0x03` chegou (libera o envio do `0x04`) |
+| 12 `0x1000` | mostra o erro `+0x2480` por 20 quadros |
+| 13 `0x2000` | falha ao conectar: mensagem `0x5ee` por 80 quadros |
+| 14 `0x4000` | aviso de senha fraca (`0x5fa..0x5ff`, botão `0x600`) |
+| 15 `0x8000` | lista de canais do Net Ocean aberta |
+
+### Quadro `0x00b54240` → desenho `0x00b54310`
+Ordem por quadro:
+1. Limpa a tela; `0x00b524b0` processa as mensagens da rede ([abaixo](#rede-e-mensagens)).
+2. Fundo `dr2_in_002_005` (`_ENG`) em (0, 0).
+3. Se não está no bit 6:
+   - Botão Close: atualiza, desenha, posição (693, 545). Clique → toca **2** e fecha o jogo (`DestroyWindow`).
+   - Se não está no bit 3: **`0x00b528e0`** — botões dos mundos: desenha DIGITAL WORLD (120, 144) e BATTLE ZONE (430, 144) com o quadro 0; o que estiver sob o mouse é redesenhado com o quadro 1 e, ao entrar nele, toca **2** uma vez (`+0x78e` evita repetir). Clique em DIGITAL WORLD → toca 2, flags `(f & ~0x4) | 0xb`. Clique em BATTLE ZONE só se `+0x8fc == 1` (ver resposta `0x05`) → seleciona a linha 1, conecta, envia `0x05` (repete o login; ❓ e cria um `CSceneServer` sem uso, bug do original: não copiar), flags `(f & ~0x2) | 0xd`. Os cliques são ignorados com `[DAT_01158504]+0x348 ≠ 0` (sem rede).
+   - Se está no bit 6: `0x00b546c0`.
+4. **`0x00b51550`** — artes e painéis:
+   - Arte DIGITAL WORLD `GUI\dr2_in_002_002.spr` (quadro 0) em (`+0x8d4`, `+0x8d8`), desenhada enquanto o bit 1 está ligado. Aberto: x += 80 até 0, y −= 80 até 0 (entra pelo canto inferior esquerdo em 10 quadros). Fechado: x −= 80, y += 80; ao chegar em (−800, 800) zera os bits 1 e 15, `+0x78d = 0`.
+   - Arte BATTLE ZONE: `GUI\dr2_in_002_004.spr` em (`+0x8e4`, `+0x8e8`), mesmo movimento de 80; e `GUI\dr2_in_002_003.spr` em (`+0x8dc`, `+0x8e0`), entrando pelo canto superior direito de 40 em 40 (20 quadros). Cada uma desenha **primeiro o quadro 1 (silhueta) com `FUN_00b569f0(1, …, 0xc)`** e depois o quadro 0.
+   - Sons: ao abrir toca **3** (`menu-1`), ao fechar toca **4** (`menu-dark`), uma vez cada (`+0x78f`).
+   - `0x00b52b30` desenha o painel do mundo aberto (só com o bit 0):
+     - DIGITAL WORLD: `GUI\dr2_in_002_006.spr` quadro `+0x78d` em **(363, 72)** (0 = painel curto, 2 = painel alto da lista de canais).
+       - Sem o bit 15: `GUI\dr2_in_002_010.spr` quadro 1 em **(363, 330)**; links "Net Ocean" `0x5da` em (448, 166) (id 102), "Net Ocean Consignment Store" `0x5dd` em (430, 366) (id 210), "Net Ocean Event Channel" `0x5e8` em (430, 398) (id 213).
+       - Com o bit 15: "Net Ocean - Channel 2" `0x5e0` em (430, 191) (id 201), "Channel 3" `0x5e1` em (430, 216) (id 202), "Channel 4" `0x5e2` em (430, 241) (id 203), "Channel 1" `0x5e3` em (430, 166) (id 200).
+     - BATTLE ZONE: `GUI\dr2_in_002_007.spr` quadro 0 em **(231, 147)**; link "Net Ocean" `0x5da` em (326, 315) (id 102).
+   - **Link de texto** `0x00b53db0(slot, idTexto, x, y, recuo, idEvento)`: retângulo = medida do texto na fonte padrão; normal: texto **amarelo** `0xffff` com sombra em (x, y); sob o mouse: texto em (x, y − 1) e os colchetes `GUI\dr2_in_002_008.spr` quadro 1 em (x − recuo, y − 9) (recuos: 30, 9, 8, 26 conforme a lista acima). Clique → `evento(idEvento)` (`0x00b51950`).
+5. Mensagens centradas (caixa `FUN_007dd610`, branco): bit 13 → `0x5ee` em (400, 260) por 80 quadros; sem rede (`IsNetworkAlive`, `0x00ad2870`) → `0x5ef` em (400, 300) por 100 quadros e bloqueia os cliques; bit 7 → `+0x2468` em (400, 260) por 20 quadros. O contador `+0xae0` é compartilhado; também some ao clicar (`[DAT_011584ec]+0x250`).
+6. Depois do desenho da GUI: versão `Digimon RPG 3.26` em (1, 1); **`0x5eb` "ⓒ Akiyoshi Hongo, Toei Animation"** em (5, 585) branco (`FUN_00b55760`, ❓ com fundo/contorno); cursor.
+
+### Eventos `0x00b51950(id)`
+Todos tocam **2** e são ignorados com `+0x348 ≠ 0`. "Conectar na linha n" = `[DAT_011584f4]+4 = n`, `FUN_00b3a950(n, 0)` (copia a linha n da tabela de servidores: IP/porta do "Login" e da "Session"), `FUN_00b52460` (log `Login %s %d Session %s %d` e conecta no IP/porta "Login" da linha); se conectou, **envia `0x03`** (`0x00b540a0`, nome `MoveInteractive_Digimon_111`) e liga o bit 5; se falhou, liga o bit 13. Grava mundo/canal em `[DAT_01158504]+0x31e5/+0x31e6`.
+
+| id | Ação (com o bit 1 = DIGITAL WORLD) | (sem o bit 1) |
+|---|---|---|
+| 1 | fecha o jogo | |
+| 100 | escolhe DIGITAL WORLD (como o botão grande) | |
+| 101 | escolhe BATTLE ZONE | |
+| 102 | abre a lista de canais: `+0x78d = 2`, flags `(f & ~0x4) \| 0x800a` | conecta na linha 7 |
+| 200–203 | conecta nas linhas 0–3 (Channel 1–4); `+0x31e5 = 1`, `+0x31e6 = 1..4` | linha 7 |
+| 210 | linha 13 (Consignment Store) | linha 7/8 ❓ |
+| 213 | linha 16 (Event Channel) | |
+| 204–215 restantes | outras linhas (4, 5, 6, 10, 11, 12, 14, 15, 17, 18) para mundos que esta versão não mostra | |
+
+### Teclado `0x00b537a0`
+- **Esc** com um mundo escolhido (bit 3): fecha o painel (zera os bits 0 e 3; as artes saem e os botões grandes voltam).
+- ❓ Tab/Enter/Esc com o bit 11 são da tela de login antiga.
+
+### Rede e mensagens
+`0x00b524b0` esvazia a fila de pacotes (`0x00b3fb30`) a cada quadro, pelo tipo:
+- **5 (resposta do login `0x05`)**: `+0x8fc = (segundo campo ≠ 0x68)`. ✅ Isso **habilita o botão BATTLE ZONE**. As capturas oficiais mandam `0x2710` (habilitado); o emulador manda `0x68` (desabilitado).
+- **3 (resposta `0x03`)**: liga os bits 7 e 10, guarda o terceiro campo em `[DAT_0135a308]+0x14` (o 4º digimon inicial). Resultado 2 → zera o bit 0, liga o bit 6 e **envia `0x04`** (`0x00b53ee0`: usuário `+0xb8`, chave `+0xd0` e três textos `DAT_0135b298`; liga o bit 8; `Sleep(100)`). Outro resultado → mensagem `0x5f1`.
+- **4 (resposta `0x04`)**: resultado 2 → guarda o usuário em minúsculas e liga o bit 9. Resultado 3 → erro pelo código: 11 `0x5f2`, 10 `0x5f3`, 16 `0x5f4`, 12 `0x5f5`, 13 `0x5f6`, 15 `0x5f7`, 0x7d2 `0x5f8`, 14 liga o bit 14, outros `0x5f9` "Please Log-In through the website. (%d)" e desconecta.
+- Com o bit 9 (`0x00b546c0`): `Sleep(100)`, e a cada quadro `escuro += dt × 10` (`0x0102ee70`) e `FUN_00b55f10(escuro)` escurece a tela (subtrai `4·escuro − 1` de cada canal de 5 bits, o verde de 6 bits em dobro); quando `escuro > 15` (`0x0102ee74`), **cena 4**. ❓ `dt` = tempo do quadro em segundos (`FUN_00867e30`): a 30 FPS são ~1,5 s, a tela fica preta em ~0,8 s.
+- Liberar (`0x00b52da0`): destrói as caixas de edição, zera as flags; a conexão do channel continua aberta para a cena 4.
+
+### Cruzamento com as capturas e o `AccountSession`
+Ordem das capturas: login `0x05` → channel `0x03` → `0x04` → `0x12` + `0x14`. No original: `0x05` ao **entrar** na cena 2; `0x03` ao **clicar num canal**; `0x04` assim que chega a resposta do `0x03`; `0x12` e `0x14` no **init da cena 4** ([abaixo](#cscenecharsel-seleção-de-personagens-)). O `AccountSession` da fase A faz tudo de uma vez; na fase C ele passa a ser dirigido pelas cenas. ❓ Se a conexão do login fica aberta até a do channel (o original usa um socket só, `0x00b3f900`; provavelmente a nova conexão fecha a anterior).
+
+### Sprites `dr2_in_002`
+| Sprite | Quadros | Uso |
+|---|---|---|
+| `002_000` | 243×256, 286×333, 264×307 | botão DIGITAL WORLD (normal, sob o mouse; ❓ 3º) |
+| `002_001` | 242×256, 314×269, 314×269 | botão BATTLE ZONE |
+| `002_002`, `003`, `004` | 800×599 ×2 | artes de digimon (0 = cor, 1 = silhueta) |
+| `002_005` (`_eng`) | 800×600 | fundo |
+| `002_006` | 255×256, 355×256, 255×400 | painel DIGITAL WORLD |
+| `002_007` | 255×255, 355×255 | painel BATTLE ZONE |
+| `002_008` | 147×31 ×2 | colchetes do link sob o mouse |
+| `002_009` | 120×22 ×3 | ❓ não visto no código destas cenas |
+| `002_010` | 255×256, 255×252 | painel de baixo do DIGITAL WORLD |
+
+## CSceneCharSel (seleção de personagens) ✅
+### init `0x00b47b30`
+1. **Envia `0x12`** (pedido da lista) e **`0x14`** com o usuário (21 bytes), nessa ordem.
+2. Duas caixas de edição em (153, 57) e (522, 57), 130×15, até 20 caracteres: são da criação (nomes do tamer e do digimon). Não aparecem no modo 0.
+3. Efeito **5 = `Sound\menu-1.wav`**. **BGM: não muda** (continua o `title.ogg` da cena 2).
+4. Botões (`0x009b75a0(x, y, sprite)`):
+   | Campo | Sprite | Posição | Função |
+   |---|---|---|---|
+   | `+0xf80` | `dr2_ch_000_001` | (26, 66) | slot 0 (mapa de quadros 0, 1, 1, 1) |
+   | `+0xfc0` | `dr2_ch_000_002` | (425, 66) | slot 1 (mapa padrão 0, 1, 2, 3) |
+   | `+0x1000` | `dr2_ch_000_003` | (26, 301) | slot 2 (padrão) |
+   | `+0x1040` | `dr2_ch_000_004` | (425, 301) | slot 3 (padrão) |
+   | `+0x1080` | `dr2_ch_000_005` (`_ENG` "Delete Character") | (26, 565) | apagar |
+   | `+0x10c0` | `dr2_ch_000_006` ("Create Character") | (134, 565) | criar |
+   | `+0x1400` | `dr2_ch_000_009` ("Exchange Password") | (246, 565) | trocar senha |
+   | `+0x1100` | `dr2_ch_000_007` ("Game Start") | (520, 549) | entrar |
+   | `+0x1140` | `dr2_ch_000_008` ("Back") | (681, 549) | voltar |
+   | `+0x1380`, `+0x13c0` | `dr2_ch_001_001` / `001_002` | (565, 549), (681, 549) | botões da criação (modo 1) |
+   - ✅ Os slots têm só 2 quadros: nos slots 1–3, o estado pressionado pede o quadro 2 e **não desenha nada** naquele quadro (mapa padrão). Fiel ao original.
+
+### Quadro `0x00b48840`
+1. Limpa; processa a rede (`0x00b45c30`).
+2. Modo `+0x85c`: 0 = seleção (`0x00b48580` → desenho da GUI `0x00b48c60` e slots `0x00b47790`); 1 = criação (`dr2_ch_001_000`, próximo marco).
+3. Mensagens centradas: `0xee4` "The Tamer name already exists." 160 quadros; `0xee6` (manutenção) 80 quadros; `0xee5` até clicar; `+0x144c` (erro da criação) até clicar.
+4. Sem rede (`IsNetworkAlive`) → desconecta e volta para a cena 2. Erro fatal do servidor (`[DAT_011584f0]+0xf802`) → `0x602` + texto, caixa em (400, 300).
+5. Cursor, fim do quadro.
+
+### Desenho `0x00b48c60` (modo 0)
+1. Fundo `dr2_ch_000_000` (`_ENG`) em (0, 0).
+2. Para cada slot i com personagem (`uid ≠ 0`): atualiza o botão; o selecionado (`+0x860 == i`) desenha o quadro 1 fixo, os outros o quadro do estado. **Clique** num slot com tamer (byte `+4` do registro ≠ 0) e diferente do atual → seleciona, toca **5**, põe tamer e digimon na animação "selecionado" (5) a partir do início. Clique em slot vazio → `+0x860 = −1`. **Duplo clique** no selecionado → entrar no jogo.
+3. Botões, na ordem: Delete (com seleção → diálogo de confirmação, ❓ próximo marco); Create (só fora da Battle Zone; → modo 1, `0x00b45510(1)`, próximo marco); Game Start (com seleção e a lista recebida → entrar); Back → desconecta e **cena 2**. Trocar senha: ❓ tratado fora deste método (`0x00b46690`/`0x00b46f00`), próximo marco.
+4. Entrar no jogo (`0x00b48670`, log `Map Server : %s %d`): escurece como na cena 2 (`+0x14c0`, mesma fórmula) e no fim conecta no servidor de mapa e vai para a cena 5. **Fora do marco 2**: a fase C para no escurecimento + log.
+
+### Slots `0x00b47790`
+Registro do slot = os **124 bytes do slot do `0x12`** como vêm no fio (`CharacterListSlot`): `+0` uid, `+4` tamer, `+5` nome[21], `+0x1a` nível, `+0x1c/+0x1e` x, y, `+0x20` equipamento (11 × u32), `+0x4c` espécie do líder, `+0x4e` nível do líder, `+0x50` nome do líder[24], `+0x68` total de batalhas, `+0x6c` vitórias, `+0x70` slot, `+0x71` mapa. Chegada do `0x12` (`0x00b45c30` caso 0x12): modo 0, seleção −1, `+0x862 = 1`; nos mundos Battle Zone (linhas 7–12) o nível é trocado por 10/10. Até lá os slots ficam vazios.
+
+Para cada slot com tamer (`+4 ≠ 0`):
+- **Textos** (`0x00b47350`, branco com sombra, fonte padrão). Origem: slot 0 (231, 110), slot 1 (449, 110), slot 2 (231, 340), slot 3 (449, 340). Slots 0/1 (tamer em cima), a partir de `y`:
+  | y | Texto |
+  |---|---|
+  | +0 | nome do tamer |
+  | +18 | `0xef1` "Level %3d" (nível do tamer) |
+  | +36 | nome do mapa (`Map_US` pelo byte `+0x71`, `0x00b395a0`) num retângulo (x, y+36)–(x+130, y+72), quebra em 140 px (`0x00b30d00`) |
+  | +54 | `(%d,%d)` com x, y |
+  | +108 | nome do digimon |
+  | +126 | "Level %3d" (nível do digimon) |
+  | +144 | `0xef2` "%d Win %d Lose %0.2f%%" com (vitórias, **total de batalhas**, vitórias/total × 100; 0 se total = 0) |
+  Slots 2/3 (digimon em cima), a partir de `y + 10`: digimon nome +0, nível +18, vitórias +36; tamer nome +90, nível +108, mapa +126 (retângulo até +162), `(x,y)` +144.
+  - ✅ O original escreve o **total de batalhas** no lugar de "Lose". Fiel.
+- **Digimon** (`0x00b46120`): sprite = `.ani` da espécie do líder (espécie → id de sprite → `Sprite\%03d_1.ani`, ver [tabelas por espécie](tabelas-de-especie.md)); desenha o quadro atual em (xBotão + dx, yBotão + dy), com (dx, dy) da tabela por espécie (padrão (−40, −14)). xBotão/yBotão = posição do botão do slot.
+- **Tamer** (`0x00b46d50`): `Sprite\a_%02d.spr` com a animação de `Sprite\a_%02d.ani` pelo id do tamer (❓ base do índice: só existem `a_00..a_03`); desenha em (xBotão + 70 − 120, yBotão + 164 − 162), +150 em x nos slots 1 e 3 (o retrato fica à direita). Com a opção de sombra (`[DAT_01158530]+2`), antes desenha a sombra do sprite (`FUN_00b57460(…, 0xe)`). Equipamento é sempre zero nas listas: só o corpo.
+- **Animação** de ambos: animação 1 (parado) direção 0; ao selecionar, animação 5 direção 0. O quadro avança **a cada 3 quadros** do jogo; quando `quadro ≥ início + contagem − 1`, volta ao início (✅ o último quadro da animação nunca aparece). Ao perder a seleção, volta para a animação 1 (o quadro continua de onde estava até o próximo laço). Início/contagem vêm da tabela do [`.ani`](formato-ani.md).
+
+### Sprites `dr2_ch_000`
+`000_000` fundo 800×600 (4 molduras com retrato e quadros TAMER/DIGIMON); `000_001..004` slots ~355×230, 2 quadros (normal, selecionado/sob o mouse); `000_005..009` botões, 3 quadros (normal, sob o mouse, pressionado). Criação (próximo marco): `dr2_ch_001_000` fundo, `001_001/002` botões, `001_003` (107×154) retratos dos 4 iniciais em (73, 188), (254, 188), (439, 188), (619, 188); iniciais = espécies 10, 11, 12 e o 4º pelo `0x03` (0 → 24, 1 → 27, …).
+
+## Texto, som e fontes ✅
+- **Textos da interface** `FUN_0091b950(id)` (ANSI) e `FUN_0091ba70(id)` (UTF-16): tabela **`TextAttach`** (loader de tabela 0x1a, `0x0091bf90`; se não carregar: `TextAttach Not Load!`). Id ausente → `Null Text`.
+  - Fonte dos dados: `table\textattach_us.dat` do `table.hf` (contagem u32 + `{u32 len, utf16 texto}` por linha, ver `drpg_pack.py`) e por cima `Language\TextAttach_US.bin`: **UTF-8 com BOM, linhas separadas por `\r` (só CR), `id|texto`**. Na v322 os dois têm as mesmas 3214 linhas. `†` dentro do texto: ❓ quebra de linha.
+  - Ids usados aqui: `0x5da..0x5ea` nomes dos servidores, `0x5eb` copyright, `0x5ee/0x5ef` conexão, `0x5f1..0x5f9` erros do `0x03`/`0x04`, `0x5fa..0x602` avisos, `0xee4..0xee6`, `0xef1` "Level %3d", `0xef2` vitórias, `0x25e..0x264` criação, `0xef3` "You are disconnected with server.".
+- **Efeitos**: não há tabela fixa id → arquivo. Cada cena registra os seus com `FUN_00a187b0(id, caminho)` (790 posições, `0x00a18890(id, 0)` toca). Barra de carga: 5 = `sound\menu-bt.wav`; seleção de mundo: 2/3/4 (acima); seleção de personagens: 5 = `Sound\menu-1.wav`. ✅ **Correção:** `FUN_00b3a950(n, 0)` **não é som**: copia a linha n da tabela de servidores.
+- **BGM**: `0x00b42500(caminho, 0)` no gerenciador `DAT_0135a1f0`.
+- Fontes GDI criadas em `0x00b563f0`: "굴림체" (GulimChe, charset 0x81) — `+0x1dc` 12 px normal (a padrão), `+0x1e4` 14 px negrito, e outras (14/12/11/10, 13×5, 32×24, 15); `Fonts\123RF_123RF_TTF.ttf` (face "123RF", 16 px). Ver [fonte do launcher](tela-login-launcher.md#fonte).
