@@ -40,6 +40,7 @@ grep -rl 'DAT_01158504 + 0xb8' $D/decomp                    # quem usa um campo 
 | Endereço | O quê |
 |---|---|
 | `0x00aa4a90` | `WinMain`: argumentos → carga de `Resource`/`Table` → janela → DirectDraw → `Game Init` → laço |
+| `0x00b504b0` | construtor do `CSceneServer` (vtable `0x0102f62c`): pré-carga dos sprites `dr2_in_*`, inclusive os da tela de login antiga |
 | `0x00b21be0` | cache de sprites por nome → `0x00b23550` (cria e carrega) |
 | `0x00871e80` | carregador de `.spr` ([formato](../cliente/formato-spr.md)); `0x00874fa0` converte RGB565 → 555 |
 | `0x00aa24b0` | parse da linha de comando: separa por espaço e exige **exatamente 2** tokens (usuário, hash); senão mostra uma caixa de erro e sai. Guarda em `[DAT_01158504+0xb8]` e `[+0xd0]` |

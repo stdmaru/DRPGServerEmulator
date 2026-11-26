@@ -116,7 +116,7 @@ Exemplo real: `Patch_240.zip` contém `DigimonRPG.bin`, `patch_240.hf/.pf` (59 M
 
 **Por que é o primeiro marco:** o launcher precisa ler **e gravar** `.hf/.pf`, e esse código (`DRPG.Shared/Formats/Pack`) é o mesmo que o cliente usa para ler os assets. Também precisa dos sprites e da renderização. O cliente (Loading → Login do jogo) passa a ser o marco 2.
 
-**Arte:** os sprites antigos que continuam no `resource.hf`, lidos 1:1: `gui\dr2_in_000_*` a `gui\dr2_in_003_*` (34) e `gui\dr_title_000..007.spr` (10), com as variantes `_eng.spr`. Layout e comportamento vêm dos sprites e da memória do dono (não há código original).
+**Arte:** os sprites antigos que continuam no `resource.hf`, lidos 1:1: `gui\dr2_in_000_*`, `dr2_in_001_*` e `dr2_in_003_*`, com as variantes `_eng.spr`. Os `dr_title_*` são da janela de títulos do jogo, não do login. Layout medido nos sprites e decidido em [tela de login do launcher](../cliente/tela-login-launcher.md) (não há código original).
 
 **Projeto:** `src/DRPG.Launcher` (NativeAOT), com as camadas `Platform/`, `Rendering/` (`IRenderer`) e `Assets/`, que depois o cliente reaproveita. ❓ Elas vão para uma biblioteca comum (`DRPG.Engine`) quando o cliente nascer.
 
