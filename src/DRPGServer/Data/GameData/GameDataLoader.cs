@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Xml.Linq;
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Stats;
+using DRPGServer.Game.World;
 
 namespace DRPGServer.Data.GameData;
 
@@ -110,7 +111,7 @@ public static class GameDataLoader
             NpcShops = npcShops,
             Npcs = npcs,
             CashShopProducts = ClientTables.CashShopProducts(pack),
-            DigimonTitles = ClientTables.DigimonTitles(pack),
+            DigimonTitles = LoadDigimonTitles(Path.Combine(root, "Digimon/DigimonTitles.xml")),
             Skills = ClientTables.Skills(pack),
             Evolutions = ClientTables.Evolutions(pack),
             DropGroups = drops.ToFrozenDictionary(),
@@ -184,6 +185,54 @@ public static class GameDataLoader
                 throw new GameDataException($"EquipmentEffects.xml: ItemID {id} duplicado");
         }
         return effects.ToFrozenDictionary();
+    }
+
+    public static FrozenDictionary<uint, DigimonTitleInfo> LoadDigimonTitles(string path)
+    {
+        if (!File.Exists(path)) throw new GameDataException($"tabela {path} não encontrada");
+        var doc = XDocument.Load(path);
+        var top = doc.Element("DigimonTitles") ?? throw new GameDataException($"{path}: falta a raiz <DigimonTitles>");
+        var titles = new Dictionary<uint, DigimonTitleInfo>();
+        foreach (var e in top.Elements("Title"))
+        {
+            uint id = U32(e, "ID");
+            string where = $"DigimonTitles.xml: título {id}";
+            if (id == 0) throw new GameDataException($"{where}: id 0 é reservado (sem título)");
+            foreach (var attr in e.Attributes())
+            {
+                if (attr.Name.LocalName is not ("ID" or "Name"))
+                    throw new GameDataException($"{where}: atributo {attr.Name} desconhecido");
+            }
+            foreach (var child in e.Elements())
+            {
+                if (child.Name.LocalName is not ("Modifier" or "Unlock"))
+                    throw new GameDataException($"{where}: elemento <{child.Name}> desconhecido");
+            }
+            var title = new DigimonTitleInfo(id, Attr(e, "Name"))
+            {
+                Modifiers = ModifierXml.Read(e.Elements("Modifier"), where),
+                Unlocks = e.Elements("Unlock").Select(u => ReadUnlock(u, where)).ToArray(),
+            };
+            if (!titles.TryAdd(id, title))
+                throw new GameDataException($"{where} duplicado");
+        }
+        return titles.ToFrozenDictionary();
+    }
+
+    private static ITitleUnlockRule ReadUnlock(XElement e, string where)
+    {
+        foreach (var attr in e.Attributes())
+        {
+            if (attr.Name.LocalName is not ("Condition" or "Value"))
+                throw new GameDataException($"{where}: <Unlock> com atributo {attr.Name} desconhecido");
+        }
+        string conditionText = Attr(e, "Condition");
+        if (int.TryParse(conditionText, out _) || !Enum.TryParse<TitleUnlockCondition>(conditionText, out var condition)
+            || !Enum.IsDefined(condition))
+            throw new GameDataException($"{where}: Condition \"{conditionText}\" desconhecida");
+        string value = Attr(e, "Value");
+        return TitleUnlockRules.Create(condition, value)
+            ?? throw new GameDataException($"{where}: <Unlock Condition=\"{condition}\"> com valor \"{value}\" inválido");
     }
 
     private static FrozenDictionary<uint, NpcShop> LoadNpcShops(string root)

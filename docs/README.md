@@ -70,3 +70,4 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [extract_status.py](ferramentas/extract-status.md): extrai amostras de status dos pcaps.
 - [drpg_replay.py](ferramentas/replay.md): reproduz uma sessão capturada contra o emulador e compara as respostas com as do oficial.
 - [extract_equipment_effects.py](ferramentas/extract-equipment-effects.md): gera o `EquipmentEffects.xml` (bônus de equipamento em `<Modifier>`) a partir do `item_info_us.dat`.
+- [extract_digimon_titles.py](ferramentas/extract-digimon-titles.md): gera o `DigimonTitles.xml` (nome, bônus e regra de desbloqueio) a partir do `digimon_title_us.dat`.

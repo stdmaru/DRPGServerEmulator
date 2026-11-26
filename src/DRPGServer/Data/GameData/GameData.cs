@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using DRPGServer.Game.Economy;
 using DRPGServer.Game.Stats;
+using DRPGServer.Game.World;
 
 namespace DRPGServer.Data.GameData;
 
@@ -59,11 +60,13 @@ public sealed record CardInfo(uint Id, string Name)
     public string Description { get; init; } = "";
 }
 
-/// <summary>Título de Digimon de <c>digimon_title_us.dat</c> (236 entradas; ver <see cref="ClientTables.DigimonTitles"/>).</summary>
+/// <summary>Título de Digimon (<c>Resources/Digimon/DigimonTitles.xml</c>, gerado de <c>digimon_title_us.dat</c>).</summary>
 public sealed record DigimonTitleInfo(uint Id, string Name)
 {
     /// <summary>Bônus do título equipado.</summary>
     public StatModifiers Modifiers { get; init; } = StatModifiers.None;
+    /// <summary>Condições de desbloqueio automático (todas precisam valer). Vazio = só por evento, item ou GM.</summary>
+    public IReadOnlyList<ITitleUnlockRule> Unlocks { get; init; } = [];
 }
 
 /// <summary>
@@ -241,6 +244,12 @@ public sealed class GameData
         NpcShops.TryGetValue(shopId, out var shop) && shop.Kind == kind ? shop : null;
     public CashShopProduct? FindCashShopProduct(uint productId) => CashShopProducts.GetValueOrDefault(productId);
     public DigimonTitleInfo? FindDigimonTitle(uint id) => id == 0 ? null : DigimonTitles.GetValueOrDefault(id);
+
+    private IReadOnlyList<DigimonTitleInfo>? _autoUnlockTitles;
+
+    /// <summary>Títulos com <see cref="DigimonTitleInfo.Unlocks"/>, por id.</summary>
+    public IReadOnlyList<DigimonTitleInfo> AutoUnlockTitles =>
+        _autoUnlockTitles ??= DigimonTitles.Values.Where(t => t.Unlocks.Count > 0).OrderBy(t => t.Id).ToArray();
 
     /// <summary>Próxima forma da linha (null no fim da linha ou se a espécie não está na árvore).</summary>
     public DigimonSpecies? NextForm(DigimonSpecies species) =>

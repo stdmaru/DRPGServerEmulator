@@ -1,6 +1,5 @@
 using System.Collections.Frozen;
 using System.Globalization;
-using System.Text.RegularExpressions;
 using DRPGServer.Game.Stats;
 
 namespace DRPGServer.Data.GameData;
@@ -21,7 +20,6 @@ public static class ClientTables
     public const string DexTable = @"table\dex_us.dat";
     public const string ItemTable = @"table\item_info_us.dat";
     public const string CardTable = @"table\card_info_us.dat";
-    public const string DigimonTitleTable = @"table\digimon_title_us.dat";
     public const string MapTable = @"table\map_us.dat";
     public const string SkillTable = @"table\digimon_skill_us.dat";
     public const string TreeTable = @"table\tree_us.dat";
@@ -118,74 +116,6 @@ public static class ClientTables
             }
         return cards.ToFrozenDictionary();
     }
-
-    /// <summary>
-    /// Títulos de Digimon: <c>digimon_title_us</c> (0 id, 1 nome, 3..13 descrição e linhas de bônus "※ ...").
-    /// ✅ Extrai bônus de atributos (STR/AGI/CON/INT/All stats) e combate (HP/VP/ATK/DEF/BR flat e %).
-    /// </summary>
-    public static FrozenDictionary<uint, DigimonTitleInfo> DigimonTitles(ClientPack pack)
-    {
-        var titles = new Dictionary<uint, DigimonTitleInfo>();
-        if (!pack.Contains(DigimonTitleTable)) return titles.ToFrozenDictionary();
-        foreach (var f in pack.ReadTable(DigimonTitleTable))
-        {
-            if (f.Length < 4 || !uint.TryParse(f[0], CultureInfo.InvariantCulture, out var id) || id == 0) continue;
-            int str = 0, agi = 0, con = 0, intl = 0;
-            int hp = 0, vp = 0, atk = 0, def = 0, br = 0;
-            int atkPct = 0, defPct = 0, brPct = 0;
-
-            int end = Math.Min(f.Length, 14);
-            for (int col = 3; col < end; col++)
-            {
-                string line = f[col];
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                foreach (Match m in TitleStatRegex.Matches(line))
-                {
-                    string stat = m.Groups[1].Value.Trim().ToUpperInvariant();
-                    int val = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
-                    bool isPercent = m.Groups[3].Value == "%";
-                    switch (stat)
-                    {
-                        case "ALL STATS":
-                            str += val; agi += val; con += val; intl += val;
-                            break;
-                        case "STR": str += val; break;
-                        case "AGI": agi += val; break;
-                        case "CON": con += val; break;
-                        case "INT": intl += val; break;
-                        case "HP" or "MAX HP": hp += val; break;
-                        case "VP" or "MAX VP": vp += val; break;
-                        case "ATK":
-                            if (isPercent) atkPct += val; else atk += val;
-                            break;
-                        case "DEF":
-                            if (isPercent) defPct += val; else def += val;
-                            break;
-                        case "BR" or "BATTLE RATING":
-                            if (isPercent) brPct += val; else br += val;
-                            break;
-                    }
-                }
-            }
-
-            titles.TryAdd(id, new DigimonTitleInfo(id, f[1])
-            {
-                Modifiers = StatModifiers.Of([
-                    new(StatModifierKind.Str, str), new(StatModifierKind.Agi, agi), new(StatModifierKind.Con, con),
-                    new(StatModifierKind.Int, intl), new(StatModifierKind.Hp, hp), new(StatModifierKind.Vp, vp),
-                    new(StatModifierKind.Atk, atk), new(StatModifierKind.Def, def), new(StatModifierKind.Br, br),
-                    new(StatModifierKind.Atk, atkPct, StatModifierForm.Percent),
-                    new(StatModifierKind.Def, defPct, StatModifierForm.Percent),
-                    new(StatModifierKind.Br, brPct, StatModifierForm.Percent),
-                ]),
-            });
-        }
-        return titles.ToFrozenDictionary();
-    }
-
-    private static readonly Regex TitleStatRegex = new(
-        @"(All stats|Max HP|Max VP|Battle Rating|STR|AGI|CON|INT|HP|VP|ATK|DEF|BR)\s*\+?\s*(\d+)\s*(%?)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
     /// Skills: <c>digimon_skill_us</c> (0 id, 1 nível para aprender, 3 nome, 4 tipo [1 melee / 2 ranged], 5 alvos [1 / 2 / 5]).

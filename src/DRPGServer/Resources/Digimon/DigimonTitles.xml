@@ -1,0 +1,1480 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gerado por server/tools/extract_digimon_titles.py de table\digimon_title_us.dat v322. -->
+<!-- <Modifier>: bônus do título equipado. <Unlock>: desbloqueio automático (todas as condições). -->
+<DigimonTitles>
+  <Title ID="10000" Name="Scent of Roses">
+    <Modifier Kind="Int" Value="10" />
+  </Title>
+  <Title ID="10010" Name="A Cold Shoulder">
+    <Modifier Kind="Con" Value="10" />
+  </Title>
+  <Title ID="10020" Name="Those Who Control The Heat">
+    <Modifier Kind="Agi" Value="5" />
+    <Modifier Kind="Hp" Value="50" />
+  </Title>
+  <Title ID="10030" Name="One Who Brings Luck">
+    <Modifier Kind="Int" Value="5" />
+    <Modifier Kind="Hp" Value="50" />
+  </Title>
+  <Title ID="10040" Name="Snoring">
+    <Modifier Kind="Agi" Value="5" />
+    <Modifier Kind="Con" Value="5" />
+  </Title>
+  <Title ID="10050" Name="Knight's Courage">
+    <Modifier Kind="Str" Value="10" />
+    <Modifier Kind="Int" Value="10" />
+  </Title>
+  <Title ID="10060" Name="Guardian's Will">
+    <Modifier Kind="Agi" Value="10" />
+    <Modifier Kind="Con" Value="10" />
+  </Title>
+  <Title ID="10070" Name="Warrior's Ambition">
+    <Modifier Kind="Str" Value="10" />
+    <Modifier Kind="Con" Value="10" />
+  </Title>
+  <Title ID="10080" Name="Sage's Wisdom">
+    <Modifier Kind="Agi" Value="10" />
+    <Modifier Kind="Int" Value="10" />
+  </Title>
+  <Title ID="10081" Name="Hero's Sacrifice">
+    <Modifier Kind="Str" Value="40" />
+    <Modifier Kind="Agi" Value="40" />
+    <Modifier Kind="Con" Value="40" />
+    <Modifier Kind="Int" Value="40" />
+  </Title>
+  <Title ID="10090" Name="Good Luck on CSAT">
+    <Modifier Kind="Str" Value="20" />
+    <Modifier Kind="Agi" Value="20" />
+    <Modifier Kind="Con" Value="20" />
+    <Modifier Kind="Int" Value="20" />
+  </Title>
+  <Title ID="10100" Name="2013 Happy New Year">
+    <Modifier Kind="Hp" Value="100" />
+    <Modifier Kind="Def" Percent="5" />
+  </Title>
+  <Title ID="10110" Name="2013 Planning Team">
+    <Modifier Kind="Str" Value="5" />
+    <Modifier Kind="Agi" Value="5" />
+    <Modifier Kind="Con" Value="5" />
+    <Modifier Kind="Int" Value="5" />
+    <Modifier Kind="Hp" Value="50" />
+  </Title>
+  <Title ID="10120" Name="2013 Graphic Team">
+    <Modifier Kind="Str" Value="5" />
+    <Modifier Kind="Agi" Value="5" />
+    <Modifier Kind="Con" Value="5" />
+    <Modifier Kind="Int" Value="5" />
+    <Modifier Kind="Hp" Value="50" />
+  </Title>
+  <Title ID="10130" Name="2013 Program Team">
+    <Modifier Kind="Str" Value="5" />
+    <Modifier Kind="Agi" Value="5" />
+    <Modifier Kind="Con" Value="5" />
+    <Modifier Kind="Int" Value="5" />
+    <Modifier Kind="Hp" Value="50" />
+  </Title>
+  <Title ID="10140" Name="The First Member of the GM Fan Club">
+    <Modifier Kind="Str" Value="1" />
+    <Modifier Kind="Agi" Value="1" />
+    <Modifier Kind="Con" Value="1" />
+  </Title>
+  <Title ID="10150" Name="The Second Member of the GM Fan Club">
+    <Modifier Kind="Str" Value="1" />
+    <Modifier Kind="Agi" Value="1" />
+    <Modifier Kind="Con" Value="1" />
+  </Title>
+  <Title ID="20000" Name="A New Start">
+    <Modifier Kind="Int" Value="3" />
+    <Unlock Condition="Stage" Value="Mega" />
+  </Title>
+  <Title ID="20010" Name="Break Through Fixed EXP">
+    <Modifier Kind="Str" Value="5" />
+    <Modifier Kind="Agi" Value="5" />
+    <Modifier Kind="Con" Value="5" />
+    <Unlock Condition="Level" Value="100" />
+  </Title>
+  <Title ID="20020" Name="Lord of Digimon">
+    <Modifier Kind="Str" Value="10" />
+    <Modifier Kind="Agi" Value="10" />
+    <Modifier Kind="Con" Value="10" />
+    <Modifier Kind="Int" Value="10" />
+    <Unlock Condition="Level" Value="110" />
+  </Title>
+  <Title ID="20030" Name="Endless Journey">
+    <Modifier Kind="Str" Value="15" />
+    <Modifier Kind="Agi" Value="15" />
+    <Modifier Kind="Con" Value="15" />
+    <Modifier Kind="Int" Value="15" />
+    <Unlock Condition="Level" Value="120" />
+  </Title>
+  <Title ID="20040" Name="Another Start">
+    <Modifier Kind="Str" Value="18" />
+    <Modifier Kind="Agi" Value="18" />
+    <Modifier Kind="Con" Value="18" />
+    <Modifier Kind="Int" Value="18" />
+    <Unlock Condition="Level" Value="130" />
+  </Title>
+  <Title ID="20050" Name="LIMIT BREAK">
+    <Modifier Kind="Str" Value="21" />
+    <Modifier Kind="Agi" Value="21" />
+    <Modifier Kind="Con" Value="21" />
+    <Modifier Kind="Int" Value="21" />
+    <Unlock Condition="Level" Value="140" />
+  </Title>
+  <Title ID="20100" Name="First Win">
+    <Modifier Kind="Str" Value="1" />
+    <Unlock Condition="Wins" Value="1" />
+  </Title>
+  <Title ID="20110" Name="10th Win">
+    <Modifier Kind="Str" Value="1" />
+    <Modifier Kind="Agi" Value="1" />
+    <Unlock Condition="Wins" Value="10" />
+  </Title>
+  <Title ID="20120" Name="100th Win">
+    <Modifier Kind="Str" Value="2" />
+    <Modifier Kind="Agi" Value="1" />
+    <Unlock Condition="Wins" Value="100" />
+  </Title>
+  <Title ID="20130" Name="1000th Win">
+    <Modifier Kind="Str" Value="2" />
+    <Modifier Kind="Agi" Value="2" />
+    <Unlock Condition="Wins" Value="1000" />
+  </Title>
+  <Title ID="20140" Name="10000th Win">
+    <Modifier Kind="Str" Value="3" />
+    <Modifier Kind="Agi" Value="3" />
+    <Unlock Condition="Wins" Value="10000" />
+  </Title>
+  <Title ID="20200" Name="First Lose">
+    <Modifier Kind="Con" Value="1" />
+    <Unlock Condition="Losses" Value="1" />
+  </Title>
+  <Title ID="20210" Name="100th Lose">
+    <Modifier Kind="Con" Value="3" />
+    <Unlock Condition="Losses" Value="100" />
+  </Title>
+  <Title ID="20220" Name="1000th Lose">
+    <Modifier Kind="Con" Value="3" />
+    <Modifier Kind="Int" Value="3" />
+    <Unlock Condition="Losses" Value="1000" />
+  </Title>
+  <Title ID="20230" Name="King of Lose">
+    <Modifier Kind="Hp" Value="250" />
+    <Modifier Kind="Def" Percent="2" />
+    <Unlock Condition="Losses" Value="10000" />
+  </Title>
+  <Title ID="30000" Name="DR Blogger">
+    <Modifier Kind="Str" Value="20" />
+    <Modifier Kind="Agi" Value="20" />
+    <Modifier Kind="Con" Value="20" />
+    <Modifier Kind="Int" Value="20" />
+  </Title>
+  <Title ID="30010" Name="Identification Complete">
+    <Modifier Kind="Str" Value="4" />
+    <Modifier Kind="Agi" Value="4" />
+  </Title>
+  <Title ID="30020" Name="Honorary Developer">
+    <Modifier Kind="Str" Value="5" />
+    <Modifier Kind="Agi" Value="5" />
+    <Modifier Kind="Con" Value="5" />
+    <Modifier Kind="Int" Value="5" />
+  </Title>
+  <Title ID="30030" Name="I was a Blogger">
+    <Modifier Kind="Str" Value="6" />
+    <Modifier Kind="Agi" Value="6" />
+    <Modifier Kind="Con" Value="6" />
+    <Modifier Kind="Int" Value="6" />
+  </Title>
+  <Title ID="30040" Name="2013 Finalist">
+    <Modifier Kind="Atk" Value="50" />
+  </Title>
+  <Title ID="30050" Name="2013 Battle Competition">
+    <Modifier Kind="Str" Value="5" />
+    <Modifier Kind="Agi" Value="5" />
+    <Modifier Kind="Con" Value="5" />
+    <Modifier Kind="Int" Value="5" />
+  </Title>
+  <Title ID="30060" Name="2013 TTT Strongest (Net Ocean)">
+    <Modifier Kind="Str" Value="16" />
+    <Modifier Kind="Agi" Value="16" />
+    <Modifier Kind="Con" Value="16" />
+    <Modifier Kind="Int" Value="16" />
+  </Title>
+  <Title ID="30070" Name="2013 TTT Strongest (Mystical Land)">
+    <Modifier Kind="Str" Value="16" />
+    <Modifier Kind="Agi" Value="16" />
+    <Modifier Kind="Con" Value="16" />
+    <Modifier Kind="Int" Value="16" />
+  </Title>
+  <Title ID="30080" Name="2013 TTT Strongest (Unknown World)">
+    <Modifier Kind="Str" Value="16" />
+    <Modifier Kind="Agi" Value="16" />
+    <Modifier Kind="Con" Value="16" />
+    <Modifier Kind="Int" Value="16" />
+  </Title>
+  <Title ID="30090" Name="2013 TTT Battle Master">
+    <Modifier Kind="Str" Value="18" />
+    <Modifier Kind="Agi" Value="18" />
+    <Modifier Kind="Con" Value="18" />
+    <Modifier Kind="Int" Value="18" />
+  </Title>
+  <Title ID="30100" Name="Those Recognized by Qinglongmon">
+    <Modifier Kind="Int" Value="20" />
+  </Title>
+  <Title ID="30110" Name="Those Recognized by Zhuqiaomon">
+    <Modifier Kind="Str" Value="20" />
+  </Title>
+  <Title ID="30120" Name="Those Recognized by Xuanwumon">
+    <Modifier Kind="Con" Value="20" />
+  </Title>
+  <Title ID="30130" Name="Those Recognized by Baihumon">
+    <Modifier Kind="Agi" Value="20" />
+  </Title>
+  <Title ID="30135" Name="Those Recognized by Huanglongmon">
+    <Modifier Kind="Str" Value="20" />
+    <Modifier Kind="Agi" Value="20" />
+    <Modifier Kind="Con" Value="20" />
+    <Modifier Kind="Int" Value="20" />
+    <Modifier Kind="Atk" Value="15" />
+  </Title>
+  <Title ID="30140" Name="2014 Battle Competition">
+    <Modifier Kind="Str" Value="5" />
+    <Modifier Kind="Agi" Value="5" />
+    <Modifier Kind="Con" Value="5" />
+    <Modifier Kind="Int" Value="5" />
+  </Title>
+  <Title ID="30150" Name="2014 Battle Competition Finalist">
+    <Modifier Kind="Str" Value="15" />
+    <Modifier Kind="Agi" Value="15" />
+    <Modifier Kind="Con" Value="15" />
+    <Modifier Kind="Int" Value="15" />
+  </Title>
+  <Title ID="30160" Name="Merry Christmas (R)">
+    <Modifier Kind="Agi" Value="10" />
+  </Title>
+  <Title ID="30170" Name="Merry Christmas (B)">
+    <Modifier Kind="Agi" Value="10" />
+  </Title>
+  <Title ID="30180" Name="Lazy King of Christmas">
+    <Modifier Kind="Con" Value="25" />
+  </Title>
+  <Title ID="30190" Name="Adventure King of Royal Base">
+    <Modifier Kind="Str" Value="18" />
+    <Modifier Kind="Agi" Value="18" />
+    <Modifier Kind="Con" Value="18" />
+    <Modifier Kind="Int" Value="18" />
+  </Title>
+  <Title ID="30200" Name="Writing King of Digimon RPG">
+    <Modifier Kind="Int" Value="25" />
+  </Title>
+  <Title ID="30210" Name="Elite of Guild">
+    <Modifier Kind="Str" Value="5" />
+    <Modifier Kind="Agi" Value="5" />
+    <Modifier Kind="Con" Value="5" />
+    <Modifier Kind="Int" Value="5" />
+  </Title>
+  <Title ID="30220" Name="Elite of Guild (Server)">
+    <Modifier Kind="Str" Value="16" />
+    <Modifier Kind="Agi" Value="16" />
+    <Modifier Kind="Con" Value="16" />
+    <Modifier Kind="Int" Value="16" />
+  </Title>
+  <Title ID="30230" Name="Elite of Guild (DR)">
+    <Modifier Kind="Str" Value="18" />
+    <Modifier Kind="Agi" Value="18" />
+    <Modifier Kind="Con" Value="18" />
+    <Modifier Kind="Int" Value="18" />
+  </Title>
+  <Title ID="30240" Name="2018 World Cup's Commemoration">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Atk" Value="5" />
+  </Title>
+  <Title ID="30250" Name="2018 World Cup Missless">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Atk" Value="6" />
+  </Title>
+  <Title ID="30260" Name="2018 World Cup 3rd, 4th">
+    <Modifier Kind="Str" Value="11" />
+    <Modifier Kind="Agi" Value="11" />
+    <Modifier Kind="Con" Value="11" />
+    <Modifier Kind="Int" Value="11" />
+    <Modifier Kind="Atk" Value="4" />
+  </Title>
+  <Title ID="30270" Name="2018 Chuseok">
+    <Modifier Kind="Str" Value="15" />
+    <Modifier Kind="Agi" Value="15" />
+    <Modifier Kind="Con" Value="15" />
+    <Modifier Kind="Int" Value="15" />
+  </Title>
+  <Title ID="30280" Name="Endless Adventure">
+    <Modifier Kind="Str" Value="24" />
+    <Modifier Kind="Agi" Value="24" />
+    <Modifier Kind="Con" Value="24" />
+    <Modifier Kind="Int" Value="24" />
+    <Modifier Kind="Br" Percent="15" />
+  </Title>
+  <Title ID="30290" Name="2018 Spooky Halloween">
+    <Modifier Kind="Str" Value="13" />
+    <Modifier Kind="Agi" Value="13" />
+    <Modifier Kind="Con" Value="13" />
+    <Modifier Kind="Int" Value="13" />
+    <Modifier Kind="Atk" Percent="1" />
+  </Title>
+  <Title ID="30300" Name="2018 Happy Halloween">
+    <Modifier Kind="Str" Value="13" />
+    <Modifier Kind="Agi" Value="13" />
+    <Modifier Kind="Con" Value="13" />
+    <Modifier Kind="Int" Value="13" />
+  </Title>
+  <Title ID="30310" Name="DR BJ">
+    <Modifier Kind="Str" Value="20" />
+    <Modifier Kind="Agi" Value="20" />
+    <Modifier Kind="Con" Value="20" />
+    <Modifier Kind="Int" Value="20" />
+  </Title>
+  <Title ID="30311" Name="2018 White Christmas">
+    <Modifier Kind="Str" Value="15" />
+    <Modifier Kind="Agi" Value="15" />
+    <Modifier Kind="Con" Value="15" />
+    <Modifier Kind="Int" Value="15" />
+    <Modifier Kind="Atk" Value="5" />
+  </Title>
+  <Title ID="30312" Name="2018 Merry Christmas">
+    <Modifier Kind="Str" Value="11" />
+    <Modifier Kind="Agi" Value="11" />
+    <Modifier Kind="Con" Value="11" />
+    <Modifier Kind="Int" Value="11" />
+  </Title>
+  <Title ID="30313" Name="Master of Royal Base 1F">
+    <Modifier Kind="Str" Value="15" />
+    <Modifier Kind="Agi" Value="15" />
+    <Modifier Kind="Con" Value="15" />
+    <Modifier Kind="Int" Value="15" />
+  </Title>
+  <Title ID="30314" Name="Master of Royal Base 2F">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+  </Title>
+  <Title ID="30315" Name="Master of Royal Base 3F">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Atk" Value="20" />
+  </Title>
+  <Title ID="30316" Name="2019 Golden Piggy-bank">
+    <Modifier Kind="Str" Value="20" />
+    <Modifier Kind="Con" Value="19" />
+  </Title>
+  <Title ID="30317" Name="2019 Golden Piggy-coin">
+    <Modifier Kind="Agi" Value="20" />
+    <Modifier Kind="Int" Value="19" />
+  </Title>
+  <Title ID="30318" Name="Hopeful New Year">
+    <Modifier Kind="Hp" Value="200" />
+    <Modifier Kind="Def" Percent="3" />
+  </Title>
+  <Title ID="30319" Name="King of Digimon">
+    <Modifier Kind="Str" Value="20" />
+    <Modifier Kind="Agi" Value="20" />
+    <Modifier Kind="Con" Value="20" />
+    <Modifier Kind="Int" Value="20" />
+    <Modifier Kind="Atk" Value="10" />
+  </Title>
+  <Title ID="30320" Name="Go to the Mischief">
+    <Modifier Kind="Str" Value="13" />
+    <Modifier Kind="Agi" Value="13" />
+    <Modifier Kind="Con" Value="13" />
+    <Modifier Kind="Int" Value="13" />
+    <Modifier Kind="Atk" Percent="1" />
+  </Title>
+  <Title ID="30321" Name="I was the... Main BJ...">
+    <Modifier Kind="Str" Value="6" />
+    <Modifier Kind="Agi" Value="6" />
+    <Modifier Kind="Con" Value="6" />
+    <Modifier Kind="Int" Value="6" />
+  </Title>
+  <Title ID="30322" Name="I was the... Main Blogger...">
+    <Modifier Kind="Str" Value="6" />
+    <Modifier Kind="Agi" Value="6" />
+    <Modifier Kind="Con" Value="6" />
+    <Modifier Kind="Int" Value="6" />
+  </Title>
+  <Title ID="30323" Name="One mind">
+    <Modifier Kind="Str" Value="20" />
+    <Modifier Kind="Agi" Value="20" />
+    <Modifier Kind="Con" Value="20" />
+    <Modifier Kind="Int" Value="20" />
+    <Modifier Kind="Hp" Value="200" />
+    <Modifier Kind="Atk" Value="15" />
+  </Title>
+  <Title ID="30324" Name="Master of Labyrinth HARD">
+    <Modifier Kind="Int" Value="50" />
+    <Modifier Kind="Atk" Value="1" />
+  </Title>
+  <Title ID="30325" Name="God of DR Flex">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Br" Percent="10" />
+  </Title>
+  <Title ID="30326" Name="King of DR Flex">
+    <Modifier Kind="Str" Value="14" />
+    <Modifier Kind="Agi" Value="14" />
+    <Modifier Kind="Con" Value="14" />
+    <Modifier Kind="Int" Value="14" />
+    <Modifier Kind="Atk" Value="2" />
+    <Modifier Kind="Br" Percent="5" />
+  </Title>
+  <Title ID="30327" Name="2019 White Day">
+    <Modifier Kind="Int" Value="30" />
+    <Modifier Kind="Atk" Value="15" />
+    <Modifier Kind="Br" Percent="10" />
+  </Title>
+  <Title ID="30328" Name="All Master of Royal Base">
+    <Modifier Kind="Str" Value="20" />
+    <Modifier Kind="Agi" Value="20" />
+    <Modifier Kind="Con" Value="20" />
+    <Modifier Kind="Int" Value="20" />
+    <Modifier Kind="Atk" Value="20" />
+  </Title>
+  <Title ID="30329" Name="2019 Children's Day">
+    <Modifier Kind="Str" Value="15" />
+    <Modifier Kind="Agi" Value="15" />
+    <Modifier Kind="Con" Value="15" />
+    <Modifier Kind="Int" Value="15" />
+    <Modifier Kind="Hp" Value="400" />
+  </Title>
+  <Title ID="30330" Name="Human Spirit of Earth">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Hp" Value="400" />
+  </Title>
+  <Title ID="30331" Name="Beast Spirit of Earth">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Def" Percent="3" />
+  </Title>
+  <Title ID="30332" Name="Welcome DR (Matsuda Takato)">
+    <Modifier Kind="Str" Value="9" />
+    <Modifier Kind="Agi" Value="9" />
+    <Modifier Kind="Con" Value="9" />
+    <Modifier Kind="Int" Value="9" />
+  </Title>
+  <Title ID="30333" Name="Welcome DR (Henry Wong)">
+    <Modifier Kind="Str" Value="9" />
+    <Modifier Kind="Agi" Value="9" />
+    <Modifier Kind="Con" Value="9" />
+    <Modifier Kind="Int" Value="9" />
+  </Title>
+  <Title ID="30334" Name="Human Spirit of Fire">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Atk" Value="25" />
+  </Title>
+  <Title ID="30335" Name="Human Spirit of Ice">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Vp" Value="200" />
+  </Title>
+  <Title ID="30336" Name="Human Spirit of Water">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="42" />
+  </Title>
+  <Title ID="30337" Name="Beast Spirit of Water">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+  </Title>
+  <Title ID="30338" Name="2019 Chuseok">
+    <Modifier Kind="Str" Value="13" />
+    <Modifier Kind="Agi" Value="13" />
+    <Modifier Kind="Con" Value="13" />
+    <Modifier Kind="Int" Value="13" />
+    <Modifier Kind="Hp" Value="150" />
+    <Modifier Kind="Br" Percent="5" />
+  </Title>
+  <Title ID="30339" Name="2019 Hangawi">
+    <Modifier Kind="Str" Value="15" />
+    <Modifier Kind="Agi" Value="15" />
+    <Modifier Kind="Con" Value="15" />
+    <Modifier Kind="Int" Value="15" />
+    <Modifier Kind="Atk" Value="10" />
+  </Title>
+  <Title ID="30340" Name="All Master of Waterspace">
+    <Modifier Kind="Agi" Value="50" />
+    <Modifier Kind="Atk" Value="15" />
+    <Modifier Kind="Br" Value="200" />
+  </Title>
+  <Title ID="30341" Name="2019 Spooky Halloween">
+    <Modifier Kind="Str" Value="16" />
+    <Modifier Kind="Agi" Value="16" />
+    <Modifier Kind="Con" Value="16" />
+    <Modifier Kind="Int" Value="16" />
+    <Modifier Kind="Atk" Value="25" />
+    <Modifier Kind="Def" Percent="2" />
+  </Title>
+  <Title ID="30342" Name="2019 Happy Halloween">
+    <Modifier Kind="Str" Value="16" />
+    <Modifier Kind="Agi" Value="16" />
+    <Modifier Kind="Con" Value="16" />
+    <Modifier Kind="Int" Value="16" />
+    <Modifier Kind="Atk" Value="15" />
+    <Modifier Kind="Def" Percent="3" />
+  </Title>
+  <Title ID="30343" Name="2019 Stick Snack">
+    <Modifier Kind="Str" Value="11" />
+    <Modifier Kind="Agi" Value="11" />
+    <Modifier Kind="Con" Value="11" />
+    <Modifier Kind="Int" Value="11" />
+    <Modifier Kind="Atk" Percent="1" />
+  </Title>
+  <Title ID="30344" Name="2019 X-Mas">
+    <Modifier Kind="Str" Value="15" />
+    <Modifier Kind="Agi" Value="15" />
+    <Modifier Kind="Con" Value="15" />
+    <Modifier Kind="Int" Value="15" />
+    <Modifier Kind="Hp" Value="200" />
+  </Title>
+  <Title ID="30345" Name="2020 Happy New Year">
+    <Modifier Kind="Hp" Value="300" />
+    <Modifier Kind="Br" Value="150" />
+    <Modifier Kind="Def" Percent="2" />
+  </Title>
+  <Title ID="30346" Name="Quiz! Quiz!">
+    <Modifier Kind="Int" Value="100" />
+  </Title>
+  <Title ID="30347" Name="2020 White Day">
+    <Modifier Kind="Atk" Value="15" />
+    <Modifier Kind="Br" Value="150" />
+  </Title>
+  <Title ID="30348" Name="RETURN TO DR">
+    <Modifier Kind="Str" Value="19" />
+    <Modifier Kind="Agi" Value="19" />
+    <Modifier Kind="Con" Value="19" />
+    <Modifier Kind="Int" Value="19" />
+  </Title>
+  <Title ID="30349" Name="Rain Drop">
+    <Modifier Kind="Atk" Value="25" />
+    <Modifier Kind="Br" Percent="10" />
+  </Title>
+  <Title ID="30350" Name="2020 National Family Month">
+    <Modifier Kind="Hp" Value="200" />
+    <Modifier Kind="Atk" Value="20" />
+  </Title>
+  <Title ID="30351" Name="2020 Buddha's Birthday">
+    <Modifier Kind="Str" Value="18" />
+    <Modifier Kind="Agi" Value="18" />
+    <Modifier Kind="Con" Value="18" />
+    <Modifier Kind="Int" Value="18" />
+  </Title>
+  <Title ID="30352" Name="Beast Spirit of Fire">
+    <Modifier Kind="Str" Value="42" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+  </Title>
+  <Title ID="30353" Name="Beast Spirit of Ice">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="42" />
+    <Modifier Kind="Int" Value="12" />
+  </Title>
+  <Title ID="30354" Name="Human Spirit of Darkness">
+    <Modifier Kind="Str" Value="27" />
+    <Modifier Kind="Agi" Value="27" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+  </Title>
+  <Title ID="30355" Name="Beast Spirit of Darkness">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Hp" Value="200" />
+    <Modifier Kind="Vp" Value="100" />
+  </Title>
+  <Title ID="30356" Name="King of Fighter">
+    <Modifier Kind="Str" Value="18" />
+    <Modifier Kind="Agi" Value="18" />
+    <Modifier Kind="Con" Value="18" />
+    <Modifier Kind="Int" Value="18" />
+    <Modifier Kind="Atk" Value="15" />
+  </Title>
+  <Title ID="30357" Name="Master of Darkness Dungeon - HARD">
+    <Modifier Kind="Con" Value="50" />
+    <Modifier Kind="Hp" Value="350" />
+    <Modifier Kind="Def" Percent="1" />
+  </Title>
+  <Title ID="30358" Name="2020 Chuseok">
+    <Modifier Kind="Str" Value="15" />
+    <Modifier Kind="Agi" Value="15" />
+    <Modifier Kind="Con" Value="15" />
+    <Modifier Kind="Int" Value="15" />
+    <Modifier Kind="Atk" Value="20" />
+  </Title>
+  <Title ID="30359" Name="Magic Rabbit">
+    <Modifier Kind="Str" Value="18" />
+    <Modifier Kind="Agi" Value="18" />
+    <Modifier Kind="Con" Value="18" />
+    <Modifier Kind="Int" Value="18" />
+  </Title>
+  <Title ID="30360" Name="2020 Spooky Halloween">
+    <Modifier Kind="Str" Value="16" />
+    <Modifier Kind="Agi" Value="16" />
+    <Modifier Kind="Con" Value="16" />
+    <Modifier Kind="Int" Value="16" />
+    <Modifier Kind="Atk" Value="30" />
+    <Modifier Kind="Def" Percent="1" />
+  </Title>
+  <Title ID="30361" Name="2020 Happy Halloween">
+    <Modifier Kind="Str" Value="16" />
+    <Modifier Kind="Agi" Value="16" />
+    <Modifier Kind="Con" Value="16" />
+    <Modifier Kind="Int" Value="16" />
+    <Modifier Kind="Atk" Value="10" />
+    <Modifier Kind="Def" Percent="5" />
+  </Title>
+  <Title ID="30362" Name="2020 Stick Snack">
+    <Modifier Kind="Str" Value="11" />
+    <Modifier Kind="Agi" Value="11" />
+    <Modifier Kind="Con" Value="11" />
+    <Modifier Kind="Int" Value="11" />
+    <Modifier Kind="Hp" Value="111" />
+    <Modifier Kind="Atk" Percent="1" />
+  </Title>
+  <Title ID="30363" Name="2020 X-Mas">
+    <Modifier Kind="Str" Value="15" />
+    <Modifier Kind="Agi" Value="15" />
+    <Modifier Kind="Con" Value="15" />
+    <Modifier Kind="Int" Value="15" />
+    <Modifier Kind="Br" Value="200" />
+    <Modifier Kind="Atk" Percent="1" />
+  </Title>
+  <Title ID="30364" Name="Adios 2020">
+    <Modifier Kind="Str" Value="20" />
+    <Modifier Kind="Agi" Value="20" />
+    <Modifier Kind="Con" Value="40" />
+    <Modifier Kind="Int" Value="20" />
+    <Modifier Kind="Atk" Value="20" />
+  </Title>
+  <Title ID="30365" Name="2021 Year of White Cow">
+    <Modifier Kind="Str" Value="18" />
+    <Modifier Kind="Agi" Value="18" />
+    <Modifier Kind="Con" Value="18" />
+    <Modifier Kind="Int" Value="18" />
+    <Modifier Kind="Atk" Percent="2" />
+  </Title>
+  <Title ID="30366" Name="2021 White Day">
+    <Modifier Kind="Str" Value="21" />
+    <Modifier Kind="Agi" Value="21" />
+    <Modifier Kind="Con" Value="21" />
+    <Modifier Kind="Int" Value="21" />
+    <Modifier Kind="Hp" Value="200" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30367" Name="2021 National Family Month">
+    <Modifier Kind="Hp" Value="210" />
+    <Modifier Kind="Atk" Value="21" />
+  </Title>
+  <Title ID="30368" Name="Human Spirit of Wood">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="27" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="22" />
+  </Title>
+  <Title ID="30369" Name="Beast Spirit of Wood">
+    <Modifier Kind="Str" Value="27" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="27" />
+    <Modifier Kind="Int" Value="12" />
+  </Title>
+  <Title ID="30370" Name="DR 19th Anniversary">
+    <Modifier Kind="Str" Value="19" />
+    <Modifier Kind="Agi" Value="19" />
+    <Modifier Kind="Con" Value="19" />
+    <Modifier Kind="Int" Value="19" />
+    <Modifier Kind="Atk" Value="10" />
+  </Title>
+  <Title ID="30371" Name="2021 Summer Days">
+    <Modifier Kind="Str" Value="21" />
+    <Modifier Kind="Agi" Value="21" />
+    <Modifier Kind="Con" Value="21" />
+    <Modifier Kind="Int" Value="21" />
+    <Modifier Kind="Vp" Value="100" />
+    <Modifier Kind="Atk" Value="30" />
+  </Title>
+  <Title ID="30372" Name="2021 Chuseok">
+    <Modifier Kind="Str" Value="21" />
+    <Modifier Kind="Agi" Value="21" />
+    <Modifier Kind="Con" Value="21" />
+    <Modifier Kind="Int" Value="21" />
+    <Modifier Kind="Br" Percent="10" />
+  </Title>
+  <Title ID="30373" Name="Cherubimon's Moon-viewing">
+    <Modifier Kind="Hp" Value="150" />
+    <Modifier Kind="Atk" Value="21" />
+    <Modifier Kind="Def" Value="21" />
+  </Title>
+  <Title ID="30374" Name="2021 Wicked Halloween">
+    <Modifier Kind="Str" Value="21" />
+    <Modifier Kind="Agi" Value="21" />
+    <Modifier Kind="Con" Value="21" />
+    <Modifier Kind="Int" Value="21" />
+    <Modifier Kind="Atk" Value="25" />
+  </Title>
+  <Title ID="30375" Name="2021 Stick Snack">
+    <Modifier Kind="Str" Value="21" />
+    <Modifier Kind="Agi" Value="21" />
+    <Modifier Kind="Con" Value="21" />
+    <Modifier Kind="Int" Value="21" />
+    <Modifier Kind="Hp" Value="300" />
+  </Title>
+  <Title ID="30376" Name="2021 Christmas">
+    <Modifier Kind="Str" Value="21" />
+    <Modifier Kind="Agi" Value="21" />
+    <Modifier Kind="Con" Value="21" />
+    <Modifier Kind="Int" Value="21" />
+    <Modifier Kind="Br" Value="300" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30377" Name="Adios 2021">
+    <Modifier Kind="Str" Value="21" />
+    <Modifier Kind="Agi" Value="21" />
+    <Modifier Kind="Con" Value="46" />
+    <Modifier Kind="Int" Value="21" />
+    <Modifier Kind="Atk" Value="30" />
+  </Title>
+  <Title ID="30378" Name="2022 Happy Tiger">
+    <Modifier Kind="Str" Value="22" />
+    <Modifier Kind="Agi" Value="22" />
+    <Modifier Kind="Con" Value="22" />
+    <Modifier Kind="Int" Value="22" />
+    <Modifier Kind="Atk" Percent="2" />
+  </Title>
+  <Title ID="30379" Name="2022 White Day">
+    <Modifier Kind="Str" Value="22" />
+    <Modifier Kind="Agi" Value="22" />
+    <Modifier Kind="Con" Value="22" />
+    <Modifier Kind="Int" Value="22" />
+    <Modifier Kind="Hp" Value="200" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30380" Name="2021 National Family Month">
+    <Modifier Kind="Hp" Value="220" />
+    <Modifier Kind="Atk" Value="22" />
+  </Title>
+  <Title ID="30381" Name="Human Spirit of Steel">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+  </Title>
+  <Title ID="30382" Name="Beast Spirit of Steel">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+  </Title>
+  <Title ID="30383" Name="2022 Summer Days">
+    <Modifier Kind="Str" Value="22" />
+    <Modifier Kind="Agi" Value="22" />
+    <Modifier Kind="Con" Value="22" />
+    <Modifier Kind="Int" Value="22" />
+    <Modifier Kind="Vp" Value="120" />
+    <Modifier Kind="Atk" Value="30" />
+  </Title>
+  <Title ID="30384" Name="DR 20th Anniversary">
+    <Modifier Kind="Str" Value="20" />
+    <Modifier Kind="Agi" Value="20" />
+    <Modifier Kind="Con" Value="20" />
+    <Modifier Kind="Int" Value="20" />
+    <Modifier Kind="Atk" Value="11" />
+  </Title>
+  <Title ID="30385" Name="2022 Autumn">
+    <Modifier Kind="Str" Value="22" />
+    <Modifier Kind="Agi" Value="22" />
+    <Modifier Kind="Con" Value="22" />
+    <Modifier Kind="Int" Value="22" />
+    <Modifier Kind="Br" Percent="12" />
+  </Title>
+  <Title ID="30386" Name="2022 Happy Halloween Day">
+    <Modifier Kind="Str" Value="22" />
+    <Modifier Kind="Agi" Value="22" />
+    <Modifier Kind="Con" Value="22" />
+    <Modifier Kind="Int" Value="22" />
+    <Modifier Kind="Atk" Value="23" />
+  </Title>
+  <Title ID="30387" Name="2022 Happy Halloween Night">
+    <Modifier Kind="Str" Value="22" />
+    <Modifier Kind="Agi" Value="22" />
+    <Modifier Kind="Con" Value="22" />
+    <Modifier Kind="Int" Value="22" />
+    <Modifier Kind="Br" Value="310" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30388" Name="2022 Stick Snack">
+    <Modifier Kind="Str" Value="22" />
+    <Modifier Kind="Agi" Value="22" />
+    <Modifier Kind="Con" Value="22" />
+    <Modifier Kind="Int" Value="22" />
+    <Modifier Kind="Br" Percent="11" />
+  </Title>
+  <Title ID="30389" Name="2022 Qatar World Cup">
+    <Modifier Kind="Str" Value="22" />
+    <Modifier Kind="Agi" Value="22" />
+    <Modifier Kind="Con" Value="22" />
+    <Modifier Kind="Int" Value="22" />
+    <Modifier Kind="Atk" Value="5" />
+  </Title>
+  <Title ID="30390" Name="2022 World Cup Quarter-final">
+    <Modifier Kind="Str" Value="22" />
+    <Modifier Kind="Agi" Value="22" />
+    <Modifier Kind="Con" Value="22" />
+    <Modifier Kind="Int" Value="22" />
+    <Modifier Kind="Atk" Value="10" />
+    <Modifier Kind="Br" Percent="5" />
+  </Title>
+  <Title ID="30391" Name="2022 World Cup Champion">
+    <Modifier Kind="Str" Value="22" />
+    <Modifier Kind="Agi" Value="22" />
+    <Modifier Kind="Con" Value="22" />
+    <Modifier Kind="Int" Value="22" />
+    <Modifier Kind="Atk" Value="15" />
+  </Title>
+  <Title ID="30392" Name="2022 Merry Christmas">
+    <Modifier Kind="Str" Value="22" />
+    <Modifier Kind="Agi" Value="22" />
+    <Modifier Kind="Con" Value="22" />
+    <Modifier Kind="Int" Value="22" />
+    <Modifier Kind="Hp" Value="320" />
+  </Title>
+  <Title ID="30393" Name="2022 Holly Jolly X-mas">
+    <Modifier Kind="Str" Value="22" />
+    <Modifier Kind="Agi" Value="22" />
+    <Modifier Kind="Con" Value="22" />
+    <Modifier Kind="Int" Value="22" />
+    <Modifier Kind="Vp" Value="150" />
+    <Modifier Kind="Atk" Value="25" />
+  </Title>
+  <Title ID="30394" Name="2023 Year of Black Rabbit">
+    <Modifier Kind="Str" Value="23" />
+    <Modifier Kind="Agi" Value="23" />
+    <Modifier Kind="Con" Value="23" />
+    <Modifier Kind="Int" Value="23" />
+    <Modifier Kind="Hp" Value="400" />
+  </Title>
+  <Title ID="30395" Name="2023 Chocolates and Candies">
+    <Modifier Kind="Str" Value="23" />
+    <Modifier Kind="Agi" Value="23" />
+    <Modifier Kind="Con" Value="23" />
+    <Modifier Kind="Int" Value="23" />
+    <Modifier Kind="Atk" Value="23" />
+    <Modifier Kind="Br" Percent="10" />
+  </Title>
+  <Title ID="30396" Name="Four Dark Masters_Metal Seadramon">
+    <Modifier Kind="Agi" Value="100" />
+    <Modifier Kind="Atk" Value="30" />
+  </Title>
+  <Title ID="30397" Name="Four Dark Masters_Pinochimon">
+    <Modifier Kind="Con" Value="100" />
+    <Modifier Kind="Atk" Value="30" />
+  </Title>
+  <Title ID="30398" Name="Four Dark Masters_Mugendramon">
+    <Modifier Kind="Str" Value="100" />
+    <Modifier Kind="Atk" Value="30" />
+  </Title>
+  <Title ID="30399" Name="Four Dark Masters_Piemon">
+    <Modifier Kind="Int" Value="100" />
+    <Modifier Kind="Atk" Value="30" />
+  </Title>
+  <Title ID="30400" Name="Invincible! The Strongest!">
+    <Modifier Kind="Str" Value="50" />
+    <Modifier Kind="Agi" Value="50" />
+    <Modifier Kind="Con" Value="50" />
+    <Modifier Kind="Int" Value="50" />
+    <Modifier Kind="Hp" Value="400" />
+    <Modifier Kind="Def" Percent="2" />
+  </Title>
+  <Title ID="30401" Name="Cursed by Apocalymon">
+    <Modifier Kind="Hp" Value="200" />
+    <Modifier Kind="Atk" Value="50" />
+  </Title>
+  <Title ID="30402" Name="Best Partner">
+    <Modifier Kind="Str" Value="30" />
+    <Modifier Kind="Agi" Value="30" />
+    <Modifier Kind="Con" Value="30" />
+    <Modifier Kind="Int" Value="30" />
+    <Unlock Condition="Level" Value="150" />
+  </Title>
+  <Title ID="30403" Name="2023 Children's Day">
+    <Modifier Kind="Hp" Value="230" />
+    <Modifier Kind="Atk" Value="23" />
+  </Title>
+  <Title ID="30404" Name="Fledgling">
+    <Modifier Kind="Str" Value="20" />
+    <Modifier Kind="Agi" Value="20" />
+    <Modifier Kind="Con" Value="20" />
+    <Modifier Kind="Int" Value="20" />
+  </Title>
+  <Title ID="30405" Name="DR 1st Anniversary">
+    <Modifier Kind="Str" Value="1" />
+    <Modifier Kind="Agi" Value="1" />
+    <Modifier Kind="Con" Value="1" />
+    <Modifier Kind="Int" Value="1" />
+    <Modifier Kind="Atk" Value="20" />
+  </Title>
+  <Title ID="30406" Name="DR 21th Anniversary">
+    <Modifier Kind="Str" Value="21" />
+    <Modifier Kind="Agi" Value="21" />
+    <Modifier Kind="Con" Value="21" />
+    <Modifier Kind="Int" Value="21" />
+    <Modifier Kind="Atk" Value="15" />
+  </Title>
+  <Title ID="30407" Name="2023 Summer Days">
+    <Modifier Kind="Str" Value="23" />
+    <Modifier Kind="Agi" Value="23" />
+    <Modifier Kind="Con" Value="23" />
+    <Modifier Kind="Int" Value="23" />
+    <Modifier Kind="Vp" Value="150" />
+    <Modifier Kind="Atk" Value="35" />
+  </Title>
+  <Title ID="30408" Name="Proof of Comrades">
+    <Modifier Kind="Str" Value="15" />
+    <Modifier Kind="Agi" Value="15" />
+    <Modifier Kind="Con" Value="15" />
+    <Modifier Kind="Int" Value="15" />
+  </Title>
+  <Title ID="30409" Name="Tyrant of the Under Forest">
+    <Modifier Kind="Str" Value="30" />
+    <Modifier Kind="Agi" Value="30" />
+    <Modifier Kind="Con" Value="30" />
+    <Modifier Kind="Int" Value="30" />
+  </Title>
+  <Title ID="30410" Name="City of Neon">
+    <Modifier Kind="Str" Value="23" />
+    <Modifier Kind="Agi" Value="23" />
+    <Modifier Kind="Con" Value="23" />
+    <Modifier Kind="Int" Value="23" />
+  </Title>
+  <Title ID="30411" Name="2023 Happy Halloween Day">
+    <Modifier Kind="Str" Value="23" />
+    <Modifier Kind="Agi" Value="23" />
+    <Modifier Kind="Con" Value="23" />
+    <Modifier Kind="Int" Value="23" />
+    <Modifier Kind="Atk" Value="30" />
+  </Title>
+  <Title ID="30412" Name="2023 Happy Halloween Night">
+    <Modifier Kind="Str" Value="23" />
+    <Modifier Kind="Agi" Value="23" />
+    <Modifier Kind="Con" Value="23" />
+    <Modifier Kind="Int" Value="23" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30413" Name="2023 Stick Snack">
+    <Modifier Kind="Str" Value="23" />
+    <Modifier Kind="Agi" Value="23" />
+    <Modifier Kind="Con" Value="23" />
+    <Modifier Kind="Int" Value="23" />
+    <Modifier Kind="Br" Percent="11" />
+  </Title>
+  <Title ID="30414" Name="2023 Autumn Rain">
+    <Modifier Kind="Str" Value="23" />
+    <Modifier Kind="Agi" Value="23" />
+    <Modifier Kind="Con" Value="23" />
+    <Modifier Kind="Int" Value="23" />
+    <Modifier Kind="Hp" Value="250" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30415" Name="Beautiful Black Pearl">
+    <Modifier Kind="Str" Value="5" />
+    <Modifier Kind="Agi" Value="5" />
+    <Modifier Kind="Con" Value="5" />
+    <Modifier Kind="Int" Value="5" />
+    <Modifier Kind="Atk" Value="23" />
+  </Title>
+  <Title ID="30416" Name="2023 White X-mas">
+    <Modifier Kind="Str" Value="23" />
+    <Modifier Kind="Agi" Value="23" />
+    <Modifier Kind="Con" Value="23" />
+    <Modifier Kind="Int" Value="23" />
+    <Modifier Kind="Vp" Value="250" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30417" Name="2023 Happy X-mas">
+    <Modifier Kind="Str" Value="23" />
+    <Modifier Kind="Agi" Value="23" />
+    <Modifier Kind="Con" Value="23" />
+    <Modifier Kind="Int" Value="23" />
+    <Modifier Kind="Hp" Value="100" />
+    <Modifier Kind="Atk" Value="25" />
+  </Title>
+  <Title ID="30418" Name="Friends for Everyone">
+    <Modifier Kind="Str" Value="23" />
+    <Modifier Kind="Agi" Value="23" />
+    <Modifier Kind="Con" Value="23" />
+    <Modifier Kind="Int" Value="23" />
+    <Modifier Kind="Atk" Value="23" />
+  </Title>
+  <Title ID="30419" Name="2024 Gapjin Year">
+    <Modifier Kind="Str" Value="24" />
+    <Modifier Kind="Agi" Value="24" />
+    <Modifier Kind="Con" Value="24" />
+    <Modifier Kind="Int" Value="24" />
+    <Modifier Kind="Hp" Value="400" />
+  </Title>
+  <Title ID="30420" Name="Lucky Golden Fortune Cookie">
+    <Modifier Kind="Agi" Value="7" />
+    <Modifier Kind="Con" Value="7" />
+    <Modifier Kind="Atk" Value="24" />
+  </Title>
+  <Title ID="30421" Name="Digimon Adventure 25th Anniversary">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+  </Title>
+  <Title ID="30422" Name="2024 White Day">
+    <Modifier Kind="Hp" Value="250" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30423" Name="2024 April Fools' Day">
+    <Modifier Kind="Str" Value="4" />
+    <Modifier Kind="Agi" Value="4" />
+    <Modifier Kind="Con" Value="4" />
+    <Modifier Kind="Int" Value="4" />
+    <Modifier Kind="Def" Percent="1" />
+  </Title>
+  <Title ID="30424" Name="Music Mania">
+    <Modifier Kind="Atk" Value="35" />
+  </Title>
+  <Title ID="30425" Name="2024 Summer Days">
+    <Modifier Kind="Str" Value="24" />
+    <Modifier Kind="Agi" Value="24" />
+    <Modifier Kind="Con" Value="24" />
+    <Modifier Kind="Int" Value="24" />
+    <Modifier Kind="Vp" Value="200" />
+    <Modifier Kind="Atk" Value="35" />
+  </Title>
+  <Title ID="30426" Name="DR 2nd Anniversary">
+    <Modifier Kind="Str" Value="2" />
+    <Modifier Kind="Agi" Value="2" />
+    <Modifier Kind="Con" Value="2" />
+    <Modifier Kind="Int" Value="2" />
+    <Modifier Kind="Atk" Value="22" />
+  </Title>
+  <Title ID="30427" Name="DR 22th Anniversary">
+    <Modifier Kind="Str" Value="22" />
+    <Modifier Kind="Agi" Value="22" />
+    <Modifier Kind="Con" Value="22" />
+    <Modifier Kind="Int" Value="22" />
+    <Modifier Kind="Atk" Value="22" />
+  </Title>
+  <Title ID="30428" Name="2024 Autumn Day">
+    <Modifier Kind="Str" Value="24" />
+    <Modifier Kind="Agi" Value="24" />
+    <Modifier Kind="Con" Value="24" />
+    <Modifier Kind="Int" Value="24" />
+  </Title>
+  <Title ID="30429" Name="2024 Fall Day">
+    <Modifier Kind="Str" Value="24" />
+    <Modifier Kind="Agi" Value="24" />
+    <Modifier Kind="Con" Value="24" />
+    <Modifier Kind="Int" Value="24" />
+    <Modifier Kind="Atk" Value="24" />
+  </Title>
+  <Title ID="30430" Name="Master of Infinity Mountain">
+    <Modifier Kind="Str" Value="30" />
+    <Modifier Kind="Agi" Value="30" />
+    <Modifier Kind="Con" Value="30" />
+    <Modifier Kind="Int" Value="30" />
+  </Title>
+  <Title ID="30431" Name="2024 Happy Halloween Day">
+    <Modifier Kind="Str" Value="24" />
+    <Modifier Kind="Agi" Value="24" />
+    <Modifier Kind="Con" Value="24" />
+    <Modifier Kind="Int" Value="24" />
+    <Modifier Kind="Atk" Value="35" />
+  </Title>
+  <Title ID="30432" Name="2024 Happy Halloween Night">
+    <Modifier Kind="Str" Value="24" />
+    <Modifier Kind="Agi" Value="24" />
+    <Modifier Kind="Con" Value="24" />
+    <Modifier Kind="Int" Value="24" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30433" Name="2024 Stick Snack">
+    <Modifier Kind="Str" Value="24" />
+    <Modifier Kind="Agi" Value="24" />
+    <Modifier Kind="Con" Value="24" />
+    <Modifier Kind="Int" Value="24" />
+    <Modifier Kind="Hp" Value="250" />
+  </Title>
+  <Title ID="30434" Name="2024 White Christmas">
+    <Modifier Kind="Str" Value="24" />
+    <Modifier Kind="Agi" Value="24" />
+    <Modifier Kind="Con" Value="24" />
+    <Modifier Kind="Int" Value="24" />
+    <Modifier Kind="Vp" Value="250" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30435" Name="2024 Merry Christmas">
+    <Modifier Kind="Str" Value="24" />
+    <Modifier Kind="Agi" Value="24" />
+    <Modifier Kind="Con" Value="24" />
+    <Modifier Kind="Int" Value="24" />
+    <Modifier Kind="Hp" Value="100" />
+    <Modifier Kind="Atk" Value="25" />
+  </Title>
+  <Title ID="30436" Name="2025 New Year [Title]">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+    <Modifier Kind="Hp" Value="400" />
+  </Title>
+  <Title ID="30437" Name="2025 Happy New Year [Title]">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+    <Modifier Kind="Hp" Value="200" />
+  </Title>
+  <Title ID="30438" Name="2025 Valentine's Day [Title]">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+    <Modifier Kind="Atk" Value="25" />
+    <Modifier Kind="Br" Percent="10" />
+  </Title>
+  <Title ID="30439" Name="2025 White Day [Title]">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+    <Modifier Kind="Hp" Value="300" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30440" Name="2025 Spring Day">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+    <Modifier Kind="Atk" Value="35" />
+    <Modifier Kind="Br" Value="400" />
+  </Title>
+  <Title ID="30441" Name="Human Spirit of Light [Title]">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Atk" Value="15" />
+    <Modifier Kind="Br" Value="50" />
+  </Title>
+  <Title ID="30442" Name="Beast Spirit of Light [Title]">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Br" Value="100" />
+  </Title>
+  <Title ID="30443" Name="Lord of Gluttony">
+    <Modifier Kind="Str" Value="30" />
+    <Modifier Kind="Agi" Value="30" />
+    <Modifier Kind="Con" Value="30" />
+    <Modifier Kind="Int" Value="30" />
+    <Modifier Kind="Atk" Value="50" />
+    <Modifier Kind="Br" Value="500" />
+  </Title>
+  <Title ID="30444" Name="Beyond Evolution">
+    <Modifier Kind="Str" Value="35" />
+    <Modifier Kind="Agi" Value="35" />
+    <Modifier Kind="Con" Value="35" />
+    <Modifier Kind="Int" Value="35" />
+    <Unlock Condition="Level" Value="160" />
+  </Title>
+  <Title ID="30445" Name="2025 Summer Days">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+    <Modifier Kind="Vp" Value="200" />
+    <Modifier Kind="Atk" Value="35" />
+  </Title>
+  <Title ID="30446" Name="DR 3rd Anniversary">
+    <Modifier Kind="Str" Value="23" />
+    <Modifier Kind="Agi" Value="23" />
+    <Modifier Kind="Con" Value="23" />
+    <Modifier Kind="Int" Value="23" />
+    <Modifier Kind="Atk" Value="18" />
+  </Title>
+  <Title ID="30447" Name="DR 23rd Anniversary">
+    <Modifier Kind="Str" Value="23" />
+    <Modifier Kind="Agi" Value="23" />
+    <Modifier Kind="Con" Value="23" />
+    <Modifier Kind="Int" Value="23" />
+    <Modifier Kind="Atk" Value="18" />
+  </Title>
+  <Title ID="30448" Name="2025 Autumn Day">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+  </Title>
+  <Title ID="30449" Name="2025 Happy Halloween Day">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+    <Modifier Kind="Atk" Value="35" />
+  </Title>
+  <Title ID="30450" Name="2025 Happy Halloween Night">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30451" Name="2025 Stick Snack">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+    <Modifier Kind="Hp" Value="250" />
+  </Title>
+  <Title ID="30452" Name="2025 Christmas">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+    <Modifier Kind="Vp" Value="250" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30453" Name="2025 Merry Christmas">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+    <Modifier Kind="Hp" Value="100" />
+    <Modifier Kind="Atk" Value="25" />
+  </Title>
+  <Title ID="30454" Name="2025 Happy Christmas">
+    <Modifier Kind="Str" Value="25" />
+    <Modifier Kind="Agi" Value="25" />
+    <Modifier Kind="Con" Value="25" />
+    <Modifier Kind="Int" Value="25" />
+    <Modifier Kind="Hp" Value="200" />
+    <Modifier Kind="Atk" Value="50" />
+  </Title>
+  <Title ID="30455" Name="The impregnable moving fortress">
+    <Modifier Kind="Str" Value="30" />
+    <Modifier Kind="Agi" Value="30" />
+    <Modifier Kind="Con" Value="30" />
+    <Modifier Kind="Int" Value="30" />
+    <Modifier Kind="Atk" Value="30" />
+    <Modifier Kind="Def" Percent="3" />
+  </Title>
+  <Title ID="30456" Name="The Sword of Storms">
+    <Modifier Kind="Str" Value="30" />
+    <Modifier Kind="Agi" Value="30" />
+    <Modifier Kind="Con" Value="30" />
+    <Modifier Kind="Int" Value="30" />
+    <Modifier Kind="Atk" Value="30" />
+    <Modifier Kind="Br" Value="550" />
+  </Title>
+  <Title ID="30457" Name="The Sage of Death">
+    <Modifier Kind="Str" Value="30" />
+    <Modifier Kind="Agi" Value="30" />
+    <Modifier Kind="Con" Value="30" />
+    <Modifier Kind="Int" Value="30" />
+    <Modifier Kind="Atk" Value="30" />
+  </Title>
+  <Title ID="30458" Name="The Goddess of Cats">
+    <Modifier Kind="Str" Value="30" />
+    <Modifier Kind="Agi" Value="30" />
+    <Modifier Kind="Con" Value="30" />
+    <Modifier Kind="Int" Value="30" />
+    <Modifier Kind="Atk" Value="30" />
+  </Title>
+  <Title ID="30459" Name="The Goddess of Darkness">
+    <Modifier Kind="Str" Value="30" />
+    <Modifier Kind="Agi" Value="30" />
+    <Modifier Kind="Con" Value="30" />
+    <Modifier Kind="Int" Value="30" />
+    <Modifier Kind="Hp" Value="300" />
+    <Modifier Kind="Atk" Value="30" />
+  </Title>
+  <Title ID="30460" Name="2026 Happy Valentine's Day [Title]">
+    <Modifier Kind="Str" Value="26" />
+    <Modifier Kind="Agi" Value="26" />
+    <Modifier Kind="Con" Value="26" />
+    <Modifier Kind="Int" Value="26" />
+    <Modifier Kind="Atk" Value="25" />
+    <Modifier Kind="Br" Percent="10" />
+  </Title>
+  <Title ID="30461" Name="2026 Valentine's Day [Title]">
+    <Modifier Kind="Str" Value="26" />
+    <Modifier Kind="Agi" Value="26" />
+    <Modifier Kind="Con" Value="26" />
+    <Modifier Kind="Int" Value="26" />
+  </Title>
+  <Title ID="30462" Name="2026 White Day [Title]">
+    <Modifier Kind="Str" Value="26" />
+    <Modifier Kind="Agi" Value="26" />
+    <Modifier Kind="Con" Value="26" />
+    <Modifier Kind="Int" Value="26" />
+    <Modifier Kind="Hp" Value="300" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30463" Name="2026 Sweet Candy [Title]">
+    <Modifier Kind="Str" Value="26" />
+    <Modifier Kind="Agi" Value="26" />
+    <Modifier Kind="Con" Value="26" />
+    <Modifier Kind="Int" Value="26" />
+    <Modifier Kind="Hp" Value="150" />
+    <Modifier Kind="Atk" Percent="1" />
+  </Title>
+  <Title ID="30464" Name="2026 Spring Rain [Title]">
+    <Modifier Kind="Str" Value="26" />
+    <Modifier Kind="Agi" Value="26" />
+    <Modifier Kind="Con" Value="26" />
+    <Modifier Kind="Int" Value="26" />
+    <Modifier Kind="Atk" Value="50" />
+    <Modifier Kind="Def" Value="50" />
+  </Title>
+  <Title ID="30465" Name="2026 Spring Day [Title]">
+    <Modifier Kind="Str" Value="26" />
+    <Modifier Kind="Agi" Value="26" />
+    <Modifier Kind="Con" Value="26" />
+    <Modifier Kind="Int" Value="26" />
+    <Modifier Kind="Atk" Value="25" />
+    <Modifier Kind="Def" Value="25" />
+  </Title>
+  <Title ID="30466" Name="FIFA World Cup 2026 [Title]">
+    <Modifier Kind="Str" Value="26" />
+    <Modifier Kind="Agi" Value="26" />
+    <Modifier Kind="Con" Value="26" />
+    <Modifier Kind="Int" Value="26" />
+    <Modifier Kind="Atk" Value="15" />
+  </Title>
+  <Title ID="30467" Name="2026 Summer Day [Title]">
+    <Modifier Kind="Str" Value="26" />
+    <Modifier Kind="Agi" Value="26" />
+    <Modifier Kind="Con" Value="26" />
+    <Modifier Kind="Int" Value="26" />
+    <Modifier Kind="Vp" Value="200" />
+    <Modifier Kind="Atk" Value="35" />
+  </Title>
+  <Title ID="30468" Name="DR 4th Anniversary">
+    <Modifier Kind="Str" Value="24" />
+    <Modifier Kind="Agi" Value="24" />
+    <Modifier Kind="Con" Value="24" />
+    <Modifier Kind="Int" Value="24" />
+    <Modifier Kind="Atk" Value="18" />
+  </Title>
+  <Title ID="30469" Name="DR 24th Anniversary">
+    <Modifier Kind="Str" Value="24" />
+    <Modifier Kind="Agi" Value="24" />
+    <Modifier Kind="Con" Value="24" />
+    <Modifier Kind="Int" Value="24" />
+    <Modifier Kind="Atk" Value="18" />
+  </Title>
+  <Title ID="30470" Name="2026 Autumn Day">
+    <Modifier Kind="Str" Value="26" />
+    <Modifier Kind="Agi" Value="26" />
+    <Modifier Kind="Con" Value="26" />
+    <Modifier Kind="Int" Value="26" />
+    <Modifier Kind="Br" Percent="15" />
+  </Title>
+  <Title ID="30471" Name="2026 Happy Halloween Day">
+    <Modifier Kind="Str" Value="26" />
+    <Modifier Kind="Agi" Value="26" />
+    <Modifier Kind="Con" Value="26" />
+    <Modifier Kind="Int" Value="26" />
+    <Modifier Kind="Atk" Value="35" />
+  </Title>
+  <Title ID="30472" Name="2026 Happy Halloween Night">
+    <Modifier Kind="Str" Value="26" />
+    <Modifier Kind="Agi" Value="26" />
+    <Modifier Kind="Con" Value="26" />
+    <Modifier Kind="Int" Value="26" />
+    <Modifier Kind="Atk" Percent="3" />
+  </Title>
+  <Title ID="30473" Name="2026 Stick Snack">
+    <Modifier Kind="Str" Value="26" />
+    <Modifier Kind="Agi" Value="26" />
+    <Modifier Kind="Con" Value="26" />
+    <Modifier Kind="Int" Value="26" />
+    <Modifier Kind="Hp" Value="250" />
+  </Title>
+  <Title ID="30474" Name="Human Spirit of Wind [Title]">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="42" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+  </Title>
+  <Title ID="30475" Name="Beast Spirit of Wind [Title]">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="27" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="27" />
+  </Title>
+  <Title ID="30476" Name="오만의 마왕">
+    <Modifier Kind="Str" Value="40" />
+    <Modifier Kind="Agi" Value="40" />
+    <Modifier Kind="Con" Value="40" />
+    <Modifier Kind="Int" Value="40" />
+    <Modifier Kind="Atk" Value="35" />
+    <Modifier Kind="Br" Value="500" />
+  </Title>
+  <Title ID="30477" Name="어둠으로 뒤덮힌">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Atk" Value="35" />
+  </Title>
+  <Title ID="30478" Name="잿더미로 태워버림">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Hp" Value="200" />
+    <Modifier Kind="Atk" Value="35" />
+  </Title>
+  <Title ID="30479" Name="악의 심판">
+    <Modifier Kind="Str" Value="12" />
+    <Modifier Kind="Agi" Value="12" />
+    <Modifier Kind="Con" Value="12" />
+    <Modifier Kind="Int" Value="12" />
+    <Modifier Kind="Vp" Value="100" />
+    <Modifier Kind="Atk" Value="35" />
+  </Title>
+  <Title ID="30480" Name="Eternal Asent">
+    <Modifier Kind="Str" Value="40" />
+    <Modifier Kind="Agi" Value="40" />
+    <Modifier Kind="Con" Value="40" />
+    <Modifier Kind="Int" Value="40" />
+  </Title>
+</DigimonTitles>

@@ -87,6 +87,9 @@ public sealed class Digimon
     public IReadOnlyList<uint> Titles => _titles;
     public DigimonTitleInfo? EquippedTitle => TitleId == 0 ? null : _data.FindDigimonTitle(TitleId);
     public string? FindTitleName(uint titleId) => _data.FindDigimonTitle(titleId)?.Name;
+
+    /// <summary>Títulos que se ganham sozinhos (regras em <c>DigimonTitles.xml</c>).</summary>
+    public IReadOnlyList<DigimonTitleInfo> AutoUnlockTitles => _data.AutoUnlockTitles;
     public Attributes TitleAttributeBonus => EquippedTitle?.Modifiers.Attributes ?? default;
 
     /// <summary>✅ Bônus dos equipamentos do Tamer (vem de <see cref="Character.SyncEquipmentModifiers"/>).</summary>

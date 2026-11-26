@@ -7,7 +7,7 @@ De onde vêm as tabelas, os modificadores de status e os efeitos. Visão geral e
 ## Fontes
 | Fonte | Onde | O que tem | Quem lê |
 |---|---|---|---|
-| Tabelas do cliente | `Resources/Client/table.pf` (fora do git) | espécies, itens, cards, skills, mapas, títulos, Cash Shop | `ClientTables` |
+| Tabelas do cliente | `Resources/Client/table.pf` (fora do git) | espécies, itens, cards, skills, mapas, Cash Shop | `ClientTables` |
 | Dados do servidor | `Resources/<Domínio>/*.xml` (versionados) | o que o cliente não tem ou só tem como texto: spawns, drops, chegadas de portal, lojas, efeitos de equipamento, card, título e uso de item | `GameDataLoader` |
 | Grades | `Resources/Client/grids.bin` (fora do git) | célula andável de cada mapa | `MapGrid` |
 
@@ -41,7 +41,7 @@ Bônus de equipamento, título, card e buff são todos `StatModifier`: um tipo d
 - Fontes: `ItemInfo.Modifiers` (equipamento), `DigimonTitleInfo.Modifiers` (título). `Inventory.EquipmentModifiers()` junta o que o tamer veste; `Character.SyncEquipmentModifiers` repassa a cada Digimon; `Digimon.Modifiers` junta equipamento e título equipado e fica em cache até `SetEquipmentModifiers`, `EquipTitle` ou `LoadTitles`.
 - Cálculo em `Digimon`: atributos somam antes de `StatFormulas.Combat`; HP/VP planos somam depois; ATK/DEF/BR = `(base + plano) × (1 + %)`, arredondado para baixo. Os modificadores de batalha e de zona (`Damage`, `CardSlashLimit`, `HpRecovery`…) são lidos de `Character.EquipmentModifiers` por quem os usa.
 - `ModifierXml.Read` lê os `<Modifier>` de qualquer fonte e derruba a carga em tipo desconhecido (nome exato do enum, nunca número), forma não aceita, `Value` e `Percent` juntos ou ausentes, valor que não é inteiro positivo, atributo a mais ou elemento estranho.
-- `EquipmentEffects.xml` é gerado por [`tools/extract_equipment_effects.py`](../ferramentas/extract-equipment-effects.md). ❓ Os títulos ainda saem de `ClientTables` até o E2.
+- `EquipmentEffects.xml` é gerado por [`tools/extract_equipment_effects.py`](../ferramentas/extract-equipment-effects.md) e `Digimon/DigimonTitles.xml` por [`tools/extract_digimon_titles.py`](../ferramentas/extract-digimon-titles.md).
 
 ## Efeitos (**PR #41: E3, E4**)
 Comportamento (curar, teleportar, capturar, dar item, atacar todos) é um **efeito tipado**, nunca um `switch` por id de item ou card:
@@ -64,13 +64,20 @@ Comportamento (curar, teleportar, capturar, dar item, atacar todos) é um **efei
 - Efeito que não cabe em parâmetros simples continua sendo uma classe de efeito com nome próprio, registrada pelo **tipo**, nunca pelo id do item.
 - ❓ **Formato dos efeitos de uso de item em aberto**: elementos estruturados (acima) × scripts no estilo rAthena (plano do PR de item scripts). A decisão fica para depois da refatoração da fundação. Seja qual for o formato, os efeitos são validados na carga e nunca vêm de texto de UI.
 
-## Regras de desbloqueio (**PR #41: E2**)
-Condições de jogo (títulos por vitórias, derrotas, nível e estágio) também são dados tipados:
+## Regras de desbloqueio (`Game/World/TitleUnlocks.cs`)
+Condições de jogo (títulos por vitórias, derrotas, nível e estágio) também são dados tipados, em `Resources/Digimon/DigimonTitles.xml`:
 
 ```xml
-<Title ID="20010" Name="Break Through Fixed Exp">
+<Title ID="20010" Name="Break Through Fixed EXP">
+  <Modifier Kind="Str" Value="5" />
   <Unlock Condition="Level" Value="100" />
+</Title>
+<Title ID="20000" Name="A New Start">
+  <Modifier Kind="Int" Value="3" />
+  <Unlock Condition="Stage" Value="Mega" />
 </Title>
 ```
 
-`Condition` é um enum fechado, avaliado por uma classe por condição.
+- `Condition` é o enum fechado `TitleUnlockCondition` (`Wins`, `Losses`, `Level`, `Stage`), e cada um vira uma classe `ITitleUnlockRule` (`WinsUnlock`, `LossesUnlock`, `LevelUnlock`, `StageUnlock`). `Value` é inteiro positivo; em `Stage` é o nome do estágio. Condição nova = um valor no enum, uma classe e uma linha em `TitleUnlockRules.Create`.
+- Um título com várias `<Unlock>` exige todas. Sem `<Unlock>`, só sai por evento, item ou GM.
+- `DigimonTitles.CheckUnlocks` percorre `GameData.AutoUnlockTitles` em ordem de id. O loader recusa condição ou valor inválido, atributo ou elemento a mais, id 0 e id repetido.

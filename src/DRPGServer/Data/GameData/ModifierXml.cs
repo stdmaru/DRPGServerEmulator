@@ -11,17 +11,20 @@ namespace DRPGServer.Data.GameData;
 /// </summary>
 public static class ModifierXml
 {
+    /// <summary>Lê os filhos de <paramref name="owner"/>, que só pode ter <c>&lt;Modifier&gt;</c>.</summary>
     public static StatModifiers Read(XElement owner, string where)
     {
-        var modifiers = new List<StatModifier>();
         foreach (var child in owner.Elements())
         {
             if (child.Name.LocalName != "Modifier")
                 throw new GameDataException($"{where}: elemento <{child.Name}> desconhecido");
-            modifiers.Add(ReadOne(child, where));
         }
-        return StatModifiers.Of(modifiers);
+        return Read(owner.Elements("Modifier"), where);
     }
+
+    /// <summary>Lê elementos <c>&lt;Modifier&gt;</c> já separados (o dono valida os outros filhos).</summary>
+    public static StatModifiers Read(IEnumerable<XElement> modifiers, string where) =>
+        StatModifiers.Of(modifiers.Select(e => ReadOne(e, where)).ToList());
 
     private static StatModifier ReadOne(XElement e, string where)
     {
