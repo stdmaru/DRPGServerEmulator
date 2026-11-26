@@ -30,12 +30,24 @@ Coordenadas relativas ao canto do painel.
 - O canto inferior direito é recortado: x ≥ 148, y ≥ 166. OK (58) + CANCEL (108) = 166×38 encaixam exatamente ali: OK em (148, 170), CANCEL em (206, 170).
 - O título "LOG IN" ocupa o alto à esquerda (y 18–46); o alto à direita é vazio, onde ficam os mascotes.
 
-## Layout escolhido (quadro 800×600)
-- Fundo `_eng` em (0, 0).
-- ❓ Painel em (242, 330): centrado na horizontal, na metade de baixo, sem cobrir o logo.
-- ❓ Mascotes sobre a borda do painel: `003_001` em painel + (200, 3), `003_002` em painel + (250, 3).
-- ❓ Botão sair `000_001_eng` no canto inferior direito, em (697, 550).
-- ❓ Texto dos campos em branco, a 4 px da borda esquerda; a senha aparece como `*`.
-- ❓ Mural de avisos (`000_007` + setas) e a caixa de loading (`001_000`) para o progresso do patch: posição a decidir quando o patcher existir.
+## Layout (quadro 800×600)
+Proporções tiradas de uma captura da tela antiga enviada pelo dono (era "Digimon Battle"; o fundo dela não existe mais na v322). O fundo é o atual.
+
+- Fundo `dr2_in_000_000_eng` em (0, 0).
+- Painel `dr2_in_003_000` em (243, 151): centrado na horizontal.
+- Mascotes sobre a borda de cima, à direita do título: `003_001` em painel + (225, −10), `003_002` em painel + (270, −10).
+- OK em painel + (148, 170), CANCEL em painel + (206, 170).
+- ❓ Botão sair `000_001_eng` no canto inferior direito, em (697, 550) (não aparece na captura).
+- Texto dos campos em branco, a 4 px da borda esquerda; a senha aparece como `*` com cursor `_`.
+
+## Caixa de status
+Na captura, uma caixa pequena centrada **abaixo do painel**, ~182×24 em (309, 392), mostra o estado em uma linha ("Verifying ID and Password...."). O launcher usa a mesma caixa para tudo:
+
+1. Ao abrir: "Connecting to server..." enquanto faz o handshake. ID, senha e OK ficam desligados até a resposta.
+2. Ao enviar: "Verifying ID and Password...".
+3. Erros e avisos (credenciais inválidas, muitas tentativas, launcher desatualizado, servidor fora, impressão digital diferente) aparecem nela; os campos voltam a ficar ativos quando dá para tentar de novo.
+4. Durante o patch, ❓ a caixa de loading `dr2_in_001_000` com a barra `001_002`.
+
+❓ Sprite da caixa: nenhum sprite de GUI é igual ao da captura (azul-marinho, cantos redondos, borda clara). Mais próximos: `gui\dr_friend_006.spr` (187×21, mesmo tamanho) e `gui\dr_friend_016.spr` (244×21, cantos redondos). Pode ter sido desenhada por código. A escolher pelo dono.
 
 A tela inteira segue a regra do [cliente novo](../planos/cliente-novo.md): quadro 800×600 centralizado, sem esticar.
