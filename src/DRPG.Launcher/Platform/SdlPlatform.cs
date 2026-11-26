@@ -33,8 +33,8 @@ public sealed unsafe class SdlPlatform : IDisposable
         _window = SDL_CreateWindow(title, IRenderer.FrameWidth, IRenderer.FrameHeight, flags);
         if (_window == null)
             throw new InvalidOperationException($"SDL_CreateWindow: {SDL_GetError()}");
-        // min = max tells the compositor the size is fixed: tiling compositors (Hyprland, Sway) float the window
-        // instead of resizing it, which otherwise shows stale frames while they animate the resize.
+        // min = max asks the compositor for a fixed size. Some tiling compositors (Hyprland) ignore it, so the
+        // renderer also copes with any window size (SdlRenderer.BeginFrame).
         SDL_SetWindowMinimumSize(_window, IRenderer.FrameWidth, IRenderer.FrameHeight);
         SDL_SetWindowMaximumSize(_window, IRenderer.FrameWidth, IRenderer.FrameHeight);
         if (fullscreen)
@@ -53,17 +53,22 @@ public sealed unsafe class SdlPlatform : IDisposable
         SDL_Event e;
         while (SDL_PollEvent(&e))
         {
-            _renderer.ToFrameCoordinates(&e);
             switch (e.Type)
             {
                 case SDL_EventType.SDL_EVENT_QUIT:
                     events.Add(new QuitEvent());
                     break;
                 case SDL_EventType.SDL_EVENT_MOUSE_MOTION:
-                    events.Add(new MouseMoveEvent((int)e.motion.x, (int)e.motion.y));
+                {
+                    var (x, y) = _renderer.ToFrame(e.motion.x, e.motion.y);
+                    events.Add(new MouseMoveEvent(x, y));
+                }
                     break;
                 case SDL_EventType.SDL_EVENT_MOUSE_BUTTON_DOWN or SDL_EventType.SDL_EVENT_MOUSE_BUTTON_UP when e.button.button == 1:
-                    events.Add(new MouseButtonEvent((int)e.button.x, (int)e.button.y, e.button.down));
+                {
+                    var (x, y) = _renderer.ToFrame(e.button.x, e.button.y);
+                    events.Add(new MouseButtonEvent(x, y, e.button.down));
+                }
                     break;
                 case SDL_EventType.SDL_EVENT_KEY_DOWN:
                     events.Add(new KeyEvent(e.key.key switch

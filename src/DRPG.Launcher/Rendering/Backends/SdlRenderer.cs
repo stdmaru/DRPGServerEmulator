@@ -14,6 +14,9 @@ public sealed unsafe class SdlRenderer : IRenderer
 {
     private readonly SDL_Renderer* _renderer;
 
+    // Layout of the 800×600 frame inside the window, recomputed every frame from the real output size.
+    private FrameLayout _layout = new(1, 0, 0);
+
     public SdlRenderer(SDL_Window* window, string? preferredDriver = "gpu")
     {
         _renderer = preferredDriver is null ? null : SDL_CreateRenderer(window, preferredDriver);
@@ -23,10 +26,8 @@ public sealed unsafe class SdlRenderer : IRenderer
             throw new InvalidOperationException($"SDL_CreateRenderer: {SDL_GetError()}");
         BackendName = SDL_GetRendererName(_renderer) ?? "?";
         SDL_SetRenderVSync(_renderer, 1);
-        // FixedScreen: 800×600 centered with black bars, scaled only by whole numbers (HiDPI, fullscreen) so pixels
-        // never deform; mouse events converted to frame coordinates.
-        SDL_SetRenderLogicalPresentation(_renderer, IRenderer.FrameWidth, IRenderer.FrameHeight,
-            SDL_RendererLogicalPresentation.SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
+        // FixedScreen is done here, not with SDL's logical presentation: tiling compositors (Hyprland) resize the
+        // window anyway, so every frame reads the real output size and lays the frame out itself (see BeginFrame).
     }
 
     public string BackendName { get; }
@@ -47,8 +48,17 @@ public sealed unsafe class SdlRenderer : IRenderer
         return new Texture(texture, width, height);
     }
 
+    /// <summary>
+    /// Reads the output size and centers the frame at the largest whole-number scale that fits, never below 1×.
+    /// A window smaller than 800×600 crops the frame instead of shrinking it, so sprites never deform.
+    /// </summary>
     public void BeginFrame()
     {
+        int width, height;
+        if (SDL_GetCurrentRenderOutputSize(_renderer, &width, &height))
+        {
+            _layout = FrameLayout.For(width, height);
+        }
         SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 255);
         SDL_RenderClear(_renderer);
     }
@@ -58,7 +68,13 @@ public sealed unsafe class SdlRenderer : IRenderer
         var t = (Texture)texture;
         if (t.Width == 0 || t.Height == 0)
             return;
-        var dst = new SDL_FRect { x = x, y = y, w = t.Width, h = t.Height };
+        var dst = new SDL_FRect
+        {
+            x = _layout.OffsetX + x * _layout.Scale,
+            y = _layout.OffsetY + y * _layout.Scale,
+            w = t.Width * _layout.Scale,
+            h = t.Height * _layout.Scale,
+        };
         SDL_RenderTexture(_renderer, t.Handle, null, &dst);
     }
 
@@ -66,7 +82,8 @@ public sealed unsafe class SdlRenderer : IRenderer
 
     public uint[] Capture()
     {
-        var surface = SDL_RenderReadPixels(_renderer, null);
+        var area = new SDL_Rect { x = _layout.OffsetX, y = _layout.OffsetY, w = IRenderer.FrameWidth * _layout.Scale, h = IRenderer.FrameHeight * _layout.Scale };
+        var surface = SDL_RenderReadPixels(_renderer, &area);
         if (surface == null)
             throw new InvalidOperationException($"SDL_RenderReadPixels: {SDL_GetError()}");
         try
@@ -76,9 +93,14 @@ public sealed unsafe class SdlRenderer : IRenderer
                 throw new InvalidOperationException($"SDL_ConvertSurface: {SDL_GetError()}");
             try
             {
-                var pixels = new uint[rgba->w * rgba->h];
-                for (int y = 0; y < rgba->h; y++)
-                    new ReadOnlySpan<uint>((byte*)rgba->pixels + y * rgba->pitch, rgba->w).CopyTo(pixels.AsSpan(y * rgba->w));
+                // One sample per frame pixel, whatever the current scale.
+                var pixels = new uint[IRenderer.FrameWidth * IRenderer.FrameHeight];
+                for (int y = 0; y < IRenderer.FrameHeight && y * _layout.Scale < rgba->h; y++)
+                {
+                    var row = new ReadOnlySpan<uint>((byte*)rgba->pixels + y * _layout.Scale * rgba->pitch, rgba->w);
+                    for (int x = 0; x < IRenderer.FrameWidth && x * _layout.Scale < rgba->w; x++)
+                        pixels[y * IRenderer.FrameWidth + x] = row[x * _layout.Scale];
+                }
                 return pixels;
             }
             finally
@@ -92,7 +114,14 @@ public sealed unsafe class SdlRenderer : IRenderer
         }
     }
 
-    internal bool ToFrameCoordinates(SDL_Event* e) => SDL_ConvertEventToRenderCoordinates(_renderer, e);
+    /// <summary>Window coordinates (from mouse events) to frame coordinates, with the layout of the last frame.</summary>
+    internal (int X, int Y) ToFrame(float windowX, float windowY)
+    {
+        float px, py;
+        if (!SDL_RenderCoordinatesFromWindow(_renderer, windowX, windowY, &px, &py))
+            return (-1, -1);
+        return _layout.ToFrame(px, py);
+    }
 
     public void Dispose() => SDL_DestroyRenderer(_renderer);
 
