@@ -3,6 +3,7 @@ using DRPG.Launcher.Login;
 using DRPG.Launcher.Patching;
 using DRPG.Launcher.Platform;
 using DRPG.Launcher.Rendering;
+using DRPG.Launcher.Rendering.Backends;
 using DRPG.Launcher.Scenes;
 using DRPG.Shared.Formats.Pack;
 
@@ -30,14 +31,16 @@ internal static class Program
         var renderer = platform.Renderer;
         Console.WriteLine($"renderer: {renderer.BackendName}");
         using var sprites = new SpriteStore(PackArchive.Open(install.ResourcePath), renderer);
-        var login = new LoginScene(sprites);
+        using IFont? font = OpenUiFont();
+        var login = new LoginScene(sprites, RememberedLogin.Load(Path.Combine(install.Directory, "option.ini")), font, renderer);
         var patchView = new PatchView(sprites);
 
         if (screenshot is not null)
         {
             double? fraction = screenshotPatch is null ? null : double.Parse(screenshotPatch, System.Globalization.CultureInfo.InvariantCulture);
             renderer.BeginFrame();
-            DrawFrame(renderer, login, patchView, fraction is null ? LauncherStage.Ready : LauncherStage.Patching, fraction ?? 0, 0);
+            var stage = fraction is null ? LauncherStage.Connecting : LauncherStage.Patching;
+            DrawFrame(renderer, login, patchView, stage, fraction ?? 0, 0, showStatus: true);
             var pixels = renderer.Capture();
             renderer.EndFrame();
             Screenshot.WritePpm(screenshot, pixels, IRenderer.FrameWidth, IRenderer.FrameHeight);
@@ -89,20 +92,43 @@ internal static class Program
             }
 
             renderer.BeginFrame();
-            DrawFrame(renderer, login, patchView, state.Stage, state.Progress?.Fraction ?? 0, SdlPlatform.TicksMs);
+            DrawFrame(renderer, login, patchView, state.Stage, state.Progress?.Fraction ?? 0, SdlPlatform.TicksMs, state.Status.Length > 0);
             renderer.EndFrame();
         }
         return Quit(stop);
     }
 
-    private static void DrawFrame(IRenderer r, LoginScene login, PatchView patch, LauncherStage stage, double fraction, ulong nowMs)
+    private static void DrawFrame(IRenderer r, LoginScene login, PatchView patch, LauncherStage stage, double fraction, ulong nowMs, bool showStatus)
     {
         login.DrawBackground(r);
         if (stage == LauncherStage.Patching)
             patch.Draw(r, fraction);
         else
             login.DrawPanel(r, nowMs);
-        login.DrawStatusBox(r);
+        if (showStatus)
+            login.DrawStatusBox(r);
+    }
+
+    /// <summary>Text is optional: without a usable font the launcher still works, only without labels.</summary>
+    private static IFont? OpenUiFont()
+    {
+        var path = FontLocator.FindUiFont();
+        if (path is null)
+        {
+            Console.Error.WriteLine("No UI font found: labels are not drawn.");
+            return null;
+        }
+        try
+        {
+            var font = new SdlTtfFont(path, FontLocator.UiPixelHeight);
+            Console.WriteLine($"font: {path}");
+            return font;
+        }
+        catch (InvalidOperationException e)
+        {
+            Console.Error.WriteLine(e.Message);
+            return null;
+        }
     }
 
     private static int Quit(CancellationTokenSource stop)

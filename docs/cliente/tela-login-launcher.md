@@ -6,7 +6,7 @@ O `DigimonRPG.bin` v322 **não desenha** mais a tela de login. Os sprites dela c
 | Sprite | Frames | Tamanho | O quê |
 |---|---|---|---|
 | `dr2_in_000_000` / `_eng` | 1 | 800×600 | fundo. A versão `_eng` tem o logo "DIGIMON RPG" e não tem a classificação indicativa coreana |
-| `dr2_in_003_000` | 1 | 315×212 | painel "LOG IN" com campos ID e PASSWORD e uma caixinha (❓ lembrar ID) |
+| `dr2_in_003_000` | 1 | 315×212 | painel "LOG IN" com campos ID e PASSWORD e a caixinha "lembrar ID" (13×13 em painel + (24, 164)) |
 | `dr2_in_003_001`, `dr2_in_003_002` | 4 cada | 48×63, 57×63 | mascotes animados (4 quadros) |
 | `dr2_in_003_003` | 3 | 58×38 | botão OK (normal, sobre, pressionado) |
 | `dr2_in_003_004` | 3 | 108×38 | botão CANCEL (mesmos estados) |
@@ -35,12 +35,22 @@ Proporções tiradas de uma captura da tela antiga enviada pelo dono (era "Digim
 
 - Fundo `dr2_in_000_000_eng` em (0, 0).
 - Painel `dr2_in_003_000` em (243, 151): centrado na horizontal.
-- Mascotes **apoiados** na borda de cima da caixa (pés sobre a borda, y 54–61 do painel), à direita do título: `003_001` em painel + (225, 2) e `003_002` em painel + (270, −2). Os quadros têm linhas transparentes embaixo (o último pixel opaco fica em y 59 e 63), por isso os y diferem. Animados em laço pelos 4 quadros. Tempo por quadro: 300 ms (decidido pelo dono).
+- Mascotes **apoiados** na borda de cima da caixa (pés sobre a borda, y 54–61 do painel), à direita do título: `003_001` em painel + (225, 2) e `003_002` em painel + (270, −2). Os quadros têm linhas transparentes embaixo (o último pixel opaco fica em y 59 e 63), por isso os y diferem. Animados em laço pelos 4 quadros, cada um no seu ritmo: `003_001` a 300 ms por quadro e `003_002` a 200 ms (como no original, nunca andam juntos; definido pelo dono).
+
+### Lembrar ID
+A caixinha funciona (pedido do dono): clique na caixa ou no texto ao lado alterna. Marcada, desenha o visto `dr2_sub_001_001` (13×13, amarelo) por cima da caixa, e o texto "Remember ID" fica à direita (x + 17, centrado). ❓ Sprite do visto, texto e cor originais não encontrados (não há código de desenho desta tela; o `DigimonRPG.exe` é empacotado com Themida).
+
+Guardado no `option.ini` do jogo, numa seção nossa: `[DRPGLauncher] Remember=1`, `Login=<id>`. Só o ID, nunca a senha; desmarcar apaga o ID. O ID só é gravado depois de um login bem-sucedido e só se for ASCII imprimível sem `;[]=` (até 64). ❓ O launcher oficial escreve `[Member] id=1`, de significado desconhecido; não é tocado. O jogo grava o `option.ini` chave por chave (`0x00b429f0`, `WritePrivateProfileString`), então a seção nossa sobrevive.
+
+### Fonte
+O original usa GDI "굴림체" (GulimChe, cp949) com célula de 12 px para a UI e `Fonts\123RF_123RF_TTF.ttf` (face "123RF", 16 px) em outro lugar (v322 `0x00b563f0`). Gulim não pode ser distribuída, então o launcher usa a do sistema quando existe e, senão, a primeira que achar entre NanumGothic, Noto Sans CJK, DejaVu Sans, Liberation Sans, Arial e Segoe UI (`FontLocator`). Texto por SDL3_ttf (`SdlTtfFont`), altura de linha igual à célula do GDI. Sem fonte nenhuma o launcher funciona sem os textos. ❓ Aparência fiel depende da Gulim.
 - OK em painel + (148, 170), CANCEL em painel + (206, 170).
 - Sem botão sair: o **CANCEL** fecha o launcher (confirmado pelo dono). `dr2_in_000_001`/`_006` não são usados.
 - Texto dos campos em branco, a 4 px da borda esquerda; a senha aparece como `*` com cursor `_`.
 
 ## Caixa de status
+**Só aparece quando tem algo a dizer** (pedido do dono): durante o patch, "Connecting to server...", erros e mensagens do login. Com o login liberado e nada a informar, some. O aviso do modo de desenvolvimento vai só para o console.
+
 Na captura, uma caixa pequena centrada **abaixo do painel**, ~182×24 na captura, mostra o estado em uma linha ("Verifying ID and Password...."). O launcher usa a mesma caixa para tudo:
 
 1. Ao abrir: "Connecting to server..." enquanto faz o handshake. ID, senha e OK ficam desligados até a resposta.
@@ -50,7 +60,7 @@ Na captura, uma caixa pequena centrada **abaixo do painel**, ~182×24 na captura
 
 Sprite da caixa: **`gui\dr_friend_016.spr`** (244×21, cantos redondos, borda clara), escolhido pelo dono em 2026-11-26. Nenhum sprite é igual ao da captura (pode ter sido desenhada por código). Fica centrado em x = 400, a partir de y = 392: em (278, 392). O texto vai em branco, a 8 px da borda esquerda.
 
-**Implementado** em `DRPG.Launcher/Scenes/LoginScene.cs` (fundo, painel, mascotes animados, OK/CANCEL com 3 estados, caixa de status). Falta o texto (campos e status), que depende da fonte. Para conferir sem janela: `SDL_VIDEO_DRIVER=offscreen dotnet run --project src/DRPG.Launcher -- --game-dir <instalação> --screenshot tela.ppm`. Um pacote mínimo só com os sprites da tela pode ficar em `.local/client-mini` (fora do git), montado com `work/tools/drpg_pack.py pack`.
+**Implementado** em `DRPG.Launcher/Scenes/LoginScene.cs` (fundo, painel, mascotes animados, OK/CANCEL com 3 estados, caixa de status, lembrar ID). Falta o texto dos campos e da caixa de status. Para conferir sem janela: `SDL_VIDEO_DRIVER=offscreen dotnet run --project src/DRPG.Launcher -- --game-dir <instalação> --screenshot tela.ppm`. Um pacote mínimo só com os sprites da tela pode ficar em `.local/client-mini` (fora do git), montado com `work/tools/drpg_pack.py pack`.
 
 ## Fluxo do launcher
 Definido pelo dono em 2026-11-26:

@@ -62,7 +62,7 @@ public sealed class LauncherFlowTests : IDisposable
 
         var state = await WaitFor(flow, LauncherStage.Ready);
         Assert.Equal(LauncherStage.Ready, state.Stage);
-        Assert.Contains("DEVELOPMENT MODE", state.Status);
+        Assert.Equal("", state.Status); // the status box hides once ready
         await server;
     }
 

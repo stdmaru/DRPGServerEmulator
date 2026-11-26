@@ -18,6 +18,7 @@ public enum LauncherStage
 /// </summary>
 public sealed class LauncherFlow(LauncherSettings settings, Patcher patcher, Func<PatchConfiguration.LoginServerSection, LoginClient> createClient)
 {
+    /// <summary><paramref name="Status"/> is empty when there is nothing to show (the status box hides).</summary>
     public sealed record State(LauncherStage Stage, string Status, PatchProgress? Progress);
 
     private readonly Lock _lock = new();
@@ -100,7 +101,9 @@ public sealed class LauncherFlow(LauncherSettings settings, Patcher patcher, Fun
         switch (result)
         {
             case HandshakeResult.Ready:
-                Set(LauncherStage.Ready, settings.AllowInsecure ? "DEVELOPMENT MODE: server key not checked" : "Enter your ID and password.");
+                if (settings.AllowInsecure)
+                    Console.WriteLine("DEVELOPMENT MODE: server key not checked");
+                Set(LauncherStage.Ready, ""); // nothing to report: the status box hides
                 break;
             case HandshakeResult.FingerprintMismatch:
                 Fail("Server key does not match. Connection refused.", null);

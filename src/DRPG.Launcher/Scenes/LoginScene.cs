@@ -6,21 +6,34 @@ namespace DRPG.Launcher.Scenes;
 
 /// <summary>
 /// The old login screen rebuilt from its sprites. Positions and timings: docs/cliente/tela-login-launcher.md.
-/// Text (fields and status) is not drawn yet: it needs the font renderer. While patching, the Loading box
+/// Field and status text is not drawn yet. While patching, the Loading box
 /// (<see cref="PatchView"/>) takes the panel's place.
 /// </summary>
 public sealed class LoginScene
 {
     private const int PanelX = 243, PanelY = 151;
     private const int StatusX = 278, StatusY = 392;
-    private const ulong MascotFrameMs = 300;
+    // Each mascot runs its own clock, so they never move in step (as in the original).
+    private const ulong MascotAFrameMs = 300, MascotBFrameMs = 200;
 
-    private readonly ITexture _background, _panel, _status;
+    // "Remember ID": the panel's 13×13 square at (24, 164); the check is dr2_sub_001_001 (13×13) drawn over it.
+    // ❓ Original check sprite, label text and colour not found (no draw code for this screen survives).
+    private const int CheckX = PanelX + 24, CheckY = PanelY + 164, CheckSize = 13;
+    private const int LabelX = CheckX + CheckSize + 4;
+    private const string RememberLabel = "Remember ID";
+    private const uint LabelColor = 0xFFFFFFFF;
+
+    private readonly ITexture _background, _panel, _status, _check;
     private readonly ITexture[] _mascotA, _mascotB;
+    private readonly ITexture? _rememberLabel;
     private readonly Button _ok, _cancel;
+    private readonly RememberedLogin _remember;
 
-    public LoginScene(SpriteStore sprites)
+    public LoginScene(SpriteStore sprites, RememberedLogin remember, IFont? font, IRenderer renderer)
     {
+        _remember = remember;
+        _check = sprites.Gui("dr2_sub_001_001")[0];
+        _rememberLabel = font?.Render(renderer, RememberLabel, LabelColor);
         _background = sprites.Gui("dr2_in_000_000")[0];
         _panel = sprites.Gui("dr2_in_003_000")[0];
         _mascotA = sprites.Gui("dr2_in_003_001");
@@ -57,6 +70,7 @@ public sealed class LoginScene
                 _cancel.Hover(m.X, m.Y);
                 break;
             case MouseButtonEvent b:
+                if (b.Down && OnRemember(b.X, b.Y)) _remember.Toggle();
                 if (_ok.Press(b.X, b.Y, b.Down)) SubmitRequested = true;
                 if (_cancel.Press(b.X, b.Y, b.Down)) CloseRequested = true;
                 break;
@@ -68,17 +82,25 @@ public sealed class LoginScene
 
     public void DrawBackground(IRenderer r) => r.Draw(_background, 0, 0);
 
+    /// <summary>Only while there is something to say (connecting, errors, login progress).</summary>
     public void DrawStatusBox(IRenderer r) => r.Draw(_status, StatusX, StatusY);
 
     public void DrawPanel(IRenderer r, ulong nowMs)
     {
-        int frame = (int)(nowMs / MascotFrameMs);
         r.Draw(_panel, PanelX, PanelY);
-        r.Draw(_mascotA[frame % _mascotA.Length], PanelX + 225, PanelY + 2);
-        r.Draw(_mascotB[frame % _mascotB.Length], PanelX + 270, PanelY - 2);
+        r.Draw(_mascotA[(int)(nowMs / MascotAFrameMs % (ulong)_mascotA.Length)], PanelX + 225, PanelY + 2);
+        r.Draw(_mascotB[(int)(nowMs / MascotBFrameMs % (ulong)_mascotB.Length)], PanelX + 270, PanelY - 2);
+        if (_remember.Remember)
+            r.Draw(_check, CheckX, CheckY);
+        if (_rememberLabel is { } label)
+            r.Draw(label, LabelX, CheckY + (CheckSize - label.Height + 1) / 2);
         _ok.Draw(r);
         _cancel.Draw(r);
     }
+
+    /// <summary>The square or its label.</summary>
+    private bool OnRemember(int x, int y) =>
+        y >= CheckY && y < CheckY + CheckSize && x >= CheckX && x < LabelX + (_rememberLabel?.Width ?? 0);
 
     /// <summary>Three-state button: normal, hover, pressed (frame order of the sprite; ❓ to confirm in CSceneServer).</summary>
     private sealed class Button(ITexture[] frames, int x, int y)
