@@ -55,6 +55,34 @@ internal static class TestSupport
 
     public static GameWorld NewWorld() => new(NullLogger<GameWorld>.Instance);
 
+    public static IOptions<PersistenceOptions> PersistenceOptions(Action<PersistenceOptions>? configure = null)
+    {
+        var o = new PersistenceOptions { RetryBaseMilliseconds = 1, RetryMaxMilliseconds = 1 };
+        configure?.Invoke(o);
+        return Options.Create(o);
+    }
+
+    /// <summary>Dead-letter numa pasta temporária nova (ou em <paramref name="directory"/>, para simular reinício).</summary>
+    public static DeadLetterStore DeadLetters(string? directory = null) =>
+        new(PersistenceOptions(o => o.DeadLetterPath = directory ?? Path.Combine(Path.GetTempPath(), "drpg-dead-letter-" + Guid.NewGuid().ToString("N"))),
+            Clock, NullLogger<DeadLetterStore>.Instance);
+
+    /// <summary>Consumidor da fila com espera de 1 ms entre tentativas.</summary>
+    public static PersistenceService NewPersistenceService(PersistenceQueue queue, DeadLetterStore? deadLetters = null,
+        Action<PersistenceOptions>? configure = null) =>
+        new(queue, deadLetters ?? DeadLetters(), PersistenceOptions(configure), TimeProvider.System, NullLogger<PersistenceService>.Instance);
+
+    /// <summary>Trabalho de teste que grava o personagem <paramref name="characterUid"/>.</summary>
+    public static PersistenceJob Job(uint characterUid, Func<CancellationToken, Task> run, string name = "test") =>
+        new(name, async ct =>
+        {
+            await run(ct);
+            return true;
+        })
+        {
+            CharacterUid = characterUid,
+        };
+
     /// <summary>Relógio real; testes de expiração usam um <see cref="GameClock"/> sobre <see cref="ManualTime"/>.</summary>
     public static IGameClock Clock { get; } = new GameClock(TimeProvider.System);
 
@@ -208,13 +236,14 @@ internal sealed class WorldHarness : IAsyncDisposable
     public GameWorld World { get; } = TestSupport.NewWorld();
     public WorldIo Io { get; }
     public PersistenceQueue Persistence { get; } = new();
+    public DeadLetterStore DeadLetters { get; } = TestSupport.DeadLetters();
     public CharacterTransfers Transfers { get; }
 
     public WorldHarness()
     {
         Io = new WorldIo(World, NullLogger<WorldIo>.Instance);
         Transfers = new CharacterTransfers(World, Persistence, NullLogger<CharacterTransfers>.Instance);
-        _persistenceService = new PersistenceService(Persistence, NullLogger<PersistenceService>.Instance);
+        _persistenceService = TestSupport.NewPersistenceService(Persistence, DeadLetters);
     }
 
     public async Task StartAsync()

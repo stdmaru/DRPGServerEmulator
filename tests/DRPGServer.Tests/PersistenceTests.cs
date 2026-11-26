@@ -23,11 +23,11 @@ public class PersistenceTests
         for (int v = 1; v <= 5; v++)
         {
             int version = v;
-            queue.EnqueueCharacterSave(7, _ => { executed.Add((7, version)); return Task.CompletedTask; });
+            queue.EnqueueCharacterSave(TestSupport.Job(7, _ => { executed.Add((7, version)); return Task.CompletedTask; }));
         }
-        queue.EnqueueCharacterSave(8, _ => { executed.Add((8, 1)); return Task.CompletedTask; });
+        queue.EnqueueCharacterSave(TestSupport.Job(8, _ => { executed.Add((8, 1)); return Task.CompletedTask; }));
 
-        var service = new PersistenceService(queue, NullLogger<PersistenceService>.Instance);
+        var service = TestSupport.NewPersistenceService(queue);
         await service.StartAsync(CancellationToken.None);
         await queue.FlushAsync();
         await service.StopAsync(CancellationToken.None);
@@ -43,20 +43,20 @@ public class PersistenceTests
         var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var executed = new List<int>();
 
-        queue.EnqueueCharacterSave(7, async _ =>
+        queue.EnqueueCharacterSave(TestSupport.Job(7, async _ =>
         {
             startedFirst.TrySetResult();
             await releaseFirst.Task;
             executed.Add(1);
-        });
+        }));
 
-        var service = new PersistenceService(queue, NullLogger<PersistenceService>.Instance);
+        var service = TestSupport.NewPersistenceService(queue);
         await service.StartAsync(CancellationToken.None);
         await startedFirst.Task;
 
         // Enquanto a gravação #1 está em andamento, chegam #2 e #3 -> devem coalescer para #3 logo após #1
-        queue.EnqueueCharacterSave(7, _ => { executed.Add(2); return Task.CompletedTask; });
-        queue.EnqueueCharacterSave(7, _ => { executed.Add(3); return Task.CompletedTask; });
+        queue.EnqueueCharacterSave(TestSupport.Job(7, _ => { executed.Add(2); return Task.CompletedTask; }));
+        queue.EnqueueCharacterSave(TestSupport.Job(7, _ => { executed.Add(3); return Task.CompletedTask; }));
         releaseFirst.TrySetResult();
 
         await queue.FlushAsync();

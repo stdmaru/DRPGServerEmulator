@@ -163,6 +163,13 @@ public sealed class PlayerSystem : IWorldSystem
         }
     }
 
+    /// <summary>O personagem está no mundo ou com a saída ainda gravando (thread do mundo).</summary>
+    public bool IsOnline(uint characterUid)
+    {
+        _world.AssertWorldThread();
+        return _bySession.Values.Any(p => p.Character.Uid == characterUid);
+    }
+
     public Player? FindByName(string name) =>
         _bySession.Values.FirstOrDefault(p => string.Equals(p.Character.Name, name, StringComparison.OrdinalIgnoreCase));
 

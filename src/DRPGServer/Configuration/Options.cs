@@ -37,6 +37,28 @@ public sealed class DatabaseOptions
     public int ConnectTimeoutSeconds { get; set; } = 60;
 }
 
+/// <summary>Seção "Persistence": gravações em segundo plano e dead-letter (docs/emulador/seguranca.md#persistência).</summary>
+public sealed class PersistenceOptions
+{
+    public const string Section = "Persistence";
+
+    /// <summary>Tentativas de cada gravação. Em queda (a anterior desistiu) e na parada, uma só.</summary>
+    public int MaxAttempts { get; set; } = 5;
+
+    /// <summary>Espera antes da 2ª tentativa; dobra a cada uma, até <see cref="RetryMaxMilliseconds"/>.</summary>
+    public int RetryBaseMilliseconds { get; set; } = 1000;
+    public int RetryMaxMilliseconds { get; set; } = 30_000;
+
+    /// <summary>
+    /// Pasta dos snapshots que não chegaram ao banco. Relativa à pasta de trabalho do processo (não à do executável:
+    /// ela precisa sobreviver a um novo build ou deploy).
+    /// </summary>
+    public string DeadLetterPath { get; set; } = "dead-letter";
+
+    /// <summary>Intervalo para reaplicar o dead-letter dos personagens offline.</summary>
+    public int ReplaySeconds { get; set; } = 60;
+}
+
 /// <summary>Seção "Network": autenticação entre servidores e limites de recurso (docs/emulador/seguranca.md).</summary>
 public sealed class NetworkOptions
 {

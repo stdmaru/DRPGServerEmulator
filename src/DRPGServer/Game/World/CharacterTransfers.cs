@@ -44,7 +44,8 @@ public sealed class CharacterTransfers(GameWorld world, PersistenceQueue persist
 
         player.BeginTransfer();
         var snapshot = CharacterSnapshot.Of(player.Character);
-        persistence.EnqueueCharacterTransfer(snapshot.Uid, async ct =>
+        // uma tentativa só, sem dead-letter: a falha é desfeita no personagem, e o rollback é gravado como save comum
+        persistence.EnqueueCharacterTransfer(new PersistenceJob(operation, async ct =>
         {
             TransferOutcome outcome;
             try
@@ -57,6 +58,10 @@ public sealed class CharacterTransfers(GameWorld world, PersistenceQueue persist
                 outcome = TransferOutcome.Failed;
             }
             world.Post(() => Settle(player, operation, outcome, settled));
+            return outcome == TransferOutcome.Committed;   // o snapshot foi gravado junto com a conta
+        })
+        {
+            CharacterUid = snapshot.Uid,
         });
     }
 

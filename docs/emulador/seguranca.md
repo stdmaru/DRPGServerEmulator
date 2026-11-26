@@ -29,7 +29,7 @@ Cada conta tem um estado no `PlayerSystem`: `Offline → Loading → Online → 
 - **Sair** (`Leave`): o jogador sai do mundo, o snapshot vai para a fila e a conta fica em `Saving` até o flush depois dele. Uma entrada que fecha no meio da carga também deixa a conta em `Saving` até o save que ela esperava.
 - O estado é por **conta**, não por personagem: o depósito da conta é compartilhado.
 - Nunca se carrega do banco um personagem cujo último estado ainda está só em memória ou na fila.
-- Uma transferência pendente adia o snapshot final até ela terminar. Um save que falha de vez ainda libera a conta (**PR #41: S7**).
+- Uma transferência pendente adia o snapshot final até ela terminar. Um save que falha de vez ainda libera a conta: o snapshot vai para o [dead-letter](#persistência), e o personagem fica bloqueado até ele ser gravado.
 
 ## Transferências entre conta e personagem
 Código: `CharacterTransfers` (o fluxo), `ItemService` (a API de itens), `AccountTransferRepository` (a transação). Testes: `TransferTests`, `CashShopTests`, `NpcShopTests` e `AccountTransferDatabaseTests` (contra o MariaDB).
@@ -85,9 +85,18 @@ Código em `Network/Traffic/`; opções na seção `Network`, validadas na parti
 - Opcode do `OpcodeLimits` é o **nome** do enum do servidor (`MapOpcode.ChatNormal`); nome desconhecido, número ou opcode de outro servidor derruba a partida. A configuração troca um opcode e mantém os outros padrões.
 - ❓ O teto do chat é escolha de projeto (há só 2 amostras de chat nas capturas).
 
-## Persistência (**PR #41: S7**)
-- Gravação que falha é repetida com backoff. Esgotadas as tentativas, o snapshot vai para um **dead-letter** (tabela ou arquivo), o log é crítico e o personagem fica bloqueado para login até a gravação ser reaplicada.
-- Nada é descartado em silêncio.
+## Persistência
+Código em `Data/Persistence/` e `Game/World/DeadLetterReplay.cs`; opções na seção `Persistence`. Nada é descartado em silêncio.
+
+- **Repetição:** cada trabalho da fila (`PersistenceJob`) tem até `MaxAttempts` (5) tentativas, com espera dobrando de `RetryBaseMilliseconds` (1 s) até `RetryMaxMilliseconds` (30 s).
+- **Queda:** depois de uma desistência, cada trabalho tem **uma** tentativa até uma gravação dar certo. Com o banco fora, a fila não fica parada minutos por trabalho, e os snapshots vão logo para o dead-letter. Na parada do servidor também é uma tentativa só.
+- **Dead-letter:** esgotadas as tentativas, o snapshot vai para `DeadLetterPath/character-<uid>.json` (arquivo, porque a causa comum é o banco fora), com data, trabalho e erro. Log crítico. Um arquivo por personagem, com o snapshot mais novo que falhou: cada snapshot é o estado inteiro. Se nem o arquivo puder ser gravado, o snapshot inteiro vai para o log crítico. `DeadLetterPath` é relativo à pasta de trabalho do processo, não à do executável, para sobreviver a um novo build ou deploy.
+- **Bloqueio:** personagem com arquivo no dead-letter não entra no mapa (`WorldEntry`). Quem já está no mundo continua: o estado em memória é o mais novo, e o próximo save que der certo resolve.
+- **Resolução:** qualquer gravação mais nova do snapshot do personagem que chega ao banco apaga o arquivo e desbloqueia: save comum, transferência conta ↔ personagem confirmada (o snapshot dela é mais novo; reaplicar o antigo depois desfaria a parte do personagem) ou a reaplicação.
+- **Reaplicação:** na partida e a cada `ReplaySeconds` (60 s), o `DeadLetterReplay` enfileira os personagens bloqueados e **offline**. Passa pela fila, atrás de qualquer save mais novo, e lê o arquivo só na hora de gravar.
+- **Partida:** a pasta precisa ser gravável, e todo arquivo precisa ser lido (versão, JSON, nome = uid do snapshot). Senão o servidor não sobe: arquivo ilegível é corrigido ou movido à mão.
+- Transferência conta ↔ personagem tem uma tentativa só e nunca vai para o dead-letter: a falha é desfeita no personagem, e o rollback é gravado como save comum.
+- ❓ Apagar um arquivo à mão desbloqueia o personagem com o estado do banco, perdendo o que estava no arquivo. Só faça isso de propósito.
 
 ## Auditoria (**PR #41: S9**)
 - Toda movimentação de moeda e de item entre fontes (loja, Cash Shop, depósitos, GM, drop coletado, NPC, recompensa) gera uma linha em `economy_log`: quem, o quê, quanto, de onde, para onde, saldo depois e motivo.

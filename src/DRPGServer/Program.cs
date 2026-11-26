@@ -53,10 +53,12 @@ var services = builder.Services;
 // opções validadas na partida (Configuration/OptionsValidation.cs): valor fora do intervalo não sobe o servidor
 services.AddOptions<ServersOptions>().Bind(builder.Configuration.GetSection(ServersOptions.Section)).ValidateOnStart();
 services.AddOptions<DatabaseOptions>().Bind(builder.Configuration.GetSection(DatabaseOptions.Section)).ValidateOnStart();
+services.AddOptions<PersistenceOptions>().Bind(builder.Configuration.GetSection(PersistenceOptions.Section)).ValidateOnStart();
 services.AddOptions<NetworkOptions>().Bind(builder.Configuration.GetSection(NetworkOptions.Section)).ValidateOnStart();
 services.AddOptions<GameOptions>().Bind(builder.Configuration.GetSection(GameOptions.Section)).ValidateOnStart();
 services.AddSingleton<IValidateOptions<ServersOptions>, ServersOptionsValidator>();
 services.AddSingleton<IValidateOptions<DatabaseOptions>, DatabaseOptionsValidator>();
+services.AddSingleton<IValidateOptions<PersistenceOptions>, PersistenceOptionsValidator>();
 services.AddSingleton<IValidateOptions<NetworkOptions>, NetworkOptionsValidator>();
 services.AddSingleton<IValidateOptions<GameOptions>, GameOptionsValidator>();
 services.AddSingleton(TimeProvider.System);
@@ -84,6 +86,7 @@ services.AddSingleton(sp =>
 
 // ordem importa: serviços param na ordem inversa (rede → I/O do mundo → mundo → persistência)
 services.AddSingleton<PersistenceQueue>();
+services.AddSingleton<DeadLetterStore>();
 services.AddHostedService<PersistenceService>();
 services.AddSingleton<GameWorld>();
 services.AddHostedService(sp => sp.GetRequiredService<GameWorld>());
@@ -98,6 +101,7 @@ services.AddHostedService(sp => sp.GetRequiredService<ExpEventService>());
 services.AddSingleton<ZoneSystem>();
 services.AddSingleton<BattleSystem>();
 services.AddSingleton<PlayerSystem>();
+services.AddHostedService<DeadLetterReplay>();
 services.AddSingleton<CharacterFactory>();
 services.AddSingleton<ICharacterLoader, CharacterLoader>();
 services.AddSingleton<WorldEntry>();
@@ -128,6 +132,7 @@ foreach (var read in new Action[]
 {
     () => _ = host.Services.GetRequiredService<IOptions<ServersOptions>>().Value,
     () => _ = host.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value,
+    () => _ = host.Services.GetRequiredService<IOptions<PersistenceOptions>>().Value,
     () => _ = host.Services.GetRequiredService<IOptions<NetworkOptions>>().Value,
     () => _ = host.Services.GetRequiredService<IOptions<GameOptions>>().Value,
 })
@@ -149,6 +154,10 @@ try
         data.Species.Count, data.Items.Count, data.DropGroups.Count, data.ZoneIds.Count, data.Portals.Values.Sum(p => p.Count), data.Grids.Count);
     if (data.Grids.Count == 0)
         log.LogWarning("Sem grids.bin: movimento e selvagens sem validação de célula. Rode extract-client (docs/cliente/arquivos-de-dados.md)");
+
+    // a pasta do dead-letter precisa ser gravável, e o que já está nela bloqueia os personagens desde a partida
+    var deadLetters = host.Services.GetRequiredService<DeadLetterStore>();
+    log.LogInformation("Dead-letter em {Path} ({Count} pendentes)", deadLetters.Directory, deadLetters.Blocked.Count);
 
     using (var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5)))
     {

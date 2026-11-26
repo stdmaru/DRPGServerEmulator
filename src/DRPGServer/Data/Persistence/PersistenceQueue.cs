@@ -1,7 +1,5 @@
 using System.Threading.Channels;
 using DRPGServer.Data.Repositories;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace DRPGServer.Data.Persistence;
 
@@ -12,33 +10,33 @@ namespace DRPGServer.Data.Persistence;
 /// </summary>
 public sealed class PersistenceQueue
 {
-    private readonly Channel<Func<CancellationToken, Task>> _jobs = Channel.CreateUnbounded<Func<CancellationToken, Task>>(
+    // cada item devolve o trabalho na hora de rodar: um save coalescido só decide o snapshot quando chega a vez dele
+    private readonly Channel<Func<PersistenceJob?>> _jobs = Channel.CreateUnbounded<Func<PersistenceJob?>>(
         new UnboundedChannelOptions { SingleReader = true });
-    private readonly Dictionary<uint, Func<CancellationToken, Task>> _pendingCharacterSaves = [];
+    private readonly Dictionary<uint, PersistenceJob> _pendingCharacterSaves = [];
     private readonly Lock _coalesceLock = new();
 
-    internal ChannelReader<Func<CancellationToken, Task>> Reader => _jobs.Reader;
+    internal ChannelReader<Func<PersistenceJob?>> Reader => _jobs.Reader;
 
-    public void Enqueue(Func<CancellationToken, Task> job) => _jobs.Writer.TryWrite(job);
+    public void Enqueue(PersistenceJob job) => _jobs.Writer.TryWrite(() => job);
 
     /// <summary>
-    /// Enfileira a gravação de um personagem com coalescing por <paramref name="characterUid"/>:
-    /// se já existe um snapshot aguardando na fila, substitui pelo mais recente sem duplicar transações.
+    /// Enfileira a gravação de um personagem com coalescing por <see cref="PersistenceJob.CharacterUid"/>: se já existe
+    /// um snapshot aguardando na fila, ele é trocado pelo mais recente sem duplicar transações.
     /// </summary>
-    public void EnqueueCharacterSave(uint characterUid, Func<CancellationToken, Task> job)
+    public void EnqueueCharacterSave(PersistenceJob job)
     {
+        var characterUid = job.CharacterUid ?? throw new ArgumentException("save de personagem sem CharacterUid", nameof(job));
         lock (_coalesceLock)
         {
             bool alreadyQueued = _pendingCharacterSaves.ContainsKey(characterUid);
             _pendingCharacterSaves[characterUid] = job;
             if (alreadyQueued) return;
 
-            _jobs.Writer.TryWrite(ct =>
+            _jobs.Writer.TryWrite(() =>
             {
-                Func<CancellationToken, Task>? latest;
                 lock (_coalesceLock)
-                    _pendingCharacterSaves.Remove(characterUid, out latest);
-                return latest is null ? Task.CompletedTask : latest(ct);
+                    return _pendingCharacterSaves.Remove(characterUid, out var latest) ? latest : null;
             });
         }
     }
@@ -47,20 +45,26 @@ public sealed class PersistenceQueue
     /// Enfileira uma transferência conta ↔ personagem (não coalescível). O snapshot dela é o mais novo do personagem,
     /// então um save coalescido do mesmo personagem que ainda espera na fila é descartado.
     /// </summary>
-    public void EnqueueCharacterTransfer(uint characterUid, Func<CancellationToken, Task> job)
+    public void EnqueueCharacterTransfer(PersistenceJob job)
     {
+        var characterUid = job.CharacterUid ?? throw new ArgumentException("transferência sem CharacterUid", nameof(job));
         lock (_coalesceLock)
         {
             _pendingCharacterSaves.Remove(characterUid);
-            _jobs.Writer.TryWrite(job);
+            _jobs.Writer.TryWrite(() => job);
         }
     }
 
-    /// <summary>Completa quando tudo o que foi enfileirado antes desta chamada estiver gravado.</summary>
+    /// <summary>Completa quando tudo o que foi enfileirado antes desta chamada estiver gravado (ou no dead-letter).</summary>
     public Task FlushAsync()
     {
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        if (!_jobs.Writer.TryWrite(_ => { done.TrySetResult(); return Task.CompletedTask; }))
+        var marker = new PersistenceJob("flush", _ =>
+        {
+            done.TrySetResult();
+            return Task.FromResult(false);
+        });
+        if (!_jobs.Writer.TryWrite(() => marker))
             done.TrySetResult();
         return done.Task;
     }
@@ -68,44 +72,8 @@ public sealed class PersistenceQueue
     internal void Complete() => _jobs.Writer.TryComplete();
 }
 
-/// <summary>Consome a <see cref="PersistenceQueue"/>. Para por último, depois de o mundo salvar todo mundo.</summary>
-public sealed class PersistenceService(PersistenceQueue queue, ILogger<PersistenceService> log) : BackgroundService
-{
-    protected override async Task ExecuteAsync(CancellationToken stopping)
-    {
-        // não usa o token de parada no laço: na parada, drena o que falta e só então sai
-        await foreach (var job in queue.Reader.ReadAllAsync(CancellationToken.None))
-        {
-            for (int attempt = 1; ; attempt++)
-            {
-                try
-                {
-                    await job(CancellationToken.None);
-                    break;
-                }
-                catch (Exception e) when (attempt < 3)
-                {
-                    log.LogWarning(e, "Falha ao gravar (tentativa {Attempt}); repetindo", attempt);
-                    await Task.Delay(TimeSpan.FromSeconds(attempt), CancellationToken.None);
-                }
-                catch (Exception e)
-                {
-                    log.LogError(e, "Gravação descartada depois de 3 tentativas");
-                    break;
-                }
-            }
-        }
-    }
-
-    public override async Task StopAsync(CancellationToken cancellationToken)
-    {
-        queue.Complete();
-        await base.StopAsync(cancellationToken);
-    }
-}
-
 public static class PersistenceQueueExtensions
 {
     public static void SaveCharacter(this PersistenceQueue queue, ICharacterSnapshotStore repository, CharacterSnapshot snapshot) =>
-        queue.EnqueueCharacterSave(snapshot.Uid, ct => repository.SaveAsync(snapshot, ct));
+        queue.EnqueueCharacterSave(PersistenceJob.SaveCharacter(repository, snapshot));
 }

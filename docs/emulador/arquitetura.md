@@ -57,7 +57,7 @@ Antes de escrever uma função de jogo, procure o serviço do domínio. Se uma l
   - **Gravação imediata (`player.RequestImmediateSave()`):** eventos críticos (coleta, descarte e uso de itens, captura, Depository, renomeação, fim de batalha, evolução permanente, NPCs, troca de mapa).
   - **Dirty + autosave (`player.MarkDirty()`):** ações frequentes de baixo risco (movimento, organização interna, pontos, ordem do time), gravadas a cada `AutosaveSeconds` (padrão 60 s).
   - **Transferência conta ↔ personagem:** job **não coalescível** (`CharacterTransfers`) que grava o snapshot e a mudança da conta na mesma transação (ver [segurança](seguranca.md#transferências-entre-conta-e-personagem)).
-  - **Falha:** retry com backoff e depois dead-letter. Uma gravação nunca é descartada em silêncio (**PR #41: S7**).
+  - **Falha:** retry com backoff e depois dead-letter em arquivo, com o personagem bloqueado até a reaplicação. Uma gravação nunca é descartada em silêncio ([persistência](seguranca.md#persistência)).
 - Ordem dos serviços: persistência → mundo → rede. Na parada, a rede fecha primeiro e a persistência grava o resto por último.
 - Tempo: o mundo usa `GameWorld.Now` (monotônico), e o tempo de calendário (expiração de itens, histórico) vem de `IGameClock`. Ninguém chama `DateTimeOffset.UtcNow` direto: entidades recebem o relógio (o `Inventory` guarda o dele) e pacotes recebem o horário pronto (ex.: `CharacterDataPacket(character, serverUnixTime)`). Prazos de infraestrutura (espera do banco, folga de ticket) usam `TimeProvider`. Nos testes, `GameClock` sobre `ManualTime` controla o calendário.
 

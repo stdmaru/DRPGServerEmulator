@@ -64,6 +64,22 @@ public sealed partial class DatabaseOptionsValidator : IValidateOptions<Database
     }
 }
 
+public sealed class PersistenceOptionsValidator : IValidateOptions<PersistenceOptions>
+{
+    public ValidateOptionsResult Validate(string? name, PersistenceOptions o)
+    {
+        var e = new OptionsErrors();
+        const string s = PersistenceOptions.Section;
+        e.Range(o.MaxAttempts, 1, 20, $"{s}:MaxAttempts");
+        e.Range(o.RetryBaseMilliseconds, 1, 60_000, $"{s}:RetryBaseMilliseconds");
+        e.Range(o.RetryMaxMilliseconds, 1, 600_000, $"{s}:RetryMaxMilliseconds");
+        e.Check(o.RetryMaxMilliseconds >= o.RetryBaseMilliseconds, $"{s}:RetryMaxMilliseconds menor que {s}:RetryBaseMilliseconds");
+        e.Check(!string.IsNullOrWhiteSpace(o.DeadLetterPath), $"{s}:DeadLetterPath vazio");
+        e.Range(o.ReplaySeconds, 5, 3600, $"{s}:ReplaySeconds");
+        return e.Result();
+    }
+}
+
 public sealed class NetworkOptionsValidator : IValidateOptions<NetworkOptions>
 {
     public ValidateOptionsResult Validate(string? name, NetworkOptions o)

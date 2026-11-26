@@ -99,8 +99,8 @@ public class TransferTests
         var queue = f.Harness.Persistence;
 
         // nada consome a fila ainda: o save fica pendente
-        queue.EnqueueCharacterSave(7, _ => { executed.Add("save"); return Task.CompletedTask; });
-        queue.EnqueueCharacterTransfer(7, _ => { executed.Add("transfer"); return Task.CompletedTask; });
+        queue.EnqueueCharacterSave(TestSupport.Job(7, _ => { executed.Add("save"); return Task.CompletedTask; }));
+        queue.EnqueueCharacterTransfer(TestSupport.Job(7, _ => { executed.Add("transfer"); return Task.CompletedTask; }));
         await f.Harness.StartAsync();
         await queue.FlushAsync();
 

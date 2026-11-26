@@ -79,8 +79,8 @@ public class WorldEntryTests
             var zones = new ZoneSystem(TestSupport.Data, world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
             Players = new PlayerSystem(world, zones, TestSupport.NewBattles(world), _queue, Store, TestSupport.GameOptions(),
                 NullLogger<PlayerSystem>.Instance);
-            Entry = new WorldEntry(world, Players, Loader, NullLogger<WorldEntry>.Instance);
-            _persistence = new PersistenceService(_queue, NullLogger<PersistenceService>.Instance);
+            Entry = new WorldEntry(world, Players, Loader, Harness.DeadLetters, NullLogger<WorldEntry>.Instance);
+            _persistence = TestSupport.NewPersistenceService(_queue, Harness.DeadLetters);
         }
 
         public async Task StartAsync()
@@ -189,6 +189,24 @@ public class WorldEntryTests
         var (ok, reentered) = await f.EnterAsync(NewMapSession());
         Assert.True(ok);
         await reentered.WaitAsync(Wait);
+    }
+
+    [Fact]
+    public async Task Character_in_the_dead_letter_cannot_enter_until_it_is_resolved()
+    {
+        await using var f = new Fixture();
+        await f.StartAsync();
+        var character = Entities.Character();
+        f.Harness.DeadLetters.Add(CharacterSnapshot.Of(character), "character.save", new TimeoutException("banco fora"));
+
+        var (blocked, _) = await f.EnterAsync(NewMapSession());
+        Assert.False(blocked);
+        Assert.Equal(0, await f.OnlineAsync());
+
+        f.Harness.DeadLetters.Resolve(character.Uid);
+        var (ok, entered) = await f.EnterAsync(NewMapSession());
+        Assert.True(ok);
+        await entered.WaitAsync(Wait);
     }
 
     [Fact]

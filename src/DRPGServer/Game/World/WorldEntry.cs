@@ -1,3 +1,4 @@
+using DRPGServer.Data.Persistence;
 using DRPGServer.Data.Repositories;
 using DRPGServer.Game.Entities;
 using DRPGServer.Network;
@@ -22,7 +23,8 @@ public sealed class CharacterLoader(CharacterRepository characters, CharacterFac
 /// <see cref="PlayerSystem"/>, espera o último save da conta chegar ao banco, carrega o personagem fora da thread do
 /// mundo e só então o coloca no mundo.
 /// </summary>
-public sealed class WorldEntry(GameWorld world, PlayerSystem players, ICharacterLoader characters, ILogger<WorldEntry> log)
+public sealed class WorldEntry(
+    GameWorld world, PlayerSystem players, ICharacterLoader characters, DeadLetterStore deadLetters, ILogger<WorldEntry> log)
 {
     /// <summary>
     /// Roda fora da thread do mundo. <paramref name="entered"/> roda na thread do mundo logo depois de o jogador entrar.
@@ -43,6 +45,12 @@ public sealed class WorldEntry(GameWorld world, PlayerSystem players, ICharacter
         {
             await start.Ready.WaitAsync(ct);
             character = await characters.LoadAsync(account.Uid, name, ct);
+            if (character is not null && deadLetters.IsBlocked(character.Uid))
+            {
+                log.LogWarning("{Session}: {Name} bloqueado, a última gravação dele está no dead-letter", session, name);
+                character = null;   // o finally encerra o Loading sem jogador
+                return false;
+            }
         }
         finally
         {
