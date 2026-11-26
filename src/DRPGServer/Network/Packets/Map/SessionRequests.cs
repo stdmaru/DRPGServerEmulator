@@ -59,21 +59,22 @@ public sealed record MoveCharacterRequest(short X, short Y) : IClientPacket<Move
 }
 
 /// <summary>
-/// ✅ 0x21 (C2S 277 B, v322): chat normal. Apelido[21] (o do servidor vale) e mensagem[256].
+/// ✅ 0x21 (C2S 291 B, v322; captures.db conn=108/158): chat normal. Apelido[21] (o do servidor vale), mensagem[256] e 14 B zerados.
 /// ❓ O servidor usa só os primeiros <see cref="MessageLength"/> bytes da mensagem.
 /// </summary>
 public sealed record ChatNormalRequest(string Message) : IClientPacket<ChatNormalRequest>
 {
     public const int MessageLength = 44;
     private const int MessageField = 256;
+    private const int TrailerLength = 14;
 
-    public static PacketLength Length => PacketLength.Exact(21 + MessageField);
+    public static PacketLength Length => PacketLength.Exact(21 + MessageField + TrailerLength);
 
     public static ChatNormalRequest Read(PacketReader r)
     {
         r.ReadFixedString(21);                  // apelido
         var message = r.ReadFixedString(MessageLength);
-        r.Skip(MessageField - MessageLength);
+        r.Skip(MessageField - MessageLength + TrailerLength);
         return new(message);
     }
 }

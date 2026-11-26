@@ -8,7 +8,7 @@ Evidência: engenharia reversa de `DigimonRPG.bin` (v322) — dispatcher do Map 
 
 | Opcode | Nome | Payload S2C | Layout | Comportamento no cliente (`DigimonRPG.bin`) |
 |---:|---|---:|---|---|
-| `0x21` | `ChatNormal` | **277 B** | `char[21]` remetente + `char[256]` mensagem | `0x00ABE221 → 0x00AEDFF0`. Formata `[%s] %s`. Se o remetente existir no mapa, abre balão de fala; caso contrário (`0x00AEE69D`), imprime direto no chat em **branco** (`245, 245, 245`) sem balão. |
+| `0x21` | `ChatNormal` | **277 B** (S2C) / **291 B** (C2S) | `char[21]` remetente + `char[256]` mensagem (+ `14 B` zerados no C2S, `captures.db conn=108/158`) | `0x00ABE221 → 0x00AEDFF0`. Formata `[%s] %s`. Se o remetente existir no mapa, abre balão de fala; caso contrário (`0x00AEE69D`), imprime direto no chat em **branco** (`245, 245, 245`) sem balão. |
 | `0x22` | `ChatNotice` | **277 B** | `char[21]` remetente + `char[256]` mensagem | `0x00ABE247 → 0x00AF18C0`. Mesmo layout de 277 B. Quando o remetente não existe no mapa (`0x00AF19D7 → 0x00B869A0`), imprime `[%s] %s` direto na janela de chat em **cor de destaque** (`0, 255, 255` — ciano/amarelo), sem balão de fala. |
 | `0x4F` | `SystemMessage` | **257 B** | `u8` tipo (`1`) + `char[256]` mensagem | Aviso cinza de sistema no chat (18 capturas v322: `conn=92/100/137/145/205/408/480`, ex.: `You gained the Title of [First Win].`). |
 

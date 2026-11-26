@@ -2109,14 +2109,17 @@
   <Equipment ItemID="7529" Name="Luxury &quot;The Emperor's New Clothes&quot; Costume [30 Days]">
     <Modifier Kind="DigimonExp" Percent="75" />
     <Modifier Kind="TamerExp" Value="10" />
+    <Modifier Kind="MoveSpeed" Percent="200" />
   </Equipment>
   <Equipment ItemID="7531" Name="Rash Guard (Male) [14 Days] X">
     <Modifier Kind="DigimonExp" Percent="100" />
     <Modifier Kind="TamerExp" Value="10" />
+    <Modifier Kind="MoveSpeed" Percent="200" />
   </Equipment>
   <Equipment ItemID="7532" Name="Rash Guard (Female) [14 Days] X">
     <Modifier Kind="DigimonExp" Percent="100" />
     <Modifier Kind="TamerExp" Value="10" />
+    <Modifier Kind="MoveSpeed" Percent="200" />
   </Equipment>
   <Equipment ItemID="7533" Name="Creepy Halloween Costume [14 Days]">
     <Modifier Kind="Atk" Percent="5" />
@@ -2124,8 +2127,48 @@
   <Equipment ItemID="7534" Name="Halloween Costume [14 Days]">
     <Modifier Kind="Atk" Percent="3" />
   </Equipment>
+  <Equipment ItemID="7601" Name="Cycle Costume">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
+  <Equipment ItemID="7602" Name="Inline Skates Costume">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
+  <Equipment ItemID="7603" Name="Ninja Costume">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
+  <Equipment ItemID="7604" Name="Cycle Costume [1 Day]">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
+  <Equipment ItemID="7605" Name="Inline Skates Costume [1 Day]">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
+  <Equipment ItemID="7606" Name="Ninja Costume [1 Day]">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
+  <Equipment ItemID="7607" Name="Cycle Costume [7 Days]">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
+  <Equipment ItemID="7608" Name="Inline Skates Costume [7 Days]">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
+  <Equipment ItemID="7609" Name="Ninja Costume [7 Days]">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
   <Equipment ItemID="7616" Name="Luxury Inline Skates Costume [30 Days]">
     <Modifier Kind="DigimonExp" Percent="75" />
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
+  <Equipment ItemID="7617" Name="Swift Legs [30 Days]">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
+  <Equipment ItemID="7618" Name="Swift Legs [1 Day]">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
+  <Equipment ItemID="7619" Name="Swift Legs [7 Days]">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
+  <Equipment ItemID="7620" Name="Swift Legs [30 Days] X">
+    <Modifier Kind="MoveSpeed" Percent="200" />
   </Equipment>
   <Equipment ItemID="8016" Name="Witch's Hat">
     <Modifier Kind="Atk" Percent="10" />
@@ -3025,6 +3068,9 @@
     <Modifier Kind="EvpRecovery" Value="13" />
     <Modifier Kind="MaintainEvolution" Value="1" />
   </Equipment>
+  <Equipment ItemID="23753" Name="Swift Legs [7 Days] X">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
   <Equipment ItemID="23797" Name="Baihumon's Gem +10 [14 Days] X">
     <Modifier Kind="Agi" Value="200" />
     <Modifier Kind="MultiSkillDamage" Percent="20" />
@@ -3816,6 +3862,9 @@
   <Equipment ItemID="24552" Name="Perfect Spirit of Water (H) X">
     <Modifier Kind="Int" Value="60" />
   </Equipment>
+  <Equipment ItemID="24579" Name="Swift Legs (S) [7 Days]">
+    <Modifier Kind="MoveSpeed" Percent="200" />
+  </Equipment>
   <Equipment ItemID="24580" Name="Beginner's Magnamon's Crest (1 Day)">
     <Modifier Kind="Atk" Value="128" />
     <Modifier Kind="Def" Value="32" />
@@ -3901,6 +3950,9 @@
   <Equipment ItemID="24598" Name="Beginner's Invisible Shoes [1Days]">
     <Modifier Kind="Int" Value="7" />
     <Modifier Kind="Atk" Value="48" />
+  </Equipment>
+  <Equipment ItemID="24599" Name="Swift Legs (S) [7Days] X">
+    <Modifier Kind="MoveSpeed" Percent="200" />
   </Equipment>
   <Equipment ItemID="24600" Name="Baihumon's Gem +10 [7 Days] X">
     <Modifier Kind="Agi" Value="200" />

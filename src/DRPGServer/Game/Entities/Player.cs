@@ -38,6 +38,7 @@ public sealed class Player(
     public AuthenticatedAccount Account { get; } = account;
     public Character Character { get; } = character;
     public Digimon Leader => Character.Leader;
+    public double MoveSpeed => Character.MoveSpeed;
 
     public Zone? Zone { get; internal set; }
     public Battle.Battle? Battle { get; internal set; }

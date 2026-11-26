@@ -24,18 +24,20 @@ public sealed class StatModifiersTests
     {
         Assert.Throws<ArgumentException>(() => StatModifiers.Of([new(StatModifierKind.Str, 5, StatModifierForm.Percent)]));
         Assert.Throws<ArgumentException>(() => StatModifiers.Of([new(StatModifierKind.DigimonExp, 5)]));
+        Assert.Throws<ArgumentException>(() => StatModifiers.Of([new(StatModifierKind.MoveSpeed, 200)]));
     }
 
     [Fact]
     public void Combine_follows_the_stacking_rule_of_each_kind()
     {
-        var dark = StatModifiers.Of([new(StatModifierKind.CardSlashLimit, 23), new(StatModifierKind.HpRecovery, 4)]);
-        var other = StatModifiers.Of([new(StatModifierKind.CardSlashLimit, 15), new(StatModifierKind.HpRecovery, 8)]);
+        var dark = StatModifiers.Of([new(StatModifierKind.CardSlashLimit, 23), new(StatModifierKind.HpRecovery, 4), new(StatModifierKind.MoveSpeed, 200, StatModifierForm.Percent)]);
+        var other = StatModifiers.Of([new(StatModifierKind.CardSlashLimit, 15), new(StatModifierKind.HpRecovery, 8), new(StatModifierKind.MoveSpeed, 200, StatModifierForm.Percent)]);
         var aura = StatModifiers.Of([new(StatModifierKind.MaintainEvolution, 1)]);
 
         var total = StatModifiers.Combine(dark, other, aura, aura);
 
         Assert.Equal(23, total.Flat(StatModifierKind.CardSlashLimit));  // Max
+        Assert.Equal(200, total.Percent(StatModifierKind.MoveSpeed));   // Max
         Assert.Equal(12, total.Flat(StatModifierKind.HpRecovery));      // Sum
         Assert.Equal(1, total.Flat(StatModifierKind.MaintainEvolution)); // Any
         Assert.True(total.Has(StatModifierKind.MaintainEvolution));

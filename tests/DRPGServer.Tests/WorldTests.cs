@@ -2,6 +2,7 @@ using System.Collections.Frozen;
 using DRPGServer.Data;
 using DRPGServer.Data.GameData;
 using DRPGServer.Game.Entities;
+using DRPGServer.Game.Stats;
 using DRPGServer.Game.World;
 using DRPGServer.Network;
 using DRPGServer.Network.Handlers;
@@ -158,7 +159,17 @@ public class MovementTests
         // parede de 3 colunas em x = 59..61: x = 60 fica a 2 células da área livre
         var data = Grids.DataWithGrid(79, WallOf3(100, 100));
         _zones = new ZoneSystem(data, _world, TestSupport.Clock, NullLogger<ZoneSystem>.Instance);
-        _player = new Player(_session, new AuthenticatedAccount(1, "u", Authority.None), Entities.Character());
+        var cycleCostume = new ItemInfo(7601, "Cycle Costume")
+        {
+            Type = 28, SubType = 1, Level = 1, MaxStack = 1,
+            Modifiers = StatModifiers.Of([new(StatModifierKind.MoveSpeed, 200, StatModifierForm.Percent)]),
+        };
+        var inv = new Inventory(id => id == 7601 ? cycleCostume : data.Items.GetValueOrDefault(id), 999, _ => null, TestSupport.Clock);
+        var character = new Character(Entities.Digimon(), inv)
+        {
+            Uid = 1, AccountUid = 1, Slot = 0, Name = "Tester", TamerId = 1, MapId = 79, X = 56, Y = 56,
+        };
+        _player = new Player(_session, new AuthenticatedAccount(1, "u", Authority.None), character);
         _zones.Find(79)!.Enter(_player);
         _session.DrainOutgoing();
     }
@@ -207,8 +218,32 @@ public class MovementTests
     public void Allowed_distance_grows_with_time_but_not_while_idle()
     {
         Assert.Equal(Movement.MaxDistance(TimeSpan.Zero), Movement.MaxDistance(Movement.ReportInterval));
-        Assert.True(Movement.MaxDistance(Movement.ReportInterval) >= 9.3);     // maior passo capturado: 9,2
+        Assert.True(Movement.MaxDistance(Movement.ReportInterval) >= 6.0);     // tamer normal: ~5 células por 0x20 (Chebyshev)
         Assert.Equal(Movement.MaxDistance(TimeSpan.FromSeconds(2)), Movement.MaxDistance(TimeSpan.FromMinutes(5)));
+    }
+
+    [Fact]
+    public void Speed_costume_doubles_allowed_move_speed_and_blocks_unbuffed_fast_steps()
+    {
+        // Sem fantasia de velocidade: passo de bicicleta (dx=-6, dy=-10 -> Chebyshev 10) é recusado
+        Assert.Equal(Movement.BaseMoveSpeed, _player.MoveSpeed);
+        _zones.Move(_player, 50, 46);
+        Assert.Equal((56, 56), (_player.Character.X, _player.Character.Y));
+        Assert.Equal([(ushort)0xB0], _session.SentOpcodes());
+
+        // Com Cycle Costume #7601 (MoveSpeed 200% = 2x base): mesmo passo de 10 células é aceito
+        var inv = _player.Character.Inventory;
+        inv.Equipment.Place(inv.Create(7601, (int)ItemPlace.CostumeSet, 1));
+        Assert.Equal(Movement.BaseMoveSpeed * 2.0, _player.MoveSpeed);
+
+        _zones.Move(_player, 50, 46);
+        Assert.Equal((50, 46), (_player.Character.X, _player.Character.Y));
+        Assert.Empty(_session.SentOpcodes());
+
+        // Mesmo com fantasia, passo muito acima de 200% (15 células num tick) continua recusado
+        _zones.Move(_player, 35, 46);
+        Assert.Equal((50, 46), (_player.Character.X, _player.Character.Y));
+        Assert.Equal([(ushort)0xB0], _session.SentOpcodes());
     }
 }
 
