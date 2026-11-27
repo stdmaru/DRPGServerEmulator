@@ -35,15 +35,31 @@ internal static class Program
         using IFont? font = OpenUiFont();
         var remembered = RememberedLogin.Load(Path.Combine(install.Directory, "option.ini"));
         using var login = new LoginScene(sprites, remembered, font, renderer);
-        var patchView = new PatchView(sprites);
+        using var newsView = new NewsView(sprites, font, renderer);
+        using var patchView = new PatchView(sprites, font, renderer);
         var cursor = new CursorView(sprites);
 
         if (screenshot is not null)
         {
             double? fraction = screenshotPatch is null ? null : double.Parse(screenshotPatch, System.Globalization.CultureInfo.InvariantCulture);
             renderer.BeginFrame();
-            var stage = fraction is null ? LauncherStage.Connecting : LauncherStage.Patching;
-            DrawFrame(renderer, login, patchView, stage, fraction ?? 0, 0, "Connecting to server...");
+            bool patchComplete = fraction is null;
+            login.PatchComplete = patchComplete;
+            var sampleNews = new PatchConfiguration.NewsItem[]
+            {
+                new() { Category = "Event", Title = "Double EXP weekend in Digital World" },
+                new() { Category = "Update", Title = "Client v322 character creation and deletion" },
+                new() { Category = "Info", Title = "Welcome to Digimon RPG Preservation Server" },
+            };
+            var sampleState = new LauncherFlow.State(
+                patchComplete ? LauncherStage.Connecting : LauncherStage.Patching,
+                patchComplete ? "Connecting to server..." : "",
+                null,
+                patchComplete ? "Up to date (v322) - Ready" : "Downloading Patch_322.zip (1/1)  12.3 / 27.1 MB",
+                fraction ?? 1.0,
+                patchComplete,
+                sampleNews);
+            DrawFrame(renderer, login, newsView, patchView, sampleState, 0);
             var pixels = renderer.Capture();
             renderer.EndFrame();
             Screenshot.WritePpm(screenshot, pixels, IRenderer.FrameWidth, IRenderer.FrameHeight);
@@ -79,6 +95,7 @@ internal static class Program
         while (!login.CloseRequested)
         {
             var state = flow.Snapshot;
+            login.PatchComplete = state.PatchComplete;
             login.Interactive = state.Stage == LauncherStage.Ready; // connected to the server and idle
             if (previousStage == LauncherStage.LoggingIn && state.Stage != LauncherStage.LoggingIn)
                 login.ClearPassword(); // refused or failed: typed again; on success it is not needed any more
@@ -102,6 +119,7 @@ internal static class Program
                 if (e is QuitEvent)
                     return Quit(stop);
                 login.Handle(e);
+                newsView.Handle(e);
                 cursor.Handle(e);
             }
             if (login.SubmitRequested)
@@ -111,22 +129,21 @@ internal static class Program
             }
 
             renderer.BeginFrame();
-            DrawFrame(renderer, login, patchView, state.Stage, state.Progress?.Fraction ?? 0, SdlPlatform.TicksMs, state.Status);
+            DrawFrame(renderer, login, newsView, patchView, state, SdlPlatform.TicksMs);
             cursor.Draw(renderer, SdlPlatform.TicksMs);
             renderer.EndFrame();
         }
         return Quit(stop);
     }
 
-    private static void DrawFrame(IRenderer r, LoginScene login, PatchView patch, LauncherStage stage, double fraction, ulong nowMs, string status)
+    private static void DrawFrame(IRenderer r, LoginScene login, NewsView news, PatchView patch, LauncherFlow.State state, ulong nowMs)
     {
         login.DrawBackground(r);
-        if (stage == LauncherStage.Patching)
-            patch.Draw(r, fraction);
-        else
-            login.DrawPanel(r, nowMs);
-        if (status.Length > 0)
-            login.DrawStatusBox(r, status);
+        news.Draw(r, state.News, loading: state.Stage == LauncherStage.Patching && !state.PatchComplete);
+        patch.Draw(r, state.PatchStatus, state.PatchFraction, state.PatchComplete);
+        login.DrawPanel(r, nowMs);
+        if (state.Stage != LauncherStage.Patching && state.Status.Length > 0)
+            login.DrawStatusBox(r, state.Status);
     }
 
     /// <summary>Text is optional: without a usable font the launcher still works, only without labels.</summary>

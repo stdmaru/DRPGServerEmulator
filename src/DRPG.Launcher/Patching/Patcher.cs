@@ -13,7 +13,7 @@ public enum PatchPhase { FetchingConfiguration, Downloading, Applying }
 
 public abstract record PatchOutcome
 {
-    public sealed record UpToDate(PatchConfiguration Configuration) : PatchOutcome;
+    public sealed record UpToDate(PatchConfiguration Configuration, int InstalledVersion = 0) : PatchOutcome;
     public sealed record Maintenance(string Title, string Message) : PatchOutcome;
     public sealed record NeedsReinstall(int Installed, int Minimum) : PatchOutcome;
     public sealed record Failed(string Reason) : PatchOutcome;
@@ -52,7 +52,8 @@ public sealed class Patcher(HttpClient http, string installDirectory, bool allow
                 await ApplyAsync(steps[i], i, steps.Count, progress, ct);
             if (Directory.Exists(WorkDirectory))
                 Directory.Delete(WorkDirectory, recursive: true);
-            return new PatchOutcome.UpToDate(configuration);
+            int finalVersion = steps.Count > 0 ? steps[^1].Version : installed;
+            return new PatchOutcome.UpToDate(configuration, finalVersion);
         }
         catch (Exception e) when (e is HttpRequestException or IOException or InvalidDataException
                                       or PatchConfigurationException or Shared.Formats.Pack.PackFormatException

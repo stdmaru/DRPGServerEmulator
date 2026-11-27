@@ -10,8 +10,8 @@ namespace DRPG.Launcher.Scenes;
 /// </summary>
 public sealed class LoginScene : IDisposable
 {
-    private const int PanelX = 243, PanelY = 151;
-    private const int StatusX = 278, StatusY = 392;
+    private const int PanelX = 455, PanelY = 165;
+    private const int StatusX = 490, StatusY = 392;
 
     // Each mascot runs its own clock, so they never move in step (as in the original).
     private const ulong MascotAFrameMs = 300, MascotBFrameMs = 200;
@@ -26,9 +26,9 @@ public sealed class LoginScene : IDisposable
     public const int MaxLoginLength = RememberedLogin.MaxLoginLength;
     public const int MaxPasswordLength = 64;
 
-    private readonly ITexture _background, _panel, _status, _check;
+    private readonly ITexture _background, _panel, _panelDisabled, _status, _check;
     private readonly ITexture _fieldsDisabled, _checkDisabled;
-    private readonly ITexture[] _mascotA, _mascotB;
+    private readonly ITexture[] _mascotA, _mascotB, _mascotADisabled, _mascotBDisabled;
     private readonly ITexture? _rememberLabel, _rememberLabelDisabled;
     private readonly Button _ok, _cancel;
     private readonly TextField _id, _password;
@@ -45,8 +45,11 @@ public sealed class LoginScene : IDisposable
         _renderer = renderer;
         _background = sprites.Gui("dr2_in_000_000")[0];
         _panel = sprites.Gui("dr2_in_003_000")[0];
+        _panelDisabled = sprites.GuiDisabled("dr2_in_003_000")[0];
         _mascotA = sprites.Gui("dr2_in_003_001");
         _mascotB = sprites.Gui("dr2_in_003_002");
+        _mascotADisabled = sprites.GuiDisabled("dr2_in_003_001");
+        _mascotBDisabled = sprites.GuiDisabled("dr2_in_003_002");
         _status = sprites.Gui("dr_friend_016")[0];
         _check = sprites.Gui("dr2_sub_001_001")[0];
         // the ID and password fields and the checkbox square, seeded at their centres (panel coordinates)
@@ -73,6 +76,9 @@ public sealed class LoginScene : IDisposable
     /// <summary>True only while connected to the server and idle (handshake done). Otherwise fields, checkbox and OK
     /// are drawn grey and ignore input; CANCEL, Esc and closing the window always work.</summary>
     public bool Interactive { get; set; }
+
+    /// <summary>False while the auto-patcher has not finished: the entire login panel is drawn greyed out.</summary>
+    public bool PatchComplete { get; set; }
 
     /// <summary>After a failed login: the password is typed again, the ID stays.</summary>
     public void ClearPassword()
@@ -162,11 +168,16 @@ public sealed class LoginScene : IDisposable
 
     public void DrawPanel(IRenderer r, ulong nowMs)
     {
-        r.Draw(_panel, PanelX, PanelY);
-        r.Draw(_mascotA[(int)(nowMs / MascotAFrameMs % (ulong)_mascotA.Length)], PanelX + 225, PanelY + 2);
-        r.Draw(_mascotB[(int)(nowMs / MascotBFrameMs % (ulong)_mascotB.Length)], PanelX + 270, PanelY - 2);
-        bool enabled = Interactive;
-        if (!enabled)
+        bool greyPanel = !PatchComplete;
+        r.Draw(greyPanel ? _panelDisabled : _panel, PanelX, PanelY);
+        var mascotA = greyPanel ? _mascotADisabled : _mascotA;
+        var mascotB = greyPanel ? _mascotBDisabled : _mascotB;
+        int frameA = greyPanel ? 0 : (int)(nowMs / MascotAFrameMs % (ulong)mascotA.Length);
+        int frameB = greyPanel ? 0 : (int)(nowMs / MascotBFrameMs % (ulong)mascotB.Length);
+        r.Draw(mascotA[frameA], PanelX + 225, PanelY + 2);
+        r.Draw(mascotB[frameB], PanelX + 270, PanelY - 2);
+        bool enabled = Interactive && PatchComplete;
+        if (!enabled && !greyPanel)
             r.Draw(_fieldsDisabled, PanelX, PanelY);
         if (_remember.Remember)
             r.Draw(enabled ? _check : _checkDisabled, CheckX, CheckY);

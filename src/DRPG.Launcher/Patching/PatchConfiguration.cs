@@ -20,6 +20,13 @@ public sealed record PatchConfiguration
     public PatchInfoSection PatchInfo { get; init; } = new();
     public MainUrlSection MainUrl { get; init; } = new();
     public LoginServerSection? LoginServer { get; init; }
+    public IReadOnlyList<NewsItem> News { get; init; } = [];
+
+    public sealed record NewsItem
+    {
+        public string Category { get; init; } = "Info";
+        public string Title { get; init; } = "";
+    }
 
     public sealed record ServerInfoSection
     {
@@ -118,7 +125,20 @@ public sealed record PatchConfiguration
                 Host = LoginServer.Host ?? "",
                 KeyFingerprint = LoginServer.KeyFingerprint ?? "",
             },
+            News = (News ?? [])
+                .Where(n => n is not null && !string.IsNullOrWhiteSpace(n.Title))
+                .Select(n => new NewsItem { Category = NormalizeCategory(n.Category), Title = n.Title.Trim() })
+                .ToArray(),
         };
+    }
+
+    private static string NormalizeCategory(string? raw)
+    {
+        if (string.Equals(raw, "Event", StringComparison.OrdinalIgnoreCase))
+            return "Event";
+        if (string.Equals(raw, "Update", StringComparison.OrdinalIgnoreCase))
+            return "Update";
+        return "Info";
     }
 
     private void Validate()

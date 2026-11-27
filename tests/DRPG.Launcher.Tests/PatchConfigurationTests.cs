@@ -64,6 +64,28 @@ public sealed class PatchConfigurationTests
         Assert.Equal("", c.ServerInfo.Message.Title);
         Assert.Equal("", c.LauncherInfo.RunExeFileName);
         Assert.Null(c.LoginServer);
+        Assert.Empty(c.News);
+    }
+
+    [Fact]
+    public void Normalizes_news_categories_and_skips_blank_titles()
+    {
+        var c = PatchConfiguration.Parse("""
+        {
+          "PatchInfo": { "PatchVersion": 1 },
+          "News": [
+            { "Category": "event", "Title": "  Double EXP  " },
+            { "Category": "UPDATE", "Title": "Patch 322" },
+            { "Category": "unknown", "Title": "General notice" },
+            { "Category": "Info", "Title": "   " }
+          ]
+        }
+        """);
+
+        Assert.Equal(3, c.News.Count);
+        Assert.Equal(("Event", "Double EXP"), (c.News[0].Category, c.News[0].Title));
+        Assert.Equal(("Update", "Patch 322"), (c.News[1].Category, c.News[1].Title));
+        Assert.Equal(("Info", "General notice"), (c.News[2].Category, c.News[2].Title));
     }
 
     [Fact]

@@ -89,9 +89,13 @@ Erros em qualquer etapa aparecem na caixa de status. Sem patch pendente, a etapa
 
 **Zip do patch** (igual ao oficial, conferido no `Patch_240.zip`): `patch_N.hf/.pf` são mesclados no `resource`; os demais arquivos substituem os da instalação (caminhos com `..`, absolutos ou `resource.*` são recusados). ❓ O zip oficial traz `DigimonRPG.bin`, que sobrescreveria o binário sem XIGNCODE / o cliente novo.
 
-### Tela do patch
-Sprites: `dr2_in_001_000` (239×196; título "Loading" e moldura da barra, só a faixa y 126–190 é opaca) e `dr2_in_001_002` (231×23, a barra; o 2º quadro é vazio). A barra encaixa dentro da moldura em (3, 165) e é desenhada **cortada na largura** = 231 × progresso. `dr2_in_001_001` (65×77, 3 quadros) é totalmente transparente.
-
-**Provisório** (opção A, aprovada pelo dono em 2026-11-26 como primeira versão; ele pode trocar por algo melhor depois): a caixa "Loading" **no lugar do painel de login**, em (280, 124), e a caixa de status abaixo com o detalhe ("Downloading Patch_241.zip 12.3 / 27.1 MB", depois "Applying Patch_241..."). Dentro da barra, o texto curto ("Patch 241 (2/5) 45%"). Ao terminar, a caixa "Loading" some e o painel de login aparece congelado. A outra opção testada (painel visível e "Loading" embaixo dele) foi descartada: o título "Loading" bate nos botões OK/CANCEL.
+### Tela do patch e painel de notícias (layout em duas colunas)
+O launcher usa layout em **duas colunas** sobre o fundo `dr2_in_000_000_eng` (800×600):
+- **Coluna esquerda (`x = 30..430`, largura 400 px):**
+  - **Topo — Últimas notícias (`NewsView`, `y = 165`, `400×212`):** caixa 9-partes `dr2_in_000_003` com cabeçalho `dr2_in_000_007` ("NOTICE BOARD"), lista de notícias vinda do campo opcional `News` de `DR_Configuration.json` com badges coloridos `[Event]`, `[Info]` e `[Update]` + título, e rolagem pela roda do mouse.
+  - **Base — Auto-patcher (`PatchView`, `y = 392`, `400×98`):** sempre visível em todas as etapas; mostra o texto de progresso/finalizado (download, aplicação ou `"Up to date (vN) - Ready"`), a barra `dr2_in_001_002` (quadro 0 recortado pela fração + quadro 1 contorno) e a porcentagem.
+- **Coluna direita (`x = 455`, largura 315 px):**
+  - Painel de login `dr2_in_003_000` em `(455, 165)` e caixa de status `dr_friend_016` em `(490, 392)`.
+  - Enquanto o patch não termina (`!PatchComplete`), **todo o painel de login e mascotes ficam em tons de cinza** e bloqueados (CANCEL e Esc continuam funcionando). Ao concluir o patch, o painel ganha cor e libera os campos assim que o handshake termina.
 
 **Janela fixa em 800×600** (pedido do dono): não redimensiona, porque escala fracionária deforma os sprites. Em tela cheia (`--fullscreen`) ou monitor HiDPI o quadro só cresce por múltiplos inteiros (2×, 3×), centralizado com bordas pretas. Compositores lado a lado (Hyprland) redimensionam a janela mesmo assim, ignorando o tamanho fixo pedido (mín = máx); por isso o renderizador lê o tamanho real a cada quadro e aplica a mesma regra (`Rendering/FrameLayout`): janela maior centraliza em escala inteira, janela menor **corta** o quadro em vez de encolher. Para o Hyprland manter a janela flutuante: `windowrulev2 = float, title:^(Digimon RPG)$`. Vale para o launcher; a regra de janela maior do [cliente novo](../planos/cliente-novo.md) é do cliente do jogo.

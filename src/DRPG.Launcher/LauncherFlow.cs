@@ -34,12 +34,27 @@ public sealed class LauncherFlow(
         _ => TimeSpan.FromSeconds(30),
     };
 
-    /// <summary><paramref name="Status"/> is empty when there is nothing to show (the status box hides).</summary>
-    public sealed record State(LauncherStage Stage, string Status, PatchProgress? Progress);
+    /// <summary>
+    /// Immutable UI snapshot read each frame. <paramref name="Status"/> is for the login status box (empty = hidden);
+    /// <paramref name="PatchStatus"/> and <paramref name="PatchFraction"/> stay visible in the left column even after
+    /// patching finishes.
+    /// </summary>
+    public sealed record State(
+        LauncherStage Stage,
+        string Status,
+        PatchProgress? Progress,
+        string PatchStatus = "Checking for updates...",
+        double PatchFraction = 0,
+        bool PatchComplete = false,
+        IReadOnlyList<PatchConfiguration.NewsItem>? News = null);
 
     private readonly Lock _lock = new();
-    private State _state = new(LauncherStage.Patching, "Checking for updates...", null);
+    private State _state = new(LauncherStage.Patching, "Checking for updates...", null, "Checking for updates...", 0, false, []);
     private PatchConfiguration? _configuration;
+    private string _patchStatus = "Checking for updates...";
+    private double _patchFraction;
+    private bool _patchComplete;
+    private IReadOnlyList<PatchConfiguration.NewsItem> _news = [];
     private Func<Task>? _retry;
     private string _failure = "";
     private int _failuresInARow;
@@ -137,21 +152,30 @@ public sealed class LauncherFlow(
 
     private async Task PatchAsync(CancellationToken ct)
     {
+        SetPatch("Checking for updates...", 0, complete: false);
         Set(LauncherStage.Patching, "Checking for updates...");
         var outcome = await patcher.RunAsync(settings.ConfigUrl, new ProgressSink(this), ct);
         switch (outcome)
         {
             case PatchOutcome.UpToDate up:
                 _configuration = up.Configuration;
+                _news = up.Configuration.News;
+                string doneText = up.InstalledVersion > 0
+                    ? $"Up to date (v{up.InstalledVersion}) - Ready"
+                    : "Up to date - Ready";
+                SetPatch(doneText, 1.0, complete: true);
                 await ConnectAsync(ct);
                 break;
             case PatchOutcome.Maintenance m:
+                SetPatch($"Maintenance: {m.Title}", 0, complete: false);
                 Fail($"{m.Title}: {m.Message.Trim()}", () => PatchAsync(ct));
                 break;
             case PatchOutcome.NeedsReinstall r:
+                SetPatch($"Version {r.Installed} too old (min {r.Minimum})", 0, complete: false);
                 Fail($"Version {r.Installed} is too old (minimum {r.Minimum}). Please reinstall the game.", null);
                 break;
             case PatchOutcome.Failed f:
+                SetPatch($"Update failed: {f.Reason}", 0, complete: false);
                 Fail($"Update failed: {f.Reason}", () => PatchAsync(ct));
                 break;
         }
@@ -230,10 +254,20 @@ public sealed class LauncherFlow(
         Set(LauncherStage.Failed, status);
     }
 
+    private void SetPatch(string patchStatus, double fraction, bool complete)
+    {
+        lock (_lock)
+        {
+            _patchStatus = patchStatus;
+            _patchFraction = Math.Clamp(fraction, 0, 1);
+            _patchComplete = complete;
+        }
+    }
+
     private void Set(LauncherStage stage, string status, bool log = true)
     {
         lock (_lock)
-            _state = new State(stage, status, null);
+            _state = new State(stage, status, null, _patchStatus, _patchFraction, _patchComplete, _news);
         if (log)
             Console.WriteLine($"[{stage}] {status}");
     }
@@ -245,11 +279,16 @@ public sealed class LauncherFlow(
             string status = p.Phase switch
             {
                 PatchPhase.FetchingConfiguration => "Checking for updates...",
-                PatchPhase.Downloading => $"Downloading Patch_{p.Version}.zip  {p.Done / 1048576.0:0.0} / {p.Total / 1048576.0:0.0} MB",
-                _ => $"Applying Patch_{p.Version}...",
+                PatchPhase.Downloading => $"Downloading Patch_{p.Version}.zip ({p.Index + 1}/{p.Count})  {p.Done / 1048576.0:0.0} / {p.Total / 1048576.0:0.0} MB",
+                _ => $"Applying Patch_{p.Version} ({p.Index + 1}/{p.Count})...",
             };
             lock (flow._lock)
-                flow._state = new State(LauncherStage.Patching, status, p);
+            {
+                flow._patchStatus = status;
+                flow._patchFraction = p.Fraction;
+                flow._patchComplete = false;
+                flow._state = new State(LauncherStage.Patching, status, p, status, p.Fraction, false, flow._news);
+            }
         }
     }
 }

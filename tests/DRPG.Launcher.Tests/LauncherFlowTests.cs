@@ -104,6 +104,9 @@ public sealed class LauncherFlowTests : IDisposable
 
         var state = flow.Snapshot;
         Assert.Equal(LauncherStage.Ready, state.Stage);
+        Assert.True(state.PatchComplete);
+        Assert.Equal(1.0, state.PatchFraction);
+        Assert.Contains("Up to date", state.PatchStatus);
         Assert.Equal("Enter your ID and password.", state.Status);
         Assert.False(flow.IsBusy);
     }
