@@ -146,6 +146,20 @@ public sealed class AccountSession(ClientSettings settings, GameCommandLine comm
         _connection!.Send(new CharacterDeleteRequest(characterUid, passwordMd5));
     }
 
+    /// <summary>
+    /// ✅ Sends <c>0x16</c> (user and character) and <c>0x18</c> (the MAC addresses) on the channel connection, in that order, right after
+    /// the map's <c>0x01</c> (<c>0x00adca00</c> → <c>0x00ae8700</c>; pcap sessions 4 and 5: the <c>0x16</c> in the same millisecond as
+    /// the <c>0x01</c>, the <c>0x18</c> 0.2 s later). The addresses go only into the packet: never logged.
+    /// </summary>
+    public void SendMapConnection(string characterName, IReadOnlyList<string> macAddresses)
+    {
+        if (Step != AccountStep.Ready)
+            throw new InvalidOperationException($"map connection announced while {Step}");
+        _connection!.Send(new MapConnectionConfirmRequest(command.Username, characterName));
+        _connection.Send(new ClientHardwareInfoRequest(macAddresses));
+        log($"channel: map connection announced for {characterName}");
+    }
+
     public int? TakeCreateError()
     {
         var code = LastCreateError;

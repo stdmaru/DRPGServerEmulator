@@ -1,5 +1,6 @@
 using DRPG.Server.Data.GameData;
 using DRPG.Server.Game.Entities;
+using DRPG.Shared.Packets.Map;
 using DRPG.Shared.Protocol;
 
 namespace DRPG.Server.Network.Packets.Map;
@@ -173,7 +174,7 @@ public sealed class DigimonReceivedPacket(Digimon digimon) : ServerPacket
 /// </summary>
 public sealed class RenamePacket(RenameResult result, RenameKind kind, uint uid, string name) : ServerPacket
 {
-    public const int NameLength = 20;
+    public const int NameLength = RenameRequest.NameLength;
 
     public override ushort Opcode => (ushort)MapOpcode.Rename;
 
@@ -186,8 +187,6 @@ public sealed class RenamePacket(RenameResult result, RenameKind kind, uint uid,
         w.WriteFixedString(name, NameLength);
     }
 }
-
-public enum RenameKind : byte { Tamer = 1, Digimon = 2 }
 
 public enum RenameResult : byte
 {

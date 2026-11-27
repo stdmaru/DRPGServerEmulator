@@ -36,6 +36,10 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
     public const int NameTakenText = 0xee4;
     public const int ConsignmentActiveText = 0xeb1a;
     private const int NameTakenFrames = 160;
+
+    /// <summary>✅ <c>0x00b48670</c>: the text shown for 80 frames when the map server cannot be reached; the scene stays.</summary>
+    public const int MapConnectFailedText = 0xee6;
+    private const int MapConnectFailedFrames = 80;
     private const int MessageCenterX = 400, MessageCenterY = 300;
 
     // ✅ reply error codes (0x00b45c30)
@@ -63,6 +67,7 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
     private string? _message;
     private int _messageFrames;                                // 0 = until click; > 0 = countdown or click
     private FadeOut? _fade;
+    private bool _worldStarted;
 
     public int FrameIntervalMs => 1000 / FramesPerSecond;
     internal int Mode => _mode;
@@ -137,7 +142,10 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
         DrawMessage(renderer);
         // ✅ 0x00b48840: CSceneCharSel does not draw the version text (only Title and Server scenes do)
         if (_fade is { } fade)
+        {
             fade.Frame(renderer, 1f / FramesPerSecond);
+            AdvanceWorldEntry(fade);
+        }
     }
 
     private void ProcessAccountEvents(AccountSession account)
@@ -382,7 +390,7 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
     /// (x + 70 − 120, y + 164 − 162). The <c>.ani</c> anchor is not used here.
     /// </summary>
     private void DrawTamer(IRenderer renderer, int index) =>
-        _tamers[index]?.Draw(renderer, DrawX(index) + 70 - 120, SlotButtons[index].Y + 164 - 162);
+        _tamers[index]?.Draw(renderer, DrawX(index) + 70 - 120, SlotButtons[index].Y + 164 - 162, game.SpriteOptions, mapHasShadow: true);
 
     /// <summary>✅ <c>0x00b47350</c>: the texts of a slot, white with a shadow.</summary>
     private void DrawTexts(IRenderer renderer, int index, CharacterListSlot slot)
@@ -457,15 +465,55 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
     }
 
     /// <summary>
-    /// ✅ <c>0x00b48670</c>: fades out like the world selection and logs the map server. ❓ Where the map server is comes
-    /// with the map protocol (milestone 3); entering scene 5 is not part of this milestone.
+    /// ✅ <c>0x00b48670</c>: fades out like the world selection, logs the map server and keeps the chosen character for scene 5.
+    /// ❓ The original picks the map server from a world × map table of the binary; the new client has one address (<c>servers.map</c>).
     /// </summary>
     private void EnterGame()
     {
-        if (_fade is not null)
+        if (_fade is not null || _selected < 0)
             return;
+        var list = game.Account?.Characters;
+        if (list is null)
+            return;
+        game.World?.Dispose();
+        game.World = new WorldEntry(list.Slots[_selected], _selected);
         _fade = new FadeOut();
-        game.Log("Map Server : (not known yet, milestone 3) 0");
+        _worldStarted = false;
+        game.Log($"Map Server : {game.Settings.Map.Host} {game.Settings.Map.Port}");
+    }
+
+    /// <summary>
+    /// ✅ At the end of the fade (<c>0x00b47790</c>): the map connection. Connected → scene 5 (its loading screen sends the <c>0x01</c> and
+    /// the channel's <c>0x16</c>/<c>0x18</c> later); not connected → text <c>0xee6</c> for 80 frames and the selection goes on.
+    /// </summary>
+    private void AdvanceWorldEntry(FadeOut fade)
+    {
+        var world = game.World;
+        if (world is null)
+            return;
+        if (!_worldStarted)
+        {
+            if (!fade.Done)
+                return;
+            _worldStarted = true;
+            world.Session = new WorldSession(game.Settings, game.Command, game.Log);
+            world.Session.Start(world.Slot.Name, firstEntry: !game.HasEnteredWorld);
+            return;
+        }
+        var session = world.Session!;
+        session.Update();
+        if (session.MapConnected)
+        {
+            game.Scenes.Switch(SceneId.Game);
+        }
+        else if (session.Step == WorldStep.Failed)
+        {
+            game.World?.Dispose();
+            game.World = null;
+            _fade = null;
+            _worldStarted = false;
+            ShowMessage(game.Texts[MapConnectFailedText], MapConnectFailedFrames);
+        }
     }
 
     public void Dispose()

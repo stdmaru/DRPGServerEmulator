@@ -38,13 +38,21 @@ public sealed class GameData(
     /// Name of a map for the character slots (✅ <c>0x00b395a0</c>): the second column of the <c>Map</c> row whose first
     /// column is the id. ❓ The language file of <c>Map</c> is not applied: its columns carry no ids.
     /// </summary>
-    public string MapName(int mapId)
+    public string MapName(int mapId) => MapRow(mapId) is { Length: >= 2 } row ? row[1] : "";
+
+    /// <summary>
+    /// The pack path of a map's file (✅ docs/cliente/mapas.md): column 4 of the <c>Map</c> row is the code (<c>R079</c>) and the
+    /// file is <c>map\r079.map</c>. Null when the map has no row or no code.
+    /// </summary>
+    public string? MapFile(int mapId) => MapRow(mapId) is { Length: >= 5 } row && row[4].Length > 0 ? $"map\\{row[4]}.map" : null;
+
+    private string[]? MapRow(int mapId)
     {
         if (!Tables.TryGetValue("map", out var rows))
-            return "";
+            return null;
         foreach (var row in rows)
-            if (row.Length >= 2 && int.TryParse(row[0], out int id) && id == mapId)
-                return row[1];
-        return "";
+            if (row.Length >= 1 && int.TryParse(row[0], out int id) && id == mapId)
+                return row;
+        return null;
     }
 }

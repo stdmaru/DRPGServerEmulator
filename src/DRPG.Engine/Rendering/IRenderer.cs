@@ -31,6 +31,22 @@ public interface IRenderer : IDisposable
     /// <summary>Draws a rectangular sub-region of <paramref name="texture"/> at (x, y), for clipped text boxes.</summary>
     void DrawRegion(ITexture texture, int x, int y, int sourceX, int sourceY, int width, int height);
 
+    /// <summary>The scale of <see cref="DrawRegionBlended"/>'s alpha: 32 = opaque, as in the original's blends.</summary>
+    const int OpaqueAlpha = 32;
+
+    /// <summary>
+    /// <see cref="DrawRegion"/> mixed with what is already in the frame: <c>(source · alpha + frame · (32 − alpha)) / 32</c> per channel,
+    /// <paramref name="alpha"/> clamped to 0..<see cref="OpaqueAlpha"/>; transparent pixels stay out (✅ v322 <c>0x00874710</c>/<c>0x008749d0</c>,
+    /// the mode −1 of <c>0x00876a30</c>).
+    /// </summary>
+    void DrawRegionBlended(ITexture texture, int x, int y, int sourceX, int sourceY, int width, int height, int alpha);
+
+    /// <summary>
+    /// Halves every colour channel of what is already in the frame under each opaque pixel of <paramref name="texture"/>; the
+    /// texture's own colours are not used (✅ v322 mode 7 of <c>0x00876a30</c>: <c>0x008750f0</c>/<c>0x00875130</c>, <c>dst >> 1</c>).
+    /// </summary>
+    void DrawHalved(ITexture texture, int x, int y);
+
     /// <summary>
     /// Subtracts <paramref name="amount"/> (0..255) from every colour channel of what is already in the frame, never
     /// below 0: the fade to black of the scene changes (✅ v322 <c>FUN_00b55f10</c>).

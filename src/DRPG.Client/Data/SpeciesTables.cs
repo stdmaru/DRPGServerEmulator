@@ -24,6 +24,19 @@ public static class SpeciesTables
         _ => null,
     };
 
+    /// <summary>
+    /// ✅ The id of the portrait <c>Sprite\icon_%03d.spr</c> of a tamer or a species (<c>0x00b1ec40</c>, loaded by <c>0x00b231b0</c>):
+    /// 0x141–0x143, 0x3ec and 0x3a5–0x3ad are used as they are, everything else through <see cref="SpriteId"/> (the tamers 1–9 have no
+    /// table entry, so they are their own id). Outside 1..1100 there is no portrait (null).
+    /// </summary>
+    public static int? IconId(int id) => id switch
+    {
+        < 1 or > 1100 => null,
+        0x141 or 0x142 or 0x143 or 0x3ec => id,
+        >= 0x3a5 and <= 0x3ad => id,
+        _ => SpriteId(id),
+    };
+
     /// <summary>✅ The id in <c>Sprite\%03d_1.ani</c>: the table entry, or the species itself when it has none (<c>0x00b23d20</c>).</summary>
     public static int SpriteId(int species)
     {

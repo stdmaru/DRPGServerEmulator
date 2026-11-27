@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using DRPG.Server.Game;
 using DRPG.Server.Game.Entities;
 using DRPG.Server.Network.Packets.Map;
+using DRPG.Shared.Packets.Map;
 
 namespace DRPG.Server.Network.Handlers;
 

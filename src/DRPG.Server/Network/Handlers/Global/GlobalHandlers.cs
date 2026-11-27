@@ -4,6 +4,7 @@ using DRPG.Server.Game.Entities;
 using DRPG.Server.Game.World;
 using DRPG.Server.Network.Packets.Global;
 using DRPG.Server.Network.Packets.Map;
+using DRPG.Shared.Packets.Global;
 using DRPG.Shared.Protocol;
 using Microsoft.Extensions.Logging;
 

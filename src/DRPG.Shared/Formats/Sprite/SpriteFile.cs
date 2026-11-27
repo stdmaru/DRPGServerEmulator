@@ -46,6 +46,20 @@ public sealed class SpriteFile
         Extra = extra;
     }
 
+    /// <summary>
+    /// A sprite made of frames that another file format stores (the <c>.til</c> tilesets and the <c>.obj</c> map objects use
+    /// the row format of the <c>.spr</c>). Sizes are checked here; the rows are checked when a frame is decoded.
+    /// </summary>
+    internal static SpriteFile FromFrames(SpriteFrameInfo[] frames, ushort[] words, int[] offsets)
+    {
+        if (frames.Length != offsets.Length)
+            throw new SpriteFormatException("frame and offset tables differ in size");
+        foreach (var frame in frames)
+            if (frame.Width > MaxSide || frame.Height > MaxSide)
+                throw new SpriteFormatException($"frame is {frame.Width}x{frame.Height}");
+        return new SpriteFile(frames, new SpriteLayer(words, offsets), null, null);
+    }
+
     public IReadOnlyList<SpriteFrameInfo> Frames { get; }
     public SpriteLayer Image { get; }
     public SpriteLayer? Shadow { get; }

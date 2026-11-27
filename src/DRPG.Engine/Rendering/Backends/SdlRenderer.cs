@@ -101,6 +101,29 @@ public sealed unsafe class SdlRenderer : IRenderer
         SDL_RenderTexture(_renderer, t.Handle, &src, &dst);
     }
 
+    /// <summary>The texture's alpha modulation with the normal blend mode is exactly the original's <c>a/32</c> mix (8-bit steps).</summary>
+    public void DrawRegionBlended(ITexture texture, int x, int y, int sourceX, int sourceY, int width, int height, int alpha)
+    {
+        alpha = Math.Clamp(alpha, 0, IRenderer.OpaqueAlpha);
+        if (alpha == 0)
+            return;
+        var t = (Texture)texture;
+        SDL_SetTextureAlphaMod(t.Handle, (byte)((alpha * 255 + IRenderer.OpaqueAlpha / 2) / IRenderer.OpaqueAlpha));
+        DrawRegion(texture, x, y, sourceX, sourceY, width, height);
+        SDL_SetTextureAlphaMod(t.Handle, 255);
+    }
+
+    /// <summary>Black at half alpha over the frame: <c>dst · (1 − 128/255)</c>, the original's <c>dst >> 1</c> to one step.</summary>
+    public void DrawHalved(ITexture texture, int x, int y)
+    {
+        var t = (Texture)texture;
+        SDL_SetTextureColorMod(t.Handle, 0, 0, 0);
+        SDL_SetTextureAlphaMod(t.Handle, 128);
+        Draw(texture, x, y);
+        SDL_SetTextureAlphaMod(t.Handle, 255);
+        SDL_SetTextureColorMod(t.Handle, 255, 255, 255);
+    }
+
     public void Darken(int amount)
     {
         amount = Math.Clamp(amount, 0, 255);

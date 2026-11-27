@@ -1,3 +1,4 @@
+using DRPG.Shared.Packets.Map;
 using DRPG.Server.Game;
 using DRPG.Server.Game.Battle;
 using DRPG.Server.Game.Entities;
@@ -38,8 +39,8 @@ public class PacketSizeTests
             (Wrap(new CharacterCreateReply(0, new CharacterCreateHeader(3, 0x4F, 0x3E, 0x38), 1, "a", 10, "b")), 64),
             (Wrap(CharacterListService.BuildList([null, null, null, null], new Random(1))), 500),
             (Wrap(new UserCheckReply("user")), 22),
-            (new CharacterDataPacket(character, TestSupport.Clock.UnixNow), 7600),                // ✅ v322 (sessão 52)
-            (new InventoryDataPacket(TestSupport.EmptyInventory(999)), 4416),
+            (Wrap(CharacterData.Of(character, TestSupport.Clock.UnixNow)), 7600),                // ✅ v322 (sessão 52)
+            (Wrap(InventoryData.Of(TestSupport.EmptyInventory(999))), 4416),
             (new Unknown05Packet(), 164),
             (new HelloPacket(0x0E), 16),
             (new RefreshCharacterInfoPacket(character), 204),          // ✅ v322
@@ -157,7 +158,7 @@ public class PacketSizeTests
         // ✅ sessões 52–56: 24 × 76 bytes e depois 24 registros de 108; checagem = uid + item
         var inventory = TestSupport.EmptyInventory(999);
         inventory.Add(41, 3);
-        var payload = new InventoryDataPacket(inventory).EncodePayload();
+        var payload = TwoWayPacket.EncodePayload(InventoryData.Of(inventory));
         var record = payload.AsSpan(24 * 76, 108);
         Assert.Equal(1u, BitConverter.ToUInt32(record));
         Assert.Equal(41u, BitConverter.ToUInt32(record[4..]));
@@ -188,7 +189,7 @@ public class PacketSizeTests
         var character = Entities.Character();
         var card0 = character.Inventory.CardSlots.Add(74, 50)[0];
         var card1 = character.Inventory.CardSlots.Add(19, 2)[0];
-        var payload = new CharacterDataPacket(character, TestSupport.Clock.UnixNow).EncodePayload();
+        var payload = TwoWayPacket.EncodePayload(CharacterData.Of(character, TestSupport.Clock.UnixNow));
 
         Assert.Equal(7600, payload.Length);
         var slot0 = payload.AsSpan(784, CardRecord.Length);

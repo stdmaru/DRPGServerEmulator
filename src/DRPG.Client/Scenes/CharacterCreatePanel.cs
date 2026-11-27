@@ -267,7 +267,7 @@ public sealed class CharacterCreatePanel(GameContext game, AnimatedSprites anima
 
             _tamerDolls[i]?.Body.Tick();
             // ✅ 0x0099fb90(tamer, xButton + 58, yButton + 126) → top-left (xButton - 62, yButton - 36)
-            _tamerDolls[i]?.Draw(renderer, button.X - 62, button.Y - 36);
+            _tamerDolls[i]?.Draw(renderer, button.X - 62, button.Y - 36, game.SpriteOptions, mapHasShadow: true);
         }
 
         DrawCenteredName(renderer, Lookup(_tamerNames, _selectedTamer), TamerNameX);

@@ -7,6 +7,7 @@ using DRPG.Engine.Audio;
 using DRPG.Engine.Rendering;
 using DRPG.Engine.Scenes;
 using DRPG.Shared.Formats.Pack;
+using DRPG.Shared.Packets.Channel;
 
 namespace DRPG.Client.Scenes;
 
@@ -19,6 +20,7 @@ public sealed class GameContext(
     SoundBank sounds,
     GameCommandLine command,
     ClientSettings settings,
+    SpriteOptions spriteOptions,
     Action<string> log)
 {
     /// <summary>✅ Version text every original scene draws in the top left corner (<c>0x0102e220</c>).</summary>
@@ -37,6 +39,9 @@ public sealed class GameContext(
     public SoundBank Sounds { get; } = sounds;
     public GameCommandLine Command { get; } = command;
     public ClientSettings Settings { get; } = settings;
+
+    /// <summary>✅ <c>option.ini [SPRITE]</c>: the blends, shadows and soft edges of the sprites (the options window <c>0x00b16980</c> changes them in game).</summary>
+    public SpriteOptions SpriteOptions { get; set; } = spriteOptions;
     public Action<string> Log { get; } = log;
 
     /// <summary>The mouse; the loop feeds it and clears it after each frame.</summary>
@@ -59,6 +64,20 @@ public sealed class GameContext(
 
     public bool IsBattleZone => ChannelLine is >= FirstBattleZoneLine and <= LastBattleZoneLine;
 
+    /// <summary>
+    /// The name the tamer panel shows for the server (✅ <c>[DAT_011584f4]+0xafc60</c>). ❓ Provisional: the text of the channel link
+    /// the player clicked (lines 0..3); the other lines have no name yet.
+    /// </summary>
+    public string ChannelName => (uint)ChannelLine < (uint)ChannelTextIds.Length ? Texts[ChannelTextIds[ChannelLine]] : "";
+
+    private static readonly int[] ChannelTextIds = [0x5e3, 0x5e0, 0x5e1, 0x5e2];
+
+    /// <summary>The character chosen in the character selection and the connection to the world; null until "Game Start".</summary>
+    public WorldEntry? World { get; set; }
+
+    /// <summary>✅ <c>[+0x3f15]</c>: set by the first entry into the world of the run, which also sends the <c>0x121</c>.</summary>
+    public bool HasEnteredWorld { get; set; }
+
     /// <summary>A failure no scene can recover from: the loop shows it in a message box and quits.</summary>
     public string? FatalError { get; set; }
 
@@ -75,4 +94,18 @@ public sealed class GameContext(
 
     /// <summary>✅ <c>FUN_00b55270(0, "Digimon RPG 3.26", x, 1, 0xffffff, 1, 0)</c>: white text with shadow at (x, 1).</summary>
     public void DrawVersion(IRenderer renderer, int x) => Text.Draw(renderer, VersionText, x, 1);
+}
+
+/// <summary>✅ The state of the world entry (<c>[DAT_011584f0]</c>): the character of "Game Start" and the connection to the map.</summary>
+public sealed class WorldEntry(CharacterListSlot slot, int slotIndex) : IDisposable
+{
+    public CharacterListSlot Slot { get; } = slot;
+    public int SlotIndex { get; } = slotIndex;
+
+    /// <summary>✅ The map of the slot (<c>[DAT_011584f8]+0x511c98</c>).</summary>
+    public int MapId => Slot.MapId;
+
+    public WorldSession? Session { get; set; }
+
+    public void Dispose() => Session?.Dispose();
 }

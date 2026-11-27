@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DRPG.Shared\DRPG.Shared.csproj" />
+    <Using Include="DRPG.Shared.Protocol" />
   </ItemGroup>
 
   <ItemGroup>

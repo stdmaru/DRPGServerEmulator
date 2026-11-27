@@ -24,7 +24,8 @@ public sealed class AnimatedSprites(PackArchive resource, SpriteStore sprites, A
         {
             var ani = AniFile.Parse(resource.ReadEntry(aniPath));
             var folder = aniPath[..(aniPath.LastIndexOf('\\') + 1)];
-            return new SpriteAnimator(ani, sprites.LoadLazy(folder + ani.SpriteName + ".spr"));
+            var frames = sprites.LoadLazy(folder + ani.SpriteName + ".spr");
+            return new SpriteAnimator(ani, frames, frames.Shadow, frames.Edge);
         }
         catch (Exception e) when (e is AniFormatException or SpriteFormatException or PackFormatException or InvalidDataException)
         {
@@ -100,9 +101,16 @@ public sealed class TamerDoll(SpriteAnimator body, IReadOnlyList<IReadOnlyList<I
 
     public IReadOnlyList<IReadOnlyList<ITexture>> Layers { get; } = layers;
 
-    /// <summary>✅ <c>0x0099fb90</c>: every layer by the top-left corner of the frame at the same point; a layer without that frame is skipped.</summary>
-    public void Draw(IRenderer renderer, int x, int y)
+    /// <summary>
+    /// ✅ <c>0x0099fb90</c>: every layer by the top-left corner of the frame at the same point; a layer without that frame is skipped.
+    /// With the <c>shadow</c> option, on a map that allows it (<paramref name="mapHasShadow"/>, <see cref="World.SpriteEffects.TamerHasShadow"/>),
+    /// <c>0x00b1d0f0</c> first draws the body's shadow layer at the same corner, blended at 14/32 (<see cref="SpriteOptions.DrawBlended"/>);
+    /// the clothes have none of their own.
+    /// </summary>
+    public void Draw(IRenderer renderer, int x, int y, SpriteOptions options, bool mapHasShadow)
     {
+        if (options.Shadow && mapHasShadow && Body.ShadowTexture is { } bodyShadow)
+            options.DrawBlended(renderer, bodyShadow, x, y, World.SpriteEffects.NormalAlpha);
         if (Body.Texture is { } frame)
             renderer.Draw(frame, x, y);
         foreach (var layer in Layers)

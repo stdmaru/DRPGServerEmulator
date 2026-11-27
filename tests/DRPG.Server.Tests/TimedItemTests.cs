@@ -81,7 +81,7 @@ public class TimedItemTests
     public void Character_data_writes_the_given_server_time()
     {
         var (player, _) = MakePlayer();
-        var payload = new CharacterDataPacket(player.Character, 1_800_000_123).EncodePayload();
+        var payload = TwoWayPacket.EncodePayload(CharacterData.Of(player.Character, 1_800_000_123));
         Assert.Equal(1_800_000_123u, BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(0x19B0)));
     }
 
@@ -148,7 +148,7 @@ public class TimedItemTests
 
         // S2C 0x02 (7600 B): offset 0x19B0 (6576) contém o Unix timestamp UTC atual do servidor
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var p02 = new CharacterDataPacket(player.Character, TestSupport.Clock.UnixNow).EncodePayload();
+        var p02 = TwoWayPacket.EncodePayload(CharacterData.Of(player.Character, TestSupport.Clock.UnixNow));
         Assert.Equal(7600, p02.Length);
         uint serverTime = BinaryPrimitives.ReadUInt32LittleEndian(p02.AsSpan(0x19B0));
         Assert.InRange(serverTime, (uint)(now - 5), (uint)(now + 5));
