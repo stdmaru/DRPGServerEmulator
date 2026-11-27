@@ -57,6 +57,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private FieldEntity? _digimonEntity;
     private readonly FieldWilds _wilds = new();
     private readonly FieldNpcs _npcs = new();
+    private FieldPortals _portals = null!;                     // set in Init
     private readonly MovePacketQueue _moveQueue = new();
     private (int X, int Y)? _lastClickCell;
     private bool _aborted, _lost;
@@ -81,6 +82,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     internal FieldEntity? DigimonEntity => _digimonEntity;
     internal FieldWilds Wilds => _wilds;
     internal FieldNpcs Npcs => _npcs;
+    internal FieldPortals Portals => _portals;
     internal FrameStats Stats => _stats;
     internal WorldLoading Loading => _loading;
 
@@ -97,6 +99,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
             return;
         }
         _animated = new AnimatedSprites(game.Resource, game.Sprites, game.Log);
+        _portals = new FieldPortals(game.Sprites);
         _hud = new FieldHud(game);
         _box = new MessageBox(game.Sprites.Load("gui\\dr2_in_000_003.spr"), game.Text);
         _screen = new LoadingScreen(game);
@@ -132,7 +135,15 @@ public sealed class GameScene(GameContext game, Random random) : IScene
 
         if (_field is not null && !_lost)
         {
-            HandleFieldInput(session, nowMs);
+            HandleFieldInput(renderer, session, nowMs);
+            if (_lost || _loading.Showing)
+            {
+                if (!_lost)
+                    _screen.Draw(renderer, _loading.Background, _loading.GaugeFrame, _screen.TipOf(_loading.Tip));
+                else
+                    DrawLost(renderer);
+                return;
+            }
             RunLogic(nowMs);
             DrawField(renderer, session);
         }
@@ -168,10 +179,17 @@ public sealed class GameScene(GameContext game, Random random) : IScene
                 session.EnterWorld();
                 game.HasEnteredWorld = true;
                 _startMs = nowMs;
+                _stepsRun = 0;
                 _started = true;
                 // ✅ no brightening: the 0x03 handler (0x00abbb20) sets +0x34c = 0x5f, and the first field frame (0x00b4e550) sees the
                 // marker, runs the entry logic (0x00aba410, quests: a later step) and sets it back to 0 at once. The darkening of
                 // 100..0x71 (0x00b55f10) belongs to coming back from a battle or an event (0x18395/0x18396), outside this milestone.
+                break;
+            case LoadingAction.MapTransitionDone:
+                session.CompleteMapTransition();
+                _startMs = nowMs;
+                _stepsRun = 0;
+                _started = true;
                 break;
         }
     }
@@ -249,10 +267,10 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         (cellX * MapFile.CellWidth + MapFile.CellWidth / 2, cellY * MapFile.CellHeight + MapFile.CellHeight / 2);
 
     /// <summary>
-    /// ✅ <c>0x00b4c1a0</c> / <c>0x00b4d290</c> / <c>0x00b4e550</c> / <c>0x00b4b360</c>: processes ground clicks and holds,
-    /// drains throttled <c>0x20</c> packets and applies same-map <c>0xB0</c> position corrections.
+    /// ✅ <c>0x00b4c1a0</c> / <c>0x00b4d290</c> / <c>0x00b4e550</c> / <c>0x00b4b360</c> / <c>0x00aba410</c>: processes ground clicks
+    /// and holds, drains throttled <c>0x20</c> packets and applies <c>0xB0</c> position corrections and cross-map transitions.
     /// </summary>
-    private void HandleFieldInput(WorldSession session, ulong nowMs)
+    private void HandleFieldInput(IRenderer renderer, WorldSession session, ulong nowMs)
     {
         while (session.TryReceiveFieldDigimon(out var wild))
             _wilds.Apply(wild, game.World!.MapId, _collision, _animated.OpenDigimon, random);
@@ -274,6 +292,11 @@ public sealed class GameScene(GameContext game, Random random) : IScene
                     _collision?.Occupy(_digimonEntity.CellX, _digimonEntity.CellY, _digimonSerial);
                 _moveQueue.Reset();
                 _lastClickCell = null;
+            }
+            else
+            {
+                BeginMapTransition(renderer, game.World!, teleport, nowMs);
+                return;
             }
         }
 
@@ -302,6 +325,58 @@ public sealed class GameScene(GameContext game, Random random) : IScene
 
         if (_moveQueue.TryDequeue(nowMs, out short sendX, out short sendY))
             session.SendMove(sendX, sendY);
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00acb072</c> → <c>0x00af0d70</c> → <c>0x00aba410</c>: transitions to another map on S2C <c>0xB0</c>.
+    /// Stops BGM, clears current map entities, opens the Map Loading Thread, loads the new <c>.map</c>, spawns its NPCs,
+    /// starts its BGM, and places the tamer and partner digimon at the target cell.
+    /// </summary>
+    private void BeginMapTransition(IRenderer renderer, WorldEntry world, TeleportCharacterPacket teleport, ulong nowMs)
+    {
+        game.Sounds.StopMusic();
+        _wilds.Clear(_collision);
+        _npcs.ClearCurrent(_collision);
+        _moveQueue.Reset();
+        _lastClickCell = null;
+        _started = false;
+
+        world.MapId = teleport.MapId;
+        _loading.BeginMapTransition(_screen.BackgroundCount);
+        _loading.Update(nowMs);
+
+        var path = game.Data?.MapFile(world.MapId);
+        try
+        {
+            if (path is null || !game.Resource.Contains(path))
+                throw new MapFormatException($"map {world.MapId} has no file in the pack");
+            var map = MapFile.Parse(game.Resource.ReadEntry(path));
+            _field?.Dispose();
+            _field = new FieldMap(map, game.Resource, renderer, game.Log);
+            _collision = new FieldCollision(map);
+            _pathfinder = new FieldPathfinder(_collision);
+            if (map.InvalidCellReferences > 0)
+                game.Log($"{path}: {map.InvalidCellReferences} cell references outside the lists were cleared");
+        }
+        catch (Exception e) when (e is MapFormatException or PackFormatException or InvalidDataException or IOException)
+        {
+            game.Log($"LoadMap Error : {path}: {e.Message}");
+            Lose($"map {world.MapId}: {e.Message}");
+            return;
+        }
+
+        if (MapBgm.FileOf(world.MapId) is { } music)
+            game.Sounds.PlayMusic(music);
+        else
+            game.Sounds.StopMusic();
+
+        _npcs.LoadForMap(world.MapId, game.Data, _collision, _animated, random);
+        _tamerEntity.PlaceAt(teleport.X, teleport.Y);
+        _digimonEntity?.PlaceAt(teleport.X - 1, teleport.Y - 1);
+        _collision.Occupy(_tamerEntity.CellX, _tamerEntity.CellY, _tamerSerial);
+        if (_digimonEntity is not null)
+            _collision.Occupy(_digimonEntity.CellX, _digimonEntity.CellY, _digimonSerial);
+        _loading.MapLoaded();
     }
 
     /// <summary>✅ <c>0x00b4e550</c>: the logic in fixed steps from the real time, never more than <see cref="MaxStepsPerFrame"/> at once.</summary>
@@ -335,6 +410,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
 
         _wilds.Step(_tamerEntity, _collision, _pathfinder, random);
         _npcs.Step(random);
+        _portals.Step();
     }
 
     private (int NextX, int NextY)? NextStep(int fromX, int fromY, int destX, int destY)
@@ -378,6 +454,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         var field = _field!;
         var (cameraX, cameraY) = field.Camera(_tamerEntity.WorldX, _tamerEntity.WorldY);
         field.DrawGround(renderer, cameraX, cameraY);
+        _portals.DrawGround(renderer, field, cameraX, cameraY, game.SpriteOptions);
 
         _queue.Clear();
         field.QueueObjects(_queue, cameraX, cameraY, SpriteEffects.ObjectLookOf(game.World!.MapId, game.SpriteOptions));
@@ -403,6 +480,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         _npcs.QueueDraw(_queue, cameraX, cameraY, currentMapId, game.SpriteOptions, (r, sprite, drawX, drawY) => DrawDigimon(r, sprite, currentMapId, drawX, drawY));
         FieldMap.Sort(_queue);
         FieldMap.DrawQueue(renderer, _queue);
+        _portals.DrawOverlay(renderer, field, cameraX, cameraY, game.SpriteOptions);
 
         var character = session.Character!;
         var leader = character.Party[0];

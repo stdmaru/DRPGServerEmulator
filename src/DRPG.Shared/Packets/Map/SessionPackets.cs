@@ -75,6 +75,24 @@ public sealed record TeleportCharacterPacket(int MapId, short X, short Y) : ITwo
 }
 
 /// <summary>
+/// ✅ 0xB0 C2S (14 B zero, v322): sent by the client right after a cross-map transition loading screen finishes
+/// (captures.db packet 1658: 28 B = 14 header + 14 zeros; <c>0x00aba410</c> @ <c>0x00aba757</c>).
+/// </summary>
+public sealed record TeleportAckRequest : ITwoWayPacket<TeleportAckRequest>
+{
+    public static ushort Opcode => (ushort)MapOpcode.TeleportCharacter;
+    public static PacketLength Length => PacketLength.Exact(14);
+
+    public static TeleportAckRequest Read(PacketReader r)
+    {
+        r.Skip(14);
+        return new();
+    }
+
+    public void Write(PacketWriter w) => w.WriteZeros(14);
+}
+
+/// <summary>
 /// ✅ 0x11 S2C (56 B, v322): wild digimon group update on the field (docs/mecanicas/selvagens.md, <c>0x00af25c0</c>).
 /// State: 1 standing, 4 walking, 8 defeated, 11 in battle, 12 leaving.
 /// </summary>

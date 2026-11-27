@@ -122,6 +122,18 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
             _map.Send(new MoveCharacterRequest(x, y));
     }
 
+    /// <summary>
+    /// ✅ <c>0x00aba410</c> (<c>0x00aba6ea</c> &amp; <c>0x00aba757</c>): after a cross-map <c>0xB0</c> transition finishes loading,
+    /// sends <c>C2S 0x04</c> (character refresh) and <c>C2S 0xB0</c> (14 zero bytes).
+    /// </summary>
+    public void CompleteMapTransition()
+    {
+        if (Step != WorldStep.InWorld || _map is null || Character is null)
+            return;
+        _map.Send(new RefreshCharacterInfoRequest(Character.Serial));
+        _map.Send(new TeleportAckRequest());
+    }
+
     /// <summary>Dequeues the next <c>0xB0</c> teleport / position-correction packet received from the map server.</summary>
     public bool TryReceiveTeleport(out TeleportCharacterPacket packet) => _teleports.TryDequeue(out packet!);
 

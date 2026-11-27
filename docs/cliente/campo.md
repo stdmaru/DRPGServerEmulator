@@ -2,7 +2,7 @@
 
 RE da v322 para o passo 2 do marco 3 (PR #51, `feat/client-walk`): andar com pathfinding, digimons do servidor andando no cliente, NPCs, portais e o comportamento da UI do campo. Complementa a [cena de jogo](cena-jogo.md) (entrada no mapa, quadro, HUD) e o [movimento](../mecanicas/movimento.md) (lado do servidor). ✅ = lido no dump; ❓ = ainda não lido.
 
-> **Estado:** etapas 1 (andar + digimon seguidor + `0x20`/`0xB0`), 2 (colisões + ocupação), 3 (pathfinding A* `0x00b43200`), 4 (selvagens `0x11` no campo) e **NPCs client-side** (`npc_info_us` + `0x09`) **implementadas**. Restante do roteiro (portais + transição de área, UI do campo) a seguir.
+> **Estado:** etapas 1 (andar + digimon seguidor + `0x20`/`0xB0`), 2 (colisões + ocupação), 3 (pathfinding A* `0x00b43200`), 4 (selvagens `0x11` no campo), **NPCs client-side** (`npc_info_us` + `0x09`) e **Portais + transição de área (`0xB0`)** **implementadas**. Restante do roteiro (UI do campo) a seguir.
 
 ## Como ler o binário
 - Dump decompilado: `work/re/v322/dump/decomp/XXXX/<endereço>.c`, com `functions.tsv` (entrada, tamanho, chamadores), `calls.tsv` (quem chama quem) e `strings.tsv`.
@@ -109,8 +109,18 @@ Cada passo chama, nesta ordem:
   - `action == 1` (`0x00abb9e0`): se `mapId == currentMapId` e `npcId` existe em `NPC_INFO`, instancia em `(x, y)` e grava na lista persistente (`+0x760`) para recriar em futuras cargas do mesmo mapa.
   - `action == 0` (`0x00acfed0`): remove da lista ativa (se `mapId == 0` ou `mapId == currentMapId`) e da lista persistente, desocupando a célula.
 
+## Portais e transição de área (`0xB0`) (✅)
+- ✅ **Renderização e animação** (`0x00b380d0`, `0x00a159a0`, `0x00a121f0`): lidos do campo `MapCell.Type` (`+8`) nas células visíveis (margem `-15..+30` em X, `-20..+40` em Y):
+  - `1000` / `1005`: `Effect\effect_portal.spr`, camada de chão (antes das entidades), centrado na célula `(cx, cy)`, alfa `16/32`, avança a cada 2 passos (30 FPS).
+  - `1001`: `Effect\effect_portal2.spr`, camada de chão, canto `(screenX − 11, screenY + 19 − h)`, alfa `16/32`, mesmo contador.
+  - `1002`: `Effect\effect_portal3.spr`, camada de topo (depois das entidades), canto `(screenX − 46, screenY + 21 − h)`, alfa `16/32`, mesmo contador.
+  - `1003`: `Effect\effect_portal_square.spr`, camada de chão, centrado na célula, opaco, avança a cada 4 passos.
+- ✅ **Gatilho**: o cliente apenas anda até o portal enviando `C2S 0x20`; o servidor detecta o portal (`ZoneSystem.Move`) e responde com `S2C 0xB0` (`TeleportCharacterPacket`, 8 B: `i32 mapId, i16 x, i16 y`).
+- ✅ **Transição de mapa no cliente** (`0x00acb072` → `0x00af0d70` → `0x00aba410`):
+  - Mesmo mapa: reposiciona tamer em `(x, y)` e digimon parceiro em `(x − 1, y − 1)` na `FieldCollision` e limpa fila de movimento.
+  - Outro mapa: para a BGM, limpa selvagens e NPCs do mapa anterior, abre a tela de carga (`WorldLoading.BeginMapTransition`, 16 quadros × 90 ms), carrega o novo `.map`, colisão, pathfinder, NPCs (auto-spawn + dinâmicos `0x09`) e BGM, posiciona tamer/digimon na célula de destino e, ao fim da tela de carga, envia `C2S 0x04` (`RefreshCharacterInfoRequest`) e `C2S 0xB0` (`TeleportAckRequest`, 14 bytes zero — confirmado em `captures.db` pacote 1658 e `0x00aba757`).
+
 ## Roteiro do que falta
 Pontos de entrada já localizados; ✅ quando lido.
-- **Portais:** `map_us` (+0x84, 4 portais, [NPCs do mapa](cena-jogo.md#npcs-do-mapa)); o desenho do redemoinho ❓ e transição de área (`0xB0`).
 - **Minimapa:** `WindowMiniMap`, marcadores em `0x00b9b930` e nomes em `0x00b9c4b0` ([minimapa](cena-jogo.md#minimapa-windowminimap-janela-5)).
 - **Botões e dicas da UI:** desenho da barra `0x00b8a850`, tamanho do chat `0x00b8e2a0`, abas `0x00b91a80`; hover, clique e dica ❓.
