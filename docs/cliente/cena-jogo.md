@@ -63,7 +63,7 @@ Despachante do mapa `0x00abc350`: índice = opcode − 2 na tabela de bytes `0xa
   4. byte `+0x29` ≠ 5, 6, 7 → `0x008669e0`: copia os `0x2b8` bytes do digimon (dados `+0x4d8`) para `digimon+0x800` e o põe **na célula (x − 1, y − 1)**, direção 0, tipo de fila `+5 = 2`;
   5. `[DAT_01158530]+0xb` = dados `+0x19b5` (❓).
 - ✅ **`0x03` (inventário)**: copia `0x1140` bytes para `personagem+0x17b8` e chama **`0x00abbb20` (entrar no mundo)**:
-  1. `0x00ad3730`: modo `[DAT_01158504]+0x80 = 1` (campo); **carrega o mapa** `0x00b37860(id)` → vtable `+4` do objeto de mapa `0x00b378f0` (`map\%s.map`, ver [mapas](mapas.md)); cria os NPCs do mapa pela lista `+0x2d18` (`0x00abb750`) e outras preparações (❓).
+  1. `0x00ad3730`: modo `[DAT_01158504]+0x80 = 1` (campo); **carrega o mapa** `0x00b37860(id)` → vtable `+4` do objeto de mapa `0x00b378f0` (`map\%s.map`, ver [mapas](mapas.md)); cria os NPCs do mapa ([quais](#npcs-do-mapa)) e outras preparações (❓).
   2. `0x00adcc50`: conecta no servidor **global** e manda o `0x64`.
   3. Manda no mapa **`0x04`** (16 B: o id de 16 B do personagem, vtable `+0x14` = `0x00865100`, que devolve `+0x1a0`).
   4. Manda **`0xF0`** (28 B, primeiro u32 = `0x100`; ❓ resto).
@@ -200,14 +200,25 @@ Texto separado por `|` em `table.hf` ([arquivos de dados](arquivos-de-dados.md))
   | 0 | +0 | mapa |
   | 1 | +4 | **id do NPC** (chave) |
   | 2 | +8 | nome (dica no minimapa) |
-  | 3 | +0x20 | ❓ tipo |
+  | 3 | +0x20 | direção inicial (3º argumento de `0x0085e7b0`; ❓ valores 0/1/2/7) |
   | 4, 5 | +0x24, +0x28 | célula x, y |
   | 6 | +0x2c | sprite (`Custom…` = avatar) |
   | 7 | +0x44 | ícone |
-  | 8..12 | +0x5c..+0x6c | ❓ (função, diálogo…) |
+  | 8 | +0x5c | ❓ |
+  | 9 | +0x60 | **1 = o cliente cria o NPC ao carregar o mapa** |
+  | 10, 11 | +0x64, +0x68 | ❓ (diálogo?) |
+  | 12 | +0x6c | ❓ guardado no NPC (`+0x2b8`) |
   | 13 | +0xb8 | quadro do `Map_icon_01` no minimapa (0..4) |
   | 14 | +0xbc | 1 = aparece no minimapa |
-  Ex.: `1|322|GM. Mitsuo Yamaki|0|59|86|NPC_yamaki|icon_npc|26|1|238|0|0|2|1`. ❓ Quais linhas viram NPCs do mapa (lista `[DAT_01158504]+0x300`, montada em `0x00ad3730`).
+  Ex.: `1|322|GM. Mitsuo Yamaki|0|59|86|NPC_yamaki|icon_npc|26|1|238|0|0|2|1`.
+
+### NPCs do mapa
+- ✅ Ao carregar o mapa (`0x00ad3730`), o cliente percorre **todas** as linhas do `npc_info_us` e cria um NPC para cada uma com **col. 0 = mapa atual** (menos o mapa `0x66`) e **col. 9 = 1** (`0x00abb750(id)`). O NPC (objeto de 0x9c4 bytes, GUID novo) é iniciado por `0x0085f090` com id (col. 1), nome (col. 2), célula (col. 4, 5), direção (col. 3) e col. 12, e entra na lista `[DAT_01158504]+0x300` — a mesma que o minimapa percorre. No mapa 1 são 21 linhas (Culumon, Pet Guide, Nyang, GM. Mitsuo Yamaki, Megumi…); as com col. 9 = 0 (Yagami Taichi, Ishida Yamato, Peti Meramon…) não aparecem sozinhas.
+- ✅ **S2C `0x09`** (10 bytes, caso `0xac7331`): i16 mapa, i16 id do NPC, i16 x, i16 y, byte +8 = 1 adicionar / 0 remover.
+  - Adicionar (`0x00abb9e0`): só se o mapa é o atual e o id existe no `npc_info_us`; cria o NPC na célula do pacote (`0x00abb8b0`) e guarda (mapa, id, x, y) na lista `+0x760`, cujos NPCs são **recriados** a cada carga daquele mapa.
+  - Remover (`0x00acfed0`): tira o NPC com esse id da lista `+0x300` e da `+0x760`.
+  - ❓ O emulador ainda não manda o `0x09`; o oficial usa para os NPCs de missão com col. 9 = 0.
+- Outros casos na carga: mapa `0x66` (`0x00abbff0`), mapas `0x58`/`0x78..0x7B` (`0x00ad48a0`), mapa `0x76` (`0x00ad6470`) — fora do marco.
 - ✅ **`map_us`** → `CTableClass_MapInfo` (grupo 11, `Map.dat`, linha lida por `0x0078e480`, registros de 0x114 bytes; busca por id `0x0078dc20`): col. 0 id (+0), 1 nome (+4), 2 (+0x1c, byte), 3 (+0x1d), 4 código (`R001`, +0x20), 5 (+0x38), 6 = n e as n colunas seguintes (de 5) = nomes de sala (+0x40); depois 12/13 posição no mapa-múndi (+0x4c/+0x50), 14/15 duas linhas de descrição (+0x54/+0x6c) e **4 portais** de 4 colunas (+0x84, passo 0x24): nome do destino (+0, dica), ligado (+0x18), célula x (+0x1c), y (+0x20). Mapa 1: `West of Administration Bureau|1|3|120` e `South of Administration Bureau|1|94|147` = os dois redemoinhos azuis da captura.
 - ✅ **`pop-upwindow_us`** → lista do `CTableClass_QuestDialog` (grupo 21, `Pop-UpWindow.dat`, linha lida por `0x007b49f0`; só as linhas com a última coluna = 1, na ordem do arquivo):
   | Col. | Registro | Conteúdo |
@@ -223,6 +234,6 @@ Texto separado por `|` em `table.hf` ([arquivos de dados](arquivos-de-dados.md))
   O arquivo do v322 tem 3 linhas (as da captura). O `questdialog_us` do mesmo grupo é o texto dos diálogos de NPC, não os painéis.
 
 ## Ainda ❓ (fase A em andamento)
-- UI: fórmula das misturas `0x00b569f0` (modos −1, 6, `0x14`, `0x18`), sprite do ícone `+0x12df`, `w_tamer_menu` na entrada, `0x009b1640`, `0x00a0ceb0`; colunas ❓ das tabelas acima; quais linhas do `npc_info_us` o cliente põe no mapa.
+- UI: fórmula das misturas `0x00b569f0` (modos −1, 6, `0x14`, `0x18`), sprite do ícone `+0x12df`, `w_tamer_menu` na entrada, `0x009b1640`, `0x00a0ceb0`; colunas ❓ das tabelas acima; sprite e animação do NPC (`0x0085f090`).
 - Montagem de `0x16`, `0x18`, `0x49`, `0x01`, resto do `0xF0`, e da conexão global (`0x64`).
 - Nome sobre o tamer (fonte, cor), sombra (opção) e o `0x00b57330`.
