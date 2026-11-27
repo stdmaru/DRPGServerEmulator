@@ -182,7 +182,7 @@ internal static class Program
         }
         try
         {
-            var font = new SdlTtfFont(path, FontLocator.UiPixelSize, smoothEdges: true);
+            var font = new SdlTtfFont(path, FontLocator.UiPixelSize);
             Console.WriteLine($"font: {path}");
             return font;
         }

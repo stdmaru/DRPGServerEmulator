@@ -151,8 +151,7 @@ internal static class Program
         }
         try
         {
-            // ✅ the original draws with GDI TextOutA and the bitmap GulimChe (0x00b55270): no smoothing, full colour
-            return new SdlTtfFont(path, FontLocator.UiPixelSize, smoothEdges: false);
+            return new SdlTtfFont(path, FontLocator.UiPixelSize);
         }
         catch (InvalidOperationException e)
         {
