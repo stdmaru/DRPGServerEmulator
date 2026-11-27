@@ -52,10 +52,43 @@ Tempo a partir da conexão no mapa:
 
 ## Mapa e entidades no campo
 - ✅ Formatos `.map`, `.til`, `.obj` e a ordem de desenho do campo: ver [mapas](mapas.md#desenho-campo-).
-- ✅ Entidades (`0x00ad4a50`, modo campo): percorre a lista `[DAT_01158504]+0x2f8` (objetos com vtable: tamers, digimons, NPCs) e põe cada um na fila de desenho com o tipo do byte `+5` e a posição em pixels `+0x170/+0x174`; tipo `+0x149 == 8` ganha uma entrada extra (tipo 3) acima (`y − +0x18c`, ❓ nome/balão), `== 0xb` uma do tipo 2; quem está sob o cursor (`+0xca0`, 12 B) ganha a do tipo 4 (destaque). Depois a lista `+0x300`. A fila (y-sort) desenha cada uma pela vtable `+0x14` da entidade. ❓ Classes de tamer e digimon, animação parada e direção: próximo passo.
+- ✅ Entidades (`0x00ad4a50`, modo campo): percorre a lista `[DAT_01158504]+0x2f8` (objetos com vtable: tamers, digimons, NPCs) e põe cada um na fila de desenho com o tipo do byte `+5` e a posição em pixels `+0x170/+0x174`; tipo `+0x149 == 8` ganha uma entrada extra (tipo 3) acima (`y − +0x18c`), `== 0xb` uma do tipo 2; quem está sob o cursor (`+0xca0`, 12 B) ganha a do tipo 4 (destaque). Depois o jogador local (`0x00b5af10`, abaixo) e a lista `+0x300`. A fila (`0x00a0d340`, ordem em y) desenha os tipos 2/4/5 pela vtable **`+0x3c`** da entidade e o tipo 3 pelo `0x00864810`.
+
+## Entrada no mundo (S2C do mapa)
+Despachante do mapa `0x00abc350`: índice = opcode − 2 na tabela de bytes `0xacb6a4` → tabela de saltos `0xacb2c4` (✅ `0x02` → `0xabdfc1`, `0x03` → `0xabe059`, `0x0E` → `0xac3394`, `0x10` → `0xabe0e8`, `0x11` → `0xabe125`, `0x73` → `0xabdb9a`, `0x74` → `0xac44a4`, `0x7E` → `0xac4a94`, `0x7F` → `0xac4b45`, `0xB4` → `0xabf314`, `0xC4` → `0xabdea5`, `0xE6` → `0xac0093`, `0xF0` → `0xabf6b7`, `0x121` → `0xabd21d`, `0x152` → `0xac96fe`; `0x05` e `0x33` caem no padrão). O da conexão global é `0x00acdc10`.
+- ✅ **`0x02` (personagem)**: copia `0x1db0` bytes, guarda o deslocamento de relógio (`DAT_01158524/28`) e chama `0x00abbd50`:
+  1. `0x00ad1f30`, `0x00abb1c0`, `0x00abb4b0` (❓ limpezas);
+  2. `0x00b5bb50`: aplica os dados ao personagem (nome em `+0x1b0`/`+0x12c9`, byte `+0x29` → `+0x12de`/`+0x1c5`, …) e cria o objeto do digimon líder em `+0x308` se ainda não existe;
+  3. `0x0085e7b0(célula x = dados+0x1270, célula y = dados+0x1272, direção 0)` põe o tamer no mapa (abaixo);
+  4. byte `+0x29` ≠ 5, 6, 7 → `0x008669e0`: copia os `0x2b8` bytes do digimon (dados `+0x4d8`) para `digimon+0x800` e o põe **na célula (x − 1, y − 1)**, direção 0, tipo de fila `+5 = 2`;
+  5. `[DAT_01158530]+0xb` = dados `+0x19b5` (❓).
+- ✅ **`0x03` (inventário)**: copia `0x1140` bytes para `personagem+0x17b8` e chama **`0x00abbb20` (entrar no mundo)**:
+  1. `0x00ad3730`: modo `[DAT_01158504]+0x80 = 1` (campo); **carrega o mapa** `0x00b37860(id)` → vtable `+4` do objeto de mapa `0x00b378f0` (`map\%s.map`, ver [mapas](mapas.md)); cria os NPCs do mapa pela lista `+0x2d18` (`0x00abb750`) e outras preparações (❓).
+  2. `0x00adcc50`: conecta no servidor **global** e manda o `0x64`.
+  3. Manda no mapa **`0x04`** (16 B: o id de 16 B do personagem, vtable `+0x14` = `0x00865100`, que devolve `+0x1a0`).
+  4. Manda **`0xF0`** (28 B, primeiro u32 = `0x100`; ❓ resto).
+  5. `+0x34c = 0x5f` (clareia a tela a partir de 95, ver o quadro da cena).
+  6. Só na primeira entrada (`+0x3f15 == 0`): `0x00ae07b0(0x121)` (pacote vazio) e marca o sinal.
+  - Isso explica o atraso de ~1 s na captura: `0x04`/`0xF0`/`0x121` só saem depois da carga do `.map`.
+
+## Tamer e digimon no campo
+- ✅ **Posição** (`0x0085e7b0(cx, cy, dir)`): estado `+0x149 = 1`, animação `+0x180 = 1` (parado), deslocamento do quadro `+0x182 = rand() % 8` (✅ **fase aleatória** da animação parada), `+0x186 = 1`, `+0x19a = rand() % 8`, `+0x18a = 0x37`, direção `+0x164 = dir`; célula atual e destino `+0x178/+0x17a` e `+0x17c/+0x17e` = (cx, cy); **mundo em px `+0x168 = cx·64 + 32`, `+0x16c = cy·32 + 16`** (centro da célula).
+- ✅ **Tela**: `+0x170/+0x174` = mundo − rolagem da câmera (abaixo).
+- ✅ **Fila de desenho** (o tamer local fica fora da lista `+0x2f8`): `0x00b5af10`, chamado no meio de `0x00ad4a50`, põe o **digimon (`+0x308`) como tipo 4** e o **tamer como tipo 3**, e cada outro digimon da lista `[DAT_01158504]+0x2f0` (❓ outros jogadores, próximo marco). Os dois vão pela ordem em y da fila.
+- ✅ **Desenho do tamer** (fila tipo 3 → `0x00864810`): o mesmo **boneco de papel `0x0099fb90`** da seleção de personagens ([cenas](cenas.md)), com (tamer = vtable `+0x20`, x = `+0x170`, y = `+0x174`, quadro `+0x184`, equipamentos `+0x224`, início da animação, −1); o corpo e as roupas vão pelo canto superior esquerdo em **(x − 120, y − 162)**, sem âncora. Depois o tipo 3 desenha o nome (`0x00a10e10` em (`+0x170`, `+0x174 − +0x18c − 30`), ❓ fonte/cor) quando `+0x128 > 0`.
+- ✅ **Desenho do digimon** (fila tipo 4 → vtable `+0x3c` da classe `0x01007310` = `0x007e79d0` → caso normal `0x007e83d0`): sprite da **espécie `+0x814`** (dados do `0x02` `+0x4ec`) pela [tabela por espécie](tabelas-de-especie.md) (`0x00b23d20`), quadro `+0x184`, **com a âncora do `.ani`**: canto em **(x − cx[quadro], y − cy[quadro])** (`0x0086d200`/`0x0086d220`); espécies `0x149` e `0x3e9` descem mais 32 px. Antes, com a opção de sombra (`[DAT_01158530]+2`), a sombra `0x00b57460(…, 0xe)` (4 no mapa `0x6d`); e, fora das animações 9/10, `0x00b57330` (❓ contorno pela opção `[DAT_01158530]+0`). Mapas `0x61`, `0x66`, `0x67`, `0x6d` usam outros modos (❓, fora deste marco).
+- ✅ **Animação** (por passo de lógica; tamer `0x00867a60`/`0x00867790`, digimon `0x007f4cf0`/`0x007f4080`):
+  1. quadro `+0x184` = início(animação `+0x180`, direção `+0x164`) + deslocamento `+0x182`;
+  2. duração do quadro `+0x186` = o **primeiro campo do quadro no [`.ani`](formato-ani.md)** (`0x00873140`; as espécies-sprite `0x11b`, `0x11c`, `0x15d`, `0x343`, `0x360` usam 2);
+  3. contador `+0x188`: se `contador ≥ duração` → deslocamento + 1 e contador 0; senão contador + 1 (cada quadro fica **duração + 1 passos**);
+  4. deslocamento > contagem − 1 → volta a 0 (parado) — no mapa **todos os quadros aparecem**, ao contrário da seleção de personagens.
+  - ✅ Digimon parado: contador `+0x1a0` + 1 por passo; no passo 200 troca para a animação **3** (1 chance em 4) ou **2**; no passo 320 volta para a 1 e zera (as espécies `0xfb` não trocam). Trocar de animação (`0x0085e4c0`) zera deslocamento e contador e recalcula o quadro.
+- ✅ **Passo de lógica**: `DAT_0135af08 = 30` (`0x00867ed0(30)`, objeto de tempo `0x135aed8`), o divisor do acumulador no quadro da cena. ❓ A unidade do tempo somado (`0x00867e40`) ainda não foi lida; o emulador calibrou o movimento a 60 passos/s.
+
+## Câmera
+- ✅ `0x00afe310` (campo): chama a vtable `+0x24` do personagem e põe a rolagem do mapa (`0x00b36b80`) em **(`+0x168` − 400, `+0x16c` − 300)**, presa a `0..largura·64 − 800` e `0..altura·32 − 600`. Na batalha a rolagem é fixa (250, 206).
 
 ## Ainda ❓ (fase A em andamento)
-- Mapa: **quando** a carga do `.map` acontece (provavelmente ao receber o `0x02`) e a câmera seguindo o tamer.
-- Tamer e digimon no mapa: classes, desenho pela vtable `+0x14`, direção e animação parada.
-- UI básica da entrada (`0x00a45230`, `0x009b6010`), BGM do mapa.
-- Montagem de `0x16`, `0x18`, `0x49`, `0x01`, `0x04`, `0xF0`, `0x121` e da conexão global.
+- UI básica da entrada (`0x00a45230`, `0x009b6010`, `0x00b42f60`, `0x00a0ceb0`, `0x007dca50`), BGM do mapa.
+- Montagem de `0x16`, `0x18`, `0x49`, `0x01`, resto do `0xF0`, e da conexão global (`0x64`).
+- Nome sobre o tamer (fonte, cor), sombra (opção) e o `0x00b57330`.
