@@ -9,15 +9,14 @@ namespace DRPG.Client.Ui;
 
 /// <summary>What the basic HUD shows (the real values of the <c>0x02</c> packet and of the map).</summary>
 public sealed record HudValues(
-    string TamerName, int TamerId, int TamerLevel, string ChannelName, int MapId, string MapName, int CellX, int CellY,
+    string TamerName, int TamerId, int TamerClass, int TamerLevel, string ChannelName, int MapId, string MapName, int CellX, int CellY,
     DigimonStatus? Leader, DateTime ClockUtc);
 
 /// <summary>
 /// The basic UI of the field (✅ v322 main bar <c>0x00b8a850</c>, docs/cliente/cena-jogo.md#ui-do-campo-hud): the tamer panel in the
 /// top left corner and the bar at the bottom, with the digimon's gauges, the menu buttons, the side buttons and the chat frame.
-/// Everything is only drawn: nothing reacts to the mouse in this milestone. ❓ Not drawn yet (they need a blend or come with their
-/// own step): the glow frame 1 of the bar, the level icon, the minimap, the teleport buttons, the REWARD button, the quest panels, the
-/// EXP bonus box, the bell and the W/E icons.
+/// Everything is only drawn: nothing reacts to the mouse in this milestone. ❓ Not drawn yet (they come with their own step): the
+/// minimap, the teleport buttons, the quest panels, the EXP bonus box, the bell and the W/E icons.
 /// </summary>
 public sealed class FieldHud(GameContext game)
 {
@@ -61,6 +60,12 @@ public sealed class FieldHud(GameContext game)
     /// </summary>
     public const int BarGlowAlpha = 0x10, ChatAlpha = 0x14;
 
+    /// <summary>✅ The class icons, 8 frames of 14×16 (<c>0x00a164f3</c> loads them into <c>+0x2698</c>).</summary>
+    private const string TamerClassSprite = "interface\\draw_tamer_class.spr";
+
+    /// <summary>✅ The class icon's corner (<c>0x00a14910(+0x12df, 33, 20)</c>).</summary>
+    private const int TamerClassX = 33, TamerClassY = 20;
+
     /// <summary>✅ <c>0x00b231b0</c>: the portrait loaded when a species' own one is missing.</summary>
     private const string FallbackIcon = "sprite\\icon_065.spr";
 
@@ -97,6 +102,7 @@ public sealed class FieldHud(GameContext game)
         Frame(renderer, Load("interface\\w_unitframe.spr"), 0, 0, 0);
         Portrait(renderer, v.TamerId, 1, 2, 2);                                               // ✅ 0x00b1ec40(tamer) frame 1 at (2, 2)
         text.Draw(renderer, v.TamerName, 33, 4, Yellow);
+        DrawTamerClass(renderer, v.TamerClass);
         text.Draw(renderer, "Level ", 50, 22, UiText.White, shadow: false);
         text.Draw(renderer, v.TamerLevel.ToString(), 90, 22, Yellow, shadow: false);
         text.Draw(renderer, GameContext.VersionText, 130, 1);
@@ -122,6 +128,18 @@ public sealed class FieldHud(GameContext game)
         Gauge(renderer, 5, 692, 545, Percent(leader.Vp, leader.MaxVp));
         Gauge(renderer, 4, 692, 564, Percent(leader.Evp, leader.MaxEvp));
         Gauge(renderer, 3, 488, 585, Percent(leader.Exp, leader.ExpToNextLevel));
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00a14910</c>: the class (the low byte of <c>0x02</c>+0x2a, kept in <c>+0x12df</c>) is frame <c>class − 1</c> of
+    /// <see cref="TamerClassSprite"/>; 0 draws nothing, and a frame the sprite lacks draws nothing either (<c>0x00b56ff0</c>).
+    /// </summary>
+    private void DrawTamerClass(IRenderer renderer, int tamerClass)
+    {
+        int frame = (byte)tamerClass - 1;
+        if (frame < 0)
+            return;
+        Frame(renderer, Load(TamerClassSprite), frame, TamerClassX, TamerClassY);
     }
 
     /// <summary>

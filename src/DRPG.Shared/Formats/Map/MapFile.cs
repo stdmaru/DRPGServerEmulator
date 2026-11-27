@@ -7,12 +7,28 @@ namespace DRPG.Shared.Formats.Map;
 /// <param name="Type">✅ +8: 1..998 areas, 1000..1005 and 9001..9021 ground effects, 8999 time warning, −1 nothing.</param>
 /// <param name="TileSet">Index in <see cref="MapFile.TileNames"/> of the ground tileset, or <see cref="MapCell.None"/>.</param>
 /// <param name="TileFrame">Frame of the tileset (0..199).</param>
-/// <param name="Flags">✅ +0x14: bit 0 = walkable; ❓ bit 8 changes the draw mode of the ground.</param>
+/// <param name="Flags">✅ +0x14: bit 0 = walkable; the byte +0x15 mirrors the ground tile (<see cref="Flip"/>).</param>
 public readonly record struct MapCell(int Object, int Type, int TileSet, int TileFrame, uint Flags)
 {
     public const int None = -1;
 
     public bool Walkable => (Flags & 1) != 0;
+
+    /// <summary>✅ The byte <c>+0x15</c>, passed to <c>0x008754f0</c> by the ground draw <c>0x00b36900</c>: bit 0 and bit 1 of it.</summary>
+    public TileFlip Flip => (TileFlip)((Flags >> 8) & 3);
+}
+
+/// <summary>✅ How <c>0x008754f0</c> mirrors a ground tile (its last argument).</summary>
+[Flags]
+public enum TileFlip
+{
+    None = 0,
+
+    /// <summary>✅ Bit 0: the columns right to left (the frame's column c lands on <c>x + w − 1 − c</c>).</summary>
+    Horizontal = 1,
+
+    /// <summary>✅ Bit 1: the rows bottom to top.</summary>
+    Vertical = 2,
 }
 
 /// <summary>

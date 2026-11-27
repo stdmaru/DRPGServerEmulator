@@ -20,7 +20,7 @@ internal sealed class FakeTexture(int width, int height) : ITexture
 /// <summary>An <see cref="IRenderer"/> that records the draw calls of a frame.</summary>
 internal sealed class FakeRenderer : IRenderer
 {
-    public sealed record DrawCall(FakeTexture Texture, int X, int Y, int? PartWidth = null, int Alpha = IRenderer.OpaqueAlpha, int? PartHeight = null);
+    public sealed record DrawCall(FakeTexture Texture, int X, int Y, int? PartWidth = null, int Alpha = IRenderer.OpaqueAlpha, int? PartHeight = null, bool Halved = false);
 
     public List<DrawCall> Draws { get; } = [];
     public string BackendName => "fake";
@@ -42,6 +42,8 @@ internal sealed class FakeRenderer : IRenderer
 
     public void DrawRegionBlended(ITexture texture, int x, int y, int sourceX, int sourceY, int width, int height, int alpha) =>
         Draws.Add(new DrawCall((FakeTexture)texture, x, y, width, alpha, height));
+
+    public void DrawHalved(ITexture texture, int x, int y) => Draws.Add(new DrawCall((FakeTexture)texture, x, y, Halved: true));
 
     public List<int> Darkens { get; } = [];
 
@@ -117,6 +119,7 @@ internal sealed class FakeInstall : IDisposable
             // portraits: tamer 1 has its own, the fallback icon_065 stands in for the others
             ("sprite\\icon_001.spr", Sprite(41, 41, 2)),
             ("sprite\\icon_065.spr", Sprite(65, 65, 2)),
+            ("interface\\draw_tamer_class.spr", Sprite(14, 16, 8)),
             ("sprite\\a_00.spr", Sprite(100, 160, 16, layers: true)),
             ("sprite\\a_00.ani", Ani("a_00.spr", 16)),
             // the default clothes of tamer 1, without a_20 (tamer 3 of the real install has no a_20 either)

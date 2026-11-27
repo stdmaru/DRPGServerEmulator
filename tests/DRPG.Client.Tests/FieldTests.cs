@@ -101,7 +101,7 @@ public sealed class FieldHudTests
 
 public sealed class FieldHudButtonsTests
 {
-    private static HudValues Values() => new("Marcus", 1, 5, "Net Ocean", 1, "Plains", 5, 6, null, new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc));
+    private static HudValues Values() => new("Marcus", 1, 1, 5, "Net Ocean", 1, "Plains", 5, 6, null, new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc));
 
     [Fact]
     public void The_reward_button_is_drawn_at_its_place_outside_the_battle_zone()
@@ -133,8 +133,8 @@ public sealed class FieldHudButtonsTests
 
 public sealed class FieldHudBlendTests
 {
-    private static HudValues Values(int tamerId = 1) =>
-        new("Marcus", tamerId, 5, "Net Ocean", 1, "Plains", 5, 6, null, new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc));
+    private static HudValues Values(int tamerId = 1, int tamerClass = 1) =>
+        new("Marcus", tamerId, tamerClass, 5, "Net Ocean", 1, "Plains", 5, 6, null, new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc));
 
     private static (List<FakeRenderer.DrawCall> Bar, FakeRenderer.DrawCall Chat) Draw(SpriteOptions options)
     {
@@ -198,6 +198,35 @@ public sealed class FieldHudBlendTests
 
         Assert.DoesNotContain(fixture.Renderer.Draws, d => (d.X, d.Y) == (2, 2) && d.Texture.Width is 41 or 65);
     }
+}
+
+public sealed class FieldHudClassIconTests
+{
+    private static List<FakeRenderer.DrawCall> ClassIcons(int tamerClass)
+    {
+        using var fixture = new SceneFixture();
+        new FieldHud(fixture.Game).Draw(fixture.Renderer,
+            new HudValues("Marcus", 1, tamerClass, 5, "Net Ocean", 1, "Plains", 5, 6, null, new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc)));
+        return fixture.Renderer.Draws.Where(d => (d.Texture.Width, d.Texture.Height) == (14, 16)).ToList();
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(5)]
+    [InlineData(8)]
+    [InlineData(0x105)]          // only the low byte is kept (+0x12df is a byte)
+    public void The_class_icon_is_drawn_between_the_portrait_and_the_level(int tamerClass)
+    {
+        var icon = Assert.Single(ClassIcons(tamerClass));
+        Assert.Equal((33, 20), (icon.X, icon.Y));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(0x100)]          // low byte 0
+    [InlineData(9)]              // the sprite has 8 frames
+    [InlineData(-1)]
+    public void A_class_without_a_frame_draws_no_icon(int tamerClass) => Assert.Empty(ClassIcons(tamerClass));
 }
 
 public sealed class SpeciesTablesIconTests
@@ -451,7 +480,10 @@ public sealed class FieldMapTests : IDisposable
         w.Write(field);
     }
 
-    private static MapFile Map(int width, int height, (int Obj, int Tile, uint Frame)[] cells, string[] tiles, string[] objects)
+    private static readonly ObjectLook Plain = new(ObjectShadow.None, IRenderer.OpaqueAlpha);
+
+    /// <param name="flags">The <c>+0x14</c> of each cell (walkable, 1, when missing).</param>
+    private static MapFile Map(int width, int height, (int Obj, int Tile, uint Frame)[] cells, string[] tiles, string[] objects, uint[]? flags = null)
     {
         using var ms = new MemoryStream();
         using var w = new BinaryWriter(ms);
@@ -468,7 +500,7 @@ public sealed class FieldMapTests : IDisposable
             w.Write((short)tile);
             w.Write((short)0);
             w.Write(frame);
-            w.Write(1u);
+            w.Write(flags is not null && i < flags.Length ? flags[i] : 1u);
         }
         w.Write((ushort)tiles.Length);
         foreach (var name in tiles) Name(w, name);
@@ -513,7 +545,7 @@ public sealed class FieldMapTests : IDisposable
         return ms.ToArray();
     }
 
-    private static byte[] Obj(int width, int height, int anchorX, int anchorY)
+    private static byte[] Obj(int width, int height, int anchorX, int anchorY, bool shadow = false)
     {
         using var ms = new MemoryStream();
         using var w = new BinaryWriter(ms);
@@ -526,6 +558,12 @@ public sealed class FieldMapTests : IDisposable
         var image = Image(width, height, 0xF800);
         w.Write((uint)image.Length);
         foreach (var word in image) w.Write(word);
+        if (shadow)
+        {
+            var dark = Image(width, height, 0x0841);
+            w.Write((uint)dark.Length);
+            foreach (var word in dark) w.Write(word);
+        }
         return ms.ToArray();
     }
 
@@ -600,7 +638,7 @@ public sealed class FieldMapTests : IDisposable
 
         field.DrawGround(_renderer, 0, 0);
 
-        Assert.Equal([(0, 0), (64, 0), (0, 32)], _renderer.Draws.Select(d => (d.X, d.Y)));   // the cell without a tileset and the empty ones draw nothing
+        Assert.Equal([(0, 0), (0, 32), (64, 0)], _renderer.Draws.Select(d => (d.X, d.Y)));   // column by column; the cell without a tileset and the empty ones draw nothing
         Assert.All(_renderer.Draws, d => Assert.Equal((64, 32), (d.Texture.Width, d.Texture.Height)));
     }
 
@@ -659,11 +697,114 @@ public sealed class FieldMapTests : IDisposable
         var field = Field(Map(3, 4, cells, [], ["tree.obj"]), ("map\\tree.obj", Obj(100, 90, 74, 40)));
         var queue = new List<DrawItem>();
 
-        field.QueueObjects(queue, 0, 0);
+        field.QueueObjects(queue, 0, 0, Plain);
 
         var item = Assert.Single(queue);
         Assert.Equal((0, 32, 72), (item.X, item.DrawY, item.Y));
         Assert.Equal(100, item.Texture!.Width);
+    }
+
+    [Fact]
+    public void The_ground_is_drawn_column_by_column()
+    {
+        var field = Field(Map(2, 2, [(-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0)], ["g.til"], []), ("map\\g.til", Til(1, 64, 32)));
+
+        field.DrawGround(_renderer, 0, 0);
+
+        Assert.Equal([(0, 0), (0, 32), (64, 0), (64, 32)], _renderer.Draws.Select(d => (d.X, d.Y)));
+    }
+
+    [Theory]
+    [InlineData(0x000u, 0)]
+    [InlineData(0x100u, 0)]          // horizontal
+    [InlineData(0x200u, 0)]          // vertical
+    [InlineData(0x300u, 1)]          // both: 0x008754f0 starts one pixel further right and down
+    [InlineData(0x401u, 0)]          // only bits 0 and 1 of the byte +0x15 count
+    public void A_mirrored_tile_is_a_texture_of_its_own_and_both_bits_shift_it(uint flags, int shift)
+    {
+        var field = Field(Map(2, 1, [(-1, 0, 0), (-1, 0, 0)], ["g.til"], [], [0u, flags]), ("map\\g.til", Til(1, 64, 32)));
+
+        field.DrawGround(_renderer, 0, 0);
+
+        Assert.Equal((64 + shift, shift), (_renderer.Draws[1].X, _renderer.Draws[1].Y));
+        bool mirrored = (flags & 0x300) != 0;
+        Assert.Equal(mirrored, !ReferenceEquals(_renderer.Draws[0].Texture, _renderer.Draws[1].Texture));
+    }
+
+    [Fact]
+    public void Mirror_reverses_the_columns_the_rows_or_both()
+    {
+        uint[] pixels = [1, 2, 3, 4, 5, 6];                 // 3 × 2
+
+        Assert.Equal([1u, 2, 3, 4, 5, 6], FieldMap.Mirror(pixels, 3, 2, TileFlip.None));
+        Assert.Equal([3u, 2, 1, 6, 5, 4], FieldMap.Mirror(pixels, 3, 2, TileFlip.Horizontal));
+        Assert.Equal([4u, 5, 6, 1, 2, 3], FieldMap.Mirror(pixels, 3, 2, TileFlip.Vertical));
+        Assert.Equal([6u, 5, 4, 3, 2, 1], FieldMap.Mirror(pixels, 3, 2, TileFlip.Horizontal | TileFlip.Vertical));
+    }
+
+    private List<FakeRenderer.DrawCall> DrawObject(ObjectLook look, bool shadow = true)
+    {
+        var cells = new (int, int, uint)[3 * 4];
+        Array.Fill(cells, (-1, -1, 0u));
+        cells[2 * 3 + 1] = (0, -1, 0u);
+        var field = Field(Map(3, 4, cells, [], ["tree.obj"]), ("map\\tree.obj", Obj(100, 90, 74, 40, shadow)));
+        var queue = new List<DrawItem>();
+        field.QueueObjects(queue, 0, 0, look);
+        FieldMap.DrawQueue(_renderer, queue);
+        return _renderer.Draws;
+    }
+
+    [Fact]
+    public void On_a_normal_map_the_object_shadow_halves_the_frame_before_the_image()
+    {
+        var draws = DrawObject(SpriteEffects.ObjectLookOf(1, SpriteOptions.Default));
+
+        Assert.Equal(2, draws.Count);
+        Assert.True(draws[0].Halved);
+        Assert.False(draws[1].Halved);
+        Assert.Equal(IRenderer.OpaqueAlpha, draws[1].Alpha);
+        Assert.Equal((0, 32), (draws[0].X, draws[0].Y));
+        Assert.Equal((0, 32), (draws[1].X, draws[1].Y));
+    }
+
+    [Fact]
+    public void Without_the_alpha_option_the_object_shadow_is_plain()
+    {
+        var draws = DrawObject(SpriteEffects.ObjectLookOf(1, SpriteOptions.Default with { Alpha = false }));
+
+        Assert.Equal(2, draws.Count);
+        Assert.All(draws, d => Assert.False(d.Halved));
+        Assert.All(draws, d => Assert.Equal(IRenderer.OpaqueAlpha, d.Alpha));
+    }
+
+    [Fact]
+    public void On_the_other_mode_maps_the_object_shadow_is_blended_at_10()
+    {
+        var draws = DrawObject(SpriteEffects.ObjectLookOf(0x6d, SpriteOptions.Default));
+
+        Assert.Equal([SpriteEffects.OtherModesObjectShadowAlpha, IRenderer.OpaqueAlpha], draws.Select(d => d.Alpha));
+    }
+
+    [Fact]
+    public void On_map_h_there_is_no_object_shadow_and_the_image_is_blended()
+    {
+        var draws = DrawObject(SpriteEffects.ObjectLookOf(SpriteEffects.BlendedObjectsMap, SpriteOptions.Default));
+
+        var image = Assert.Single(draws);
+        Assert.Equal(SpriteEffects.BlendedObjectAlpha, image.Alpha);
+    }
+
+    [Theory]
+    [InlineData(false)]          // the option off
+    [InlineData(true)]           // a file without a shadow
+    public void No_shadow_draws_only_the_image(bool fileWithoutShadow)
+    {
+        var options = fileWithoutShadow ? SpriteOptions.Default : SpriteOptions.Default with { Shadow = false };
+
+        var draws = DrawObject(SpriteEffects.ObjectLookOf(1, options), shadow: !fileWithoutShadow);
+
+        var image = Assert.Single(draws);
+        Assert.Equal(100, image.Texture.Width);
     }
 
     [Fact]
@@ -675,7 +816,7 @@ public sealed class FieldMapTests : IDisposable
         var field = Field(Map(3, 3, cells, [], ["tree.obj"]), ("map\\tree.obj", Obj(10, 10, 600, 600)));   // drawn far above and left of the cell
         var queue = new List<DrawItem>();
 
-        field.QueueObjects(queue, 0, 0);
+        field.QueueObjects(queue, 0, 0, Plain);
 
         Assert.Empty(queue);
     }
@@ -689,8 +830,8 @@ public sealed class FieldMapTests : IDisposable
         var field = Field(Map(2, 1, cells, [], ["missing.obj", "bad.obj"]), ("map\\bad.obj", [9, 9, 9]));
         var queue = new List<DrawItem>();
 
-        field.QueueObjects(queue, 0, 0);
-        field.QueueObjects(queue, 0, 0);
+        field.QueueObjects(queue, 0, 0, Plain);
+        field.QueueObjects(queue, 0, 0, Plain);
 
         Assert.Empty(queue);
         Assert.Equal(2, _log.Count(line => line.Contains("LoadObject Error")));      // once each, not once per frame

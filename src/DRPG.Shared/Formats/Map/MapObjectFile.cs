@@ -6,7 +6,7 @@ namespace DRPG.Shared.Formats.Map;
 /// <summary>
 /// A <c>map\*.obj</c> map object (✅ v322 <c>0x00b415b0</c>, docs/cliente/mapas.md#obj-objeto-do-mapa): name[20], width and
 /// height, the anchor, a 400-byte mask (❓ covered cells) and two images, each a <c>u32</c> word count and the words of one frame
-/// in the row format of the <c>.spr</c>. The second image (❓ shadow or top) is read but not drawn.
+/// in the row format of the <c>.spr</c>. The second image is the shadow (✅ <c>+0x1d0</c>, drawn before the image by <c>0x00b41410</c>).
 /// </summary>
 public sealed class MapObjectFile
 {
@@ -35,9 +35,12 @@ public sealed class MapObjectFile
     public int AnchorX { get; }
     public int AnchorY { get; }
 
-    public bool HasSecondImage => _second is not null;
+    public bool HasShadow => _second is not null;
 
     public uint[] DecodeImage() => _image.Decode(_image.Image, 0);
+
+    /// <summary>✅ The shadow (the second image, <c>+0x1d0</c>), the same size as the image; null when the file has none.</summary>
+    public uint[]? DecodeShadow() => _second?.Decode(_second.Image, 0);
 
     public static MapObjectFile Parse(ReadOnlySpan<byte> data)
     {

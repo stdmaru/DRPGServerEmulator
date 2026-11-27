@@ -319,9 +319,9 @@ public sealed class MapFormatTests
         Assert.Equal("tree", obj.Name);
         Assert.Equal((100, 90), (obj.Width, obj.Height));
         Assert.Equal((590, 333), (obj.AnchorX, obj.AnchorY));
-        Assert.True(obj.HasSecondImage);
+        Assert.True(obj.HasShadow);
         Assert.Equal(100 * 90, obj.DecodeImage().Length);
-        Assert.False(MapObjectFile.Parse(Obj(8, 8, 0, 0, second: false)).HasSecondImage);
+        Assert.False(MapObjectFile.Parse(Obj(8, 8, 0, 0, second: false)).HasShadow);
     }
 
     [Fact]

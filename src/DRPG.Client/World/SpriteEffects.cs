@@ -7,6 +7,33 @@ namespace DRPG.Client.World;
 /// </summary>
 public static class SpriteEffects
 {
+    /// <summary>✅ The map <c>'h'</c> (<c>0x68</c>): its objects have no shadow and their image is blended (<c>0x00a0d340</c>, case 7).</summary>
+    public const int BlendedObjectsMap = 0x68;
+
+    /// <summary>✅ <c>0x00b413b0(…, −1, 0x14)</c>: the alpha of the objects' image on <see cref="BlendedObjectsMap"/>.</summary>
+    public const int BlendedObjectAlpha = 0x14;
+
+    /// <summary>✅ <c>0x00b414d0(…, 0xa)</c>: the alpha of the objects' shadow on the maps of <see cref="UsesOtherModes"/>.</summary>
+    public const int OtherModesObjectShadowAlpha = 0xa;
+
+    /// <summary>
+    /// ✅ How the queue draws a map object (<c>0x00a0d340</c>, case 7): with the <c>shadow</c> option and outside
+    /// <see cref="BlendedObjectsMap"/>, first its shadow — plain without the <c>alpha</c> option (<c>0x00b41410(…, 0)</c>), mode 7 on the
+    /// normal maps (<c>0x00b41410(…, 0x14)</c> → <c>0x00875a00(…, 7, …)</c>: the frame halved under it), blended at 10/32 on the
+    /// other-mode maps (<c>0x00b414d0</c>); then its image, plain (<c>0x00b41370</c>), or blended at 20/32 on <see cref="BlendedObjectsMap"/>.
+    /// </summary>
+    public static ObjectLook ObjectLookOf(int mapId, SpriteOptions options)
+    {
+        int imageAlpha = mapId == BlendedObjectsMap ? BlendedObjectAlpha : DRPG.Engine.Rendering.IRenderer.OpaqueAlpha;
+        if (!options.Shadow || mapId == BlendedObjectsMap)
+            return new ObjectLook(ObjectShadow.None, imageAlpha);
+        if (!options.Alpha)
+            return new ObjectLook(ObjectShadow.Plain, imageAlpha);
+        if (UsesOtherModes(mapId))
+            return new ObjectLook(ObjectShadow.Blended, imageAlpha);
+        return new ObjectLook(ObjectShadow.Halved, imageAlpha);
+    }
+
     /// <summary>✅ <c>0x00b57460(…, 0xe)</c> and <c>0x00b57330</c>: the alpha of the shadow and of the edge on a normal map.</summary>
     public const int NormalAlpha = 0xe;
 
@@ -51,3 +78,19 @@ public static class SpriteEffects
         _ => true,
     };
 }
+
+/// <summary>How a map object's shadow is drawn (<see cref="SpriteEffects.ObjectLookOf"/>).</summary>
+public enum ObjectShadow
+{
+    None,
+    Plain,
+
+    /// <summary>The frame under it halved (mode 7).</summary>
+    Halved,
+
+    /// <summary>Mixed at <see cref="SpriteEffects.OtherModesObjectShadowAlpha"/>/32.</summary>
+    Blended,
+}
+
+/// <summary>The shadow of a map object and the alpha (of 32) of its image.</summary>
+public readonly record struct ObjectLook(ObjectShadow Shadow, int ImageAlpha);

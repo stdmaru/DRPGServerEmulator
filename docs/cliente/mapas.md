@@ -23,7 +23,7 @@ Célula (24 B):
 | +8 | i32 | **tipo da célula**: 1..998 áreas registradas na carga (`0x00b392a0`); 1000..1005, 9001..9021 efeitos de chão (`0x00b380d0`); 8999 aviso de tempo; −1 nada |
 | +0xC | i16 | **tileset**: índice na lista de `.til` (−1 = sem chão; ≥ 200 → aviso `0x5d0`) |
 | +0x10 | u32 | **quadro** do tile dentro do tileset (0..199) |
-| +0x14 | u32 | **bit 0 = andável** ✅; o byte `+0x15` (bit 8) muda o modo de desenho do chão (`0x00b56160(600, b)`, ❓ qual) |
+| +0x14 | u32 | **bit 0 = andável** ✅; o byte `+0x15` **espelha o tile** ✅ (último argumento de `0x008754f0`): bit 0 horizontal, bit 1 vertical |
 
 - O `r001.map` (e outros antigos) tem lixo `0xBAADF0xx` nos bits altos dos campos; o bit 0 continua valendo.
 - Depois da carga: tamanho do mapa em pixels `largura · 64` × `altura · 32`, janela visível `800 / 64 + 2` × `600 / 32 + 2` células (`[+0x511c90/94]`), câmera em pixels `[+0x511c80/84]`. O mapa `0x66/0x67` carrega extras (`0x00b385e0`).
@@ -49,12 +49,12 @@ Célula (24 B):
 | âncora x, y | u16, u16 (590, 333); no desenho entra `âncora mod 64` / `mod 32` |
 | máscara | 400 B (❓ células cobertas) |
 | imagem | u32 n + u16[n]: um quadro no formato de linha do `.spr` |
-| segunda imagem | u32 m + u16[m] (❓ sombra ou topo) |
+| segunda imagem | u32 m + u16[m]: ✅ a **sombra** (`+0x1d0`; a imagem fica em `+0x1c8`), do mesmo tamanho |
 
 ## Desenho (campo) ✅
 Grade **retangular** de 64 × 32 px (os tiles já trazem a arte isométrica): a célula (cx, cy) fica em `(cx · 64 − câmeraX, cy · 32 − câmeraY)`.
-1. **Chão** `0x00b36900`: para cada célula visível com tileset ≠ −1, desenha o quadro `+0x10` do `.til` `+0xC` direto na tela (`0x00b5db30`). Depois, nos mapas `< 0x6e`, um véu de cor `0x88bcf8` (`0x00b55110`, ❓ alpha).
-2. **Objetos** `0x00b36630`: varre a janela com margem (10 células à esquerda, 15 acima, +20/+30) e põe cada objeto `+4` na **fila de desenho** (`0x00a0cd80(tipo 7, obj, x + âncoraX mod 64, y + âncoraY mod 32)`; tipo 0x1f no mapa `h` para `GR_CHT01.obj`).
+1. **Chão** `0x00b36900`: **coluna por coluna** (x por fora, y por dentro), para cada célula visível com tileset ≠ −1, desenha o quadro `+0x10` do `.til` `+0xC` direto na tela (`0x00b5db30` → `0x008754f0`, no tamanho do quadro, sem recorte), **espelhado** pelo byte `+0x15`: bit 0 inverte as colunas, bit 1 as linhas. Com os dois bits o `0x008754f0` começa em `x + w` e `y + h` (e não em `− 1`), então o tile sai deslocado (+1, +1) ✅. No mapa 7 os tocos de árvore são dois tiles, o segundo espelhado. Depois, nos mapas `< 0x6e`, `0x00b55110(0x88bcf8)`: ✅ é um `Blt` com `DDBLT_COLORFILL` (`0x400`) na superfície `+0x58`, não a que acabou de receber o chão (pintá-la apagaria o chão), então **não há véu** sobre o mapa (❓ qual superfície é). Implementado em `FieldMap.DrawGround` + `MapCell.Flip`.
+2. **Objetos** `0x00b36630`: varre a janela com margem (10 células à esquerda, 15 acima, +20/+30) e põe cada objeto `+4` na **fila de desenho** (`0x00a0cd80(tipo 7, obj, x + âncoraX mod 64, y + âncoraY mod 32)`; tipo 0x1f no mapa `h` para `GR_CHT01.obj`). ✅ O tipo 7 da fila (`0x00a0d340`) desenha pelo canto **(x da fila − âncoraX, y da fila − âncoraY)** (`+0x30`/`+0x32` do objeto). Antes da imagem, com a opção `shadow` e fora do mapa `0x68` (`'h'`), a **sombra**: sem a opção `alpha`, normal (`0x00b41410(…, 0)` → `0x008754f0`); com ela, nos mapas normais o **modo 7** de `0x00876a30` (`0x00b41410(…, 0x14)` → `0x00875a00(…, 7, …)` → `0x008750f0`/`0x00875130`: sob cada pixel opaco da sombra o destino vira `dst >> 1`, a cor da sombra não entra); nos mapas `0x61`/`0x66`/`0x67`/`0x6d`, mistura do modo −1 a 10/32 (`0x00b414d0(…, 0xa)`). Depois a imagem, normal (`0x00b41370`), ou misturada a 20/32 no mapa `0x68` (`0x00b413b0(…, −1, 0x14)`). Implementado em `FieldMap.QueueObjects` + `SpriteEffects.ObjectLookOf`; o modo 7 é `IRenderer.DrawHalved`.
 3. **Efeitos de chão** (vtable `+8`, `0x00b380d0`) pelo tipo da célula, também na fila (`0x00a0cdf0`).
 4. **Fila** (`0x00a0d340`): entradas `{tipo, y, x, ponteiro, ordem}`; ordenada por **y crescente e, no empate, pela ordem de entrada** (`0x00a0afc0`/`0x00a0a450`). Tamers, digimons e NPCs entram na mesma fila (y-sort com os objetos).
 

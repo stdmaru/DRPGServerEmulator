@@ -28,7 +28,7 @@ public static class CharacterData
 
         return new CharacterDataPacket(
             c.Uid, c.Serial, c.Name, c.TamerId,
-            Unknown42: 1,                                       // ?
+            TamerClass: 1,                                      // ❓ the class of a new tamer is 1 in the captures; how it grows is not known
             c.Level,
             Fame: 0,
             Exp: 0,                                             // EXP do tamer ❓ não persistido

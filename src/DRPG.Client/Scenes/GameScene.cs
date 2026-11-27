@@ -254,7 +254,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         field.DrawGround(renderer, cameraX, cameraY);
 
         _queue.Clear();
-        field.QueueObjects(_queue, cameraX, cameraY);
+        field.QueueObjects(_queue, cameraX, cameraY, SpriteEffects.ObjectLookOf(game.World!.MapId, game.SpriteOptions));
         if (_digimon?.Texture is { } frame && _hasDigimon)
         {
             var (anchorX, anchorY) = _digimon.Anchor;               // ✅ the digimon is drawn by the anchor of the .ani
@@ -278,7 +278,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         var character = session.Character!;
         var leader = character.Party[0];
         _hud.Draw(renderer, new HudValues(
-            character.Name, character.TamerId, character.Level, game.ChannelName, game.World!.MapId, game.Data?.MapName(game.World.MapId) ?? "",
+            character.Name, character.TamerId, character.TamerClass, character.Level, game.ChannelName, game.World!.MapId, game.Data?.MapName(game.World.MapId) ?? "",
             character.X, character.Y, leader.IsEmpty ? null : leader, DateTime.UtcNow + _clockOffset));
     }
 

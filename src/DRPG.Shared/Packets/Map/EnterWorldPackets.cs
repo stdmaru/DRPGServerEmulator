@@ -7,7 +7,7 @@ namespace DRPG.Shared.Packets.Map;
 /// docs/protocolo/structs/tamer-resumo.md and status-digimon.md; offsets in the comments are from the payload start.
 /// </summary>
 public sealed record CharacterDataPacket(
-    uint Uid, Serial Serial, string Name, byte TamerId, ushort Unknown42, ushort Level,
+    uint Uid, Serial Serial, string Name, byte TamerId, ushort TamerClass, ushort Level,
     int Fame, int Exp, int ExpToNextLevel, double Bits, int TotalWins, int TotalBattles,
     short RankedWins, short RankedBattles, int RankedPoints, ushort Rank, uint LadderPoints,
     ItemData[] PrimaryEquipment, CardData[] CardSlots, DigimonStatus[] Party, short X, short Y,
@@ -104,7 +104,7 @@ public sealed record CharacterDataPacket(
         Serial.Write(w);                        // 4
         w.WriteFixedString(Name, NameBytes);    // 20
         w.WriteU8(TamerId);                     // 41
-        w.WriteU16(Unknown42);                  // 42 ❓ 1
+        w.WriteU16(TamerClass);                 // 42 ✅ class icon: the client draws frame (low byte − 1) of draw_tamer_class.spr (0x00a14910); 1, 2 and 5 in the captures
         w.WriteU16(Level);                      // 44
         w.WriteZeros(2);
         w.WriteI32(Fame);                       // 48

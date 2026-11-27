@@ -42,6 +42,12 @@ public interface IRenderer : IDisposable
     void DrawRegionBlended(ITexture texture, int x, int y, int sourceX, int sourceY, int width, int height, int alpha);
 
     /// <summary>
+    /// Halves every colour channel of what is already in the frame under each opaque pixel of <paramref name="texture"/>; the
+    /// texture's own colours are not used (✅ v322 mode 7 of <c>0x00876a30</c>: <c>0x008750f0</c>/<c>0x00875130</c>, <c>dst >> 1</c>).
+    /// </summary>
+    void DrawHalved(ITexture texture, int x, int y);
+
+    /// <summary>
     /// Subtracts <paramref name="amount"/> (0..255) from every colour channel of what is already in the frame, never
     /// below 0: the fade to black of the scene changes (✅ v322 <c>FUN_00b55f10</c>).
     /// </summary>

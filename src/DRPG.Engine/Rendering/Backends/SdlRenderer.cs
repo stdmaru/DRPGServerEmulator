@@ -113,6 +113,17 @@ public sealed unsafe class SdlRenderer : IRenderer
         SDL_SetTextureAlphaMod(t.Handle, 255);
     }
 
+    /// <summary>Black at half alpha over the frame: <c>dst · (1 − 128/255)</c>, the original's <c>dst >> 1</c> to one step.</summary>
+    public void DrawHalved(ITexture texture, int x, int y)
+    {
+        var t = (Texture)texture;
+        SDL_SetTextureColorMod(t.Handle, 0, 0, 0);
+        SDL_SetTextureAlphaMod(t.Handle, 128);
+        Draw(texture, x, y);
+        SDL_SetTextureAlphaMod(t.Handle, 255);
+        SDL_SetTextureColorMod(t.Handle, 255, 255, 255);
+    }
+
     public void Darken(int amount)
     {
         amount = Math.Clamp(amount, 0, 255);
