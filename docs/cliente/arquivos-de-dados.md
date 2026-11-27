@@ -45,6 +45,9 @@ senão, pelo id. 762 espécies; 5 sem dex (sem crescimento): 515 Kazemon, 516 Ze
 | `make_item_us`, `makeitem_us`, `makeitem_material_item_us` | crafting (❓ sem as chances de sucesso) |
 | `monsterregen_us` | ❓ id composto, espécie, nome, nível, ?; **não tem mapa nem área**, então os spawns continuam em `Resources/Map/DigimonSpawns.xml` |
 | `map_us`, `npc_info_us`, `npc_function_us`, `npcdialogwindow_us`, `questdialog_us` | mapas, NPCs, diálogos, texto de quest |
+| `pop-upwindow_us` | painéis de missão do canto inferior esquerdo (item → NPC, título, lugar) |
+
+Colunas de `npc_info_us`, `map_us` (portais) e `pop-upwindow_us` como o cliente as usa: [cena de jogo](cena-jogo.md#tabelas-usadas-pelo-minimapa-e-pelos-painéis).
 | `eventshop_us`, `p_shop_us`, `shopdialog_us`, `ingameshop_*` | lojas e cash shop |
 | `digixros_*`, `evo_card_info_us`, `specialevolreturn_us` | evolução |
 

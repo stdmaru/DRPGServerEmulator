@@ -175,7 +175,7 @@ Só fora dos canais BATTLE ZONE (`0x00b39760`) e com `[DAT_01158504]+0x80` = 1 (
   1. `GUI\dr2_sub_007_007` (158×20, título) em (641, 0);
   2. se não recolhido (`+0x180` = 0): `dr2_sub_007_021` (158×126, moldura) em (641, y + 15) — ou (641, y + 20) com a opção `[DAT_01158530]+1` ligada; depois a imagem do mapa em **(645, 22)** (com a opção ligada por `0x00b569f0(…, −1, 0x18, …)`, ❓ mistura);
   3. botão recolher/abrir (controle `+0x184`) em **(781, 5)**: `dr2_sub_007_022` aberto, `023` recolhido; o clique alterna `+0x180`. Recolhido, nada abaixo é desenhado;
-  4. `0x00b9b930` — **marcadores** (`Interface\Map_icon_01.spr`, 12×12): para cada NPC do mapa (lista `[DAT_01158504]+0x300`), o registro da tabela `CTableClass_Npc` pelo id do NPC: se `+0xbc` ≠ 0, quadro `+0xb8` na célula (`+0x24`, `+0x28`) do registro; e os até 4 pontos do registro do mapa em `CTableClass_MapInfo` (`+0x84`, passo 0x24: ligado em +0x18, célula em +0x1c/+0x20) com o quadro 0 (o portal azul). Mouse em cima → nome (texto do registro) por `0x00b9c4b0`;
+  4. `0x00b9b930` — **marcadores** (`Interface\Map_icon_01.spr`, 12×12): para cada NPC do mapa (lista `[DAT_01158504]+0x300`), o registro do `npc_info_us` pelo id do NPC: se `+0xbc` (col. 14) ≠ 0, quadro `+0xb8` (col. 13) na célula (`+0x24`, `+0x28`) (col. 4, 5) do registro; e os até 4 portais do registro do mapa no `map_us` (`+0x84`, passo 0x24: ligado em +0x18, célula em +0x1c/+0x20) com o quadro 0 (o portal azul). Mouse em cima → nome (texto do registro) por `0x00b9c4b0`;
   5. membros do grupo no mesmo mapa (lista `[DAT_01158504]+0x308`, menos o próprio): `w_minimap_point` por `0x00b569f0(…, 6, −18, −3, 31, …)` (❓ tingido);
   6. **o jogador**: `Interface\w_minimap_point.spr` (8×8) quadro 0 centrado em (645 + px · L / Lpx, 22 + py · A / Apx), com px/py = posição em pixels (`+0x168`/`+0x16c`) e Lpx/Apx = tamanho do mapa em pixels (`[DAT_011584f8]+0x511c88/+0x511c8c`).
   Posição na imagem de uma célula (NPC, grupo, portal) = (645 + cx · L / largura em células − w/2, 22 + cy · A / altura em células − h/2) (`[DAT_011584f8]+4/+8`), centrada pelo tamanho do quadro.
@@ -183,16 +183,46 @@ Só fora dos canais BATTLE ZONE (`0x00b39760`) e com `[DAT_01158504]+0x80` = 1 (
 - ✅ **3 botões redondos** à esquerda = `GUI\TeleportEasy_Icon24.spr` quadros 0, 1, 2 (controles da barra `+0x77624/+0x77664/+0x776a4`, carregados em `0x00b91610`) em **(615, 65), (615, 92), (615, 119)**, desenhados em `0x00b8db44` só com o minimapa visível e aberto (`0x00b9d0f0` e `+0x180` = 0) e fora das linhas 7..18 do servidor e dos mapas `0x58`, `0x76`, `0x78..0x7B`. O clique usa itens de teletransporte (`0x238`/`0x23a`/`0x23b`/`0x23c`; fora do marco).
 
 ### Painéis de missão (`CWindow_QuestNotice`, janela `0x17B`)
-- ✅ **Não vêm de um pacote**: o handler do S2C `0x03` (`0x00abbd04`) chama a vtable `+0x20` (`0x0098bed0`) da janela, fora das linhas 7..18 e dos mapas de `0x00b38b30`. Ela percorre a tabela **`CTableClass_QuestDialog`** (tabela `0x15`, registros de 0x48 bytes) e cria um painel para cada registro cujo **item** (u32 +0) o jogador tem (`0x00ad30f0(item, 1)`: bolsa principal `[jogador]+0x1ee4`, 4 × 6 espaços de 0x6c bytes, e as 7 bolsas extras em `+0x76fc` de 0xa90 bytes, que são as páginas do **S2C `0x7F`**). Sem nenhum painel a janela fecha. Na captura são as cartas de apresentação recebidas no tutorial.
+- ✅ **Não vêm de um pacote próprio**: o handler do S2C `0x03` (`0x00abbd04`) chama a vtable `+0x20` (`0x0098bed0`) da janela, fora das linhas 7..18 e dos mapas de `0x00b38b30`. Ela percorre os registros de **`pop-upwindow_us`** (lista `+0x20..+0x24` do `CTableClass_QuestDialog`, tabela do grupo 21, registros de 0x48 bytes; [tabelas](#tabelas-usadas-pelo-minimapa-e-pelos-painéis)) e cria um painel para cada um cujo **item** (coluna 0) o jogador tem (`0x00ad30f0(item, 1)`: id em +4 e quantidade em +0xc de cada espaço de 108 bytes da **bolsa de itens do próprio `0x03`** (`[jogador]+0x1ed8`, 24 espaços) ou das 7 bolsas extras em `+0x76fc` (0xa90 bytes cada, as páginas do **S2C `0x7F`**). Sem nenhum painel a janela fecha. Na captura: os itens 22008, 24171 e 24172 (cartas de apresentação do tutorial) → Nyang (embaixo), Matsuda Takato & Guilmon, GM. Mitsuo Yamaki (em cima).
 - ✅ **Desenho** (`0x0098b0e0`): base (x, y) = (2, 398); painel n (n = 0 é o primeiro registro da tabela, embaixo) com deslocamento n × 61 para cima:
   - `GUI\QuestNoticeUI.spr` quadro 1 (misturado, `0x00b569f0`) e quadro 0 em (2, 398 − 61n);
-  - retrato `Sprite\QuestNoticeIcon.spr` quadro `registro+0xc` em y = 398 − 61n + 19;
-  - textos brancos com sombra em x = 2 + 47: título (`registro+0x18`) e mapa (`registro+0x30`), cortados com "..." acima de 25 e 20 caracteres (`+0x180`/`+0x184` da janela); mouse em cima do texto → texto inteiro;
+  - retrato `Sprite\QuestNoticeIcon.spr` quadro `registro+0xc` (coluna 3) em y = 398 − 61n + 19;
+  - textos brancos com sombra em x = 2 + 47: título (`registro+0x18`, coluna 6) e lugar (`registro+0x30`, coluna 7), cortados com "..." acima de 25 e 20 caracteres (`+0x180`/`+0x184` da janela); mouse em cima do texto → texto inteiro;
   - botão "Progress" `GUI\win052_1_go` em (2 + 169, 398 − 61(n+1) + 99); o clique (fora do tutorial `0x4F`) manda um C2S (fora do marco).
   ❓ Posições exatas do retrato e do título/mapa no eixo y (ler os `push` em `0x0098b44e`…`0x0098ba75`).
-- O `0x7E` (7 páginas, índices `0x29..0x2F`, 0x790 bytes cada, gravadas em `[jogador]+0x4190 + 0x790·(índice − 0x29)`) é outra bolsa (espaços de 0x4c bytes; ❓ cards?), não os painéis.
+- O `0x7E` (7 páginas, índices `0x29..0x2F`, 0x790 bytes cada, gravadas em `[jogador]+0x4190 + 0x790·(índice − 0x29)`) é outra bolsa (24 espaços de 0x4c bytes = registros de card, como a bolsa de cards do `0x03`; ❓ quais), não os painéis.
+
+### Tabelas usadas pelo minimapa e pelos painéis
+Texto separado por `|` em `table.hf` ([arquivos de dados](arquivos-de-dados.md)); colunas a partir de 0, com o offset no registro do original.
+- ✅ **`npc_info_us`** → `CTableClass_Npc` (grupo 15, `NPC_INFO.dat`, linha lida por `0x007231e0`; mapa por **id do NPC**, `0x00722ce0`):
+  | Col. | Registro | Conteúdo |
+  |---|---|---|
+  | 0 | +0 | mapa |
+  | 1 | +4 | **id do NPC** (chave) |
+  | 2 | +8 | nome (dica no minimapa) |
+  | 3 | +0x20 | ❓ tipo |
+  | 4, 5 | +0x24, +0x28 | célula x, y |
+  | 6 | +0x2c | sprite (`Custom…` = avatar) |
+  | 7 | +0x44 | ícone |
+  | 8..12 | +0x5c..+0x6c | ❓ (função, diálogo…) |
+  | 13 | +0xb8 | quadro do `Map_icon_01` no minimapa (0..4) |
+  | 14 | +0xbc | 1 = aparece no minimapa |
+  Ex.: `1|322|GM. Mitsuo Yamaki|0|59|86|NPC_yamaki|icon_npc|26|1|238|0|0|2|1`. ❓ Quais linhas viram NPCs do mapa (lista `[DAT_01158504]+0x300`, montada em `0x00ad3730`).
+- ✅ **`map_us`** → `CTableClass_MapInfo` (grupo 11, `Map.dat`, linha lida por `0x0078e480`, registros de 0x114 bytes; busca por id `0x0078dc20`): col. 0 id (+0), 1 nome (+4), 2 (+0x1c, byte), 3 (+0x1d), 4 código (`R001`, +0x20), 5 (+0x38), 6 = n e as n colunas seguintes (de 5) = nomes de sala (+0x40); depois 12/13 posição no mapa-múndi (+0x4c/+0x50), 14/15 duas linhas de descrição (+0x54/+0x6c) e **4 portais** de 4 colunas (+0x84, passo 0x24): nome do destino (+0, dica), ligado (+0x18), célula x (+0x1c), y (+0x20). Mapa 1: `West of Administration Bureau|1|3|120` e `South of Administration Bureau|1|94|147` = os dois redemoinhos azuis da captura.
+- ✅ **`pop-upwindow_us`** → lista do `CTableClass_QuestDialog` (grupo 21, `Pop-UpWindow.dat`, linha lida por `0x007b49f0`; só as linhas com a última coluna = 1, na ordem do arquivo):
+  | Col. | Registro | Conteúdo |
+  |---|---|---|
+  | 0 | +0 | id do item que mostra o painel |
+  | 1 | +4 | id do NPC |
+  | 2 | +8 | ❓ (diálogo?) |
+  | 3 | +0xc | quadro do `QuestNoticeIcon` |
+  | 4, 5 | +0x10, +0x14 | célula de destino x, y (botão Progress) |
+  | 6 | +0x18 | título |
+  | 7 | +0x30 | lugar |
+  | 8 | — | 1 = entra na lista |
+  O arquivo do v322 tem 3 linhas (as da captura). O `questdialog_us` do mesmo grupo é o texto dos diálogos de NPC, não os painéis.
 
 ## Ainda ❓ (fase A em andamento)
-- UI: fórmula das misturas `0x00b569f0` (modos −1, 6, `0x14`, `0x18`), sprite do ícone `+0x12df`, `w_tamer_menu` na entrada, `0x009b1640`, `0x00a0ceb0`; formato das tabelas `CTableClass_Npc`/`MapInfo`/`QuestDialog` (arquivos e campos usados acima); conteúdo do inventário no `0x02`.
+- UI: fórmula das misturas `0x00b569f0` (modos −1, 6, `0x14`, `0x18`), sprite do ícone `+0x12df`, `w_tamer_menu` na entrada, `0x009b1640`, `0x00a0ceb0`; colunas ❓ das tabelas acima; quais linhas do `npc_info_us` o cliente põe no mapa.
 - Montagem de `0x16`, `0x18`, `0x49`, `0x01`, resto do `0xF0`, e da conexão global (`0x64`).
 - Nome sobre o tamer (fonte, cor), sombra (opção) e o `0x00b57330`.
