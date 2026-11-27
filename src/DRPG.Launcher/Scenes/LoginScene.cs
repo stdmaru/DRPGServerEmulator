@@ -13,6 +13,8 @@ public sealed class LoginScene : IDisposable
     private const int PanelX = 455, PanelY = 165, PanelWidth = 315;
     private const int StatusX = PanelX, StatusY = 392, StatusWidth = PanelWidth;
     private const int StatusPaddingX = 14, StatusPaddingY = 12, StatusLineGap = 4;
+    private const ulong StatusDotStepMs = 180;
+    private const int StatusMaxDots = 5;
 
     // Each mascot runs its own clock, so they never move in step (as in the original).
     private const ulong MascotAFrameMs = 300, MascotBFrameMs = 200;
@@ -37,9 +39,11 @@ public sealed class LoginScene : IDisposable
     private readonly IFont? _font;
     private readonly IRenderer _renderer;
     private readonly List<ITexture> _statusLines = [];
+    private readonly List<ITexture> _animatedStatusFrames = [];
     private ITexture? _statusBg;
     private int _statusBgHeight;
     private string? _statusTextValue;
+    private bool _statusAnimated;
 
     public LoginScene(SpriteStore sprites, RememberedLogin remember, IFont? font, IRenderer renderer)
     {
@@ -151,32 +155,60 @@ public sealed class LoginScene : IDisposable
     /// <summary>
     /// Expandable authentication status box styled to match the <c>dr2_in_003_000</c> login panel (deep blue translucent
     /// fill with a crisp light-blue border): word-wraps long messages and grows vertically to fit all lines.
+    /// When <paramref name="animateDots"/> is true, animates 1..5 trailing dots rapidly while keeping the base text anchored.
     /// </summary>
-    public void DrawStatusBox(IRenderer r, string text)
+    public void DrawStatusBox(IRenderer r, string text, ulong nowMs = 0, bool animateDots = false)
     {
         if (text.Length == 0)
             return;
         int innerWidth = StatusWidth - 2 * StatusPaddingX;
-        if (_font is not null && _statusTextValue != text)
+        int lineHeight = _font?.LineHeight ?? 14;
+
+        if (animateDots)
+        {
+            string baseText = text.TrimEnd('.');
+            if (_font is not null && (!_statusAnimated || _statusTextValue != baseText))
+            {
+                ClearStatusLines();
+                for (int dots = 1; dots <= StatusMaxDots; dots++)
+                    _animatedStatusFrames.Add(_font.Render(_renderer, baseText + new string('.', dots), TextColor));
+                _statusTextValue = baseText;
+                _statusAnimated = true;
+            }
+
+            int boxHeight = Math.Max(36, lineHeight + 2 * StatusPaddingY);
+            r.Draw(StatusBackground(r, StatusWidth, boxHeight), StatusX, StatusY);
+            if (_animatedStatusFrames.Count == StatusMaxDots)
+            {
+                var frame = _animatedStatusFrames[(int)(nowMs / StatusDotStepMs % StatusMaxDots)];
+                int maxFrameWidth = Math.Min(_animatedStatusFrames[^1].Width, innerWidth);
+                int x = StatusX + Math.Max(StatusPaddingX, (StatusWidth - maxFrameWidth) / 2);
+                int y = StatusY + (boxHeight - lineHeight) / 2;
+                r.DrawPart(frame, x, y, 0, Math.Min(frame.Width, innerWidth));
+            }
+            return;
+        }
+
+        if (_font is not null && (_statusAnimated || _statusTextValue != text))
         {
             ClearStatusLines();
             foreach (var line in WrapText(text, innerWidth))
                 _statusLines.Add(_font.Render(_renderer, line, TextColor));
             _statusTextValue = text;
+            _statusAnimated = false;
         }
 
-        int lineHeight = _font?.LineHeight ?? 14;
         int lineCount = Math.Max(1, _statusLines.Count);
         int contentHeight = lineCount * lineHeight + (lineCount - 1) * StatusLineGap;
-        int boxHeight = Math.Max(36, contentHeight + 2 * StatusPaddingY);
-        r.Draw(StatusBackground(r, StatusWidth, boxHeight), StatusX, StatusY);
+        int staticBoxHeight = Math.Max(36, contentHeight + 2 * StatusPaddingY);
+        r.Draw(StatusBackground(r, StatusWidth, staticBoxHeight), StatusX, StatusY);
 
-        int y = StatusY + (boxHeight - contentHeight) / 2;
+        int staticY = StatusY + (staticBoxHeight - contentHeight) / 2;
         foreach (var line in _statusLines)
         {
             int x = StatusX + Math.Max(StatusPaddingX, (StatusWidth - line.Width) / 2);
-            r.DrawPart(line, x, y, 0, Math.Min(line.Width, innerWidth));
-            y += lineHeight + StatusLineGap;
+            r.DrawPart(line, x, staticY, 0, Math.Min(line.Width, innerWidth));
+            staticY += lineHeight + StatusLineGap;
         }
     }
 
@@ -251,6 +283,9 @@ public sealed class LoginScene : IDisposable
         foreach (var line in _statusLines)
             line.Dispose();
         _statusLines.Clear();
+        foreach (var frame in _animatedStatusFrames)
+            frame.Dispose();
+        _animatedStatusFrames.Clear();
     }
 
     public void DrawPanel(IRenderer r, ulong nowMs)

@@ -13,6 +13,7 @@ namespace DRPG.Launcher;
 internal static class Program
 {
     private const uint LauncherVersion = 1;
+    private const ulong TransientStatusDurationMs = 5_000;
 
     private static int Main(string[] args)
     {
@@ -59,7 +60,7 @@ internal static class Program
                 fraction ?? 1.0,
                 patchComplete,
                 sampleNews);
-            DrawFrame(renderer, login, newsView, patchView, sampleState, 0);
+            DrawFrame(renderer, login, newsView, patchView, sampleState, 0, 0);
             var pixels = renderer.Capture();
             renderer.EndFrame();
             Screenshot.WritePpm(screenshot, pixels, IRenderer.FrameWidth, IRenderer.FrameHeight);
@@ -92,11 +93,19 @@ internal static class Program
 
         var events = new List<InputEvent>();
         var previousStage = LauncherStage.Patching;
+        int lastStatusVersion = -1;
+        ulong statusShownAtMs = 0;
         while (!login.CloseRequested)
         {
             var state = flow.Snapshot;
+            ulong nowMs = SdlPlatform.TicksMs;
+            if (state.StatusVersion != lastStatusVersion)
+            {
+                lastStatusVersion = state.StatusVersion;
+                statusShownAtMs = nowMs;
+            }
             login.PanelAvailable = state.PatchComplete
-                && state.Stage is LauncherStage.Ready or LauncherStage.LoggingIn or LauncherStage.LoggedIn;
+                && state.Stage is LauncherStage.Ready or LauncherStage.LoggingIn or LauncherStage.LoggedIn or LauncherStage.LockedOut;
             login.Interactive = state.Stage == LauncherStage.Ready; // connected to the server and idle
             if (previousStage == LauncherStage.LoggingIn && state.Stage != LauncherStage.LoggingIn)
                 login.ClearPassword(); // refused or failed: typed again; on success it is not needed any more
@@ -130,21 +139,30 @@ internal static class Program
             }
 
             renderer.BeginFrame();
-            DrawFrame(renderer, login, newsView, patchView, state, SdlPlatform.TicksMs);
-            cursor.Draw(renderer, SdlPlatform.TicksMs);
+            DrawFrame(renderer, login, newsView, patchView, state, nowMs, statusShownAtMs);
+            cursor.Draw(renderer, nowMs);
             renderer.EndFrame();
         }
         return Quit(stop);
     }
 
-    private static void DrawFrame(IRenderer r, LoginScene login, NewsView news, PatchView patch, LauncherFlow.State state, ulong nowMs)
+    private static void DrawFrame(
+        IRenderer r,
+        LoginScene login,
+        NewsView news,
+        PatchView patch,
+        LauncherFlow.State state,
+        ulong nowMs,
+        ulong statusShownAtMs)
     {
         login.DrawBackground(r);
         news.Draw(r, state.News, loading: state.Stage == LauncherStage.Patching && !state.PatchComplete);
         patch.Draw(r, state.PatchStatus, state.PatchDetail, state.PatchFraction, state.PatchComplete);
         login.DrawPanel(r, nowMs);
-        if (state.PatchComplete && state.Status.Length > 0)
-            login.DrawStatusBox(r, state.Status);
+        bool transientExpired = state.Stage == LauncherStage.Ready && nowMs >= statusShownAtMs + TransientStatusDurationMs;
+        bool animateDots = state.Stage is LauncherStage.Connecting or LauncherStage.LoggingIn or LauncherStage.LoggedIn;
+        if (state.PatchComplete && state.Status.Length > 0 && !transientExpired)
+            login.DrawStatusBox(r, state.Status, nowMs, animateDots);
     }
 
     /// <summary>Text is optional: without a usable font the launcher still works, only without labels.</summary>

@@ -11,6 +11,7 @@ public enum LauncherStage
     Ready,       // login panel usable; the status box shows the last login error, if any
     LoggingIn,   // panel frozen, "Logging in..."
     LoggedIn,    // game key received: the launcher starts the game (see GameLogin)
+    LockedOut,   // too many login attempts: fields and OK locked
     Failed,      // message in the status box; retried by itself unless nothing can be retried
 }
 
@@ -47,16 +48,18 @@ public sealed class LauncherFlow(
         double PatchFraction = 0,
         bool PatchComplete = false,
         IReadOnlyList<PatchConfiguration.NewsItem>? News = null,
-        string PatchDetail = "");
+        string PatchDetail = "",
+        int StatusVersion = 0);
 
     private readonly Lock _lock = new();
-    private State _state = new(LauncherStage.Patching, "Checking for updates...", null, "Checking for updates...", 0, false, [], "");
+    private State _state = new(LauncherStage.Patching, "Checking for updates...", null, "Checking for updates...", 0, false, [], "", 0);
     private PatchConfiguration? _configuration;
     private string _patchStatus = "Checking for updates...";
     private string _patchDetail = "";
     private string _patchDetailBase = "";
     private double _patchFraction;
     private bool _patchComplete;
+    private int _statusVersion;
     private IReadOnlyList<PatchConfiguration.NewsItem> _news = [];
     private Func<Task>? _retry;
     private string _failure = "";
@@ -250,7 +253,7 @@ public sealed class LauncherFlow(
                 Set(LauncherStage.Ready, "Wrong ID or password.");
                 break;
             case LauncherLoginStatus.TooManyAttempts:
-                Set(LauncherStage.Ready, "Too many attempts. Try again later.");
+                Set(LauncherStage.LockedOut, "Too many attempts. Try again later.");
                 break;
             case LauncherLoginStatus.AccountUnavailable:
                 Set(LauncherStage.Ready, "This account cannot play.");
@@ -288,7 +291,10 @@ public sealed class LauncherFlow(
     private void Set(LauncherStage stage, string status, bool log = true)
     {
         lock (_lock)
-            _state = new State(stage, status, null, _patchStatus, _patchFraction, _patchComplete, _news, _patchDetail);
+        {
+            _statusVersion++;
+            _state = new State(stage, status, null, _patchStatus, _patchFraction, _patchComplete, _news, _patchDetail, _statusVersion);
+        }
         if (log)
             Console.WriteLine($"[{stage}] {status}");
     }
@@ -310,7 +316,7 @@ public sealed class LauncherFlow(
                 flow._patchDetailBase = "";
                 flow._patchFraction = p.Fraction;
                 flow._patchComplete = false;
-                flow._state = new State(LauncherStage.Patching, status, p, status, p.Fraction, false, flow._news, "");
+                flow._state = new State(LauncherStage.Patching, status, p, status, p.Fraction, false, flow._news, "", flow._statusVersion);
             }
         }
     }
