@@ -114,7 +114,7 @@ public sealed class FieldWilds
             int oldX = wild.Entity.CellX, oldY = wild.Entity.CellY;
             if (wild.Entity.IsAtCellCenter)
                 wild.Entity.ProcessNextCommand(isWild: true);
-            wild.Entity.StepPhysics(pathfinder is not null ? pathfinder.NextStep : null);
+            wild.Entity.StepPhysics(pathfinder is not null ? pathfinder.ResolveStep : null);
 
             if (collision is not null)
             {

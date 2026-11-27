@@ -1,6 +1,13 @@
 namespace DRPG.Client.World;
 
 /// <summary>
+/// ✅ <c>0x007f4b10</c> / <c>0x008671c0</c>: one A* step result. When <see cref="BlockedAtTarget"/> is true, the next cell
+/// IS the destination and failed <see cref="FieldCollision.IsFree"/>, so the entity stops (<c>Dest = Cell</c>) while still
+/// turning to face (<see cref="NextX"/>, <see cref="NextY"/>).
+/// </summary>
+public readonly record struct PathStep(int NextX, int NextY, bool BlockedAtTarget);
+
+/// <summary>
 /// A* pathfinder of the field map (✅ v322 <c>0x00b43200</c> → <c>0x00b430f0</c> → <c>0x00b433d0</c> → <c>0x00b43520</c> /
 /// <c>0x00b436e0</c>, docs/cliente/campo.md). Used identically by the player tamer (<c>0x008671c0</c>, <c>0x00b4d290</c>),
 /// the partner digimon and the server wild digimon (<c>0x007f4b10</c>).
@@ -34,21 +41,28 @@ public sealed class FieldPathfinder(FieldCollision collision)
     }
 
     /// <summary>
-    /// ✅ <c>0x00b43200</c> + <c>0x00b35b30</c> final-cell check: returns the next adjacent cell from
-    /// (<paramref name="fromX"/>, <paramref name="fromY"/>) toward (<paramref name="destX"/>, <paramref name="destY"/>),
-    /// or <c>null</c> when already there, unreachable within <see cref="MaxDepth"/>, or when the next cell is the target
-    /// itself and is not free (<see cref="FieldCollision.IsFree"/>).
+    /// ✅ <c>0x007f4b10</c> / <c>0x008671c0</c>: resolves the next A* step toward (<paramref name="destX"/>,
+    /// <paramref name="destY"/>), reporting <see cref="PathStep.BlockedAtTarget"/> when the next cell is the destination
+    /// itself and is not free (<see cref="FieldCollision.IsFree"/>) so callers can stop AND still face that cell.
     /// </summary>
-    public (int NextX, int NextY)? NextStep(int fromX, int fromY, int destX, int destY)
+    public PathStep? ResolveStep(int fromX, int fromY, int destX, int destY)
     {
         if (fromX == destX && fromY == destY)
             return null;
         if (!TryFindFirstStep(fromX, fromY, destX, destY, out int nextX, out int nextY))
             return null;
-        if (nextX == destX && nextY == destY && !collision.IsFree(nextX, nextY))
-            return null;
-        return (nextX, nextY);
+        bool blockedAtTarget = nextX == destX && nextY == destY && !collision.IsFree(nextX, nextY);
+        return new PathStep(nextX, nextY, blockedAtTarget);
     }
+
+    /// <summary>
+    /// ✅ <c>0x00b43200</c> + <c>0x00b35b30</c> final-cell check: returns the next adjacent cell from
+    /// (<paramref name="fromX"/>, <paramref name="fromY"/>) toward (<paramref name="destX"/>, <paramref name="destY"/>),
+    /// or <c>null</c> when already there, unreachable within <see cref="MaxDepth"/>, or when the next cell is the target
+    /// itself and is not free (<see cref="FieldCollision.IsFree"/>).
+    /// </summary>
+    public (int NextX, int NextY)? NextStep(int fromX, int fromY, int destX, int destY) =>
+        ResolveStep(fromX, fromY, destX, destY) is { BlockedAtTarget: false } step ? (step.NextX, step.NextY) : null;
 
     /// <summary>✅ <c>0x00b43200</c> / <c>0x00b430f0</c>: raw A* search returning the first step without the final-cell free check.</summary>
     public bool TryFindFirstStep(int fromX, int fromY, int destX, int destY, out int nextX, out int nextY)

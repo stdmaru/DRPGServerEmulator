@@ -171,6 +171,33 @@ public sealed class FieldWildsTests
     }
 
     [Fact]
+    public void Wild_blocked_north_by_own_occupancy_faces_north_matching_0x007f4b10()
+    {
+        var collision = Grid(".....", ".....", ".....", ".....", ".....");
+        var pathfinder = new FieldPathfinder(collision);
+        var wilds = new FieldWilds();
+        var tamer = new FieldEntity(2, 2);
+        var serial = new Serial(9, 10);
+        var rng = new Random(0);
+
+        // Spawn at (2, 3): 0x00b36550 occupies both (2, 3) and (2, 2)
+        wilds.Apply(WildPacket(serial, 1, 2, 3, 2, 3, dir: 0), mapId: 79, collision, _ => null, rng);
+        wilds.Step(tamer, collision, pathfinder, rng);
+        Assert.Equal(serial, collision.OccupantAt(2, 2));
+
+        // Server moved wild to (2, 2) with Facing = NE (5) (e.g. after a dx=+1, dy=-2 walk) and now sends Standing at (2, 2)
+        wilds.Apply(WildPacket(serial, 1, 2, 2, 2, 2, dir: 5), mapId: 79, collision, _ => null, rng);
+        wilds.Step(tamer, collision, pathfinder, rng);
+
+        // ✅ 0x00859340 sets Dest=(2,2), State=Run, Dir=NE(5); then 0x007f4b10 finds (2,2) occupied (by self!), sets Dest=(2,3)
+        // AND still overwrites Direction = FromTo((2,3) -> (2,2)) = North (4), then 0x0085e5b0 stops it facing North (4).
+        Assert.True(wilds.TryGet(serial, out var wild));
+        Assert.Equal(MoveState.Standing, wild.Entity.State);
+        Assert.Equal((2, 3), (wild.Entity.CellX, wild.Entity.CellY));
+        Assert.Equal(4, wild.Entity.Direction);
+    }
+
+    [Fact]
     public void Map_decoder_parses_0x11_and_rejects_wrong_length()
     {
         var payload = Convert.FromHexString("2E709CEA6897AE41B514A9EAAEAC2949597572616D6F6E0000000000000000000000000000000E0001000200020102001900410019004100");

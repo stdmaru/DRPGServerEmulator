@@ -114,10 +114,10 @@ public sealed class FieldCollisionTests
         var entity = new FieldEntity(0, 0);
         entity.SetDestination(4, 0);
 
-        (int, int)? Next(int fx, int fy, int dx, int dy)
+        PathStep? Next(int fx, int fy, int dx, int dy)
         {
             int nx = fx + Math.Sign(dx - fx), ny = fy + Math.Sign(dy - fy);
-            return collision.CanStepTo(nx, ny, dx, dy) ? (nx, ny) : null;
+            return collision.CanStepTo(nx, ny, dx, dy) ? new PathStep(nx, ny, BlockedAtTarget: false) : null;
         }
 
         for (int step = 0; step < 40; step++)

@@ -52,7 +52,7 @@ public sealed class FieldPathfinderTests
 
         for (int step = 0; step < 100 && entity.IsMoving; step++)
         {
-            entity.StepPhysics(pathfinder.NextStep);
+            entity.StepPhysics(pathfinder.ResolveStep);
             Assert.True(collision.IsWalkable(entity.CellX, entity.CellY));
         }
 
@@ -72,10 +72,11 @@ public sealed class FieldPathfinderTests
         entity.SetDestination(4, 1);            // (4, 1) is blocked
 
         for (int step = 0; step < 80 && entity.IsMoving; step++)
-            entity.StepPhysics(pathfinder.NextStep);
+            entity.StepPhysics(pathfinder.ResolveStep);
 
         Assert.Equal((3, 1), (entity.CellX, entity.CellY));
         Assert.Equal(MoveState.Standing, entity.State);
+        Assert.Equal(6, entity.Direction);      // ✅ 0x008671c0: still faces the blocked target cell (E = 6)
     }
 
     [Fact]

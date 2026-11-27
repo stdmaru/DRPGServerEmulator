@@ -145,12 +145,12 @@ public sealed class FieldEntity
     public void EnqueueCommand(MoveCommand command) => _commands.Enqueue(command);
 
     /// <summary>
-    /// ✅ <c>0x008671c0</c> / <c>0x007f3df0</c> + <c>0x0085e5b0</c> + <c>0x0085e940</c>: one logic step of movement physics.
-    /// <paramref name="nextStep"/> (used in stages 2–3 for collision and pathfinding) picks the next adjacent cell from
-    /// (<see cref="CellX"/>, <see cref="CellY"/>) toward (<see cref="DestX"/>, <see cref="DestY"/>); when null, steps directly
-    /// toward the destination.
+    /// ✅ <c>0x008671c0</c> / <c>0x007f3df0</c> + <c>0x007f4b10</c> + <c>0x0085e5b0</c> + <c>0x0085e940</c>: one logic step
+    /// of movement physics. <paramref name="resolveStep"/> picks the next adjacent cell from (<see cref="CellX"/>,
+    /// <see cref="CellY"/>) toward (<see cref="DestX"/>, <see cref="DestY"/>); when null, steps directly toward the
+    /// destination.
     /// </summary>
-    public void StepPhysics(Func<int, int, int, int, (int NextX, int NextY)?>? nextStep = null)
+    public void StepPhysics(Func<int, int, int, int, PathStep?>? resolveStep = null)
     {
         if (State == MoveState.Standing && (CellX != DestX || CellY != DestY))
             State = MoveState.Run;
@@ -162,17 +162,24 @@ public sealed class FieldEntity
         {
             if (CellX != DestX || CellY != DestY)
             {
-                var next = nextStep is not null
-                    ? nextStep(CellX, CellY, DestX, DestY)
-                    : (CellX + Math.Sign(DestX - CellX), CellY + Math.Sign(DestY - CellY));
-                if (next is null)
+                var step = resolveStep is not null
+                    ? resolveStep(CellX, CellY, DestX, DestY)
+                    : new PathStep(CellX + Math.Sign(DestX - CellX), CellY + Math.Sign(DestY - CellY), BlockedAtTarget: false);
+                if (step is null)
                 {
                     DestX = CellX;
                     DestY = CellY;
                 }
                 else
                 {
-                    int dir = FieldDirection.FromTo(CellX, CellY, next.Value.NextX, next.Value.NextY);
+                    // ✅ 0x007f4b10 lines 53-61 / 0x008671c0 lines 75-84: if the next step IS the destination and fails
+                    // 0x00b35b30 (blocked/occupied), stop (Dest = Cell) AND still turn to face that cell.
+                    if (step.Value.BlockedAtTarget)
+                    {
+                        DestX = CellX;
+                        DestY = CellY;
+                    }
+                    int dir = FieldDirection.FromTo(CellX, CellY, step.Value.NextX, step.Value.NextY);
                     if (dir != -1)
                         Direction = dir;
                 }
@@ -279,7 +286,7 @@ public sealed class FieldEntity
     /// ✅ <c>0x008671c0</c> (lines 93–165) + <c>0x007f3df0</c>: updates the partner digimon following
     /// <paramref name="leader"/> for one logic step.
     /// </summary>
-    public void FollowLeader(FieldEntity leader, Func<int, int, int, int, (int NextX, int NextY)?>? nextStep = null)
+    public void FollowLeader(FieldEntity leader, Func<int, int, int, int, PathStep?>? resolveStep = null)
     {
         if (leader.IsMoving && leader.IsAtCellCenter)
         {
@@ -305,7 +312,7 @@ public sealed class FieldEntity
 
         if (IsAtCellCenter)
             ProcessNextCommand();
-        StepPhysics(nextStep);
+        StepPhysics(resolveStep);
     }
 }
 

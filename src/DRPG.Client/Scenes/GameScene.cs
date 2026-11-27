@@ -336,7 +336,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
                 && _lastClickCell != (cellX, cellY))
             {
                 _lastClickCell = (cellX, cellY);
-                if (NextStep(_tamerEntity.CellX, _tamerEntity.CellY, cellX, cellY) is not null)
+                if (ResolveStep(_tamerEntity.CellX, _tamerEntity.CellY, cellX, cellY) is { BlockedAtTarget: false })
                 {
                     _tamerEntity.SetDestination(cellX, cellY);
                     _moveQueue.Enqueue((short)cellX, (short)cellY);
@@ -415,7 +415,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     internal void Step()
     {
         int oldTamerX = _tamerEntity.CellX, oldTamerY = _tamerEntity.CellY;
-        _tamerEntity.StepPhysics(NextStep);
+        _tamerEntity.StepPhysics(ResolveStep);
         UpdateOccupancy(oldTamerX, oldTamerY, _tamerEntity, _tamerSerial);
         SyncAnimation(_tamerAnimation, _tamerEntity);
         _tamerAnimation?.Step();
@@ -423,7 +423,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         if (_digimonEntity is not null)
         {
             int oldDigiX = _digimonEntity.CellX, oldDigiY = _digimonEntity.CellY;
-            _digimonEntity.FollowLeader(_tamerEntity, NextStep);
+            _digimonEntity.FollowLeader(_tamerEntity, ResolveStep);
             UpdateOccupancy(oldDigiX, oldDigiY, _digimonEntity, _digimonSerial);
             SyncAnimation(_digimonAnimation, _digimonEntity);
             _digimonAnimation?.Step(random.Next(4));                       // ✅ 1 in 4 for the animation 3
@@ -461,13 +461,13 @@ public sealed class GameScene(GameContext game, Random random) : IScene
             _cursor = CursorKind.Portal;
     }
 
-    private (int NextX, int NextY)? NextStep(int fromX, int fromY, int destX, int destY)
+    private PathStep? ResolveStep(int fromX, int fromY, int destX, int destY)
     {
         if (fromX == destX && fromY == destY)
             return null;
         if (_pathfinder is not null)
-            return _pathfinder.NextStep(fromX, fromY, destX, destY);
-        return (fromX + Math.Sign(destX - fromX), fromY + Math.Sign(destY - fromY));
+            return _pathfinder.ResolveStep(fromX, fromY, destX, destY);
+        return new PathStep(fromX + Math.Sign(destX - fromX), fromY + Math.Sign(destY - fromY), BlockedAtTarget: false);
     }
 
     private void UpdateOccupancy(int oldX, int oldY, FieldEntity entity, Serial serial)
