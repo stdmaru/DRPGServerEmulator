@@ -223,6 +223,19 @@ public class MovementTests
     }
 
     [Fact]
+    public void Click_near_viewport_edge_up_to_11_cells_is_accepted_without_speed_buff()
+    {
+        // ✅ 0x20 envia a célula clicada (em 800×600 meia tela Y = 9,375 células; máximo em 9640 amostras v322 = 11)
+        _zones.Move(_player, 57, 66);                       // dist=10 (ex.: (16,196) -> (17,206))
+        Assert.Equal((57, 66), (_player.Character.X, _player.Character.Y));
+        Assert.Empty(_session.SentOpcodes());
+
+        _zones.Move(_player, 57, 77);                       // dist=11 num intervalo imediato
+        Assert.Equal((57, 77), (_player.Character.X, _player.Character.Y));
+        Assert.Empty(_session.SentOpcodes());
+    }
+
+    [Fact]
     public void Speed_costume_doubles_allowed_move_speed_and_blocks_unbuffed_fast_steps()
     {
         // Sem fantasia de velocidade: passo de bicicleta a 60 FPS (dx=-5, dy=-12 -> Chebyshev 12) é recusado

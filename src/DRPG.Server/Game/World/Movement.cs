@@ -23,8 +23,14 @@ public static class Movement
     /// </summary>
     public const double BaseMoveSpeed = 7.5;
 
-    /// <summary>Folga fixa em células (arredondamento de grade, jitter de rede e ~62,5 FPS em Sleep(16)).</summary>
-    public const double Slack = 2.0;
+    /// <summary>
+    /// Folga fixa em células. ✅ O cliente envia em <c>0x20</c> a célula de destino clicada (<c>0x00b4d290</c> →
+    /// <c>0x00ae1000</c>), não a posição já percorrida; em 800×600 meia tela vertical tem <c>300/32 = 9,375</c>
+    /// células e nas 9640 amostras v322 de <c>captures.db</c> o máximo observado sem bônus é <c>|dy| = 11</c>.
+    /// Com 4,5 células de folga, o limite em 0,867 s fica em 11,00 células (aceita cliques até a borda da tela
+    /// e segue barrando passos ≥ 12 sem fantasia e ≥ 18 com fantasia de 200%).
+    /// </summary>
+    public const double Slack = 4.5;
 
     /// <summary>Distância Chebyshev entre duas células (<c>max(|dx|, |dy|)</c>), igual ao passo por eixo do cliente.</summary>
     public static int Distance(int fromX, int fromY, int x, int y) =>
