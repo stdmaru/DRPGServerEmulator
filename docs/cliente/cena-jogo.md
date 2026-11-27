@@ -50,8 +50,12 @@ Tempo a partir da conexão no mapa:
   2. Entidades `0x00ad4a50`; efeitos de clima por mapa (`0x00a14360`, `0x00a16d40`); `0x00a0d340`; nomes `0x00b37b00`.
   3. UI: `0x00a45230(0)`, `0x00a45230(1)`, GUI `0x009b6010`, `0x00b42f60`, `0x00a0ceb0`, `0x007dca50`. ❓ Quais janelas aparecem na entrada.
 
+## Mapa e entidades no campo
+- ✅ Formatos `.map`, `.til`, `.obj` e a ordem de desenho do campo: ver [mapas](mapas.md#desenho-campo-).
+- ✅ Entidades (`0x00ad4a50`, modo campo): percorre a lista `[DAT_01158504]+0x2f8` (objetos com vtable: tamers, digimons, NPCs) e põe cada um na fila de desenho com o tipo do byte `+5` e a posição em pixels `+0x170/+0x174`; tipo `+0x149 == 8` ganha uma entrada extra (tipo 3) acima (`y − +0x18c`, ❓ nome/balão), `== 0xb` uma do tipo 2; quem está sob o cursor (`+0xca0`, 12 B) ganha a do tipo 4 (destaque). Depois a lista `+0x300`. A fila (y-sort) desenha cada uma pela vtable `+0x14` da entidade. ❓ Classes de tamer e digimon, animação parada e direção: próximo passo.
+
 ## Ainda ❓ (fase A em andamento)
-- Mapa: objeto `DAT_011584f8`, carga do `.map`/`.til`/`.obj` (quando: provavelmente ao receber o `0x02`), câmera `0x00b36c20`, desenho de tiles e objetos, y-sort.
-- Tamer e digimon no mapa (`0x00ad4a50`), direção e animação parada.
+- Mapa: **quando** a carga do `.map` acontece (provavelmente ao receber o `0x02`) e a câmera seguindo o tamer.
+- Tamer e digimon no mapa: classes, desenho pela vtable `+0x14`, direção e animação parada.
 - UI básica da entrada (`0x00a45230`, `0x009b6010`), BGM do mapa.
 - Montagem de `0x16`, `0x18`, `0x49`, `0x01`, `0x04`, `0xF0`, `0x121` e da conexão global.
