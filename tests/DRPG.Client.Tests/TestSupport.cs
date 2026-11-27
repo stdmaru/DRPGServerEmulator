@@ -116,6 +116,11 @@ internal sealed class FakeInstall : IDisposable
             // the field bar: the background and its glow, the chat's background (taller than the 81 px drawn)
             ("gui\\dr2_main_000_000.spr", Sprite(800, 105, 2)),
             ("gui\\dr2_main_000_018.spr", Sprite(409, 190)),
+            ("gui\\dr2_main_000_001.spr", Sprite(13, 13, 3)),
+            ("gui\\dr2_main_000_037.spr", Sprite(35, 14, 3)),
+            ("gui\\dr2_main_000_038.spr", Sprite(35, 14, 3)),
+            ("gui\\dr2_main_000_039.spr", Sprite(35, 14, 3)),
+            ("gui\\dr2_main_000_040.spr", Sprite(35, 14, 3)),
             // portraits: tamer 1 has its own, the fallback icon_065 stands in for the others
             ("sprite\\icon_001.spr", Sprite(41, 41, 2)),
             ("sprite\\icon_065.spr", Sprite(65, 65, 2)),

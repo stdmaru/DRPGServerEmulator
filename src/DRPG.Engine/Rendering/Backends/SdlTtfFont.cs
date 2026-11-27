@@ -8,12 +8,15 @@ namespace DRPG.Engine.Rendering.Backends;
 public sealed unsafe class SdlTtfFont : IFont
 {
     private static bool _initialized;
+    private readonly bool _smoothEdges;
     private TTF_Font* _font;
 
     /// <summary>Opens <paramref name="path"/> with an em of <paramref name="pixelSize"/> pixels. Not GDI's cell
     /// height: fallback faces such as Noto CJK have tall line gaps and came out too small that way.</summary>
-    public SdlTtfFont(string path, int pixelSize)
+    /// <param name="smoothEdges">False draws hard glyphs (<see cref="TextPixels.Harden"/>), like GDI's text in the original client.</param>
+    public SdlTtfFont(string path, int pixelSize, bool smoothEdges)
     {
+        _smoothEdges = smoothEdges;
         if (!_initialized)
         {
             if (!TTF_Init())
@@ -47,6 +50,8 @@ public sealed unsafe class SdlTtfFont : IFont
             var pixels = new uint[w * h];
             for (int y = 0; y < h; y++)
                 new ReadOnlySpan<uint>((byte*)converted->pixels + y * converted->pitch, w).CopyTo(pixels.AsSpan(y * w, w));
+            if (!_smoothEdges)
+                TextPixels.Harden(pixels);
             return renderer.CreateTexture(w, h, pixels);
         }
         finally

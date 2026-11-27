@@ -229,6 +229,35 @@ public sealed class FieldHudClassIconTests
     public void A_class_without_a_frame_draws_no_icon(int tamerClass) => Assert.Empty(ClassIcons(tamerClass));
 }
 
+public sealed class FieldHudChatTests
+{
+    private static List<FakeRenderer.DrawCall> Draws()
+    {
+        using var fixture = new SceneFixture();
+        new FieldHud(fixture.Game).Draw(fixture.Renderer,
+            new HudValues("Marcus", 1, 1, 5, "Net Ocean", 1, "Plains", 5, 6, null, new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc)));
+        return fixture.Renderer.Draws;
+    }
+
+    [Fact]
+    public void The_watch_tab_is_never_drawn()
+    {
+        var tabs = Draws().Where(d => (d.Texture.Width, d.Texture.Height) == (35, 14)).Select(d => (d.X, d.Y)).ToList();
+
+        Assert.Equal([(280, 574), (317, 574), (391, 574)], tabs);
+    }
+
+    [Fact]
+    public void The_chat_size_buttons_are_frames_2_0_1_side_by_side_last_of_the_bar()
+    {
+        var draws = Draws();
+        var sizes = draws.Where(d => (d.Texture.Width, d.Texture.Height) == (13, 13)).ToList();
+
+        Assert.Equal([(398, 549), (413, 549), (428, 549)], sizes.Select(d => (d.X, d.Y)));
+        Assert.Equal(sizes, draws.TakeLast(3));
+    }
+}
+
 public sealed class SpeciesTablesIconTests
 {
     [Theory]

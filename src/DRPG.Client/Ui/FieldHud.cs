@@ -52,6 +52,15 @@ public sealed class FieldHud(GameContext game)
     private static readonly (int Sprite, int X, int Y)[] ChatButtons = [(23, 179, 572), (24, 201, 572), (25, 222, 572), (26, 244, 572), (27, 157, 572)];
     private static readonly (int Sprite, int X, int Y)[] ChatTabs = [(37, 280, 574), (38, 317, 574), (39, 355, 574), (40, 391, 574)];
 
+    /// <summary>✅ <c>0x00b91a80</c>, case 2: the third tab ("Watch", <c>000_039</c>) is never drawn.</summary>
+    private const int HiddenChatTab = 2;
+
+    /// <summary>
+    /// ✅ The chat size buttons (<c>0x00b8e2a0</c>, set up in <c>0x00b90570</c>): frames 2, 0 and 1 of <c>dr2_main_000_001</c> (13×13) at
+    /// x = 398, 400 + w(2) and that + w(0) + 2, y = 549; drawn plain, last of the bar.
+    /// </summary>
+    private const int ChatSizeSprite = 1, ChatSizeY = 0x225, ChatSizeFirstX = 0x18e, ChatSizeSecondX = 0x190, ChatSizeGap = 2;
+
     private const int ChatX = 28, ChatY = 460, ChatHeight = 81;
 
     /// <summary>
@@ -80,6 +89,20 @@ public sealed class FieldHud(GameContext game)
         DrawTamerPanel(renderer, v);
         DrawDigimonPanel(renderer, v.Leader);
         DrawButtons(renderer);
+        DrawChatSizeButtons(renderer);
+    }
+
+    /// <summary>✅ <c>0x00b8e2a0</c>, the last call of <c>0x00b8a850</c>: the three chat size buttons.</summary>
+    private void DrawChatSizeButtons(IRenderer renderer)
+    {
+        var frames = Gui(ChatSizeSprite);
+        if (frames.Length < 3)
+            return;
+        int secondX = ChatSizeSecondX + frames[2].Width;
+        int thirdX = secondX + frames[0].Width + ChatSizeGap;
+        renderer.Draw(frames[2], ChatSizeFirstX, ChatSizeY);
+        renderer.Draw(frames[0], secondX, ChatSizeY);
+        renderer.Draw(frames[1], thirdX, ChatSizeY);
     }
 
     /// <summary>
@@ -184,11 +207,17 @@ public sealed class FieldHud(GameContext game)
         foreach (var (sprite, x, y) in ChatButtons)
         {
             bool current = sprite == 25;                                                       // ✅ mode 0 of the chat
-            // ❓ the 000_027 button is disabled at level 4 or less: how the original greys it is not known, it is drawn as the others
+            // ✅ the 000_027 button is disabled when the tamer class (+0x12df) is 4 or less, unless GM or on the maps of 0x00b39760
+            // (0x00b8e6a0); ❓ how a disabled button looks is not read: drawn as the others (the original looks the same at class 1)
             Frame(renderer, Gui(sprite), current ? 0 : 3, x, y);
         }
         for (int i = 0; i < ChatTabs.Length; i++)
-            Frame(renderer, Gui(ChatTabs[i].Sprite), i == 0 ? 2 : 0, ChatTabs[i].X, ChatTabs[i].Y);   // ✅ the first tab is the current one
+        {
+            if (i == HiddenChatTab)
+                continue;
+            // ✅ frame 2 on the current tab (+0x4b7b0 = 0 on entry) and on "Setting" while its window 0x10 is open (never yet), else 0
+            Frame(renderer, Gui(ChatTabs[i].Sprite), i == 0 ? 2 : 0, ChatTabs[i].X, ChatTabs[i].Y);
+        }
     }
 
     private ITexture[] Gui(int number) => Load($"gui\\dr2_main_000_{number:000}.spr", gui: true);
