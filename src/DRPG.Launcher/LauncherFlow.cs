@@ -46,12 +46,15 @@ public sealed class LauncherFlow(
         string PatchStatus = "Checking for updates...",
         double PatchFraction = 0,
         bool PatchComplete = false,
-        IReadOnlyList<PatchConfiguration.NewsItem>? News = null);
+        IReadOnlyList<PatchConfiguration.NewsItem>? News = null,
+        string PatchDetail = "");
 
     private readonly Lock _lock = new();
-    private State _state = new(LauncherStage.Patching, "Checking for updates...", null, "Checking for updates...", 0, false, []);
+    private State _state = new(LauncherStage.Patching, "Checking for updates...", null, "Checking for updates...", 0, false, [], "");
     private PatchConfiguration? _configuration;
     private string _patchStatus = "Checking for updates...";
+    private string _patchDetail = "";
+    private string _patchDetailBase = "";
     private double _patchFraction;
     private bool _patchComplete;
     private IReadOnlyList<PatchConfiguration.NewsItem> _news = [];
@@ -147,7 +150,12 @@ public sealed class LauncherFlow(
             int seconds = (int)Math.Ceiling(left.TotalSeconds);
             string text = $"{_failure} Retrying in {seconds} s...";
             if (!_patchComplete)
-                SetPatch(text, _patchFraction, complete: false);
+            {
+                string detail = string.IsNullOrWhiteSpace(_patchDetailBase)
+                    ? $"Retrying in {seconds} s..."
+                    : $"{_patchDetailBase}\nRetrying in {seconds} s...";
+                SetPatch(_patchStatus, _patchFraction, complete: false, detail: detail, keepDetailBase: true);
+            }
             Set(LauncherStage.Failed, text, log: false);
             await Task.Delay(left < TimeSpan.FromSeconds(1) ? left : TimeSpan.FromSeconds(1), ct);
         }
@@ -172,19 +180,20 @@ public sealed class LauncherFlow(
             case PatchOutcome.Maintenance m:
                 if (m.News is not null)
                     _news = m.News;
-                string maint = string.IsNullOrWhiteSpace(m.Message) ? m.Title : $"{m.Title}: {m.Message.Trim()}";
-                SetPatch(maint, 0, complete: false);
-                Fail(maint, () => PatchAsync(ct));
+                string title = string.IsNullOrWhiteSpace(m.Title) ? "Maintenance" : m.Title.Trim();
+                string message = m.Message.Trim();
+                SetPatch(title, 1.0, complete: false, detail: message);
+                Fail(string.IsNullOrWhiteSpace(message) ? title : $"{title}: {message}", () => PatchAsync(ct));
                 break;
             case PatchOutcome.NeedsReinstall r:
                 if (r.News is not null)
                     _news = r.News;
                 string old = $"Version {r.Installed} is too old (minimum {r.Minimum}). Please reinstall the game.";
-                SetPatch(old, 0, complete: false);
+                SetPatch("Reinstall required", 0, complete: false, detail: old);
                 Fail(old, null);
                 break;
             case PatchOutcome.Failed f:
-                SetPatch($"Update failed: {f.Reason}", 0, complete: false);
+                SetPatch("Update failed", 0, complete: false, detail: f.Reason);
                 Fail($"Update failed: {f.Reason}", () => PatchAsync(ct));
                 break;
         }
@@ -263,11 +272,14 @@ public sealed class LauncherFlow(
         Set(LauncherStage.Failed, status);
     }
 
-    private void SetPatch(string patchStatus, double fraction, bool complete)
+    private void SetPatch(string patchStatus, double fraction, bool complete, string detail = "", bool keepDetailBase = false)
     {
         lock (_lock)
         {
             _patchStatus = patchStatus;
+            _patchDetail = detail;
+            if (!keepDetailBase)
+                _patchDetailBase = detail;
             _patchFraction = Math.Clamp(fraction, 0, 1);
             _patchComplete = complete;
         }
@@ -276,7 +288,7 @@ public sealed class LauncherFlow(
     private void Set(LauncherStage stage, string status, bool log = true)
     {
         lock (_lock)
-            _state = new State(stage, status, null, _patchStatus, _patchFraction, _patchComplete, _news);
+            _state = new State(stage, status, null, _patchStatus, _patchFraction, _patchComplete, _news, _patchDetail);
         if (log)
             Console.WriteLine($"[{stage}] {status}");
     }
@@ -294,9 +306,11 @@ public sealed class LauncherFlow(
             lock (flow._lock)
             {
                 flow._patchStatus = status;
+                flow._patchDetail = "";
+                flow._patchDetailBase = "";
                 flow._patchFraction = p.Fraction;
                 flow._patchComplete = false;
-                flow._state = new State(LauncherStage.Patching, status, p, status, p.Fraction, false, flow._news);
+                flow._state = new State(LauncherStage.Patching, status, p, status, p.Fraction, false, flow._news, "");
             }
         }
     }

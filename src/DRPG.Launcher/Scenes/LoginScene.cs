@@ -28,7 +28,6 @@ public sealed class LoginScene : IDisposable
     public const int MaxPasswordLength = 64;
 
     private readonly ITexture _background, _panel, _panelDisabled, _check;
-    private readonly NineSliceBox _statusBox;
     private readonly ITexture _fieldsDisabled, _checkDisabled;
     private readonly ITexture[] _mascotA, _mascotB, _mascotADisabled, _mascotBDisabled;
     private readonly ITexture? _rememberLabel, _rememberLabelDisabled;
@@ -38,6 +37,8 @@ public sealed class LoginScene : IDisposable
     private readonly IFont? _font;
     private readonly IRenderer _renderer;
     private readonly List<ITexture> _statusLines = [];
+    private ITexture? _statusBg;
+    private int _statusBgHeight;
     private string? _statusTextValue;
 
     public LoginScene(SpriteStore sprites, RememberedLogin remember, IFont? font, IRenderer renderer)
@@ -52,7 +53,6 @@ public sealed class LoginScene : IDisposable
         _mascotB = sprites.Gui("dr2_in_003_002");
         _mascotADisabled = sprites.GuiDisabled("dr2_in_003_001");
         _mascotBDisabled = sprites.GuiDisabled("dr2_in_003_002");
-        _statusBox = new NineSliceBox(sprites.Load("gui\\dr2_in_000_003.spr"));
         _check = sprites.Gui("dr2_sub_001_001")[0];
         // the ID and password fields and the checkbox square, seeded at their centres (panel coordinates)
         _fieldsDisabled = sprites.GuiDisabledRegions("dr2_in_003_000", (211, 91), (211, 137), (30, 170));
@@ -148,8 +148,8 @@ public sealed class LoginScene : IDisposable
     public void DrawBackground(IRenderer r) => r.Draw(_background, 0, 0);
 
     /// <summary>
-    /// Expandable 9-slice authentication status box under the login panel: word-wraps long messages so nothing is
-    /// clipped and grows vertically to fit all lines.
+    /// Expandable authentication status box styled to match the <c>dr2_in_003_000</c> login panel (deep blue translucent
+    /// fill with a crisp light-blue border): word-wraps long messages and grows vertically to fit all lines.
     /// </summary>
     public void DrawStatusBox(IRenderer r, string text)
     {
@@ -167,8 +167,8 @@ public sealed class LoginScene : IDisposable
         int lineHeight = _font?.LineHeight ?? 14;
         int lineCount = Math.Max(1, _statusLines.Count);
         int contentHeight = lineCount * lineHeight + (lineCount - 1) * StatusLineGap;
-        int boxHeight = Math.Max(42, contentHeight + 2 * StatusPaddingY);
-        _statusBox.Draw(r, StatusX, StatusY, StatusWidth, boxHeight);
+        int boxHeight = Math.Max(36, contentHeight + 2 * StatusPaddingY);
+        r.Draw(StatusBackground(r, StatusWidth, boxHeight), StatusX, StatusY);
 
         int y = StatusY + (boxHeight - contentHeight) / 2;
         foreach (var line in _statusLines)
@@ -177,6 +177,30 @@ public sealed class LoginScene : IDisposable
             r.DrawPart(line, x, y, 0, Math.Min(line.Width, innerWidth));
             y += lineHeight + StatusLineGap;
         }
+    }
+
+    private ITexture StatusBackground(IRenderer r, int width, int height)
+    {
+        if (_statusBg is not null && _statusBgHeight == height)
+            return _statusBg;
+        _statusBg?.Dispose();
+        const uint fill = 0xE6783C0A;       // translucent deep blue matching dr2_in_003_000 (RGBA8888, R low)
+        const uint border = 0xFFDEC890;     // crisp light-blue border
+        var pixels = new uint[width * height];
+        Array.Fill(pixels, fill);
+        for (int x = 0; x < width; x++)
+        {
+            pixels[x] = border;
+            pixels[(height - 1) * width + x] = border;
+        }
+        for (int y = 0; y < height; y++)
+        {
+            pixels[y * width] = border;
+            pixels[y * width + (width - 1)] = border;
+        }
+        _statusBg = r.CreateTexture(width, height, pixels);
+        _statusBgHeight = height;
+        return _statusBg;
     }
 
     private List<string> WrapText(string text, int maxWidth)
@@ -259,6 +283,7 @@ public sealed class LoginScene : IDisposable
     public void Dispose()
     {
         ClearStatusLines();
+        _statusBg?.Dispose();
         _rememberLabel?.Dispose();
         _rememberLabelDisabled?.Dispose();
     }
