@@ -213,8 +213,12 @@ public sealed class FieldEntity
         }
     }
 
-    /// <summary>✅ <c>0x00859340</c>: consumes one command from the queue (caller checks <see cref="IsAtCellCenter"/>).</summary>
-    public void ProcessNextCommand()
+    /// <summary>
+    /// ✅ <c>0x00859340</c>: consumes one command from the queue (caller checks <see cref="IsAtCellCenter"/>).
+    /// <paramref name="isWild"/> distinguishes entity type <c>+5 == 5</c> (wild digimon: any mismatch with <c>From</c>
+    /// runs to <c>Dest</c>) from <c>+5 == 4</c> (partner digimon: only mismatches &gt; 1 cell run to <c>Dest</c>).
+    /// </summary>
+    public void ProcessNextCommand(bool isWild = false)
     {
         if (!_commands.TryDequeue(out var cmd))
             return;
@@ -223,21 +227,38 @@ public sealed class FieldEntity
             case MoveState.Standing:
             case MoveState.IdleA:
             case MoveState.IdleB:
-                if (State == MoveState.Run && (CellX != cmd.FromX || CellY != cmd.FromY))
+            {
+                var nextState = cmd.State;
+                if (isWild)
                 {
-                    DestX = cmd.DestX;
-                    DestY = cmd.DestY;
-                    State = MoveState.Run;
+                    if (CellX != cmd.FromX || CellY != cmd.FromY)
+                    {
+                        DestX = Math.Max(0, cmd.DestX);
+                        DestY = Math.Max(0, cmd.DestY);
+                        nextState = MoveState.Run;
+                    }
+                    else
+                    {
+                        DestX = CellX;
+                        DestY = CellY;
+                    }
                 }
-                else if (State == MoveState.Walk && FieldDirection.Chebyshev(CellX, CellY, cmd.FromX, cmd.FromY) > 1)
+                else if (FieldDirection.Chebyshev(CellX, CellY, cmd.FromX, cmd.FromY) > 1)
                 {
-                    DestX = cmd.DestX;
-                    DestY = cmd.DestY;
-                    State = MoveState.Run;
+                    DestX = Math.Max(0, cmd.DestX);
+                    DestY = Math.Max(0, cmd.DestY);
+                    nextState = MoveState.Run;
                 }
+
+                // ✅ 0x00859340 lines 81-86 & 2320-2323: preserve idle if already < 4, always apply Direction, then apply nextState
+                if ((byte)State < 4)
+                    nextState = State;
                 if (cmd.Direction is >= 0 and < 8)
                     Direction = cmd.Direction;
+                if (nextState != MoveState.Standing || State is not (MoveState.IdleA or MoveState.IdleB))
+                    State = nextState;
                 break;
+            }
 
             case MoveState.Walk:
             case MoveState.Run:

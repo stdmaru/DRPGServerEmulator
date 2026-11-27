@@ -113,10 +113,9 @@ public sealed class FieldPathfinder(FieldCollision collision)
             {
                 existing.Parent = current;
                 existing.G = newG;
+                // ✅ 0x00b43520 lines 90-110: open-list nodes update G/F in place without reinserting; closed nodes propagate down
                 if (existing.Closed)
                     PropagateDown(existing);
-                else
-                    ReinsertOpen(open, existing);
             }
             return;
         }
@@ -136,12 +135,6 @@ public sealed class FieldPathfinder(FieldCollision collision)
         while (i < open.Count && f > open[i].F)
             i++;
         open.Insert(i, node);
-    }
-
-    private static void ReinsertOpen(List<Node> open, Node node)
-    {
-        open.Remove(node);
-        InsertOpen(open, node);
     }
 
     /// <summary>✅ <c>0x00b436e0</c>: propagates a shorter G cost through already-closed descendants.</summary>

@@ -143,6 +143,34 @@ public sealed class FieldWildsTests
     }
 
     [Fact]
+    public void Standing_0x11_stops_walking_wild_and_applies_final_direction()
+    {
+        var collision = Grid(".......", ".......", ".......", ".......", ".......");
+        var pathfinder = new FieldPathfinder(collision);
+        var wilds = new FieldWilds();
+        var tamer = new FieldEntity(3, 3);
+        var serial = new Serial(7, 8);
+        var rng = new Random(0);
+
+        // Wild starts walking NW from (3, 3) toward (1, 1)
+        wilds.Apply(WildPacket(serial, 4, 3, 3, 1, 1, dir: 3), mapId: 79, collision, _ => null, rng);
+        // Step 16 frames (1 cell at Walk speed) to reach cell centre (2, 2) facing NW (3)
+        for (int i = 0; i < 16; i++)
+            wilds.Step(tamer, collision, pathfinder, rng);
+        Assert.True(wilds.TryGet(serial, out var wild));
+        Assert.Equal((2, 2), (wild.Entity.CellX, wild.Entity.CellY));
+        Assert.Equal(3, wild.Entity.Direction);
+
+        // Server sends Standing (state 1) at (2, 2) facing North (4): must stop immediately and face North (4), not keep walking NW
+        wilds.Apply(WildPacket(serial, 1, 2, 2, 2, 2, dir: 4), mapId: 79, collision, _ => null, rng);
+        wilds.Step(tamer, collision, pathfinder, rng);
+
+        Assert.Equal(MoveState.Standing, wild.Entity.State);
+        Assert.Equal((2, 2), (wild.Entity.CellX, wild.Entity.CellY));
+        Assert.Equal(4, wild.Entity.Direction);
+    }
+
+    [Fact]
     public void Map_decoder_parses_0x11_and_rejects_wrong_length()
     {
         var payload = Convert.FromHexString("2E709CEA6897AE41B514A9EAAEAC2949597572616D6F6E0000000000000000000000000000000E0001000200020102001900410019004100");
