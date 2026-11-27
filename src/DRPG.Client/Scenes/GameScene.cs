@@ -47,6 +47,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private WorldLoading _loading = null!;                     // set in Init
     private FieldMap? _field;
     private FieldCollision? _collision;
+    private FieldPathfinder? _pathfinder;
     private FieldAnimator? _tamerAnimation, _digimonAnimation;
     private TamerDoll? _tamer;
     private SpriteAnimator? _digimon;
@@ -186,6 +187,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
             var map = MapFile.Parse(game.Resource.ReadEntry(path));
             _field = new FieldMap(map, game.Resource, renderer, game.Log);
             _collision = new FieldCollision(map);
+            _pathfinder = new FieldPathfinder(_collision);
             if (map.InvalidCellReferences > 0)
                 game.Log($"{path}: {map.InvalidCellReferences} cell references outside the lists were cleared");
         }
@@ -325,11 +327,9 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     {
         if (fromX == destX && fromY == destY)
             return null;
-        int nextX = fromX + Math.Sign(destX - fromX);
-        int nextY = fromY + Math.Sign(destY - fromY);
-        if (_collision is not null && !_collision.CanStepTo(nextX, nextY, destX, destY))
-            return null;
-        return (nextX, nextY);
+        if (_pathfinder is not null)
+            return _pathfinder.NextStep(fromX, fromY, destX, destY);
+        return (fromX + Math.Sign(destX - fromX), fromY + Math.Sign(destY - fromY));
     }
 
     private void UpdateOccupancy(int oldX, int oldY, FieldEntity entity, Serial serial)

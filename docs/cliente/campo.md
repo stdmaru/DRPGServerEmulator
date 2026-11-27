@@ -2,7 +2,7 @@
 
 RE da v322 para o passo 2 do marco 3 (PR #51, `feat/client-walk`): andar com pathfinding, digimons do servidor andando no cliente, NPCs, portais e o comportamento da UI do campo. Complementa a [cena de jogo](cena-jogo.md) (entrada no mapa, quadro, HUD) e o [movimento](../mecanicas/movimento.md) (lado do servidor). ✅ = lido no dump; ❓ = ainda não lido.
 
-> **Estado:** etapas 1 (andar + digimon seguidor + `0x20`/`0xB0`) e 2 (colisões estáticas e grade de ocupação) **implementadas**. Próximas etapas: pathfinding A* (`0x00b43200`) e selvagens no campo (`0x11`).
+> **Estado:** etapas 1 (andar + digimon seguidor + `0x20`/`0xB0`), 2 (colisões + ocupação) e 3 (pathfinding A* `0x00b43200`) **implementadas**. Próxima etapa: selvagens no campo (`0x11`).
 
 ## Como ler o binário
 - Dump decompilado: `work/re/v322/dump/decomp/XXXX/<endereço>.c`, com `functions.tsv` (entrada, tamanho, chamadores), `calls.tsv` (quem chama quem) e `strings.tsv`.
@@ -90,9 +90,17 @@ Cada passo chama, nesta ordem:
   - No pathfinding (`0x00b432d0`), células intermediárias precisam passar em `0x00b35f40` (andável estático), mas a **célula de destino** é sempre permitida (`x == destX && y == destY`).
   - No passo efetivo (`0x008671c0`, `0x007f4b10`) e no clique (`0x00b4d290`), se o próximo passo já é o destino e `!0x00b35b30(next)` (bloqueada ou ocupada), a entidade **para antes de entrar** (ou ignora o clique se já está adjacente).
 
+## Pathfinding A* (etapa 3 ✅)
+- ✅ **Entrada** (`0x00b43200` → `0x00b430f0`): usado pelo tamer (`0x008671c0`, `0x00b4d290`), pelo digimon seguidor e pelos selvagens (`0x007f4b10`).
+- ✅ **Parâmetros exatos:**
+  - 8 vizinhos em `0x00b433d0`, na ordem: `NW, N, NE, E, SE, S, SW, W`.
+  - Custo de passo uniforme `g + 1` (cardinal e diagonal custam 1); heurística Manhattan `|dx| + |dy|`; `f = g + h` (`0x00b43520`, empates inseridos antes na lista aberta).
+  - Limite de profundidade: `min(2 · manhattan + 1, 25)` (`0x19` em `0x00b430f0`). Se `g >= limite`, falha (retorna `null`).
+  - Passabilidade: `0x00b432d0` permite qualquer célula intermediária com `0x00b35f40` (andável estático) e sempre permite a célula de destino; depois os chamadores conferem `0x00b35b30` quando o próximo passo já é o destino, fazendo a entidade parar adjacente a paredes/NPCs.
+  - Retorna apenas o **primeiro passo** do caminho (retrocedendo pelos ponteiros de pai até `g <= 1`).
+
 ## Roteiro do que falta
 Pontos de entrada já localizados; ✅ quando lido.
-- **Pathfinding (etapa 3):** A* em `0x00b43200` → `0x00b430f0` → `0x00b433d0` (8 vizinhos) → `0x00b43520` / `0x00b436e0`, limite `min(2 * manhattan + 1, 25)`.
 - **Selvagens no campo (etapa 4):** desenho `0x007e83d0` na fila de y, pacote `0x11` no `DRPG.Shared` e entidades na `GameScene`.
 - **NPCs:** criação em `0x00abb750`/`0x0085f090` ([NPCs do mapa](cena-jogo.md#npcs-do-mapa)), lista `+0x300`, atualização `+0x24` da vtable deles, sprite e nome.
 - **Portais:** `map_us` (+0x84, 4 portais, [NPCs do mapa](cena-jogo.md#npcs-do-mapa)); o desenho do redemoinho ❓ (procurar o sprite na fila de desenho `0x00a0d340`).
