@@ -101,3 +101,20 @@ public sealed class FieldFeatureTests
         Assert.False(field.Handlers.Handle(new MoveCharacterRequest(1, 1)));
     }
 }
+
+public sealed class FieldHoverTests
+{
+    [Fact]
+    public void The_entity_under_the_mouse_is_the_occupant_of_its_cell_or_the_one_below()
+    {
+        using var field = new FieldFixture(FieldFixture.Open(10, 10), new DRPG.Client.World.Cell(4, 4));
+        field.State.Hover(new DRPG.Client.World.Cell(4, 4));
+        Assert.Equal(FieldFixture.TamerSerial, field.State.Hovered);
+        field.State.Hover(new DRPG.Client.World.Cell(4, 3));                  // ✅ 0x00b36550: the cell above is the tamer's too
+        Assert.Equal(FieldFixture.TamerSerial, field.State.Hovered);
+        field.State.Hover(new DRPG.Client.World.Cell(7, 7));
+        Assert.Equal(default, field.State.Hovered);
+        field.State.Hover(null);                                               // the mouse is on the HUD or a window
+        Assert.Equal(default, field.State.Hovered);
+    }
+}

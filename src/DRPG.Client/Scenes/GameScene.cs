@@ -312,6 +312,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         }
 
         RunLogic(nowMs);
+        _state.Hover(GroundCellUnderMouse());
         UpdateCursor();
     }
 

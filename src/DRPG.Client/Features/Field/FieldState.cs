@@ -1,5 +1,6 @@
 using DRPG.Client.Data;
 using DRPG.Client.World;
+using DRPG.Shared.Protocol;
 
 namespace DRPG.Client.Features.Field;
 
@@ -23,6 +24,20 @@ public sealed class FieldState
     public FieldParty Party { get; }
     public QuestNpcs QuestNpcs { get; } = new();
     public MapTransition Transition { get; } = new();
+
+    /// <summary>
+    /// ✅ <c>DAT_0135b254</c>: the entity under the mouse, set each frame by <c>0x00b4dd90</c> (<see cref="Hover"/>); none
+    /// (<c>default</c>) when the mouse is off the ground. ❓ The name plates and the attack cursor the original draws for it
+    /// (<c>0x00a0d340</c>, <c>0x00a11180</c>) come with their step.
+    /// </summary>
+    public Serial Hovered { get; private set; }
+
+    /// <summary>
+    /// ✅ <c>0x00b4dd90</c>: while the ground is the mouse's hot control (not the HUD nor a window), the occupant of the cell under the
+    /// mouse in the occupancy grid (an entity takes its cell and the one above, <c>0x00b36550</c>); otherwise none.
+    /// </summary>
+    public void Hover(Cell? cellUnderMouse) =>
+        Hovered = cellUnderMouse is { } cell ? Area.Collision.OccupantAt(cell.X, cell.Y) : default;
     public WarpEffect Warp { get; }
 
     /// <summary>
