@@ -88,13 +88,42 @@ Despachante do mapa `0x00abc350`: índice = opcode − 2 na tabela de bytes `0xa
 ## Câmera
 - ✅ `0x00afe310` (campo): chama a vtable `+0x24` do personagem e põe a rolagem do mapa (`0x00b36b80`) em **(`+0x168` − 400, `+0x16c` − 300)**, presa a `0..largura·64 − 800` e `0..altura·32 − 600`. Na batalha a rolagem é fixa (250, 206).
 
-## UI do campo (em andamento)
-- ✅ Bloco de UI do campo (`0x00b4b550` passo 3): `0x00a45230(0)`/`(1)` são as **camadas de efeitos** (lista de efeitos com tipo `+0x3c` = camada; desenho por tabela de saltos `0x00a47e80` ou `0x00b569f0`), não janelas. `0x009b6010` → `0x009b1640`: um objeto com modos 1..4 (`+8`; ❓ qual janela). `0x00b42f60` é vazio. `0x007dca50` → `0x00b641b0` ×2, `0x00b40340` (texto de aviso que gira a cada 7 s em (centrado, 40)), `0x007de4b0` (`Interface\w_tamer_menu.spr`), **`0x00b9a7c0` (gerenciador de janelas: desenha cada janela visível pela vtable `+0x28`)**.
-- ✅ **Barra principal** = objeto global `DAT_01158508` (ctor `0x00b84b20`, vtable `0x01031724`, desenho `+0x28` = **`0x00b8a850`**, 1391 linhas). Ligada/desligada por `+0x184` (Ctrl+Z alterna). Sprites `GUI\dr2_main_000_*` (`_eng` quando existe): `000_000` barra de baixo 800×105 (chat, retrato do digimon, HP/VP/EVP, EXP), `000_018` fundo do chat 409×190, botões 29×29 (`000_010..017`) e 20×20 (`000_023..027`).
-- ✅ Começo do desenho no campo (asm `0x00b8a964`): painel do tamer no canto superior esquerdo — sprite `[barra+0xfd8]` quadro 0 em (0, 0); retrato do tamer (`0x00b1ec40(tamer)`) quadro 1 em (2, 2); nome (vtable `+0xc`) em (33, 4) cor `0x80ffff` com sombra (`0x00b55760`); ícone `0x00a14910(+0x12df, 33, 20)`; texto `0x1031f64` em (50, 22) branco; nível (`+0x12e0`) em (90, 22) cor `0x80ffff`; texto da versão em (130, 1) e o nome do servidor (`[DAT_011584f4]+0xafc60`) em (130, 14). ❓ Resto: próximo passo.
-- `GUI\dr2_main_001_*` (carregador `0x00b64540`): `001_000` 170×145 (❓ minimapa), `001_001` "COMMAND" com 3 botões, `001_009` 272×72.
+## UI do campo (HUD)
+Escopo do marco 3 (decisão do dono): **painéis com os valores reais** do `0x02`; chat e botões só desenhados (sem função). Minimapa: ❓ não se sabe se aparece aberto na entrada (janela própria, `GUI\dr2_main_001_*`, carregador `0x00b64540`, posição dinâmica presa à tela em `0x00b67240`/`0x00b67790`); fica de fora até uma captura de tela do original.
+
+- ✅ Bloco de UI do campo (`0x00b4b550` passo 3): `0x00a45230(0)`/`(1)` são as **camadas de efeitos** (não janelas). `0x009b6010` → `0x009b1640` (objeto com modos 1..4, ❓). `0x00b42f60` é vazio. `0x007dca50` → `0x00b641b0` ×2, `0x00b40340` (aviso que gira a cada 7 s em (centrado, 40)), `0x007de4b0` (`Interface\w_tamer_menu.spr`, ❓), **`0x00b9a7c0`** (gerenciador de janelas: cada janela visível pela vtable `+0x28`).
+- ✅ **Barra principal** = objeto global `DAT_01158508` (ctor `0x00b84b20`, vtable `0x01031724`, desenho `+0x28` = `0x00b8a850`, carga dos sprites e posições `+0x20` = `0x00b90570`). Visível por `+0x184` (1 no ctor; Ctrl+Z alterna). Janela 800 × altura de `dr2_main_000_000`, em y = 600 − 105 = **495**. Sprites `GUI\%s.spr` (o `_eng` quando existe).
+
+### Ordem do desenho (`0x00b8a850`, modo campo, sem batalha)
+1. **Fundo** (`[+0x180]` vtable `+4` = `0x00b90520`): `dr2_main_000_000` quadro 0 em (0, 495); depois o quadro 1 no mesmo lugar por `0x00b569f0(1, spr, 0, 495, −1, 0x10, 0, 0, −1, −1, 0)` (modo −1: depende da opção `[DAT_01158530]+1`; ❓ fórmula exata da mistura — o quadro 1 é um brilho sobre a moldura).
+2. **Painel do tamer** (canto superior esquerdo, asm `0x00b8a964`):
+   - `Interface\w_unitframe.spr` (129×38) quadro 0 em (0, 0);
+   - retrato do tamer `0x00b1ec40(tamer)` **quadro 1** em (2, 2) (tabela de sprites por id `0x010d5624`, ❓ provavelmente `Sprite\icon_%03d.spr`, carregados em `0x00b21cd0`);
+   - nome do tamer em (33, 4), cor `0x80ffff`, com sombra (`0x00b55760`);
+   - ícone `0x00a14910(+0x12df, 33, 20)`: quadro `valor − 1` do sprite `[DAT_0135a300]+0x2698`; 0 não desenha (`+0x12df` = byte `0x02`+0x2a, o `Unknown42` do `CharacterDataPacket`; ❓ sprite);
+   - `"Level "` em (50, 22) branco **sem sombra** (`0x00b55900`); nível do tamer (`+0x12e0` = `0x02`+0x2c) em (90, 22) cor `0x80ffff` sem sombra;
+   - `"Digimon RPG 3.26"` em (130, 1) branco com sombra; nome do servidor/canal (`[DAT_011584f4]+0xafc60`) em (130, 14); mapa ≥ 200: mais uma linha `[DAT_011584f4]+0xafc9c` em (130, 28);
+   - **relógio** (texto largo, `0x00b55320`): `TextAttach 0x1118` `"PST : %2d:%02d:%02d %d-%d-%d"` com (hora, min, seg, ano, mês, dia) de **UTC − 7 h** (`time − 0x6270`, `gmtime`), alinhado à direita em x = **640 − largura**, y = 1, branco com sombra;
+   - **mapa e posição**: nome do mapa (`0x00b395a0(id)`, `Map_US`) + `"(" x "," y ")"` com a célula `+0x178`/`+0x17a`, em (130, 27) branco com sombra; nos mapas `0x33..0x35, 0x6a, 0x6c, 0x6d, 0x75, 0x77, 0x81, 0x82, 0x85, 0x87..0x95, 0x98..0x9c` só o nome.
+3. `0x00b89df0`, `0x00b891c0`, `0x00b86f90`: dicas de buff e de tempo restante (nada na entrada; fora do marco).
+4. **Painel do digimon** (bloco de status do líder = `digimon+0x800` = `0x02`+0x4d8, `DigimonStatus`):
+   - retrato `0x00b1ec40(espécie +0x14)` quadro 0 em (594, 509);
+   - `"Lv.%d"` (nível `+0x2e`) em (670, 508) branco com sombra;
+   - só na batalha: `dr2_main_000_007` em (454, 473), a barra de TP e `dr2_main_000_008` (`[+0x1d90]`) em (672, 479); no campo o código pula direto para o HP (`0x00b8cc87` → `0x00b8cf05`);
+   - **barras** (classe `0x007e3460`: `0x007e35e0(%)` guarda a largura = (largura do quadro 0 − 1) × % / 100 + 1; `0x007e3560` desenha o **quadro 0 recortado nessa largura** e depois o **quadro 1 inteiro** por cima); % = atual / máximo × 100 (`0x00b31c00`, 0 se máximo = 0):
+     | Barra | Sprite | Posição | Atual / máximo (bloco) |
+     |---|---|---|---|
+     | HP | `dr2_main_000_002` (99×12) | (692, 525) | `+0xc0` / `+0xec` |
+     | VP | `dr2_main_000_005` (99×12) | (692, 545) | `+0xc4` / `+0xf0` |
+     | EVP | `dr2_main_000_004` (99×12) | (692, 564) | `+0xc8` / `+0xf4` |
+     | EXP | `dr2_main_000_003` (295×12) | (488, 585) | `+0xe0` / `+0x100` (i64) |
+     | TP | `dr2_main_000_006` (202×12) | (464, 481) | só na batalha |
+   - os textos `"HP %d/%d"`, `"VP %d/%d"`, `"EVP %d/%d"`, `0x885` `"EXP %I64d/%I64d %.2f%%"` só aparecem com o **mouse sobre a barra** (`0x00b31aa0`), no painel de dica `0x007de1b0` (fora do marco).
+   - entre EVP e EXP, `0x00b91720`: os **8 botões de menu** `dr2_main_000_010..017` (29×29) em (450, 515), (482, 515), (546, 514), (546, 548), (514, 515), (514, 548), (482, 548), (450, 548); quadro **3** com a janela fechada, 0 aberta (janelas 1, 3, 4, 0xf, 2, 0xcc, 0xa8, 0xb) → todos no quadro 3 na entrada.
+5. Botões no estado normal (quadro 0; `0x009b7260` = quadro `tabela[estado]`, estado 0/1/2 = normal/mouse em cima/pressionado): `000_032` (516, 462), `000_041` (516, 485), `000_042` (516, 439), `000_031` (451, 485).
+- ✅ **Chat** (`0x00b8e6a0`/`0x00b91a70`, modo do tamanho `+0x770a4` = 0 na entrada): fundo `dr2_main_000_018` quadro 0 em **(28, 460) recortado a 81 px de altura** (opção `[DAT_01158530]+1` → por `0x00b569f0` modo `0x14`, ❓ mistura; senão `0x00b56ff0` direto). Botões do modo de chat `000_023..027` (20×20) em (179, 572), (201, 572), (222, 572), (244, 572), (157, 572): quadro 3, e 0 no modo atual (0 → `000_025`); o `000_027` fica desabilitado com nível ≤ 4. Abas `000_037..040` (35×14) em (280, 574), (317, 574), (355, 574), (391, 574): quadro 2 na aba atual (0 na entrada), 0 nas outras.
 
 ## Ainda ❓ (fase A em andamento)
-- UI: resto da barra principal `0x00b8a850`, quais janelas o gerenciador `0x00b9a7c0` mostra na entrada, `0x009b1640`, `0x00a0ceb0`; BGM do mapa.
+- UI: fórmula das misturas `0x00b569f0` (modos −1 e `0x14`), sprite do ícone `+0x12df`, se o minimapa e o `w_tamer_menu` aparecem na entrada (precisa de uma captura de tela do original), `0x009b1640`, `0x00a0ceb0`; BGM do mapa.
 - Montagem de `0x16`, `0x18`, `0x49`, `0x01`, resto do `0xF0`, e da conexão global (`0x64`).
 - Nome sobre o tamer (fonte, cor), sombra (opção) e o `0x00b57330`.
