@@ -37,6 +37,8 @@ internal sealed class FakeRenderer : IRenderer
 
     public void DrawPart(ITexture texture, int x, int y, int sourceX, int width) => Draws.Add(new DrawCall((FakeTexture)texture, x, y, width));
 
+    public void DrawRegion(ITexture texture, int x, int y, int sourceX, int sourceY, int width, int height) => Draws.Add(new DrawCall((FakeTexture)texture, x, y, width));
+
     public List<int> Darkens { get; } = [];
 
     public void Darken(int amount) => Darkens.Add(amount);

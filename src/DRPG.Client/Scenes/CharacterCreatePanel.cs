@@ -33,11 +33,11 @@ public sealed class CharacterCreatePanel(GameContext game, AnimatedSprites anima
     // ✅ Edit boxes: 0x00b47b30 (130×15, max 20 characters)
     private const int TamerBoxX = 153, DigimonBoxX = 522, EditBoxY = 57, EditBoxW = 130, EditBoxH = 15, EditBoxMaxLength = 20;
 
-    // ✅ Text layout: 0x00b46f00 (tamer) and 0x00b46690 (digimon)
+    // ✅ Text layout: 0x00b46f00 (tamer) and 0x00b46690 (digimon), scroll in 0x00b48420
     private const int NameWidth = 130, NameY = 60, TamerNameX = 18, DigimonNameX = 658;
-    private const int DescStartY = 84, DescLineStep = 14, DescBottom = 144;
-    private const int TamerDescX = 24, TamerDescWidth = 279 - 24;
-    private const int DigimonDescX = 522, DigimonDescWidth = 780 - 522;
+    private const int DescStartY = 84, DescLineStep = 14, DescScrollStep = 5, DescVisibleLines = 4;
+    private const int TamerDescLeft = 24, TamerDescTop = 83, TamerDescRight = 279, TamerDescBottom = 144;
+    private const int DigimonDescLeft = 522, DigimonDescTop = 81, DigimonDescRight = 780, DigimonDescBottom = 144;
 
     // ✅ TextAttach ids (0x00b44738)
     private const int TamerNamesText = 0xee8, TamerDescsText = 0xee9;
@@ -65,6 +65,10 @@ public sealed class CharacterCreatePanel(GameContext game, AnimatedSprites anima
     private byte _selectedTamer = 1;
     private ushort _selectedDigimon = 10;
     private int _digimonCount = BaseStarters.Length;
+    private int _tamerScrollY;                                 // ✅ +0x146c (0x00b48420)
+    private int _digimonScrollY;                               // ✅ +0x1468 (0x00b48420)
+    private int _tamerDescLineCount;                           // ✅ +0x1470
+    private int _digimonDescLineCount;                         // ✅ +0x1474
 
     public int TargetSlot => _targetSlot;
     public byte SelectedTamer => _selectedTamer;
@@ -73,6 +77,8 @@ public sealed class CharacterCreatePanel(GameContext game, AnimatedSprites anima
     public string DigimonName => _digimonNameBox.Text;
     public bool TamerNameFocused => _tamerNameBox.Focused;
     public bool DigimonNameFocused => _digimonNameBox.Focused;
+    internal int TamerScrollY => _tamerScrollY;
+    internal int DigimonScrollY => _digimonScrollY;
 
     public void Init()
     {
@@ -107,6 +113,10 @@ public sealed class CharacterCreatePanel(GameContext game, AnimatedSprites anima
 
         _selectedTamer = 1;
         _selectedDigimon = BaseStarters[0];
+        _tamerScrollY = 0;
+        _digimonScrollY = 0;
+        _tamerDescLineCount = CountLines(Lookup(_tamerDescs, _selectedTamer));
+        _digimonDescLineCount = CountLines(Lookup(_digimonDescs, DigimonTextIndex(_selectedDigimon)));
 
         for (int i = 0; i < BaseStarters.Length; i++)
             _digimonSpecies[i] = BaseStarters[i];
@@ -164,6 +174,9 @@ public sealed class CharacterCreatePanel(GameContext game, AnimatedSprites anima
                     FocusField(NameField.Tamer);
                 else if (_digimonNameBox.Contains(click.X, click.Y))
                     FocusField(NameField.Digimon);
+                break;
+            case MouseWheelEvent wheel:
+                ScrollDescription(wheel.Delta, game.Mouse.X, game.Mouse.Y);
                 break;
             case TextEvent text:
                 if (_tamerNameBox.Focused)
@@ -229,7 +242,7 @@ public sealed class CharacterCreatePanel(GameContext game, AnimatedSprites anima
         return action;
     }
 
-    /// <summary>✅ <c>0x00b46f00</c>: the four tamer buttons, dolls, and selected tamer name + description.</summary>
+    /// <summary>✅ <c>0x00b46f00</c>: the four tamer buttons (only the selected draws frame 0; no hover), dolls, and selected tamer name + description.</summary>
     private void DrawTamers(IRenderer renderer, bool interactive)
     {
         for (int i = 0; i < TamerCount; i++)
@@ -239,13 +252,15 @@ public sealed class CharacterCreatePanel(GameContext game, AnimatedSprites anima
             button.Update(game.Mouse, interactive);
             if (_selectedTamer == tamerId)
                 button.DrawFrame(renderer, 0);
-            else
-                button.Draw(renderer);
 
-            if (button.Clicked && interactive && _selectedTamer != tamerId)
+            if (button.Clicked && interactive)
             {
-                _tamerDolls[_selectedTamer - 1]?.Body.Switch(SpriteAnimator.Standing);
-                _selectedTamer = tamerId;
+                _tamerScrollY = 0;
+                if (_selectedTamer != tamerId)
+                {
+                    _tamerDolls[_selectedTamer - 1]?.Body.Switch(SpriteAnimator.Standing);
+                    _selectedTamer = tamerId;
+                }
                 _tamerDolls[i]?.Body.Restart(SpriteAnimator.Selected);
                 game.Sounds.PlayEffect(SelectSound);
             }
@@ -256,10 +271,11 @@ public sealed class CharacterCreatePanel(GameContext game, AnimatedSprites anima
         }
 
         DrawCenteredName(renderer, Lookup(_tamerNames, _selectedTamer), TamerNameX);
-        DrawDescription(renderer, Lookup(_tamerDescs, _selectedTamer), TamerDescX, TamerDescWidth);
+        string tamerDesc = Lookup(_tamerDescs, _selectedTamer);
+        _tamerDescLineCount = DrawDescription(renderer, tamerDesc, TamerDescLeft, _tamerScrollY, TamerDescLeft, TamerDescTop, TamerDescRight, TamerDescBottom);
     }
 
-    /// <summary>✅ <c>0x00b46690</c>: the 3 or 4 starter digimon buttons, sprites, and selected name + description.</summary>
+    /// <summary>✅ <c>0x00b46690</c>: the 3 or 4 starter digimon buttons (only the selected draws frame 0; no hover), sprites, and selected name + description.</summary>
     private void DrawDigimons(IRenderer renderer, bool interactive)
     {
         for (int i = 0; i < _digimonCount; i++)
@@ -269,17 +285,16 @@ public sealed class CharacterCreatePanel(GameContext game, AnimatedSprites anima
             button.Update(game.Mouse, interactive);
             if (_selectedDigimon == species)
                 button.DrawFrame(renderer, 0);
-            else
-                button.Draw(renderer);
 
-            if (button.Clicked && interactive && _selectedDigimon != species)
+            if (button.Clicked && interactive)
             {
                 for (int j = 0; j < _digimonCount; j++)
                 {
-                    if (_digimonSpecies[j] == _selectedDigimon)
+                    if (_digimonSpecies[j] == _selectedDigimon && j != i)
                         _digimonSprites[j]?.Switch(SpriteAnimator.Standing);
                 }
                 _selectedDigimon = species;
+                _digimonScrollY = 0;
                 _digimonSprites[i]?.Restart(SpriteAnimator.Selected);
                 game.Sounds.PlayEffect(SelectSound);
             }
@@ -294,8 +309,33 @@ public sealed class CharacterCreatePanel(GameContext game, AnimatedSprites anima
 
         int index = DigimonTextIndex(_selectedDigimon);
         DrawCenteredName(renderer, Lookup(_digimonNames, index), DigimonNameX);
-        DrawDescription(renderer, Lookup(_digimonDescs, index), DigimonDescX, DigimonDescWidth);
+        string digimonDesc = Lookup(_digimonDescs, index);
+        _digimonDescLineCount = DrawDescription(renderer, digimonDesc, DigimonDescLeft, _digimonScrollY, DigimonDescLeft, DigimonDescTop, DigimonDescRight, DigimonDescBottom);
     }
+
+    /// <summary>✅ <c>0x00b48420</c>: mouse wheel scrolls the description box under the cursor by ±5 px.</summary>
+    private void ScrollDescription(int delta, int mouseX, int mouseY)
+    {
+        if (Inside(mouseX, mouseY, DigimonDescLeft, DigimonDescTop, DigimonDescRight, DigimonDescBottom))
+            _digimonScrollY = ApplyScroll(_digimonScrollY, delta, _digimonDescLineCount);
+        else if (Inside(mouseX, mouseY, TamerDescLeft, TamerDescTop, TamerDescRight, TamerDescBottom))
+            _tamerScrollY = ApplyScroll(_tamerScrollY, delta, _tamerDescLineCount);
+    }
+
+    internal static int ApplyScroll(int current, int delta, int lineCount)
+    {
+        if (delta > 0)
+            return current <= 0 ? Math.Min(0, current + DescScrollStep) : current;
+        if (delta < 0 && lineCount > DescVisibleLines - 1)
+        {
+            int minScroll = -(lineCount - DescVisibleLines) * DescLineStep;
+            return Math.Max(minScroll, current - DescScrollStep);
+        }
+        return current;
+    }
+
+    private static bool Inside(int x, int y, int left, int top, int right, int bottom) =>
+        x >= left && x < right && y >= top && y < bottom;
 
     private void DrawCenteredName(IRenderer renderer, string name, int areaX)
     {
@@ -305,19 +345,20 @@ public sealed class CharacterCreatePanel(GameContext game, AnimatedSprites anima
         game.Text.Draw(renderer, name, areaX + (NameWidth - width) / 2, NameY, UiText.NameHighlight, shadow: false);
     }
 
-    private void DrawDescription(IRenderer renderer, string description, int x, int maxWidth)
+    private int DrawDescription(IRenderer renderer, string description, int x, int scrollY, int clipLeft, int clipTop, int clipRight, int clipBottom)
     {
         if (description.Length == 0)
-            return;
+            return 0;
         var lines = description.Split('\n');
         for (int i = 0; i < lines.Length; i++)
         {
-            int y = DescStartY + i * DescLineStep;
-            if (y >= DescBottom)
-                break;
-            game.Text.DrawClipped(renderer, lines[i], x, y, maxWidth, UiText.White, shadow: false);
+            int y = DescStartY + scrollY + i * DescLineStep;
+            game.Text.DrawClippedRect(renderer, lines[i], x, y, clipLeft, clipTop, clipRight, clipBottom, UiText.White, shadow: false);
         }
+        return lines.Length;
     }
+
+    private static int CountLines(string description) => description.Length == 0 ? 0 : description.Split('\n').Length;
 
     /// <summary>✅ <c>0x00b46690</c>: sprite corner offset from the digimon button in creation mode.</summary>
     internal static (int Dx, int Dy) CreationDigimonOffset(ushort species) => species switch

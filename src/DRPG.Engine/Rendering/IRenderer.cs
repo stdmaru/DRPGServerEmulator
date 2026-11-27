@@ -28,6 +28,9 @@ public interface IRenderer : IDisposable
     /// of the texture at (x, y): progress bars (left part) and text fields (the tail of a long text).</summary>
     void DrawPart(ITexture texture, int x, int y, int sourceX, int width);
 
+    /// <summary>Draws a rectangular sub-region of <paramref name="texture"/> at (x, y), for clipped text boxes.</summary>
+    void DrawRegion(ITexture texture, int x, int y, int sourceX, int sourceY, int width, int height);
+
     /// <summary>
     /// Subtracts <paramref name="amount"/> (0..255) from every colour channel of what is already in the frame, never
     /// below 0: the fade to black of the scene changes (✅ v322 <c>FUN_00b55f10</c>).

@@ -208,7 +208,7 @@ Offsets de cena (no `0x00b48c60` o ECX é `cena + 0x18`: offset local + 0x18 = o
 
 **Entrada `0x00b45510(1)`** (botão Create, que fica desabilitado nas linhas 7–12 da Battle Zone e nas linhas 0/4/5 quando `[DAT_011584f4]+8 == 1`):
 1. Limpa os dois nomes. Slot alvo `+0x860`: o selecionado se estiver vazio, senão o **menor slot vazio**; sem nenhum → mensagem `0x264` "No empty tamer creation window." (até clicar) e não entra.
-2. Tamer selecionado `+0xc72 = 1`, digimon selecionado `+0xc74 = 10` (Gigimon). Rolagens das descrições `+0x1468/+0x146c = 0` (❓ nada no cliente as altera; ficam 0).
+2. Tamer selecionado `+0xc72 = 1`, digimon selecionado `+0xc74 = 10` (Gigimon). Rolagens das descrições `+0x1468/+0x146c = 0` (✅ alteradas pela roda do mouse em `0x00b48420`, ±5 px por passo dentro das caixas de descrição).
 3. Digimons dos 4 botões `+0xe78[0..3] = 10, 11, 12, X`, com X pelo `[DAT_0135a308]+0x14` (o 4º inicial do `0x03`): 0 → 24 (Chibimon), 1 → 27 (Yarmon), 2 → 31 (Hopmon), 3 → 40 (Dorimon); fora disso o 4º botão não aparece.
 4. Animações: tamer 1 e digimon 10 já em "selecionado" (animação 5, do início); os outros em 1 (parado).
 5. Foco na caixa do nome do tamer; modo `+0x85c = 1`. Sair (`0x00b45510(0)`): modo 0, `+0x860 = −1`.
@@ -228,14 +228,14 @@ Offsets de cena (no `0x00b48c60` o ECX é `cena + 0x18`: offset local + 0x18 = o
 - **Caixas de texto** (`0x00a19680` → `0x00a19040`): tamer em (153, 57), digimon em (522, 57), 130×15, até 20 caracteres; texto branco com sombra preta na fonte padrão (`FUN_00b55270`) e cursor piscando quando focado; aceitam o que o IME manda (por isso existe o erro 1).
 
 **Coluna dos tamers** `0x00b46f00`, para i = 0..3 (botão `dr2_ch_001_003` em (73, 188), (254, 188), (439, 188), (619, 188); tamer do botão = `+0xe98[i]`, 1..4):
-- Atualiza o botão; o do tamer selecionado desenha o quadro 0 fixo (`0x009b71e0(0)`), os outros o do estado.
+- Atualiza o botão (`0x009b7140`); **só o tamer selecionado** desenha o quadro 0 fixo (`0x009b71e0(0)`); os demais não desenham nada (sem efeito de hover).
 - Clique (conectado `+0x863`) → `+0xc72 = tamer`, tamer na animação 5 do início, toca o efeito **5**, rolagem 0. Tamer que deixa de ser o selecionado volta para a animação 1.
 - Animação igual à dos slots: 1 parado / 5 selecionado, direção 0, avança a cada 3 quadros, volta ao início quando `quadro ≥ início + contagem − 1`.
 - Se este é o selecionado (ou nenhum está selecionado, `+0xc72 == 0`, que mostra o texto 0): nome `0xee8[tamer]` centrado em 130 px a partir de x = 18 (`x = 18 + (130 − w) / 2`), y = 60, cor `0x63cbff`, fonte padrão, **sem sombra** (`0x00b55900`: `TextOutA` com fundo transparente); descrição `0xee9[tamer]` em linhas (quebra por `\n`), x = 24, y = 84 + 14·linha, branca sem sombra, recortada ao retângulo (24, 83)–(279, 144) (`0x00b55bb0`).
 - Boneco: `0x0099fb90(tamer, xBotão + 58, yBotão + 126, quadro…)`, ou seja canto superior esquerdo em **(xBotão − 62, yBotão − 36)** pela mesma regra do boneco dos slots (−120, −162).
 
 **Coluna dos digimons** `0x00b46690`, para i = 0..3 (botão `dr2_ch_001_004` em (126, 394), (273, 394), (419, 394), (565, 394); o 4º só existe com o 4º inicial):
-- Botão e clique como os tamers: `+0xc74 = espécie`, animação 5 do início, efeito 5, rolagem 0.
+- Botão e clique como os tamers (só o digimon selecionado desenha o quadro 0 fixo; os demais não desenham nada): `+0xc74 = espécie`, animação 5 do início, efeito 5, rolagem `+0x1468 = 0`.
 - Sprite = o `.ani` da espécie (mesmo caminho dos slots, `0x00b47b00`), quadro atual pelo canto superior esquerdo em (xBotão + dx, yBotão + dy): espécie 27 (−156, −148); 31 (−156, −165); 40 (−156, −160); 42 (−106, −82); as outras (10, 11, 12, 24) **(−110, −70)**. Animação 1/5 e avanço como os tamers.
 - Se selecionado: índice n = espécie − 9 (10..12 → 1..3), 24 → 4, 27 → 5, 31 → 6, 40 → 7, 42 → 8. Nome `0xeeb[n]` centrado em 130 px a partir de x = 658, y = 60, cor `0x63cbff`; descrição `0xeec[n]` em linhas, x = 522, y = 84 + 14·linha, branca, recortada a (522, 81)–(780, 144).
 - Nenhum digimon selecionado (`+0xc74 == 0`, não acontece na prática): `0xeec[0]` com `DrawTextA` em (522, 83)–(780, 510), `DT_WORDBREAK`, branco.

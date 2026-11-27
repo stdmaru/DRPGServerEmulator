@@ -253,6 +253,65 @@ public sealed class CharacterCreateDeleteTests
         Assert.Equal("Your Consignment Store is currently active.", scene.ActiveMessage);
     }
 
+    [Fact]
+    public void Creation_panel_draws_only_selected_buttons_and_scrolls_descriptions_with_mouse_wheel()
+    {
+        using var fixture = new SceneFixture();
+        var texts = new TextAttach();
+        texts.AddTableRows([
+            [$"{0xee8}", "†Tamer1†Tamer2†Tamer3†Tamer4"],
+            [$"{0xee9}", "Pick-†L1†L2†L3†L4†L5†L6-†B1"],
+            [$"{0xeeb}", "†Gigimon†Gummymon†Viximon"],
+            [$"{0xeec}", "Pick-†D1†D2†D3†D4†D5-†G1"],
+        ]);
+        var table = DRPG.Shared.Formats.Pack.PackArchive.Open(fixture.Game.Install.TablePath);
+        fixture.Game.Data = new DRPG.Client.Startup.GameData(
+            fixture.Resource, table, new Dictionary<string, IReadOnlyList<string[]>>(),
+            new Dictionary<string, byte[]>(), texts, new ProhibitedWords(),
+            new Dictionary<string, DRPG.Shared.Formats.Sprite.SpriteFile>());
+
+        using var scene = new CharacterSelectScene(fixture.Game, new FixedRandom(0));
+        scene.Init();
+        scene.CreatePanel.Enter(targetSlot: 0, fourthStarter: -1);
+
+        // Hover over unselected tamer 2 (254, 188) and unselected digimon 2 (273, 394):
+        // only the selected tamer (73, 188) and selected digimon (126, 394) draw their highlight sprite.
+        fixture.Game.Mouse.Handle(new MouseMoveEvent(260, 200), 10);
+        fixture.Renderer.BeginFrame();
+        scene.CreatePanel.Frame(fixture.Renderer, 10, hasList: true, interactive: true);
+        Assert.Contains(fixture.Renderer.Draws, d => d.X == 73 && d.Y == 188);
+        Assert.DoesNotContain(fixture.Renderer.Draws, d => d.X == 254 && d.Y == 188);
+        Assert.Contains(fixture.Renderer.Draws, d => d.X == 126 && d.Y == 394);
+        Assert.DoesNotContain(fixture.Renderer.Draws, d => d.X == 273 && d.Y == 394);
+
+        // Scroll tamer description (6 lines -> minScroll = -(6-4)*14 = -28)
+        fixture.Game.Mouse.Handle(new MouseMoveEvent(100, 100), 20);
+        scene.CreatePanel.Handle(new MouseWheelEvent(-1));
+        Assert.Equal(-5, scene.CreatePanel.TamerScrollY);
+        for (int i = 0; i < 10; i++)
+            scene.CreatePanel.Handle(new MouseWheelEvent(-1));
+        Assert.Equal(-28, scene.CreatePanel.TamerScrollY);
+        scene.CreatePanel.Handle(new MouseWheelEvent(1));
+        Assert.Equal(-23, scene.CreatePanel.TamerScrollY);
+        for (int i = 0; i < 10; i++)
+            scene.CreatePanel.Handle(new MouseWheelEvent(1));
+        Assert.Equal(0, scene.CreatePanel.TamerScrollY);
+
+        // Scroll digimon description (5 lines -> minScroll = -(5-4)*14 = -14)
+        fixture.Game.Mouse.Handle(new MouseMoveEvent(600, 100), 30);
+        scene.CreatePanel.Handle(new MouseWheelEvent(-1));
+        Assert.Equal(-5, scene.CreatePanel.DigimonScrollY);
+        for (int i = 0; i < 10; i++)
+            scene.CreatePanel.Handle(new MouseWheelEvent(-1));
+        Assert.Equal(-14, scene.CreatePanel.DigimonScrollY);
+
+        // Scroll outside both description rects does nothing
+        fixture.Game.Mouse.Handle(new MouseMoveEvent(400, 300), 40);
+        scene.CreatePanel.Handle(new MouseWheelEvent(1));
+        Assert.Equal(-14, scene.CreatePanel.DigimonScrollY);
+        Assert.Equal(0, scene.CreatePanel.TamerScrollY);
+    }
+
     private sealed class FixedRandom(params int[] values) : Random
     {
         private int _index;

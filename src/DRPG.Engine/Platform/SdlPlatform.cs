@@ -12,6 +12,7 @@ public sealed record QuitEvent : InputEvent;
 public sealed record MouseMoveEvent(int X, int Y) : InputEvent;
 public sealed record MouseLeaveEvent : InputEvent;
 public sealed record MouseButtonEvent(int X, int Y, bool Down) : InputEvent;
+public sealed record MouseWheelEvent(int Delta) : InputEvent;
 public sealed record KeyEvent(GameKey Key) : InputEvent;
 public sealed record TextEvent(string Text) : InputEvent;
 
@@ -91,6 +92,12 @@ public sealed unsafe class SdlPlatform : IDisposable
                     var (x, y) = _renderer.ToFrame(e.button.x, e.button.y);
                     events.Add(new MouseButtonEvent(x, y, e.button.down));
                 }
+                    break;
+                case SDL_EventType.SDL_EVENT_MOUSE_WHEEL:
+                    if (e.wheel.y > 0)
+                        events.Add(new MouseWheelEvent(1));
+                    else if (e.wheel.y < 0)
+                        events.Add(new MouseWheelEvent(-1));
                     break;
                 case SDL_EventType.SDL_EVENT_KEY_DOWN:
                     events.Add(new KeyEvent(e.key.key switch

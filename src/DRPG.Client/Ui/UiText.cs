@@ -87,19 +87,30 @@ public sealed class UiText(IFont? font) : IDisposable
         renderer.Draw(Line(renderer, text, colorRef), x, y);
     }
 
-    /// <summary>Draws <paramref name="text"/> at (x, y) clipped horizontally to <paramref name="maxWidth"/> px.</summary>
-    public void DrawClipped(IRenderer renderer, string text, int x, int y, int maxWidth, uint colorRef = White, bool shadow = true, uint shadowColorRef = Black)
+    /// <summary>
+    /// Draws <paramref name="text"/> at (x, y) clipped to the rectangle [<paramref name="clipLeft"/>, <paramref name="clipRight"/>)
+    /// × [<paramref name="clipTop"/>, <paramref name="clipBottom"/>) (✅ <c>0x00b55bb0</c> <c>ExtTextOutA</c> with <c>ETO_CLIPPED</c>).
+    /// </summary>
+    public void DrawClippedRect(IRenderer renderer, string text, int x, int y, int clipLeft, int clipTop, int clipRight, int clipBottom,
+        uint colorRef = White, bool shadow = true, uint shadowColorRef = Black)
     {
-        if (font is null || text.Length == 0 || maxWidth <= 0)
+        if (font is null || text.Length == 0 || clipRight <= clipLeft || clipBottom <= clipTop)
             return;
-        y += CellAscent - font.Ascent;
+        int drawY = y + CellAscent - font.Ascent;
         if (shadow)
-        {
-            var shadowLine = Line(renderer, text, shadowColorRef);
-            renderer.DrawPart(shadowLine, x + 1, y + 1, 0, Math.Min(shadowLine.Width, maxWidth));
-        }
-        var line = Line(renderer, text, colorRef);
-        renderer.DrawPart(line, x, y, 0, Math.Min(line.Width, maxWidth));
+            DrawLineClipped(renderer, Line(renderer, text, shadowColorRef), x + 1, drawY + 1, clipLeft, clipTop, clipRight, clipBottom);
+        DrawLineClipped(renderer, Line(renderer, text, colorRef), x, drawY, clipLeft, clipTop, clipRight, clipBottom);
+    }
+
+    private static void DrawLineClipped(IRenderer renderer, ITexture line, int x, int y, int clipLeft, int clipTop, int clipRight, int clipBottom)
+    {
+        int left = Math.Max(x, clipLeft);
+        int top = Math.Max(y, clipTop);
+        int right = Math.Min(x + line.Width, clipRight);
+        int bottom = Math.Min(y + line.Height, clipBottom);
+        if (right <= left || bottom <= top)
+            return;
+        renderer.DrawRegion(line, left, top, left - x, top - y, right - left, bottom - top);
     }
 
     /// <summary>
