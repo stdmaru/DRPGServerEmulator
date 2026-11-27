@@ -268,4 +268,6 @@ Código: `GameScene` (cena 5), `WorldLoading` e `LoadingScreen` (tela de carga),
 
 **Provisório (❓)** no código, para a conferência lado a lado: curva do clareamento (escuro até 100, linear até 200), nome do servidor (texto do link do canal), passo da lógica de 60/s no lugar de `DAT_0135af08 = 30` e saída da tela de conexão perdida (um clique volta à cena 2).
 
+**Tempo de quadro** (`FrameStats`, escrito na saída de erro ao sair da cena; alvo 60 FPS, p99 < 16,6 ms): primeira medição em 2026-11-27, no Linux, com o renderizador `gpu`, contra o emulador local, parado no mapa 7: **3218 quadros, média 7,21 ms, p99 7,75 ms, máximo 431 ms**. O máximo é o quadro da tela de carga em que o `.map` e os tiles são carregados (`AdvanceLoading`), escondido atrás da tela de carga como no original; com o jogador parado, ainda não há jogadores, selvagens nem movimento na medição.
+
 **Corrigido ao testar**: o contador do clareamento (`+0x34c`) zerava ao chegar em 200 e o passo seguinte o somava de novo, escurecendo a tela outra vez em ciclo; agora 0 = terminado.
