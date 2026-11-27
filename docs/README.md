@@ -82,6 +82,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 ### Planos
 - [Cliente novo](planos/cliente-novo.md): em andamento (PR #42: marco 1 Loading → Login; launcher de login + patch). Source port em C# .NET 10 + SDL3/SDL_GPU (Vulkan/D3D12), Windows/Linux x64/arm64, regras de desempenho, RE de formatos e marcos.
 - [Cards e Card Slash](planos/card-slash.md): especificação do sistema de cards.
+- [Widescreen e resoluções maiores](planos/widescreen.md): escopo definido, começa depois do PR #51. Apresentação entre 4:3 e 2,39, UI fracionária com âncoras, assets HD, migração do que já existe.
 
 ### Ferramentas de RE
 - [Dump de RE](ferramentas/dump-re.md): Ghidra headless → decompilado por função, strings, chamadas e símbolos em `work/re/<versão>/dump`, consultados com `grep`; pontos conhecidos da v322 (WinMain, linha de comando, cenas).

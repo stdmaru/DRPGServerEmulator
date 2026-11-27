@@ -1,6 +1,6 @@
 # Cliente: fidelidade e resolução
 
-**Leitura obrigatória** antes de escrever ou portar qualquer coisa que desenhe, posicione ou teste clique no cliente. Vale para mundo, UI, cursor e telas fixas. Visão geral do cliente em [cliente](cliente.md). Decisão em [decisões](../projeto/decisoes.md) (2026-11-27).
+**Leitura obrigatória** antes de escrever ou portar qualquer coisa que desenhe, posicione ou teste clique no cliente. Vale para mundo, UI, cursor e telas fixas. Visão geral do cliente em [cliente](cliente.md). Decisão em [decisões](../projeto/decisoes.md) (2026-11-27). Escopo da implementação em [plano de widescreen](../planos/widescreen.md).
 
 ## O princípio
 O cliente original é a referência de **todo** comportamento e de toda apresentação. A **única diferença de apresentação** intencional é rodar em resoluções e proporções além de 800×600 (4:3). Resolução nunca justifica redesenhar, simplificar ou reinterpretar o original.
