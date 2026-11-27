@@ -1,4 +1,5 @@
 using System.Text;
+using DRPG.Client.Scenes;
 using DRPG.Client.Ui;
 using DRPG.Client.World;
 using DRPG.Shared.Formats.Map;
@@ -94,6 +95,38 @@ public sealed class FieldHudTests
     [InlineData(0, false)]
     [InlineData(79, false)]
     public void The_cell_is_hidden_only_on_the_maps_of_the_list(int map, bool hidden) => Assert.Equal(hidden, FieldHud.HidesCell(map));
+}
+
+public sealed class FieldHudButtonsTests
+{
+    private static HudValues Values() => new("Marcus", 1, 5, "Net Ocean", 1, "Plains", 5, 6, null, new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc));
+
+    [Fact]
+    public void The_reward_button_is_drawn_at_its_place_outside_the_battle_zone()
+    {
+        using var fixture = new SceneFixture();
+        fixture.Game.ChannelLine = 0;
+        var hud = new FieldHud(fixture.Game);
+
+        hud.Draw(fixture.Renderer, Values());
+
+        var reward = Assert.Single(fixture.Renderer.Draws, d => d.Texture.Width == 57 && d.Texture.Height == 20);
+        Assert.Equal((451, 462), (reward.X, reward.Y));
+    }
+
+    [Theory]
+    [InlineData(GameContext.FirstBattleZoneLine)]
+    [InlineData(GameContext.LastBattleZoneLine)]
+    public void The_reward_button_is_not_drawn_in_the_battle_zone_channels(int line)
+    {
+        using var fixture = new SceneFixture();
+        fixture.Game.ChannelLine = line;
+        var hud = new FieldHud(fixture.Game);
+
+        hud.Draw(fixture.Renderer, Values());
+
+        Assert.DoesNotContain(fixture.Renderer.Draws, d => d.Texture.Width == 57 && d.Texture.Height == 20);
+    }
 }
 
 public sealed class FieldAnimatorTests

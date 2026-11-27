@@ -55,6 +55,9 @@ public sealed class FieldHud(GameContext game)
 
     private const int ChatX = 28, ChatY = 460, ChatHeight = 81;
 
+    private const string RewardSprite = "gui\\dr2_sub_016_005.spr";
+    private const int RewardX = 451, RewardY = 462;
+
     private readonly Dictionary<string, ITexture[]> _cache = new(StringComparer.OrdinalIgnoreCase);
 
     public void Draw(IRenderer renderer, HudValues v)
@@ -119,6 +122,10 @@ public sealed class FieldHud(GameContext game)
             Frame(renderer, Gui(sprite), 3, x, y);                                            // ✅ frame 3 = the window is closed
         foreach (var (sprite, x, y) in SideButtons)
             Frame(renderer, Gui(sprite), 0, x, y);
+        // ✅ REWARD = GUI\dr2_sub_016_005 at (451, 462), frame 0 = normal; not drawn in the BATTLE ZONE channels (0x00b8d399, docs/cliente/cena-jogo.md).
+        // ❓ The original blinks it when there is a reward (+0x7743c: who sets it is not read); nothing sets it in this step.
+        if (!game.IsBattleZone)
+            Frame(renderer, Load(RewardSprite, gui: true), 0, RewardX, RewardY);
 
         if (Gui(18) is { Length: > 0 } chat)                                                  // ✅ the chat frame, clipped to 81 px (❓ blended with the option)
             renderer.DrawRegion(chat[0], ChatX, ChatY, 0, 0, chat[0].Width, Math.Min(chat[0].Height, ChatHeight));
