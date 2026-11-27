@@ -12,6 +12,9 @@ public interface IScene : IDisposable
     /// <summary>Minimum time between two frames; 0 = as fast as the display allows. The loading screen runs at 30 FPS.</summary>
     int FrameIntervalMs { get; }
 
+    /// <summary>Whether the game cursor is drawn over this scene (✅ <c>0x00b34250</c> hides it during the 3 s return loading).</summary>
+    bool ShowCursor => true;
+
     void Init();
 
     void Handle(InputEvent input);

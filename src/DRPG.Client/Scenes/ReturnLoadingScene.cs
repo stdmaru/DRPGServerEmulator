@@ -27,6 +27,9 @@ public sealed class ReturnLoadingScene(GameContext game, Random random) : IScene
 
     public int FrameIntervalMs => StepMs;
 
+    /// <summary>✅ <c>0x00b34250</c> does not call <c>FUN_00b3e3d0</c>: the cursor is hidden during the 3 s loading screen.</summary>
+    public bool ShowCursor => false;
+
     public void Init()
     {
         var images = game.Sprites.GuiLazy("loading_image");   // big, and only one frame is shown
