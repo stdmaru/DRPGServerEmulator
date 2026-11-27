@@ -383,14 +383,14 @@ public sealed class GameSceneTests : IDisposable
         using var owned = scene;
         Assert.Equal(0, scene.DigimonAnimation!.IdleCounter);
 
-        scene.Frame(_fixture.Renderer, entered + 500);                  // half a second: 30 steps
-        Assert.Equal(30, scene.DigimonAnimation.IdleCounter);
+        scene.Frame(_fixture.Renderer, entered + 500);                  // half a second: 15 steps (✅ 30 a second)
+        Assert.Equal(15, scene.DigimonAnimation.IdleCounter);
 
-        scene.Frame(_fixture.Renderer, entered + 500 + 8);              // 8 ms are not a whole step (16.6 ms)
-        Assert.Equal(30, scene.DigimonAnimation.IdleCounter);
+        scene.Frame(_fixture.Renderer, entered + 500 + 20);             // 20 ms are not a whole step (33.3 ms)
+        Assert.Equal(15, scene.DigimonAnimation.IdleCounter);
 
-        scene.Frame(_fixture.Renderer, entered + 1000);                 // a second since the start: 60 steps in all
-        Assert.Equal(60, scene.DigimonAnimation.IdleCounter);
+        scene.Frame(_fixture.Renderer, entered + 1000);                 // a second since the start: 30 steps in all
+        Assert.Equal(30, scene.DigimonAnimation.IdleCounter);
     }
 
     [Fact]
@@ -400,11 +400,11 @@ public sealed class GameSceneTests : IDisposable
         var (scene, entered) = Enter();
         using var owned = scene;
 
-        // 1000 s = 60000 due steps: the frame runs 10000 of them and the next frames go on from the real time, not from a backlog
+        // 1000 s = 30000 due steps: the frame runs 10000 of them and the next frames go on from the real time, not from a backlog
         scene.Frame(_fixture.Renderer, entered + 1_000_000);
         scene.Frame(_fixture.Renderer, entered + 1_000_000 + 1000);
 
-        Assert.Equal((10_000 + 60) % 320, scene.DigimonAnimation!.IdleCounter);
+        Assert.Equal((10_000 + 30) % 320, scene.DigimonAnimation!.IdleCounter);
         Assert.False(scene.ConnectionLost);
     }
 

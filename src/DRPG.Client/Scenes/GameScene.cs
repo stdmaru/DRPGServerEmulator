@@ -21,10 +21,12 @@ namespace DRPG.Client.Scenes;
 public sealed class GameScene(GameContext game, Random random) : IScene
 {
     /// <summary>
-    /// ❓ The logic runs every <c>DAT_0135af08 = 30</c> units of a time whose unit is not read yet (✅ <c>0x00867ed0(30)</c>); like the
-    /// emulator, 60 steps a second.
+    /// ✅ 30 logic steps a second. The main loop (<c>0x00aa4a90</c>) runs a frame only when the performance counter passes the due time,
+    /// which goes forward by <c>frequency / 30</c> each frame (<c>0x00867ed0(0x1e)</c>, <c>0x00867eb0</c>, <c>0x00868020</c>): at most 30
+    /// frames a second. The field frame (<c>0x00b4e550</c>) runs one step per frame, plus catch-up steps when the measured frame rate
+    /// (<c>0x00867fb0</c>, once a second) falls under <c>DAT_0135af08 = 30</c>. Steps by the clock at 30 a second give the same pace.
     /// </summary>
-    public const int StepsPerSecond = 60;
+    public const int StepsPerSecond = 30;
 
     /// <summary>✅ <c>0x00b4e550</c>: at most 10000 steps in one frame.</summary>
     public const int MaxStepsPerFrame = 10_000;
