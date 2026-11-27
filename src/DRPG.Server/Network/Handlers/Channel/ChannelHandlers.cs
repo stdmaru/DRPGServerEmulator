@@ -95,14 +95,27 @@ public sealed class CharacterListHandler(CharacterListService list) : AccountHan
         await list.SendAsync(session, account.Uid, ct);
 }
 
-/// <summary>0x14: confirmação do usuário.</summary>
+/// <summary>0x14: confirmação do usuário e estado da senha secundária (byte 21).</summary>
 [PacketHandler(ChannelOpcode.UserCheck)]
-public sealed class UserCheckHandler : AccountHandler<UserCheckRequest>
+public sealed class UserCheckHandler(SecondaryPasswordService secondaryPasswords) : AccountHandler<UserCheckRequest>
 {
-    protected override ValueTask HandleAsync(Session session, AuthenticatedAccount account, UserCheckRequest request, CancellationToken ct)
+    protected override async ValueTask HandleAsync(Session session, AuthenticatedAccount account, UserCheckRequest request, CancellationToken ct)
     {
-        session.Send(new UserCheckReply(account.Username));
-        return ValueTask.CompletedTask;
+        var status = await secondaryPasswords.GetStatusAsync(account.Uid, ct);
+        session.Send(new UserCheckReply(account.Username, status));
+    }
+}
+
+/// <summary>0x15: cadastro ou troca da senha secundária (✅ v322 <c>0x00ae6070</c> / <c>0x00b45c30</c>).</summary>
+[PacketHandler(ChannelOpcode.SecondaryPassword)]
+public sealed class SecondaryPasswordHandler(SecondaryPasswordService secondaryPasswords, ILogger<SecondaryPasswordHandler> log)
+    : AccountHandler<SecondaryPasswordRequest>
+{
+    protected override async ValueTask HandleAsync(Session session, AuthenticatedAccount account, SecondaryPasswordRequest request, CancellationToken ct)
+    {
+        var result = await secondaryPasswords.ChangeAsync(account.Uid, request.OldPassword, request.NewPassword, request.ConfirmPassword, ct);
+        log.LogInformation("{Username} secondary password change: {Result}", account.Username, result);
+        session.Send(new SecondaryPasswordReply(result));
     }
 }
 
@@ -163,12 +176,21 @@ public sealed partial class CharacterCreateHandler(
 
 /// <summary>0x11: apagar personagem.</summary>
 [PacketHandler(ChannelOpcode.CharacterDelete)]
-public sealed class CharacterDeleteHandler(CharacterRepository characters, CharacterListService list, ILogger<CharacterDeleteHandler> log)
+public sealed class CharacterDeleteHandler(
+    CharacterRepository characters, CharacterListService list, SecondaryPasswordService secondaryPasswords, ILogger<CharacterDeleteHandler> log)
     : AccountHandler<CharacterDeleteRequest>
 {
+    private const int SecondaryPasswordMismatchError = 2000;
+
     protected override async ValueTask HandleAsync(Session session, AuthenticatedAccount account, CharacterDeleteRequest request, CancellationToken ct)
     {
         var uid = request.CharacterUid;
+        if (!await secondaryPasswords.VerifyForDeleteAsync(account.Uid, request.PasswordMd5, ct))
+        {
+            log.LogWarning("{Username}: secondary password mismatch when deleting character {Uid}", account.Username, uid);
+            session.Send(new CharacterDeleteReply(SecondaryPasswordMismatchError, uid, request.PasswordMd5));
+            return;
+        }
         if (!await characters.DeleteAsync(uid, account.Uid, ct)) return;
         log.LogInformation("{Username} apagou o personagem {Uid}", account.Username, uid);
         session.Send(new CharacterDeleteReply(ChannelError.None, uid, request.PasswordMd5));

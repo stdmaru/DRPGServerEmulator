@@ -22,6 +22,7 @@ public static class AccountDecoder
         (ushort)ChannelOpcode.Authenticate => ClientPacket.Parse<AuthenticateReply>(frame.Payload),
         (ushort)ChannelOpcode.CharacterList => ClientPacket.Parse<CharacterListReply>(frame.Payload),
         (ushort)ChannelOpcode.UserCheck => ClientPacket.Parse<UserCheckReply>(frame.Payload),
+        (ushort)ChannelOpcode.SecondaryPassword => ClientPacket.Parse<SecondaryPasswordReply>(frame.Payload),
         (ushort)ChannelOpcode.CharacterCreate => ClientPacket.Parse<CharacterCreateReply>(frame.Payload),
         (ushort)ChannelOpcode.CharacterDelete => ClientPacket.Parse<CharacterDeleteReply>(frame.Payload),
         (ushort)ChannelOpcode.KeepAlive => ClientPacket.Parse<KeepAliveReply>(frame.Payload),

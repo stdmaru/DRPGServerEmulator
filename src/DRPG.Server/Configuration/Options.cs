@@ -129,10 +129,24 @@ public sealed class RateLimitOptions
     public int Burst { get; set; }
 }
 
+/// <summary>Secondary password policy on character select and character deletion.</summary>
+public enum SecondaryPasswordMode
+{
+    /// <summary>Disabled (default, 1:1 with official v322: no prompt, Exchange Password hidden, delete skips password).</summary>
+    Disabled,
+    /// <summary>Optional: no mandatory prompt on login; players may opt in via Exchange Password and then delete requires it.</summary>
+    Optional,
+    /// <summary>Required: accounts without a secondary password are prompted to register before selecting a character.</summary>
+    Required,
+}
+
 /// <summary>Seção "Game": regras ajustáveis (antigo ServerConsts.xml).</summary>
 public sealed class GameOptions
 {
     public const string Section = "Game";
+
+    /// <summary>Secondary password mode: Disabled (v322 default), Optional, or Required.</summary>
+    public SecondaryPasswordMode SecondaryPasswordMode { get; set; } = SecondaryPasswordMode.Disabled;
 
     /// <summary>Pasta das tabelas XML. Relativa ao executável se não for absoluta.</summary>
     public string ResourcesPath { get; set; } = "Resources";

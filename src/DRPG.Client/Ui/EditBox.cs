@@ -24,6 +24,7 @@ public sealed class EditBox(int x, int y, int width, int height, int maxLength) 
 
     public string Text => _text;
     public bool Focused { get; set; }
+    public bool Masked { get; set; }
 
     public bool Contains(int px, int py) => px >= X && py >= Y && px < X + Width && py < Y + Height;
 
@@ -57,11 +58,12 @@ public sealed class EditBox(int x, int y, int width, int height, int maxLength) 
 
     public void Clear() => _text = "";
 
-    /// <summary>✅ <c>0x00a19040</c>: draws white text with a black shadow at (X, Y) and a blinking caret when focused.</summary>
+    /// <summary>✅ <c>0x00a19040</c>: draws white text (or <c>*</c> when masked) with a black shadow at (X, Y) and a blinking caret when focused.</summary>
     public void Draw(IRenderer renderer, UiText uiText, ulong nowMs, bool enabled = true)
     {
         int maxTextWidth = Math.Max(0, Width - 1);
-        int shownWidth = uiText.DrawTail(renderer, _text, X, Y, maxTextWidth, UiText.White, shadow: true);
+        string shown = Masked ? new string('*', _text.Length) : _text;
+        int shownWidth = uiText.DrawTail(renderer, shown, X, Y, maxTextWidth, UiText.White, shadow: true);
         if (enabled && Focused && nowMs / CaretBlinkMs % 2 == 0)
             renderer.Draw(Caret(renderer), X + shownWidth, Y);
     }

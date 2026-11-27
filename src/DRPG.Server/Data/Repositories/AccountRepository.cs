@@ -42,7 +42,15 @@ public interface ILauncherAccountStore
     Task<IReadOnlyList<(uint Uid, string PasswordHash)>> PlainPasswordsAsync(CancellationToken ct);
 }
 
-public sealed class AccountRepository(Database database) : IAccountStore, ILauncherAccountStore
+/// <summary>Persistence of the account's secondary password hash (PBKDF2 over the client's MD5).</summary>
+public interface ISecondaryPasswordStore
+{
+    Task<string?> GetSecondaryPasswordHashAsync(uint accountUid, CancellationToken ct);
+
+    Task SetSecondaryPasswordHashAsync(uint accountUid, string hash, CancellationToken ct);
+}
+
+public sealed class AccountRepository(Database database) : IAccountStore, ILauncherAccountStore, ISecondaryPasswordStore
 {
     private sealed class Row
     {
@@ -116,5 +124,21 @@ public sealed class AccountRepository(Database database) : IAccountStore, ILaunc
         var rows = await db.QueryAsync<Row>(new CommandDefinition(
             "SELECT uid, password_hash FROM account WHERE password_hash LIKE 'plain$%'", cancellationToken: ct));
         return rows.Select(r => (r.Uid, r.PasswordHash!)).ToList();
+    }
+
+    public async Task<string?> GetSecondaryPasswordHashAsync(uint accountUid, CancellationToken ct)
+    {
+        await using var db = await database.OpenAsync(ct);
+        return await db.QuerySingleOrDefaultAsync<string?>(new CommandDefinition(
+            "SELECT secondary_password_hash FROM account WHERE uid = @accountUid",
+            new { accountUid }, cancellationToken: ct));
+    }
+
+    public async Task SetSecondaryPasswordHashAsync(uint accountUid, string hash, CancellationToken ct)
+    {
+        await using var db = await database.OpenAsync(ct);
+        await db.ExecuteAsync(new CommandDefinition(
+            "UPDATE account SET secondary_password_hash = @hash WHERE uid = @accountUid",
+            new { accountUid, hash }, cancellationToken: ct));
     }
 }

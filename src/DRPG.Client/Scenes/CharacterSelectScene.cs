@@ -53,8 +53,10 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
     private MessageBox _box = null!;                           // set in Init
     private CharacterCreatePanel _createPanel = null!;         // set in Init
     private readonly DeleteCharacterDialog _deleteDialog = new();
+    private readonly SecondaryPasswordDialog _secondaryPasswordDialog = new();
 
     private bool _requested;
+    private bool _checkedSecondaryPasswordPrompt;
     private int _loadedListVersion;
     private int _mode;                                         // ✅ +0x85c: 0 = selection, 1 = creation
     private int _selected = -1;
@@ -67,6 +69,7 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
     internal int SelectedSlot => _selected;
     internal string? ActiveMessage => _message;
     internal DeleteCharacterDialog DeleteDialog => _deleteDialog;
+    internal SecondaryPasswordDialog SecondaryPasswordDialog => _secondaryPasswordDialog;
     internal CharacterCreatePanel CreatePanel => _createPanel;
 
     public void Init()
@@ -93,6 +96,11 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
 
     public void Handle(InputEvent input)
     {
+        if (_secondaryPasswordDialog.IsOpen)
+        {
+            _secondaryPasswordDialog.Handle(input);
+            return;
+        }
         if (_deleteDialog.IsOpen)
         {
             _deleteDialog.Handle(input);
@@ -124,7 +132,7 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
         if (_mode == 1)
             FrameCreateMode(renderer, account, nowMs);
         else
-            FrameSelectMode(renderer, account);
+            FrameSelectMode(renderer, account, nowMs);
 
         DrawMessage(renderer);
         // ✅ 0x00b48840: CSceneCharSel does not draw the version text (only Title and Server scenes do)
@@ -142,6 +150,17 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
 
         if (account.TakeDeleteError() is { } deleteError)
             HandleDeleteError(deleteError);
+
+        // ✅ 0x00b45c30 case 0x14: RequiredUnset opens mandatory registration on entering character select
+        if (account.UserConfirmed && !_checkedSecondaryPasswordPrompt)
+        {
+            _checkedSecondaryPasswordPrompt = true;
+            if (account.SecondaryPasswordStatus == SecondaryPasswordStatus.RequiredUnset)
+                _secondaryPasswordDialog.OpenRegister(mandatory: true);
+        }
+
+        if (account.TakeSecondaryPasswordResult() is { } spResult)
+            _secondaryPasswordDialog.ShowResult(spResult);
     }
 
     /// <summary>✅ <c>0x00b45c30</c> case <c>0x10</c>: only error 102 (<c>NameTaken</c>) is handled.</summary>
@@ -167,19 +186,26 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
         }
     }
 
-    private void FrameSelectMode(IRenderer renderer, AccountSession account)
+    private void FrameSelectMode(IRenderer renderer, AccountSession account, ulong nowMs)
     {
         renderer.Draw(_background, 0, 0);
-        // ✅ +0x318 (delete dialog open) locks all mode 0 buttons and slots
-        bool interactive = _fade is null && !_deleteDialog.IsOpen && _message is null;
+        // ✅ +0x318 (delete dialog) and +0x538 (secondary password dialog) lock all mode 0 buttons and slots
+        bool interactive = _fade is null && !_deleteDialog.IsOpen && !_secondaryPasswordDialog.IsOpen && _message is null;
         DrawSlots(renderer, account, interactive);
         DrawButtons(renderer, account, interactive);
 
         if (_deleteDialog.IsOpen)
         {
-            var action = _deleteDialog.Frame(renderer, _box, game.Text, game.Texts, game.Mouse);
+            var action = _deleteDialog.Frame(renderer, _box, game.Text, game.Texts, game.Mouse, nowMs);
             if (action == DeleteDialogAction.ConfirmDelete)
                 SendDelete(account);
+        }
+
+        if (_secondaryPasswordDialog.IsOpen)
+        {
+            var action = _secondaryPasswordDialog.Frame(renderer, _box, game.Text, game.Texts, game.Mouse, nowMs);
+            if (action is SecondaryPasswordAction.Submit submit && account.Step == AccountStep.Ready)
+                account.SendSecondaryPassword(submit.OldPassword, submit.NewPassword, submit.ConfirmPassword);
         }
     }
 
@@ -211,8 +237,8 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
         var slot = list.Slots[_selected];
         if (slot.IsEmpty || string.IsNullOrEmpty(slot.Name))
             return;
-        // ✅ 0x00b46020: v322 skips state 0 so the box text is "", MD5 = d41d8cd98f00b204e9800998ecf8427e
-        account.DeleteCharacter(slot.Uid, DeleteCharacterDialog.ComputePasswordMd5(""));
+        // ✅ 0x00b46020: sends MD5 of the password box ("" when state 0 was skipped)
+        account.DeleteCharacter(slot.Uid, _deleteDialog.TakePasswordMd5());
     }
 
     /// <summary>✅ Arrival of the list: mode 0, nothing selected, the animations of the species and tamers opened (<c>0x00b45c30</c>, case <c>0x12</c>).</summary>
@@ -393,12 +419,16 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
     private void DrawButtons(IRenderer renderer, AccountSession account, bool interactive)
     {
         bool hasList = account.Characters is not null;
+        bool exchangeVisible = account.SecondaryPasswordStatus != SecondaryPasswordStatus.Disabled;
         _delete.Update(game.Mouse, interactive);
         _delete.Draw(renderer);
         _create.Update(game.Mouse, interactive);
         _create.Draw(renderer);
-        _exchange.Update(game.Mouse, interactive);
-        _exchange.Draw(renderer);
+        if (exchangeVisible)
+        {
+            _exchange.Update(game.Mouse, interactive);
+            _exchange.Draw(renderer);
+        }
         _gameStart.Update(game.Mouse, interactive);
         _gameStart.Draw(renderer);
         _back.Update(game.Mouse, interactive);
@@ -407,11 +437,16 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
         if (!interactive)
             return;
         if (_delete.Clicked && _selected >= 0 && hasList)
-            _deleteDialog.OpenConfirm();
+            _deleteDialog.Open(requirePassword: account.SecondaryPasswordStatus == SecondaryPasswordStatus.Set);
         if (_create.Clicked && !game.IsBattleZone && hasList)
             TryEnterCreateMode(account);
-        if (_exchange.Clicked)
-            game.Log("Exchange Password: it comes with the next milestone");                      // ❓
+        if (exchangeVisible && _exchange.Clicked && hasList)
+        {
+            if (account.SecondaryPasswordStatus == SecondaryPasswordStatus.Set)
+                _secondaryPasswordDialog.OpenChange();
+            else
+                _secondaryPasswordDialog.OpenRegister(mandatory: false);
+        }
         if (_gameStart.Clicked && _selected >= 0 && hasList)
             EnterGame();
         if (_back.Clicked)
@@ -433,5 +468,10 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
         game.Log("Map Server : (not known yet, milestone 3) 0");
     }
 
-    public void Dispose() => _createPanel?.Dispose();
+    public void Dispose()
+    {
+        _createPanel?.Dispose();
+        _deleteDialog.Dispose();
+        _secondaryPasswordDialog.Dispose();
+    }
 }

@@ -29,6 +29,12 @@ public sealed class LoginChannelPacketTests
         AssertRoundTrip(new AuthenticateReply(ChannelError.InvalidCredentials, "user", new string('b', 40), "m1", "m2", "m3"));
         AssertRoundTrip(new UserCheckRequest());
         AssertRoundTrip(new UserCheckReply("user"));
+        AssertRoundTrip(new UserCheckReply("user", SecondaryPasswordStatus.RequiredUnset));
+        AssertRoundTrip(new UserCheckReply("user", SecondaryPasswordStatus.Set));
+        AssertRoundTrip(new UserCheckReply("user", SecondaryPasswordStatus.OptionalUnset));
+        AssertRoundTrip(new SecondaryPasswordRequest("user", new string('a', 32), new string('b', 32), new string('b', 32)));
+        AssertRoundTrip(new SecondaryPasswordReply(SecondaryPasswordResult.Success));
+        AssertRoundTrip(new SecondaryPasswordReply(SecondaryPasswordResult.InvalidOldPassword));
         AssertRoundTrip(new MapConnectionConfirmRequest("user", "Tamer"));
         AssertRoundTrip(new KeepAliveRequest());
         AssertRoundTrip(new KeepAliveReply());
@@ -80,6 +86,8 @@ public sealed class LoginChannelPacketTests
         Assert.Equal(500, Payload(new CharacterListReply([Slot(0), Slot(1), Slot(2), Slot(3)])).Length);
         Assert.Equal(36, Payload(new UserCheckRequest()).Length);
         Assert.Equal(22, Payload(new UserCheckReply("u")).Length);
+        Assert.Equal(142, Payload(new SecondaryPasswordRequest("u", "old", "new", "new")).Length);
+        Assert.Single(Payload(new SecondaryPasswordReply(SecondaryPasswordResult.Success)));
         Assert.Equal(55, Payload(new MapConnectionConfirmRequest("u", "c")).Length);
         Assert.Empty(Payload(new KeepAliveReply()));
     }

@@ -166,15 +166,98 @@ public sealed record UserCheckRequest(string Username = "") : ITwoWayPacket<User
     }
 }
 
-/// <summary>✅ 0x14 S2C (22 B, v322): the user name, confirmed.</summary>
-public sealed record UserCheckReply(string Username) : ITwoWayPacket<UserCheckReply>
+/// <summary>
+/// Byte 21 of <see cref="UserCheckReply"/> (<c>0x14</c> S2C, ✅ v322 <c>0x00b45c30</c> → <c>0x00c96960</c>):
+/// tells the client whether the secondary password system is disabled, mandatory to register, already set, or optional.
+/// </summary>
+public enum SecondaryPasswordStatus : byte
+{
+    /// <summary>Disabled on the server (v322 default: byte 21 = 0, Exchange Password hidden, delete skips password).</summary>
+    Disabled = 0,
+    /// <summary>Required on the server and not yet set on this account (byte 21 = 1: opens registration state 3).</summary>
+    RequiredUnset = 1,
+    /// <summary>Enabled on the server and already set on this account (Exchange Password opens change; delete prompts state 0).</summary>
+    Set = 2,
+    /// <summary>Optional on the server and not yet set on this account (no auto-prompt; Exchange Password lets player opt in).</summary>
+    OptionalUnset = 3,
+}
+
+/// <summary>Result byte of <see cref="SecondaryPasswordReply"/> (<c>0x15</c> S2C, ✅ v322 <c>0x00c950d0</c> state 5).</summary>
+public enum SecondaryPasswordResult : byte
+{
+    /// <summary>✅ <c>0x55d</c> "Password has been changed."</summary>
+    Success = 1,
+    /// <summary>✅ <c>0x55e</c> "New Password you entered is incorrect."</summary>
+    InvalidNewPassword = 2,
+    /// <summary>✅ <c>0x55f</c> "Old Password you entered is incorrect."</summary>
+    InvalidOldPassword = 3,
+}
+
+/// <summary>✅ 0x14 S2C (22 B, v322): <c>username[21]</c> and <c>u8 secondaryPasswordStatus</c> (byte 21, <c>0x00b45c30</c>).</summary>
+public sealed record UserCheckReply(string Username, SecondaryPasswordStatus SecondaryPassword = SecondaryPasswordStatus.Disabled)
+    : ITwoWayPacket<UserCheckReply>
 {
     public static ushort Opcode => (ushort)ChannelOpcode.UserCheck;
     public static PacketLength Length => PacketLength.Exact(UserCheckRequest.UsernameBytes);
 
-    public static UserCheckReply Read(PacketReader r) => new(r.ReadFixedString(UserCheckRequest.UsernameBytes));
+    public static UserCheckReply Read(PacketReader r)
+    {
+        var username = r.ReadFixedString(AccountLimits.ChannelUsernameBytes);
+        var status = (SecondaryPasswordStatus)r.ReadU8();
+        return new(username, status);
+    }
 
-    public void Write(PacketWriter w) => w.WriteFixedString(Username, UserCheckRequest.UsernameBytes);
+    public void Write(PacketWriter w)
+    {
+        w.WriteFixedString(Username, AccountLimits.ChannelUsernameBytes);
+        w.WriteU8((byte)SecondaryPassword);
+    }
+}
+
+/// <summary>
+/// ✅ 0x15 C2S (142 B, v322 <c>0x00ae6070</c>): <c>u8 0, username[21], oldPassword[40], newPassword[40], confirmPassword[40]</c>.
+/// Each password field holds a lowercase hex MD5 (or <c>TextAttach[0x55b]</c> in <c>OldPassword</c> on initial registration).
+/// </summary>
+public sealed record SecondaryPasswordRequest(string Username, string OldPassword, string NewPassword, string ConfirmPassword)
+    : ITwoWayPacket<SecondaryPasswordRequest>
+{
+    public const int PasswordBytes = 40;
+
+    public static ushort Opcode => (ushort)ChannelOpcode.SecondaryPassword;
+    public static PacketLength Length => PacketLength.Exact(1 + AccountLimits.ChannelUsernameBytes + PasswordBytes * 3);
+
+    public static SecondaryPasswordRequest Read(PacketReader r)
+    {
+        r.ReadU8();
+        var username = r.ReadFixedString(AccountLimits.ChannelUsernameBytes);
+        var oldPassword = r.ReadFixedString(PasswordBytes);
+        var newPassword = r.ReadFixedString(PasswordBytes);
+        var confirmPassword = r.ReadFixedString(PasswordBytes);
+        return new(username, oldPassword, newPassword, confirmPassword);
+    }
+
+    public void Write(PacketWriter w)
+    {
+        w.WriteU8(0);
+        w.WriteFixedString(Username, AccountLimits.ChannelUsernameBytes);
+        w.WriteFixedString(OldPassword, PasswordBytes);
+        w.WriteFixedString(NewPassword, PasswordBytes);
+        w.WriteFixedString(ConfirmPassword, PasswordBytes);
+    }
+
+    /// <summary>Never prints any password or MD5.</summary>
+    public override string ToString() => $"{nameof(SecondaryPasswordRequest)}({Username})";
+}
+
+/// <summary>✅ 0x15 S2C (1 B, v322 <c>0x00b45c30</c> case <c>0x15</c>): result byte (1 = success, 2 = bad new, 3 = bad old).</summary>
+public sealed record SecondaryPasswordReply(SecondaryPasswordResult Result) : ITwoWayPacket<SecondaryPasswordReply>
+{
+    public static ushort Opcode => (ushort)ChannelOpcode.SecondaryPassword;
+    public static PacketLength Length => PacketLength.Exact(1);
+
+    public static SecondaryPasswordReply Read(PacketReader r) => new((SecondaryPasswordResult)r.ReadU8());
+
+    public void Write(PacketWriter w) => w.WriteU8((byte)Result);
 }
 
 /// <summary>

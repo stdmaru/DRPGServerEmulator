@@ -19,6 +19,7 @@ public enum ChannelOpcode : ushort
     CharacterDelete = 0x11,
     CharacterList = 0x12,
     UserCheck = 0x14,
+    SecondaryPassword = 0x15,
     MapConnectionConfirm = 0x16,
     ClientHardwareInfo = 0x18,     // C2S: endereços MAC do cliente; sem resposta
     KeepAlive = 0xC4,

@@ -73,6 +73,12 @@ public sealed class AccountSession(ClientSettings settings, GameCommandLine comm
     /// <summary>True once the server confirmed the user (<c>0x14</c>).</summary>
     public bool UserConfirmed { get; private set; }
 
+    /// <summary>Secondary password policy/state reported by the server in <c>0x14</c> byte 21.</summary>
+    public SecondaryPasswordStatus SecondaryPasswordStatus { get; private set; } = SecondaryPasswordStatus.Disabled;
+
+    /// <summary>Result of the last <c>0x15</c> secondary password reply, until taken by the scene.</summary>
+    public SecondaryPasswordResult? LastSecondaryPasswordResult { get; private set; }
+
     /// <summary>The server's offer of the fourth starter digimon (from the <c>0x03</c> reply).</summary>
     public int FourthStarter { get; private set; } = -1;
 
@@ -154,6 +160,22 @@ public sealed class AccountSession(ClientSettings settings, GameCommandLine comm
         return code;
     }
 
+    /// <summary>✅ Sends <c>0x15</c> to register or change the secondary password (<c>0x00ae6070</c>). Never logs passwords or MD5.</summary>
+    public void SendSecondaryPassword(string oldPassword, string newPassword, string confirmPassword)
+    {
+        if (Step != AccountStep.Ready)
+            throw new InvalidOperationException($"secondary password requested while {Step}");
+        LastSecondaryPasswordResult = null;
+        _connection!.Send(new SecondaryPasswordRequest(command.Username, oldPassword, newPassword, confirmPassword));
+    }
+
+    public SecondaryPasswordResult? TakeSecondaryPasswordResult()
+    {
+        var result = LastSecondaryPasswordResult;
+        LastSecondaryPasswordResult = null;
+        return result;
+    }
+
     /// <summary>Drops the connections and starts over from <see cref="AccountStep.NotStarted"/> (Back, or a failure).</summary>
     public void Reset()
     {
@@ -169,6 +191,8 @@ public sealed class AccountSession(ClientSettings settings, GameCommandLine comm
         LastCreateError = null;
         LastDeleteError = null;
         UserConfirmed = false;
+        SecondaryPasswordStatus = SecondaryPasswordStatus.Disabled;
+        LastSecondaryPasswordResult = null;
         AuthenticationRefusal = null;
     }
 
@@ -260,8 +284,15 @@ public sealed class AccountSession(ClientSettings settings, GameCommandLine comm
                     log($"character delete refused: {reply.ErrorCode}");
                 }
                 break;
-            case (UserCheckReply, AccountStep.WaitingCharacterList or AccountStep.Ready):
+            case (UserCheckReply reply, AccountStep.WaitingCharacterList or AccountStep.Ready):
                 UserConfirmed = true;
+                SecondaryPasswordStatus = reply.SecondaryPassword;
+                break;
+            case (SecondaryPasswordReply reply, AccountStep.Ready):
+                LastSecondaryPasswordResult = reply.Result;
+                if (reply.Result == SecondaryPasswordResult.Success)
+                    SecondaryPasswordStatus = SecondaryPasswordStatus.Set;
+                log($"secondary password reply: {reply.Result}");
                 break;
             case (KeepAliveReply, AccountStep.Ready):
                 break;
