@@ -10,7 +10,7 @@ Especificação para o marco 2 do [cliente novo](../planos/cliente-novo.md): abr
   - Ao pedir a cena 2: escolhe a linha 1 da tabela de servidores (`FUN_00b3a950(1, 0)`), conecta (`FUN_00b52460`) e, se conectou, envia o **login `0x05`** com o usuário (`FUN_00b54150`). Ou seja: **o login é feito ao entrar na seleção de mundo**, antes de qualquer clique.
   - Se a cena 2 for pedida com `[DAT_0135b150]+0x690 == 0` (volta do jogo/da seleção de personagens), antes desenha 30 quadros de `FUN_00b34250(i % 12)` com `Sleep(100)` entre eles (3 s). Na primeira vez (`Game Init` põe `+0x690 = 1`) isso é pulado.
     - ✅ `FUN_00b34250` (sprites de `0x00b34980`): `GUI\loading_image_ENG.spr` num quadro sorteado uma vez, em (0, 0); `GUI\loading_under_line.spr` quadro 0 em (0, 550); uma dica = pedaço n (sorteado de 1 a 15, uma vez) do texto `0xa6b` dividido nas quebras `†` (`FUN_0091b7d0`), amarelo com sombra preta, centrado nos 800 px em y 580 (`FUN_00b55560`); `GUI\game_end_gauge.spr` quadro `i % 12` em (740, 540). Depois recria a cena 2, que faz o login de novo. Implementado em `ReturnLoadingScene`.
-- Toda cena desenha o texto `Digimon RPG 3.26` no canto (`FUN_00b55270(0, texto, x, 1, 0xffffff, 1, 0)`; x = 0 na carga, 1 na seleção de mundo).
+- As cenas de carga (`0x00b35560`, `0x00b54cc0`) e seleção de mundo (`0x00b54240`) desenham o texto `Digimon RPG 3.26` no canto (`FUN_00b55270(0, texto, x, 1, 0xffffff, 1, 0)`; x = 0 na carga, 1 na seleção de mundo). ✅ Confirmado no decompilado: `CSceneCharSel` (`0x00b48840`) **não** desenha esse texto.
 - `FUN_00b3e3d0`: cursor (`Interface\cursor_*.spr`, carregados em `0x00b3ebf0`). `FUN_00b56010` + `FUN_007dbf10`: fim do quadro (apresentação).
 - ✅ 30 quadros por segundo em todas as cenas (`FUN_00867ed0(0x1e)` no `WinMain` e no fim do `Game Init`).
 
@@ -191,7 +191,7 @@ Para cada slot com tamer (`+4 ≠ 0`):
   | +108 | nome do digimon |
   | +126 | "Level %3d" (nível do digimon) |
   | +144 | `0xef2` "%d Win %d Lose %0.2f%%" com (vitórias, **total de batalhas**, vitórias/total × 100; 0 se total = 0) |
-  Slots 2/3 (digimon em cima), a partir de `y + 10`: digimon nome +0, nível +18, vitórias +36; tamer nome +90, nível +108, mapa +126 (retângulo até +162), `(x,y)` +144.
+  Slots 2/3 (digimon em cima), a partir de `y`: digimon nome `+10`, nível `+28`, vitórias `+46`; tamer nome **`+100`**, nível `+118`, mapa `+136` (retângulo até `+172`), `(x,y)` `+154` (✅ `0x00b47350` linhas 31–53).
   - ✅ O original escreve o **total de batalhas** no lugar de "Lose". Fiel.
 - **Digimon** (`0x00b46120`): sprite = `.ani` da espécie do líder (espécie → id de sprite → `Sprite\%03d_1.ani`, ver [tabelas por espécie](tabelas-de-especie.md)); desenha o quadro atual em (x + dx, yBotão + dy), com (dx, dy) da tabela por espécie (padrão (−40, −14)). x = xBotão, **+150 nos slots 1 e 3**: o `0x00b47790` soma os 150 (`0x00b4782c`) no x que passa **para o digimon e para o tamer** (antes da correção só o tamer andava, e o digimon dos slots da direita caía em cima dos textos).
 - **Tamer** (`0x00b46d50` → `0x0099fb90`, boneco de papel): corpo + roupas, todos pelo **canto superior esquerdo** do quadro em (x + 70 − 120, yBotão + 164 − 162), com o mesmo x do digimon (+150 nos slots 1 e 3) e **o mesmo número de quadro** do `.ani` do corpo (a âncora do `.ani` não entra). Com a opção de sombra (`[DAT_01158530]+2`), antes desenha a sombra do corpo (`FUN_00b57460(…, 0xe)`) ❓ não implementada.

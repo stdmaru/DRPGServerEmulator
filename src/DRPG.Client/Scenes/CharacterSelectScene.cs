@@ -127,7 +127,7 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
             FrameSelectMode(renderer, account);
 
         DrawMessage(renderer);
-        game.DrawVersion(renderer, 1);
+        // ✅ 0x00b48840: CSceneCharSel does not draw the version text (only Title and Server scenes do)
         if (_fade is { } fade)
             fade.Frame(renderer, 1f / FramesPerSecond);
     }
@@ -370,11 +370,12 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
         var record = PrintfFormat.Format(texts[WinLoseText], slot.TotalWins, slot.TotalBattles,
             slot.TotalBattles == 0 ? 0.0 : (double)slot.TotalWins / slot.TotalBattles * 100);
         // ✅ the original writes the total of battles where the text says "Lose"
+        // ✅ 0x00b47350: slots 0/1 put tamer at y and digimon at y + 108; slots 2/3 put digimon at y + 10 and tamer at y + 100
         int tamerY, digimonY;
         if (index < 2)
             (tamerY, digimonY) = (y, y + 108);
         else
-            (tamerY, digimonY) = (y + 90, y + 10);
+            (tamerY, digimonY) = (y + 100, y + 10);
 
         var text = game.Text;
         text.Draw(renderer, slot.Name, x, tamerY);
