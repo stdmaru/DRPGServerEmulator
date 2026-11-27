@@ -13,7 +13,7 @@ Marco 3 do [cliente novo](../planos/cliente-novo.md) (PR #49). Endereços da v32
    - **conecta no servidor de mapa** (`0x00b3f9a0(ip, porta)`: objeto de conexão novo, `connect` síncrono);
    - conectou → `0x00b8e690(0)`, **troca para a cena 5** e `[DAT_0135a1dc]+0x10 = 1`;
    - não conectou → `+0x864 = 1`: mensagem `0xee6` "The server is under maintenance. Please try again later. 12" por 80 quadros, continua na seleção.
-3. ✅ Pelas capturas (sessão 52), **antes** de conectar no mapa o cliente manda no channel `0x16` (`MapConnectionConfirm`, 69 B) e `0x18` (`ClientHardwareInfo`, 88 B: endereços MAC). ❓ Onde são montados (candidatos: `0x00adb4f0`, `0x00ae8700` para `0x16`). 🔒 Decisão do dono pendente: mandar o `0x18` zerado em vez dos MACs reais.
+3. ✅ Pelas capturas (sessão 52), **antes** de conectar no mapa o cliente manda no channel `0x16` (`MapConnectionConfirm`, 69 B) e `0x18` (`ClientHardwareInfo`, 88 B: endereços MAC). ❓ Onde são montados (candidatos: `0x00adb4f0`, `0x00ae8700` para `0x16`). ✅ Decisão do dono: o cliente novo manda os **MACs reais**, como o original (1:1). Só no pacote; nunca em log.
 
 ## Sequência na rede (✅ captura `v322 login até o mapa`, conexões 87–89)
 Tempo a partir da conexão no mapa:
