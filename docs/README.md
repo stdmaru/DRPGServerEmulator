@@ -40,6 +40,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Padrões de código](arquitetura/padroes-de-codigo.md): nomes e sufixos, tamanho, tipos e erros, recursos permitidos/proibidos, testes, garantias automáticas (analyzers, APIs banidas, testes de arquitetura).
 - [Biblioteca compartilhada](arquitetura/shared.md): pacotes de mão dupla com ida e volta e testes dourados, leitores de formato, versões do oficial.
 - [Cliente](arquitetura/cliente.md): camadas, fatia de feature (`State`/`Handlers`/`Actions`/`Window`), frame, registro compatível com NativeAOT, resolução e UI ancorada.
+- [Fidelidade e resolução](arquitetura/resolucao.md): espaço original 800×600, UI fracionária com âncoras, mundo inteiro, assets HD, guia de tradução de coordenadas do decompilado.
 - [Como estender](arquitetura/extensao.md): receitas fechadas (item, C2S, S2C, janela, domínio, formato, opção, patch do oficial) e os únicos pontos de registro manuais.
 
 ### Emulador

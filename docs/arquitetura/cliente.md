@@ -56,10 +56,12 @@ Sem `async`/`await` dentro do frame. Sem alocação por frame no caminho quente 
 Handlers (`[PacketHandler]`) e janelas (`[Window]`) são achados por um **gerador de código** do projeto, que monta a tabela em tempo de compilação. Não é reflexão em runtime, que o NativeAOT corta. Criar o arquivo basta. Testes de contrato conferem que todo S2C do `DRPG.Shared` tem handler no cliente ou está na lista explícita de ignorados, com o motivo.
 
 ## Tela e resolução
-- O mundo é desenhado em coordenadas de mapa, e a câmera tem viewport livre e zoom. Tela maior mostra mais mapa.
-- Cada janela guarda a **posição original em 800×600** (constante com a evidência: classe `CWindow_*` e endereço) e uma **âncora** (canto, borda ou centro). A posição final = âncora + posição original × escala da UI (1×, 1,5×, 2×; padrão 1×).
-- Arte de tela cheia de 800×600 e telas fixas em 4:3 (login, seleção de personagem, loading) são **centralizadas** num quadro de 800×600, com bordas pretas, por um único utilitário (`FixedScreen`). Nada de esticar.
-- Texto sempre por `Font` (TTF), com tamanho em pontos multiplicado pela escala da UI.
+Regras completas e o guia de tradução de coordenadas do decompilado em [fidelidade e resolução](resolucao.md). Resumo:
+- Área de apresentação recortada entre **4:3 e 2,39**, com barras pretas fora disso.
+- **Mundo:** escala inteira (padrão 1×), `Viewport` = área / escala; tela maior mostra mais mapa nos dois eixos. Zoom inteiro para alturas > 600 fica para depois.
+- **UI:** escala fracionária `altura / 600` (altura lógica sempre 600), assets HD 2×/3×/4× com o tamanho exato do original × n. Cada janela guarda a **posição original em 800×600** (constante com a evidência: classe `CWindow_*` e endereço) dentro de um `UiGroup` com **âncora**; a feature nunca faz a conta da adaptação.
+- Arte de tela cheia de 800×600 e telas fixas em 4:3 (login, seleção de personagem, loading) são **centralizadas** num quadro de 800×600, com bordas pretas (`FixedScreen`). Nada de esticar.
+- Texto sempre por `Font` (TTF), rasterizado no tamanho físico (pontos × escala da UI).
 - **Modo padrão = original.** Modernidades (resolução, escala, zoom, fontes) ficam em `ClientOptions`, validadas na partida.
 
 ## Instalação original (drop-in)

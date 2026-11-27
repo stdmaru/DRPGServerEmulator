@@ -2,7 +2,7 @@
 
 Este arquivo define as diretrizes de fluxo de trabalho, organização de código e qualidade para agentes e desenvolvedores que atuam no **DRPG.Server**.
 
-> **Leitura obrigatória antes de qualquer código:** [arquitetura do projeto](docs/arquitetura/README.md) (valores, camadas, threads), [padrões de código](docs/arquitetura/padroes-de-codigo.md) e [como estender](docs/arquitetura/extensao.md). Elas valem para servidor, cliente e ferramentas e prevalecem sobre preferências pessoais. Mudança nelas só com entrada no [registro de decisões](docs/projeto/decisoes.md).
+> **Leitura obrigatória antes de qualquer código:** [arquitetura do projeto](docs/arquitetura/README.md) (valores, camadas, threads), [padrões de código](docs/arquitetura/padroes-de-codigo.md), [como estender](docs/arquitetura/extensao.md) e, no cliente, [fidelidade e resolução](docs/arquitetura/resolucao.md). Elas valem para servidor, cliente e ferramentas e prevalecem sobre preferências pessoais. Mudança nelas só com entrada no [registro de decisões](docs/projeto/decisoes.md).
 
 ---
 
@@ -145,3 +145,27 @@ Detalhes em [`docs/emulador/handlers.md`](docs/emulador/handlers.md#checklist-de
 - [ ] Regra no serviço do domínio, reaproveitando `ItemService`, `Wallet` e `EquipmentService`.
 - [ ] Movimento de economia auditado.
 - [ ] Testes com entrada hostil: tamanho errado, id trocado, índice fora do intervalo, estado errado, longe do alvo.
+
+---
+
+## 6. Cliente: Fidelidade 1:1 e Resolução
+
+Regras completas e o guia de tradução em [`docs/arquitetura/resolucao.md`](docs/arquitetura/resolucao.md).
+
+- **O original é a referência de todo comportamento e apresentação.** A única diferença de apresentação intencional é rodar além de 800×600. Resolução nunca justifica redesenhar, simplificar ou mudar comportamento.
+- **800×600 é o espaço de coordenadas da UI.** Feature não conhece tamanho de janela, escala nem densidade de asset. Isso é da apresentação (`DRPG.Engine/Rendering`).
+- **Copie o número do decompilado como está; nunca faça a conta da adaptação.** Posição de UI vira `const` com o valor original e a evidência ✅, dentro de um `UiGroup` com a `Anchor` do conjunto que o original move junto. Clique usa os mesmos números, contra o mouse já no espaço original.
+- **Classifique cada 800/600 do decompilado** ([tabela](docs/arquitetura/resolucao.md#classificação)):
+  - tamanho de tela na UI → `OriginalScreen.Width`/`Height`, com a conta original intacta;
+  - tamanho de tela no mundo (câmera, células visíveis) → `Viewport.Width`/`Height`, comentário `original 800`;
+  - coincidência (800 ms) → `const` com o nome do que é.
+- **Proibido em feature:** número físico ou derivado da resolução (`1920`, `1067`, `uiScale`), coordenada original ajustada à mão (`600 − 85`), `if` de resolução ou proporção, sistema de posição ou escala próprio, `800`/`600` literal.
+- **Mundo:** escala inteira, mais visão nos dois eixos. Movimento, tempo, colisão e protocolo não mudam. Dependência do servidor (alcance de visibilidade) é registrada com ❓, nunca resolvida em silêncio.
+- **Assets HD (2×/3×/4×)** têm exatamente o tamanho original × n e nunca mudam o tamanho lógico.
+- **Conflito entre o original e o layout se resolve na apresentação**, nunca mudando o comportamento original. Se a âncora certa não está clara, investigue o decompilado. Sem evidência, marque ❓.
+
+### Checklist de tela ou janela nova (cliente)
+- [ ] Coordenadas e tamanhos com o valor do original e a evidência ✅/❓.
+- [ ] `UiGroup` e `Anchor` declarados para o conjunto, não por elemento.
+- [ ] Nenhum literal de resolução nem conta de adaptação na feature.
+- [ ] Teste de layout sem GPU em 800×600 (igual ao original), 1920×1080 e 1280×1024.
