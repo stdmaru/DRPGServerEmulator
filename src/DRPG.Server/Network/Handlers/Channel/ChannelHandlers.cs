@@ -177,7 +177,8 @@ public sealed partial class CharacterCreateHandler(
 /// <summary>0x11: apagar personagem.</summary>
 [PacketHandler(ChannelOpcode.CharacterDelete)]
 public sealed class CharacterDeleteHandler(
-    CharacterRepository characters, CharacterListService list, SecondaryPasswordService secondaryPasswords, ILogger<CharacterDeleteHandler> log)
+    CharacterRepository characters, CharacterListService list, SecondaryPasswordService secondaryPasswords, PlayerSystem players,
+    ILogger<CharacterDeleteHandler> log)
     : AccountHandler<CharacterDeleteRequest>
 {
     private const int SecondaryPasswordMismatchError = 2000;
@@ -189,6 +190,13 @@ public sealed class CharacterDeleteHandler(
         {
             log.LogWarning("{Username}: secondary password mismatch when deleting character {Uid}", account.Username, uid);
             session.Send(new CharacterDeleteReply(SecondaryPasswordMismatchError, uid, request.PasswordMd5));
+            return;
+        }
+        // o personagem no mundo, ou com o save de saída ainda na fila, não se apaga: o save quebraria contra a linha apagada
+        // (❓ o original não tem resposta capturada para a recusa: fica sem resposta, como o personagem que não existe)
+        if (!await players.ReleaseForDeleteAsync(account.Uid, uid))
+        {
+            log.LogWarning("{Username}: character {Uid} is in the world, delete refused", account.Username, uid);
             return;
         }
         if (!await characters.DeleteAsync(uid, account.Uid, ct)) return;
