@@ -23,8 +23,9 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     /// <summary>
     /// ✅ 30 logic steps a second. The main loop (<c>0x00aa4a90</c>) runs a frame only when the performance counter passes the due time,
     /// which goes forward by <c>frequency / 30</c> each frame (<c>0x00867ed0(0x1e)</c>, <c>0x00867eb0</c>, <c>0x00868020</c>): at most 30
-    /// frames a second. The field frame (<c>0x00b4e550</c>) runs one step per frame, plus catch-up steps when the measured frame rate
-    /// (<c>0x00867fb0</c>, once a second) falls under <c>DAT_0135af08 = 30</c>. Steps by the clock at 30 a second give the same pace.
+    /// frames a second. The field frame (<c>0x00b4e550</c>) runs exactly one step per frame: its catch-up adds
+    /// <c>DAT_0135af08 − 0x00867e40()</c>, and 0x00867e40 returns the measured rate or 30.0 under 30, so it never adds. Steps by the
+    /// clock at 30 a second give the same pace.
     /// </summary>
     public const int StepsPerSecond = 30;
 
