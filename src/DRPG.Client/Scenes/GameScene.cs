@@ -349,7 +349,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private Cell? GroundCellUnderMouse()
     {
         var mouse = game.Mouse;
-        if (mouse.X < 0 || mouse.Y < 0 || mouse.X >= IRenderer.FrameWidth || mouse.Y >= IRenderer.FrameHeight || FieldHud.Covers(mouse.X, mouse.Y)
+        if (mouse.X < 0 || mouse.Y < 0 || mouse.X >= IRenderer.FrameWidth || mouse.Y >= IRenderer.FrameHeight || _hud.Covers(mouse.X, mouse.Y)
             || _windows.Covers(mouse.X, mouse.Y))
             return null;
         return FieldView.CellAt(_map!, _state!, mouse.X, mouse.Y);

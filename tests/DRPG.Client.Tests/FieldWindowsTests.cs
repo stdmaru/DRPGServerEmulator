@@ -491,3 +491,65 @@ public sealed class FieldHudInteractionTests
         Assert.Contains(fixture.Renderer.Draws, d => d.Texture.Width == 14 && d.Texture.Height == 14 && d.Y == 462 - 0x1a);
     }
 }
+
+public sealed class FieldHudChatInteractionTests
+{
+    private static HudValues Values(int tamerClass = 1) =>
+        new("Marcus", 1, tamerClass, 5, "Net Ocean", 1, "Plains", 5, 6, null, new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc));
+
+    private static void Click(SceneFixture fixture, FieldHud hud, int x, int y, int tamerClass = 1)
+    {
+        var mouse = fixture.Game.Mouse;
+        mouse.Move(x, y);
+        hud.Frame(fixture.Renderer, Values(tamerClass), mouse);
+        mouse.EndFrame();
+        mouse.Press(x, y);
+        hud.Frame(fixture.Renderer, Values(tamerClass), mouse);
+        mouse.EndFrame();
+        mouse.Release(x, y);
+        hud.Frame(fixture.Renderer, Values(tamerClass), mouse);
+        mouse.EndFrame();
+    }
+
+    [Fact]
+    public void The_size_buttons_move_the_chat_frame_and_what_it_covers()
+    {
+        using var fixture = new SceneFixture();
+        var hud = fixture.Hud();
+        Assert.False(hud.Covers(100, 400));
+        Click(fixture, hud, 428 + 3, 549 + 3);                                // max
+        Assert.Equal(1, hud.ChatSize);
+        Assert.True(hud.Covers(100, 400));
+        fixture.Renderer.Draws.Clear();
+        hud.Frame(fixture.Renderer, Values(), fixture.Game.Mouse);
+        Assert.Equal((28, 0x160), Assert.Single(fixture.Renderer.Draws, d => d.Texture.Width == 409) is var f ? (f.X, f.Y) : default);
+        Click(fixture, hud, 398 + 3, 549 + 3);                                // min
+        Assert.Equal(2, hud.ChatSize);
+        Assert.False(hud.Covers(100, 470));
+        Assert.True(hud.Covers(100, 492));
+    }
+
+    [Fact]
+    public void The_battle_tab_is_chosen_and_the_watch_tab_cannot_be()
+    {
+        using var fixture = new SceneFixture();
+        var hud = fixture.Hud();
+        Click(fixture, hud, 317 + 3, 574 + 3);
+        Assert.Equal(1, hud.ChatTab);
+        Click(fixture, hud, 355 + 3, 574 + 3);                                // where the hidden tab would be
+        Assert.Equal(1, hud.ChatTab);
+        Click(fixture, hud, 280 + 3, 574 + 3);
+        Assert.Equal(0, hud.ChatTab);
+    }
+
+    [Theory]
+    [InlineData(1, 0)]                                                         // class 1: Shout is disabled
+    [InlineData(5, 3)]
+    public void Shout_needs_class_5(int tamerClass, int mode)
+    {
+        using var fixture = new SceneFixture();
+        var hud = fixture.Hud();
+        Click(fixture, hud, 157 + 3, 572 + 3, tamerClass);
+        Assert.Equal(mode, hud.ChatMode);
+    }
+}

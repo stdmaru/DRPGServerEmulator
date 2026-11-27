@@ -87,9 +87,15 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
     private const int ChatX = 28, ChatY = 460, ChatWidth = 409, ChatHeight = 81;
     private const int BarY = 495;
 
-    /// <summary>✅ <c>0x00b91ec0</c> + bottom bar (<c>y &gt;= 495</c>): true when the point hits the HUD so a ground click is ignored.</summary>
-    public static bool Covers(int x, int y) =>
-        y >= BarY || (x >= ChatX && x < ChatX + ChatWidth && y >= ChatY && y < ChatY + ChatHeight);
+    /// <summary>
+    /// ✅ <c>0x00b91ec0</c> + bottom bar (<c>y &gt;= 495</c>): true when the point hits the HUD so a ground click is ignored. The chat's
+    /// top follows its size; ❓ its height is the frame's drawn height (the sprite 0x00b91ec0 measures is not read).
+    /// </summary>
+    public bool Covers(int x, int y)
+    {
+        var (top, height) = ChatArea(ChatSize, Gui(18) is { Length: > 0 } chat ? chat[0].Height : ChatHeight);
+        return y >= BarY || (x >= ChatX && x < ChatX + ChatWidth && y >= top && y < top + height);
+    }
 
     /// <summary>
     /// ✅ The alphas (of 32) of the two blends of the bar with the <c>alpha</c> option on: the bar's frame 1 (<c>0x00b569f0(1, …, −1, 0x10, …)</c>)
@@ -124,8 +130,9 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
         DrawDigimonPanel(renderer, v.Leader, mouse);
         DrawSideButtons(renderer, mouse);
         DrawTeleportButtons(renderer, mouse, v);
-        DrawChat(renderer);
-        DrawChatSizeButtons(renderer);
+        TamerClass = (byte)v.TamerClass;
+        DrawChat(renderer, mouse);
+        DrawChatSizeButtons(renderer, mouse);
     }
 
     /// <summary>✅ <c>0x00b90570</c>: the buttons and where they sit (<c>0x009b7570</c>, frame map 0, 1, 2, 3).</summary>
@@ -138,18 +145,37 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
         _reward = new Button(Load(RewardSprite, gui: true), RewardX, RewardY);
     }
 
-    /// <summary>✅ <c>0x00b8e2a0</c>, the last call of <c>0x00b8a850</c>: the three chat size buttons.</summary>
-    private void DrawChatSizeButtons(IRenderer renderer)
+    /// <summary>
+    /// ✅ <c>0x00b8e2a0</c>, the last call of <c>0x00b8a850</c>: the three size buttons (normal, max, min) read the mouse, the hot one shows
+    /// its name (<c>0x007de1b0</c>, mixed at 16/32) and a click sets the size; then they are drawn with frames 0, 1 and 2 whatever their
+    /// state. ✅ <c>0x00b90570</c>: min (frame 2) at x = 398, normal at 400 + its width, max 2 px after that, y = 549.
+    /// </summary>
+    private void DrawChatSizeButtons(IRenderer renderer, MouseState mouse)
     {
         var frames = Gui(ChatSizeSprite);
         if (frames.Length < 3)
             return;
-        int secondX = ChatSizeSecondX + frames[2].Width;
-        int thirdX = secondX + frames[0].Width + ChatSizeGap;
-        renderer.Draw(frames[2], ChatSizeFirstX, ChatSizeY);
-        renderer.Draw(frames[0], secondX, ChatSizeY);
-        renderer.Draw(frames[1], thirdX, ChatSizeY);
+        if (_chatSizes is null)
+        {
+            int normalX = ChatSizeSecondX + frames[2].Width;
+            _chatSizes = [new Button(frames, normalX, ChatSizeY), new Button(frames, normalX + frames[0].Width + ChatSizeGap, ChatSizeY),
+                new Button(frames, ChatSizeFirstX, ChatSizeY)];
+        }
+        for (int i = 0; i < _chatSizes.Length; i++)
+        {
+            var button = _chatSizes[i];
+            button.Update(mouse);
+            if (button.IsHot(mouse))
+                tooltips.DrawPanel(renderer, game.SpriteOptions, game.Texts[ChatSizeHints[i]], button.X, button.Y - ChatSizeHintUp,
+                    alpha: SizeHintAlpha);
+            if (button.Clicked)
+                ChatSize = i;
+        }
+        for (int i = 0; i < _chatSizes.Length; i++)
+            _chatSizes[i].DrawFrame(renderer, i);
     }
+
+    private const int SizeHintAlpha = 0x10;
 
     /// <summary>
     /// ✅ 1. the bar's background (<c>0x00b90520</c>): frame 0 at (0, 495), then frame 1 at the same place, blended at
@@ -352,28 +378,143 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
     private static readonly int[] TeleportButtonYs = [0x41, 0x5c, 0x77];
     private Button[]? _teleport;
 
-    /// <summary>✅ The chat (<c>0x00b91a80</c> tabs, <c>0x00b8e6a0</c> frame and mode buttons).</summary>
-    private void DrawChat(IRenderer renderer)
+    /// <summary>✅ <c>+0x4b7b0</c>: the chat tab shown, 0 General or 1 Battle (<c>0x00b91a80</c>).</summary>
+    public int ChatTab { get; private set; }
+
+    /// <summary>✅ <c>+0x770a4</c>: the chat's size, 0 normal, 1 max, 2 min (<c>0x00b8e2a0</c>).</summary>
+    public int ChatSize { get; private set; }
+
+    /// <summary>✅ <c>+0x270c</c>: the chat mode, 0 General, 1 Whisper, 2 Party, 3 Shout, 4 Guild (<c>0x00b8e6a0</c>).</summary>
+    public int ChatMode { get; private set; }
+
+    /// <summary>✅ <c>0x00b91a80</c>: the window the "Setting" tab opens.</summary>
+    public const int ChatSettingWindow = 0x10;
+
+    /// <summary>
+    /// ✅ The chat (<c>0x00b91a80</c> tabs, then <c>0x00b8e6a0</c>: the frame and the mode buttons). ❓ The lines, the scroll bar and
+    /// the input box of <c>0x00b8e6a0</c> come with the chat packets.
+    /// </summary>
+    private void DrawChat(IRenderer renderer, MouseState mouse)
     {
-        for (int i = 0; i < ChatTabs.Length; i++)
+        DrawChatTabs(renderer, mouse);
+        DrawChatFrame(renderer);
+        DrawChatModeButtons(renderer, mouse);
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00b91a80</c>: General and Battle draw frame 2 while they are the tab shown and 0 otherwise, "Setting" frame 2 while its
+    /// window (0x10) is open; the third tab ("Watch Battle") is never read nor drawn. The frame does not follow the mouse
+    /// (<c>0x009b71e0</c>). A click shows General or Battle, or opens the setting window.
+    /// </summary>
+    private void DrawChatTabs(IRenderer renderer, MouseState mouse)
+    {
+        _chatTabs ??= [.. ChatTabs.Select(t => new Button(Gui(t.Sprite), t.X, t.Y))];
+        for (int i = 0; i < _chatTabs.Length; i++)
         {
             if (i == HiddenChatTab)
                 continue;
-            // ✅ frame 2 on the current tab (+0x4b7b0 = 0 on entry) and on "Setting" while its window 0x10 is open (never yet), else 0
-            Frame(renderer, Gui(ChatTabs[i].Sprite), i == 0 ? 2 : 0, ChatTabs[i].X, ChatTabs[i].Y);
-        }
-        if (Gui(18) is { Length: > 0 } chat)                                                  // ✅ the chat frame, clipped to 81 px
-        {
-            game.SpriteOptions.DrawRegionBlended(renderer, chat[0], ChatX, ChatY, chat[0].Width, Math.Min(chat[0].Height, ChatHeight), ChatAlpha);
-        }
-        foreach (var (sprite, x, y) in ChatButtons)
-        {
-            bool current = sprite == 25;                                                       // ✅ mode 0 of the chat
-            // ✅ the 000_027 button is disabled when the tamer class (+0x12df) is 4 or less, unless GM or on the maps of 0x00b39760
-            // (0x00b8e6a0); ❓ how a disabled button looks is not read: drawn as the others (the original looks the same at class 1)
-            Frame(renderer, Gui(sprite), current ? 0 : 3, x, y);
+            int frame = i switch
+            {
+                0 => ChatTab == 0 ? 2 : 0,
+                1 => ChatTab == 1 ? 2 : 0,
+                _ => windows.IsOpen(ChatSettingWindow) ? 2 : 0,
+            };
+            _chatTabs[i].Update(mouse);
+            _chatTabs[i].DrawFrame(renderer, frame);
+            if (!_chatTabs[i].Clicked)
+                continue;
+            switch (i)
+            {
+                case 0:
+                    ChatTab = 0;
+                    break;
+                case 1:
+                    ChatTab = 1;
+                    break;
+                default:
+                    windows.Open(ChatSettingWindow);
+                    break;
+            }
         }
     }
+
+    /// <summary>
+    /// ✅ <c>0x00b8f04d</c>: the chat's frame at x = 28 by size: (460, 81 px high), (352, whole) or (491, 50 px high), mixed at
+    /// <see cref="ChatAlpha"/> with the <c>alpha</c> option.
+    /// </summary>
+    private void DrawChatFrame(IRenderer renderer)
+    {
+        if (Gui(18) is not { Length: > 0 } chat)
+            return;
+        var (top, height) = ChatArea(ChatSize, chat[0].Height);
+        game.SpriteOptions.DrawRegionBlended(renderer, chat[0], ChatX, top, chat[0].Width, height, ChatAlpha);
+    }
+
+    /// <summary>✅ The chat frame's top and height for a size (<c>0x00b8f04d</c>; the top is also <c>0x00b91ec0</c>'s).</summary>
+    public static (int Top, int Height) ChatArea(int size, int frameHeight) => size switch
+    {
+        1 => (MaxChatY, frameHeight),
+        2 => (MinChatY, Math.Min(frameHeight, MinChatHeight)),
+        _ => (ChatY, Math.Min(frameHeight, ChatHeight)),
+    };
+
+    private const int MaxChatY = 0x160, MinChatY = 0x1eb, MinChatHeight = 0x32;
+
+    /// <summary>
+    /// ✅ <c>0x00b8fd80</c>: the five mode buttons, each frame 3 for state 0 and 0 on the current mode. Shout (<c>000_027</c>) reads the
+    /// mouse only for a GM, a tamer class of 5 or more, or in the BATTLE ZONE; otherwise it is disabled (<c>0x009b7660</c>). A click
+    /// chooses the mode; a hot button shows its name in a message box 30 px above it (<c>0x007dd610</c>). ❓ The click also focuses the
+    /// input box, which comes with the chat packets.
+    /// </summary>
+    private void DrawChatModeButtons(IRenderer renderer, MouseState mouse)
+    {
+        _chatModes ??= [.. ChatButtons.Select(b => new Button(Gui(b.Sprite), b.X, b.Y))];
+        bool shoutEnabled = ShoutEnabled();
+        foreach (int i in ChatModeOrder)
+            if (i != Shout || shoutEnabled)
+                _chatModes[i].Update(mouse);
+        for (int i = 0; i < _chatModes.Length; i++)
+            _chatModes[i].SetFrame(0, ClosedMenuFrame);
+        if (ChatMode != ShoutMode || shoutEnabled)
+            _chatModes[ModeButton(ChatMode)].SetFrame(0, OpenMenuFrame);
+        foreach (int i in ChatModeOrder)
+        {
+            if (i == Shout && !shoutEnabled)
+                _chatModes[i].Disable();
+            _chatModes[i].Draw(renderer);
+            if (_chatModes[i].Clicked && (i != Shout || shoutEnabled))
+                ChatMode = ButtonMode(i);
+        }
+        foreach (int i in ChatModeOrder)
+        {
+            if (i == Shout && !shoutEnabled)
+                continue;
+            if (_chatModes[i].IsHot(mouse))
+                tooltips.DrawMessage(renderer, game.Texts[ChatModeHints[ButtonMode(i)]], _chatModes[i].X, _chatModes[i].Y - ChatHintUp);
+        }
+    }
+
+    /// <summary>✅ Shout needs a GM (<c>[DAT_01158504]+0x82</c>), a tamer class of 5 or more (<c>+0x12df</c>) or the BATTLE ZONE.</summary>
+    private bool ShoutEnabled() => TamerClass >= 5 || game.IsBattleZone;
+
+    /// <summary>The tamer's class of the frame (the low byte of the <c>0x02</c>'s, as the panel shows it).</summary>
+    private int TamerClass { get; set; }
+
+    // ✅ ChatButtons index → mode: 000_023 Guild (4), 000_024 Party (2), 000_025 General (0), 000_026 Whisper (1), 000_027 Shout (3)
+    private static readonly int[] ButtonModes = [4, 2, 0, 1, 3];
+    private static readonly int[] ChatModeOrder = [2, 3, 1, 0, 4];                     // ✅ the order they are read and drawn
+    private const int Shout = 4, ShoutMode = 3, ChatHintUp = 0x1e;
+    private static readonly int[] ChatModeHints = [0x88b, 0x88c, 0x88d, 0x88f, 0x88e];  // by mode
+
+    private static int ButtonMode(int button) => ButtonModes[button];
+
+    private static int ModeButton(int mode) => Array.IndexOf(ButtonModes, mode);
+
+    /// <summary>✅ <c>0x00b8e2a0</c>: the size buttons' names in the tooltip (<c>0x890..0x892</c>), 20 px above the button.</summary>
+    private static readonly int[] ChatSizeHints = [0x890, 0x891, 0x892];
+    private const int ChatSizeHintUp = 0x14;
+
+    private Button[]? _chatTabs, _chatModes, _chatSizes;
 
     private ITexture[] Gui(int number) => sprites.Gui($"dr2_main_000_{number:000}");
 

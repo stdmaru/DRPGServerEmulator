@@ -248,12 +248,13 @@ public sealed class FieldHudChatTests
     }
 
     [Fact]
-    public void The_chat_size_buttons_are_frames_2_0_1_side_by_side_last_of_the_bar()
+    public void The_chat_size_buttons_sit_min_normal_max_side_by_side_last_of_the_bar()
     {
         var draws = Draws();
         var sizes = draws.Where(d => (d.Texture.Width, d.Texture.Height) == (13, 13)).ToList();
 
-        Assert.Equal([(398, 549), (413, 549), (428, 549)], sizes.Select(d => (d.X, d.Y)));
+        // ✅ 0x00b8e4bf: frames 0, 1, 2 at the normal, max and min buttons, which sit at 413, 428 and 398
+        Assert.Equal([(413, 549), (428, 549), (398, 549)], sizes.Select(d => (d.X, d.Y)));
         Assert.Equal(sizes, draws.TakeLast(3));
     }
 }

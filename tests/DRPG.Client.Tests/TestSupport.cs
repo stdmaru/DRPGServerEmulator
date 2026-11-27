@@ -128,6 +128,8 @@ internal sealed class FakeInstall : IDisposable
             // the HP gauge, the options' menu button, the tooltip panel
             ("gui\\dr2_main_000_002.spr", Sprite(99, 12, 2)),
             ("gui\\dr2_main_000_013.spr", Sprite(29, 29, 4)),
+            ("gui\\dr2_main_000_025.spr", Sprite(20, 20, 4)),
+            ("gui\\dr2_main_000_027.spr", Sprite(20, 20, 4)),
             ("gui\\dr2_main_000_032.spr", Sprite(61, 21, 3)),
             ("interface\\w_panel.spr", Sprite(800, 600)),
             // the minimap: map 1's picture, the title, the frame, the collapse button, the markers and the player's point
