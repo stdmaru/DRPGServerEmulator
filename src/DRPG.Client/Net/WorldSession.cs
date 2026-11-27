@@ -50,6 +50,7 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
     private readonly List<ushort> _unknownLogged = [];
     private readonly Queue<TeleportCharacterPacket> _teleports = new();
     private readonly Queue<FieldDigimonPacket> _wilds = new();
+    private readonly Queue<FieldNpcPacket> _npcs = new();
 
     public WorldStep Step { get; private set; }
 
@@ -127,6 +128,9 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
     /// <summary>Dequeues the next <c>0x11</c> wild digimon update received from the map server.</summary>
     public bool TryReceiveFieldDigimon(out FieldDigimonPacket packet) => _wilds.TryDequeue(out packet!);
 
+    /// <summary>Dequeues the next <c>0x09</c> dynamic NPC add/remove packet received from the map server.</summary>
+    public bool TryReceiveFieldNpc(out FieldNpcPacket packet) => _npcs.TryDequeue(out packet!);
+
     /// <summary>One step; call every frame.</summary>
     public void Update()
     {
@@ -200,6 +204,9 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
                 break;
             case FieldDigimonPacket wild:
                 _wilds.Enqueue(wild);
+                break;
+            case FieldNpcPacket npc:
+                _npcs.Enqueue(npc);
                 break;
             case IgnoredPacket ignored:
                 IgnoredCounts[ignored.Opcode] = IgnoredCounts.GetValueOrDefault(ignored.Opcode) + 1;

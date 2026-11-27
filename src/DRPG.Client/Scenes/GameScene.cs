@@ -56,6 +56,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private FieldEntity _tamerEntity = new(0, 0);
     private FieldEntity? _digimonEntity;
     private readonly FieldWilds _wilds = new();
+    private readonly FieldNpcs _npcs = new();
     private readonly MovePacketQueue _moveQueue = new();
     private (int X, int Y)? _lastClickCell;
     private bool _aborted, _lost;
@@ -79,6 +80,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     internal FieldEntity TamerEntity => _tamerEntity;
     internal FieldEntity? DigimonEntity => _digimonEntity;
     internal FieldWilds Wilds => _wilds;
+    internal FieldNpcs Npcs => _npcs;
     internal FrameStats Stats => _stats;
     internal WorldLoading Loading => _loading;
 
@@ -208,6 +210,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
 
         // ✅ the server clock: the offset of the server's time from the local clock (0x00abbd50)
         _clockOffset = DateTimeOffset.FromUnixTimeSeconds(character.ServerUnixTime) - DateTimeOffset.UtcNow;
+        _npcs.LoadForMap(world.MapId, game.Data, _collision, _animated, random);
         PlaceCharacters(character);
         return true;
     }
@@ -253,6 +256,9 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     {
         while (session.TryReceiveFieldDigimon(out var wild))
             _wilds.Apply(wild, game.World!.MapId, _collision, _animated.OpenDigimon, random);
+
+        while (session.TryReceiveFieldNpc(out var npc))
+            _npcs.Apply(npc, game.World!.MapId, game.Data, _collision, _animated, random);
 
         while (session.TryReceiveTeleport(out var teleport))
         {
@@ -328,6 +334,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         }
 
         _wilds.Step(_tamerEntity, _collision, _pathfinder, random);
+        _npcs.Step(random);
     }
 
     private (int NextX, int NextY)? NextStep(int fromX, int fromY, int destX, int destY)
@@ -393,6 +400,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
             bool mapHasShadow = SpriteEffects.TamerHasShadow(game.World!.MapId);
             _queue.Add(new DrawItem(y, null, x - 120, y - 162, (r, drawX, drawY) => tamer.Draw(r, drawX, drawY, game.SpriteOptions, mapHasShadow)));
         }
+        _npcs.QueueDraw(_queue, cameraX, cameraY, currentMapId, game.SpriteOptions, (r, sprite, drawX, drawY) => DrawDigimon(r, sprite, currentMapId, drawX, drawY));
         FieldMap.Sort(_queue);
         FieldMap.DrawQueue(renderer, _queue);
 

@@ -53,6 +53,8 @@ public sealed class MapEntryPacketTests
         AssertRoundTrip(new TeleportCharacterPacket(46, 15, 15));
         AssertRoundTrip(new TeleportCharacterPacket(0, -1, short.MaxValue));
         AssertRoundTrip(new FieldDigimonPacket(new Serial(1, 2), "Yuramon", 14, 1, 2, 2, 4, 6, 25, 65, 28, 65));
+        AssertRoundTrip(new FieldNpcPacket(141, 85, 200, 255, FieldNpcPacket.ActionAdd));
+        AssertRoundTrip(new FieldNpcPacket(0, 85, 0, 0, FieldNpcPacket.ActionRemove));
         AssertRoundTrip(Character());
         AssertRoundTrip(new InventoryDataPacket(Bags()));
         AssertRoundTrip(new InventoryDataPacket(new InventoryBags(
@@ -110,6 +112,11 @@ public sealed class MapEntryPacketTests
         Assert.Equal(("Yuramon", (ushort)14, (ushort)1, (ushort)2, (byte)2, (byte)1, (ushort)2, (short)25, (short)65, (short)25, (short)65),
             (wildParsed.Name, wildParsed.SpeciesId, wildParsed.Stage, wildParsed.Level, wildParsed.Grade, wildParsed.State, wildParsed.Direction, wildParsed.X, wildParsed.Y, wildParsed.DestX, wildParsed.DestY));
         Assert.Equal(wildGolden, Payload(wildParsed));
+        // ✅ captures.db 0x09 S2C (packet 15512): map 141 (0x8D), npc 85 (0x55), cell (200, 255), action 1 (add)
+        var npcGolden = Convert.FromHexString("8D005500C800FF000100");
+        var npcParsed = ClientPacket.Parse<FieldNpcPacket>(npcGolden);
+        Assert.Equal(new FieldNpcPacket(141, 85, 200, 255, FieldNpcPacket.ActionAdd), npcParsed);
+        Assert.Equal(npcGolden, Payload(npcParsed));
         Assert.Equal(57, Payload(new JoinCharacterRequest("Tamer", "user")).Length);
 
         var item = Payload(new ItemRecordPacket(Item(7, 215)));
@@ -179,6 +186,8 @@ public sealed class MapEntryPacketTests
         Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<TeleportCharacterPacket>(new byte[9]));
         Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<FieldDigimonPacket>(new byte[55]));
         Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<FieldDigimonPacket>(new byte[57]));
+        Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<FieldNpcPacket>(new byte[9]));
+        Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<FieldNpcPacket>(new byte[11]));
     }
 
     [Fact]

@@ -2,7 +2,7 @@
 
 RE da v322 para o passo 2 do marco 3 (PR #51, `feat/client-walk`): andar com pathfinding, digimons do servidor andando no cliente, NPCs, portais e o comportamento da UI do campo. Complementa a [cena de jogo](cena-jogo.md) (entrada no mapa, quadro, HUD) e o [movimento](../mecanicas/movimento.md) (lado do servidor). ✅ = lido no dump; ❓ = ainda não lido.
 
-> **Estado:** etapas 1 (andar + digimon seguidor + `0x20`/`0xB0`), 2 (colisões + ocupação), 3 (pathfinding A* `0x00b43200`) e 4 (selvagens `0x11` no campo) **implementadas**. Restante do roteiro (NPCs, portais, UI do campo) para etapa seguinte.
+> **Estado:** etapas 1 (andar + digimon seguidor + `0x20`/`0xB0`), 2 (colisões + ocupação), 3 (pathfinding A* `0x00b43200`), 4 (selvagens `0x11` no campo) e **NPCs client-side** (`npc_info_us` + `0x09`) **implementadas**. Restante do roteiro (portais + transição de área, UI do campo) a seguir.
 
 ## Como ler o binário
 - Dump decompilado: `work/re/v322/dump/decomp/XXXX/<endereço>.c`, com `functions.tsv` (entrada, tamanho, chamadores), `calls.tsv` (quem chama quem) e `strings.tsv`.
@@ -99,9 +99,18 @@ Cada passo chama, nesta ordem:
   - Passabilidade: `0x00b432d0` permite qualquer célula intermediária com `0x00b35f40` (andável estático) e sempre permite a célula de destino; depois os chamadores conferem `0x00b35b30` quando o próximo passo já é o destino, fazendo a entidade parar adjacente a paredes/NPCs.
   - Retorna apenas o **primeiro passo** do caminho (retrocedendo pelos ponteiros de pai até `g <= 1`).
 
+## NPCs client-side no mapa (✅)
+- ✅ **Carga automática na entrada do mapa** (`0x00ad3730` → `0x00abb750` / `0x0085f090`): percorre `npc_info_us` (`NPC_INFO`, `0x007231e0`) e instancia toda linha com `col 0 == mapId` (exceto mapa `0x66`) e `col 9 == 1` na lista `+0x300`.
+- ✅ **Sprite e avatar**:
+  - Padrão (`0x00b40d30`): carrega `Sprite\<col6>.ani` (fallback `Sprite\065_1.ani`). Animação (`0x00863430` + `0x00863b80`): a cada 200 passos, 1 em 4 troca para animação `3` ou `2` (se disponível), retornando a `1` ao concluir o ciclo. Desenho (`0x00860e50`): sombra 14/32 + edge 14/32 + sprite pela âncora, na fila Y-sort (`0x00ad4a50`, tipo 6).
+  - Avatar (`Custom_N`, `0x007231e0` + `0x007230e0` + `0x00862650`): extrai o índice base-1 em `Custom_AvatarNPC` e desenha como boneco de papel (`TamerDoll`) em `(x − 120, y − 162)`, avançando quadro a cada 3 passos.
+- ✅ **Ocupação na colisão** (`0x0085e940` / `0x0085f5c0`): cada NPC recebe um `Serial` (GUID) e ocupa `(x, y)` e `(x, y − 1)` na `FieldCollision`, fazendo o pathfinder parar adjacente ao clicar nele.
+- ✅ **NPCs dinâmicos via S2C `0x09`** (`FieldNpcPacket`, 10 B: `i16 mapId, i16 npcId, i16 x, i16 y, u8 action, u8 0`; golden `captures.db`: `8D005500C800FF000100`):
+  - `action == 1` (`0x00abb9e0`): se `mapId == currentMapId` e `npcId` existe em `NPC_INFO`, instancia em `(x, y)` e grava na lista persistente (`+0x760`) para recriar em futuras cargas do mesmo mapa.
+  - `action == 0` (`0x00acfed0`): remove da lista ativa (se `mapId == 0` ou `mapId == currentMapId`) e da lista persistente, desocupando a célula.
+
 ## Roteiro do que falta
 Pontos de entrada já localizados; ✅ quando lido.
-- **NPCs:** criação em `0x00abb750`/`0x0085f090` ([NPCs do mapa](cena-jogo.md#npcs-do-mapa)), lista `+0x300`, atualização `+0x24` da vtable deles, sprite e nome.
-- **Portais:** `map_us` (+0x84, 4 portais, [NPCs do mapa](cena-jogo.md#npcs-do-mapa)); o desenho do redemoinho ❓ (procurar o sprite na fila de desenho `0x00a0d340`).
+- **Portais:** `map_us` (+0x84, 4 portais, [NPCs do mapa](cena-jogo.md#npcs-do-mapa)); o desenho do redemoinho ❓ e transição de área (`0xB0`).
 - **Minimapa:** `WindowMiniMap`, marcadores em `0x00b9b930` e nomes em `0x00b9c4b0` ([minimapa](cena-jogo.md#minimapa-windowminimap-janela-5)).
 - **Botões e dicas da UI:** desenho da barra `0x00b8a850`, tamanho do chat `0x00b8e2a0`, abas `0x00b91a80`; hover, clique e dica ❓.

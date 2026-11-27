@@ -46,6 +46,17 @@ public sealed class AnimatedSprites(PackArchive resource, SpriteStore sprites, A
     }
 
     /// <summary>
+    /// ✅ <c>0x00b40d30</c>: opens an NPC animation <c>Sprite\&lt;name&gt;.ani</c>, falling back to <see cref="FallbackDigimon"/>
+    /// (<c>Sprite\065_1.ani</c>) when missing or malformed.
+    /// </summary>
+    public SpriteAnimator? OpenNpc(string spriteName)
+    {
+        if (string.IsNullOrWhiteSpace(spriteName))
+            return Open(FallbackDigimon);
+        return Open($"Sprite\\{spriteName}.ani") ?? Open(FallbackDigimon);
+    }
+
+    /// <summary>
     /// ✅ The default clothes of a tamer (<c>0x00b21cd0</c> loads them for tamers 1–4, <c>0x0099fb90</c> draws them),
     /// in the order they are drawn over the body: <c>a_15</c> (<c>0x00b1e630</c>), <c>a_16</c> behind (<c>0x00b1e460</c>),
     /// <c>a_17</c> (<c>0x00b1e120</c>), <c>a_16</c> again in front, <c>a_18</c> (<c>0x00b1da70</c>), <c>a_19</c>

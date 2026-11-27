@@ -132,3 +132,37 @@ public sealed record FieldDigimonPacket(
         w.WriteI16(DestY);
     }
 }
+
+/// <summary>
+/// ✅ 0x09 S2C (10 B, v322): dynamic/quest NPC add or remove on the field (captures.db: <c>8D00 5500 C800 FF00 0100</c>;
+/// <c>0x00ac7331</c> → <c>0x00abb9e0</c> / <c>0x00acfed0</c>). Action: 1 = add, 0 = remove.
+/// </summary>
+public sealed record FieldNpcPacket(short MapId, short NpcId, short X, short Y, byte Action) : ITwoWayPacket<FieldNpcPacket>
+{
+    public const byte ActionRemove = 0;
+    public const byte ActionAdd = 1;
+
+    public static ushort Opcode => (ushort)MapOpcode.FieldNpcUpdate;
+    public static PacketLength Length => PacketLength.Exact(10);
+
+    public static FieldNpcPacket Read(PacketReader r)
+    {
+        var mapId = r.ReadI16();
+        var npcId = r.ReadI16();
+        var x = r.ReadI16();
+        var y = r.ReadI16();
+        var action = r.ReadU8();
+        r.ReadU8();
+        return new(mapId, npcId, x, y, action);
+    }
+
+    public void Write(PacketWriter w)
+    {
+        w.WriteI16(MapId);
+        w.WriteI16(NpcId);
+        w.WriteI16(X);
+        w.WriteI16(Y);
+        w.WriteU8(Action);
+        w.WriteU8(0);
+    }
+}
