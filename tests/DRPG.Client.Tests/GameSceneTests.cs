@@ -4,6 +4,7 @@ using DRPG.Client.Startup;
 using DRPG.Client.Text;
 using DRPG.Client.World;
 using DRPG.Engine.Platform;
+using DRPG.Engine.Rendering;
 using DRPG.Shared.Formats.Pack;
 using DRPG.Shared.Formats.Sprite;
 using DRPG.Shared.Packets.Channel;
@@ -434,6 +435,50 @@ public sealed class GameSceneTests : IDisposable
         for (int step = 0; step < GameScene.FadeEnd; step++)
             scene.Step();
         Assert.Equal(0, scene.Transition);
+    }
+
+    /// <summary>The field's draws of the digimon (003_1, 80 wide) and of the tamer's body (a_00, 100 wide), in order.</summary>
+    private (List<FakeRenderer.DrawCall> Digimon, List<FakeRenderer.DrawCall> Body) FieldDraws(SpriteOptions options)
+    {
+        UseData();
+        _fixture.Game.SpriteOptions = options;
+        var (scene, entered) = Enter();
+        using var owned = scene;
+        _fixture.Renderer.Draws.Clear();
+
+        scene.Frame(_fixture.Renderer, entered + 16);
+
+        var draws = _fixture.Renderer.Draws;
+        return (draws.Where(d => d.Texture.Width == 80).ToList(), draws.Where(d => d.Texture.Width == 100).ToList());
+    }
+
+    [Fact]
+    public void With_the_options_the_digimon_is_its_shadow_its_edge_and_its_sprite_at_the_same_corner()
+    {
+        var (digimon, body) = FieldDraws(SpriteOptions.Default);
+
+        Assert.Equal([SpriteEffects.NormalAlpha, SpriteEffects.NormalAlpha, IRenderer.OpaqueAlpha], digimon.Select(d => d.Alpha));
+        Assert.Single(digimon.Select(d => (d.X, d.Y)).Distinct());
+        Assert.Equal([SpriteEffects.NormalAlpha, IRenderer.OpaqueAlpha], body.Select(d => d.Alpha));     // the tamer's shadow, then its body
+        Assert.Single(body.Select(d => (d.X, d.Y)).Distinct());
+    }
+
+    [Fact]
+    public void Without_the_shadow_and_anti_options_only_the_sprites_are_drawn()
+    {
+        var (digimon, body) = FieldDraws(SpriteOptions.Default with { Shadow = false, Edge = false });
+
+        Assert.Equal([IRenderer.OpaqueAlpha], digimon.Select(d => d.Alpha));
+        Assert.Equal([IRenderer.OpaqueAlpha], body.Select(d => d.Alpha));
+    }
+
+    [Fact]
+    public void The_anti_option_alone_draws_only_the_digimon_edge()
+    {
+        var (digimon, body) = FieldDraws(SpriteOptions.Default with { Shadow = false });
+
+        Assert.Equal([SpriteEffects.NormalAlpha, IRenderer.OpaqueAlpha], digimon.Select(d => d.Alpha));
+        Assert.Single(body);
     }
 
     [Fact]

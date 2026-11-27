@@ -20,7 +20,7 @@ internal sealed class FakeTexture(int width, int height) : ITexture
 /// <summary>An <see cref="IRenderer"/> that records the draw calls of a frame.</summary>
 internal sealed class FakeRenderer : IRenderer
 {
-    public sealed record DrawCall(FakeTexture Texture, int X, int Y, int? PartWidth = null);
+    public sealed record DrawCall(FakeTexture Texture, int X, int Y, int? PartWidth = null, int Alpha = IRenderer.OpaqueAlpha, int? PartHeight = null);
 
     public List<DrawCall> Draws { get; } = [];
     public string BackendName => "fake";
@@ -37,7 +37,11 @@ internal sealed class FakeRenderer : IRenderer
 
     public void DrawPart(ITexture texture, int x, int y, int sourceX, int width) => Draws.Add(new DrawCall((FakeTexture)texture, x, y, width));
 
-    public void DrawRegion(ITexture texture, int x, int y, int sourceX, int sourceY, int width, int height) => Draws.Add(new DrawCall((FakeTexture)texture, x, y, width));
+    public void DrawRegion(ITexture texture, int x, int y, int sourceX, int sourceY, int width, int height) =>
+        Draws.Add(new DrawCall((FakeTexture)texture, x, y, width, PartHeight: height));
+
+    public void DrawRegionBlended(ITexture texture, int x, int y, int sourceX, int sourceY, int width, int height, int alpha) =>
+        Draws.Add(new DrawCall((FakeTexture)texture, x, y, width, alpha, height));
 
     public List<int> Darkens { get; } = [];
 
@@ -107,7 +111,13 @@ internal sealed class FakeInstall : IDisposable
             ("gui\\loading_under_line.spr", Sprite(800, 50)),
             ("gui\\game_end_gauge.spr", Sprite(40, 40, 12)),
             ("gui\\dr2_sub_016_005.spr", Sprite(57, 20, 6)),
-            ("sprite\\a_00.spr", Sprite(100, 160, 16)),
+            // the field bar: the background and its glow, the chat's background (taller than the 81 px drawn)
+            ("gui\\dr2_main_000_000.spr", Sprite(800, 105, 2)),
+            ("gui\\dr2_main_000_018.spr", Sprite(409, 190)),
+            // portraits: tamer 1 has its own, the fallback icon_065 stands in for the others
+            ("sprite\\icon_001.spr", Sprite(41, 41, 2)),
+            ("sprite\\icon_065.spr", Sprite(65, 65, 2)),
+            ("sprite\\a_00.spr", Sprite(100, 160, 16, layers: true)),
             ("sprite\\a_00.ani", Ani("a_00.spr", 16)),
             // the default clothes of tamer 1, without a_20 (tamer 3 of the real install has no a_20 either)
             ("sprite\\a_15_01_00.spr", Sprite(15, 15, 16)),
@@ -116,7 +126,7 @@ internal sealed class FakeInstall : IDisposable
             ("sprite\\a_18_01_00.spr", Sprite(18, 18, 16)),
             ("sprite\\a_19_01_00.spr", Sprite(19, 19, 4)),
             ("sprite\\a_21_01_00.spr", Sprite(21, 21, 16)),
-            ("sprite\\003_1.spr", Sprite(80, 80, 16)),
+            ("sprite\\003_1.spr", Sprite(80, 80, 16, layers: true)),
             ("sprite\\003_1.ani", Ani("003_1.spr", 16)),
             ("sprite\\065_1.spr", Sprite(70, 70, 16)),
             ("sprite\\065_1.ani", Ani("065_1.spr", 16)),
@@ -206,8 +216,11 @@ internal sealed class FakeInstall : IDisposable
         return data;
     }
 
-    /// <summary>A fully transparent <c>.spr</c> of <paramref name="frames"/> frames of the given size (layout of SpriteTests).</summary>
-    private static byte[] Sprite(int width, int height, int frames = 1)
+    /// <summary>
+    /// A fully transparent <c>.spr</c> of <paramref name="frames"/> frames of the given size (layout of SpriteTests); with
+    /// <paramref name="layers"/> it also has the shadow and the edge layers, transparent too.
+    /// </summary>
+    private static byte[] Sprite(int width, int height, int frames = 1, bool layers = false)
     {
         var words = new List<ushort>();
         var offsets = new List<uint>();
@@ -226,8 +239,17 @@ internal sealed class FakeInstall : IDisposable
         for (int i = 0; i < frames; i++) w.Write((uint)width);
         for (int i = 0; i < frames; i++) w.Write((uint)height);
         foreach (var word in words) w.Write(word);
-        w.Write((uint)0);                                   // no shadow layer
-        w.Write((uint)0);                                   // no extra layer
+        for (int layer = 0; layer < 2; layer++)             // the shadow, then the extra (edge) layer
+        {
+            if (!layers)
+            {
+                w.Write((uint)0);                           // no layer
+                continue;
+            }
+            w.Write((uint)words.Count);
+            foreach (var offset in offsets) w.Write(offset);
+            foreach (var word in words) w.Write(word);
+        }
         return ms.ToArray();
     }
 }
@@ -286,7 +308,7 @@ internal sealed class SceneFixture : IDisposable
         Sprites = new SpriteStore(Resource, Renderer);
         Sounds = new SoundBank(Audio, install.SoundDirectory, volume, volume, Log.Add);
         Game = new GameContext(install, Resource, Sprites, new UiText(null), Sounds, new GameCommandLine("tamer", "0123456789ABCDEF0123456789ABCDEF01234567"),
-            settings ?? ClientSettings.Local, Log.Add);
+            settings ?? ClientSettings.Local, SpriteOptions.Default, Log.Add);
         Game.Scenes = new SceneManager(_ => throw new InvalidOperationException("no scene is created in these tests"));
     }
 

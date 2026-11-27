@@ -390,7 +390,7 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
     /// (x + 70 − 120, y + 164 − 162). The <c>.ani</c> anchor is not used here.
     /// </summary>
     private void DrawTamer(IRenderer renderer, int index) =>
-        _tamers[index]?.Draw(renderer, DrawX(index) + 70 - 120, SlotButtons[index].Y + 164 - 162);
+        _tamers[index]?.Draw(renderer, DrawX(index) + 70 - 120, SlotButtons[index].Y + 164 - 162, game.SpriteOptions, mapHasShadow: true);
 
     /// <summary>✅ <c>0x00b47350</c>: the texts of a slot, white with a shadow.</summary>
     private void DrawTexts(IRenderer renderer, int index, CharacterListSlot slot)

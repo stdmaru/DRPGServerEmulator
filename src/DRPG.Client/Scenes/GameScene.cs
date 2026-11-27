@@ -260,14 +260,17 @@ public sealed class GameScene(GameContext game, Random random) : IScene
             var (anchorX, anchorY) = _digimon.Anchor;               // ✅ the digimon is drawn by the anchor of the .ani
             int x = _digimonWorld.X - cameraX, y = _digimonWorld.Y - cameraY;
             int lower = LowerSpecies.Contains(_digimonSpecies) ? 32 : 0;
-            _queue.Add(new DrawItem(y, frame, x - anchorX, y - anchorY + lower));
+            var digimon = _digimon;
+            int mapId = game.World!.MapId;
+            _queue.Add(new DrawItem(y, frame, x - anchorX, y - anchorY + lower, (r, drawX, drawY) => DrawDigimon(r, digimon, mapId, drawX, drawY)));
         }
         if (_tamer is not null)
         {
             // ✅ the paper doll of the character selection, by the top-left corner at (x − 120, y − 162), no anchor
             int x = _tamerWorld.X - cameraX, y = _tamerWorld.Y - cameraY;
             var tamer = _tamer;
-            _queue.Add(new DrawItem(y, null, x - 120, y - 162, (r, drawX, drawY) => tamer.Draw(r, drawX, drawY)));
+            bool mapHasShadow = SpriteEffects.TamerHasShadow(game.World!.MapId);
+            _queue.Add(new DrawItem(y, null, x - 120, y - 162, (r, drawX, drawY) => tamer.Draw(r, drawX, drawY, game.SpriteOptions, mapHasShadow)));
         }
         FieldMap.Sort(_queue);
         FieldMap.DrawQueue(renderer, _queue);
@@ -277,6 +280,21 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         _hud.Draw(renderer, new HudValues(
             character.Name, character.TamerId, character.Level, game.ChannelName, game.World!.MapId, game.Data?.MapName(game.World.MapId) ?? "",
             character.X, character.Y, leader.IsEmpty ? null : leader, DateTime.UtcNow + _clockOffset));
+    }
+
+    /// <summary>
+    /// ✅ <c>0x007e83d0</c>: with the <c>shadow</c> option the frame's shadow layer, then with the <c>anti</c> option (outside the animations
+    /// 9/10) its edge layer, both blended at the same corner as the sprite (<see cref="SpriteEffects"/>), then the sprite.
+    /// </summary>
+    private void DrawDigimon(IRenderer renderer, SpriteAnimator digimon, int mapId, int x, int y)
+    {
+        var options = game.SpriteOptions;
+        if (options.Shadow && digimon.ShadowTexture is { } shadow)
+            options.DrawBlended(renderer, shadow, x, y, SpriteEffects.DigimonShadowAlpha(mapId));
+        if (options.Edge && SpriteEffects.DigimonHasEdge(digimon.Animation) && digimon.EdgeTexture is { } edge)
+            options.DrawBlended(renderer, edge, x, y, SpriteEffects.DigimonEdgeAlpha(mapId));
+        if (digimon.Texture is { } frame)
+            renderer.Draw(frame, x, y);
     }
 
     /// <summary>❓ The darkness: black until the counter reaches 100, then it fades out linearly until 200.</summary>

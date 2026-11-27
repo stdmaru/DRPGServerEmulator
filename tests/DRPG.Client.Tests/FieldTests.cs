@@ -1,7 +1,9 @@
 using System.Text;
+using DRPG.Client.Data;
 using DRPG.Client.Scenes;
 using DRPG.Client.Ui;
 using DRPG.Client.World;
+using DRPG.Engine.Rendering;
 using DRPG.Shared.Formats.Map;
 using DRPG.Shared.Formats.Pack;
 using DRPG.Shared.Formats.Sprite;
@@ -129,6 +131,150 @@ public sealed class FieldHudButtonsTests
     }
 }
 
+public sealed class FieldHudBlendTests
+{
+    private static HudValues Values(int tamerId = 1) =>
+        new("Marcus", tamerId, 5, "Net Ocean", 1, "Plains", 5, 6, null, new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc));
+
+    private static (List<FakeRenderer.DrawCall> Bar, FakeRenderer.DrawCall Chat) Draw(SpriteOptions options)
+    {
+        using var fixture = new SceneFixture();
+        fixture.Game.SpriteOptions = options;
+        new FieldHud(fixture.Game).Draw(fixture.Renderer, Values());
+        var bar = fixture.Renderer.Draws.Where(d => d.Texture.Width == 800 && d.Texture.Height == 105).ToList();
+        return (bar, Assert.Single(fixture.Renderer.Draws, d => d.Texture.Width == 409));
+    }
+
+    [Fact]
+    public void With_the_alpha_option_the_bar_glow_and_the_chat_are_blended_at_their_alphas()
+    {
+        var (bar, chat) = Draw(SpriteOptions.Default);
+
+        Assert.Equal(2, bar.Count);
+        Assert.All(bar, d => Assert.Equal((0, 495), (d.X, d.Y)));
+        Assert.Equal(IRenderer.OpaqueAlpha, bar[0].Alpha);          // the background is plain
+        Assert.Equal(FieldHud.BarGlowAlpha, bar[1].Alpha);          // 16/32
+        Assert.Equal((28, 460, FieldHud.ChatAlpha, (int?)81), (chat.X, chat.Y, chat.Alpha, chat.PartHeight));
+    }
+
+    [Fact]
+    public void Without_the_alpha_option_everything_is_opaque()
+    {
+        var (bar, chat) = Draw(SpriteOptions.Default with { Alpha = false });
+
+        Assert.Equal(2, bar.Count);
+        Assert.All(bar, d => Assert.Equal(IRenderer.OpaqueAlpha, d.Alpha));
+        Assert.Equal((IRenderer.OpaqueAlpha, (int?)81), (chat.Alpha, chat.PartHeight));
+    }
+
+    [Fact]
+    public void The_tamer_portrait_is_frame_1_of_its_icon()
+    {
+        using var fixture = new SceneFixture();
+        new FieldHud(fixture.Game).Draw(fixture.Renderer, Values(tamerId: 1));
+
+        var portrait = Assert.Single(fixture.Renderer.Draws, d => d.Texture.Width == 41);
+        Assert.Equal((2, 2), (portrait.X, portrait.Y));
+    }
+
+    [Fact]
+    public void A_tamer_without_an_icon_gets_icon_065()
+    {
+        using var fixture = new SceneFixture();
+        new FieldHud(fixture.Game).Draw(fixture.Renderer, Values(tamerId: 4));
+
+        Assert.Contains(fixture.Renderer.Draws, d => d.Texture.Width == 65 && (d.X, d.Y) == (2, 2));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(1101)]
+    [InlineData(65535)]
+    public void An_id_outside_the_table_has_no_portrait(int tamerId)
+    {
+        using var fixture = new SceneFixture();
+        new FieldHud(fixture.Game).Draw(fixture.Renderer, Values(tamerId));
+
+        Assert.DoesNotContain(fixture.Renderer.Draws, d => (d.X, d.Y) == (2, 2) && d.Texture.Width is 41 or 65);
+    }
+}
+
+public sealed class SpeciesTablesIconTests
+{
+    [Theory]
+    [InlineData(1, 1)]          // the tamers have no table entry
+    [InlineData(7, 7)]
+    [InlineData(34, 10)]        // through 0x00b23d20
+    [InlineData(0x141, 0x141)]  // used as they are
+    [InlineData(0x3ec, 0x3ec)]
+    [InlineData(0x3a5, 0x3a5)]
+    [InlineData(0x3ad, 0x3ad)]
+    [InlineData(1100, 1100)]
+    public void The_icon_id_follows_0x00b1ec40(int id, int icon) => Assert.Equal(icon, SpeciesTables.IconId(id));
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    [InlineData(1101)]
+    public void Outside_1_to_1100_there_is_no_icon(int id) => Assert.Null(SpeciesTables.IconId(id));
+}
+
+public sealed class SpriteOptionsTests
+{
+    [Fact]
+    public void Missing_keys_are_on()
+    {
+        Assert.Equal(SpriteOptions.Default, SpriteOptions.From(new Dictionary<string, string>()));
+    }
+
+    [Theory]
+    [InlineData("0", false)]
+    [InlineData("1", true)]
+    [InlineData("2", true)]
+    [InlineData("256", false)]      // a byte: only the low byte counts
+    [InlineData("", false)]         // GetPrivateProfileInt of no digits is 0
+    [InlineData("abc", false)]
+    [InlineData("1x", true)]        // the leading digits
+    [InlineData("-1", false)]
+    public void A_value_is_read_like_GetPrivateProfileInt(string text, bool on)
+    {
+        var options = SpriteOptions.From(new Dictionary<string, string> { ["sprite.alpha"] = text });
+        Assert.Equal(on, options.Alpha);
+        Assert.True(options.Shadow && options.Edge && options.Card);
+    }
+
+    [Fact]
+    public void Each_key_sets_its_own_option()
+    {
+        var options = SpriteOptions.From(new Dictionary<string, string>
+        {
+            ["sprite.anti"] = "0", ["sprite.alpha"] = "1", ["sprite.shadow"] = "0", ["sprite.card"] = "1",
+        });
+        Assert.Equal(new SpriteOptions(Edge: false, Alpha: true, Shadow: false, Card: true), options);
+    }
+}
+
+public sealed class SpriteEffectsTests
+{
+    [Theory]
+    [InlineData(1, SpriteEffects.NormalAlpha, SpriteEffects.NormalAlpha, true)]
+    [InlineData(0x61, 4, 6, false)]
+    [InlineData(0x66, 4, 6, false)]
+    [InlineData(0x67, 4, 6, false)]
+    [InlineData(0x6d, 4, 6, false)]
+    [InlineData(0x50, SpriteEffects.NormalAlpha, SpriteEffects.NormalAlpha, false)]
+    [InlineData(0x54, SpriteEffects.NormalAlpha, SpriteEffects.NormalAlpha, false)]
+    [InlineData(0x55, SpriteEffects.NormalAlpha, SpriteEffects.NormalAlpha, true)]
+    [InlineData(0x59, SpriteEffects.NormalAlpha, SpriteEffects.NormalAlpha, false)]
+    public void The_alphas_and_the_tamer_shadow_depend_on_the_map(int map, int shadow, int edge, bool tamerShadow)
+    {
+        Assert.Equal(shadow, SpriteEffects.DigimonShadowAlpha(map));
+        Assert.Equal(edge, SpriteEffects.DigimonEdgeAlpha(map));
+        Assert.Equal(tamerShadow, SpriteEffects.TamerHasShadow(map));
+    }
+}
+
 public sealed class FieldAnimatorTests
 {
     /// <summary>An <c>.ani</c> of 12 frames: animation 1 = frames 0..3, 2 = 4..7, 3 = 8..11, every frame lasting <paramref name="duration"/>.</summary>
@@ -157,7 +303,7 @@ public sealed class FieldAnimatorTests
     private static FieldAnimator Animator(int duration, bool digimon, int species, int offset)
     {
         var textures = Enumerable.Range(0, 12).Select(_ => (DRPG.Engine.Rendering.ITexture)new FakeTexture(8, 8)).ToList();
-        return new FieldAnimator(new SpriteAnimator(Ani(duration), textures), digimon, species, offset);
+        return new FieldAnimator(new SpriteAnimator(Ani(duration), textures, null, null), digimon, species, offset);
     }
 
     [Fact]

@@ -55,6 +55,15 @@ public sealed class FieldHud(GameContext game)
 
     private const int ChatX = 28, ChatY = 460, ChatHeight = 81;
 
+    /// <summary>
+    /// ✅ The alphas (of 32) of the two blends of the bar with the <c>alpha</c> option on: the bar's frame 1 (<c>0x00b569f0(1, …, −1, 0x10, …)</c>)
+    /// and the chat's background (<c>0x00b569f0(0, …, −1, 0x14, …, 81, 0)</c>, <c>0x00b8e6a0</c>).
+    /// </summary>
+    public const int BarGlowAlpha = 0x10, ChatAlpha = 0x14;
+
+    /// <summary>✅ <c>0x00b231b0</c>: the portrait loaded when a species' own one is missing.</summary>
+    private const string FallbackIcon = "sprite\\icon_065.spr";
+
     private const string RewardSprite = "gui\\dr2_sub_016_005.spr";
     private const int RewardX = 451, RewardY = 462;
 
@@ -68,15 +77,25 @@ public sealed class FieldHud(GameContext game)
         DrawButtons(renderer);
     }
 
-    /// <summary>✅ 1. the bar's background, frame 0 at (0, 495) (❓ frame 1 is a glow drawn blended over it: not yet).</summary>
-    private void DrawBar(IRenderer renderer) => Frame(renderer, Gui(0), 0, 495);
+    /// <summary>
+    /// ✅ 1. the bar's background (<c>0x00b90520</c>): frame 0 at (0, 495), then frame 1 at the same place, blended at
+    /// <see cref="BarGlowAlpha"/> with the <c>alpha</c> option and drawn plain without it.
+    /// </summary>
+    private void DrawBar(IRenderer renderer)
+    {
+        var bar = Gui(0);
+        Frame(renderer, bar, 0, 0, 495);
+        if (bar.Length < 2)
+            return;
+        game.SpriteOptions.DrawBlended(renderer, bar[1], 0, 495, BarGlowAlpha);
+    }
 
     /// <summary>✅ 2. the panel of the tamer.</summary>
     private void DrawTamerPanel(IRenderer renderer, HudValues v)
     {
         var text = game.Text;
         Frame(renderer, Load("interface\\w_unitframe.spr"), 0, 0, 0);
-        Frame(renderer, Load($"sprite\\icon_{v.TamerId:000}.spr"), 1, 2, 2);                 // ❓ the portrait sprite is guessed from the table of icons
+        Portrait(renderer, v.TamerId, 1, 2, 2);                                               // ✅ 0x00b1ec40(tamer) frame 1 at (2, 2)
         text.Draw(renderer, v.TamerName, 33, 4, Yellow);
         text.Draw(renderer, "Level ", 50, 22, UiText.White, shadow: false);
         text.Draw(renderer, v.TamerLevel.ToString(), 90, 22, Yellow, shadow: false);
@@ -97,12 +116,25 @@ public sealed class FieldHud(GameContext game)
     {
         if (leader is null || leader.IsEmpty)
             return;
-        Frame(renderer, Load($"sprite\\icon_{Data.SpeciesTables.SpriteId(leader.SpeciesId):000}.spr"), 0, 594, 509);   // ❓ see the tamer's portrait
+        Portrait(renderer, leader.SpeciesId, 0, 594, 509);                                    // ✅ 0x00b1ec40(species) frame 0
         game.Text.Draw(renderer, $"Lv.{leader.Level}", 670, 508);
         Gauge(renderer, 2, 692, 525, Percent(leader.Hp, leader.MaxHp));
         Gauge(renderer, 5, 692, 545, Percent(leader.Vp, leader.MaxVp));
         Gauge(renderer, 4, 692, 564, Percent(leader.Evp, leader.MaxEvp));
         Gauge(renderer, 3, 488, 585, Percent(leader.Exp, leader.ExpToNextLevel));
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00b1ec40</c>: the portrait <c>Sprite\icon_%03d.spr</c> of <see cref="Data.SpeciesTables.IconId"/>; a missing file is
+    /// <c>icon_065</c> (✅ <c>0x00b231b0</c>).
+    /// </summary>
+    private void Portrait(IRenderer renderer, int id, int frame, int x, int y)
+    {
+        if (Data.SpeciesTables.IconId(id) is not { } icon)
+            return;
+        var path = $"sprite\\icon_{icon:000}.spr";
+        var frames = game.Resource.Contains(path) ? Load(path) : Load(FallbackIcon);
+        Frame(renderer, frames, frame, x, y);
     }
 
     /// <summary>✅ <c>0x007e3560</c>: frame 0 clipped to the gauge's width, then frame 1 whole over it.</summary>
@@ -127,8 +159,10 @@ public sealed class FieldHud(GameContext game)
         if (!game.IsBattleZone)
             Frame(renderer, Load(RewardSprite, gui: true), 0, RewardX, RewardY);
 
-        if (Gui(18) is { Length: > 0 } chat)                                                  // ✅ the chat frame, clipped to 81 px (❓ blended with the option)
-            renderer.DrawRegion(chat[0], ChatX, ChatY, 0, 0, chat[0].Width, Math.Min(chat[0].Height, ChatHeight));
+        if (Gui(18) is { Length: > 0 } chat)                                                  // ✅ the chat frame, clipped to 81 px
+        {
+            game.SpriteOptions.DrawRegionBlended(renderer, chat[0], ChatX, ChatY, chat[0].Width, Math.Min(chat[0].Height, ChatHeight), ChatAlpha);
+        }
         foreach (var (sprite, x, y) in ChatButtons)
         {
             bool current = sprite == 25;                                                       // ✅ mode 0 of the chat

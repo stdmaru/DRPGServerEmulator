@@ -20,6 +20,7 @@ public sealed class GameContext(
     SoundBank sounds,
     GameCommandLine command,
     ClientSettings settings,
+    SpriteOptions spriteOptions,
     Action<string> log)
 {
     /// <summary>✅ Version text every original scene draws in the top left corner (<c>0x0102e220</c>).</summary>
@@ -38,6 +39,9 @@ public sealed class GameContext(
     public SoundBank Sounds { get; } = sounds;
     public GameCommandLine Command { get; } = command;
     public ClientSettings Settings { get; } = settings;
+
+    /// <summary>✅ <c>option.ini [SPRITE]</c>: the blends, shadows and soft edges of the sprites (the options window <c>0x00b16980</c> changes them in game).</summary>
+    public SpriteOptions SpriteOptions { get; set; } = spriteOptions;
     public Action<string> Log { get; } = log;
 
     /// <summary>The mouse; the loop feeds it and clears it after each frame.</summary>

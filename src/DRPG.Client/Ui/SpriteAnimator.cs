@@ -9,7 +9,9 @@ namespace DRPG.Client.Ui;
 /// <c>start + count − 1</c>, goes back to <c>start</c> (so the last frame of the range is never shown). Direction 0 always.
 /// Changing to another animation keeps the current frame until the next loop, like the original; <see cref="Restart"/> does not.
 /// </summary>
-public sealed class SpriteAnimator(AniFile ani, IReadOnlyList<ITexture> frames)
+/// <param name="shadow">The sprite's shadow layer (✅ <c>0x00871e30</c>); null when the file has none.</param>
+/// <param name="edge">The sprite's soft-edge layer (✅ <c>0x00871df0</c>); null when the file has none.</param>
+public sealed class SpriteAnimator(AniFile ani, IReadOnlyList<ITexture> frames, IReadOnlyList<ITexture>? shadow, IReadOnlyList<ITexture>? edge)
 {
     public const int TicksPerFrame = 3;
 
@@ -26,6 +28,12 @@ public sealed class SpriteAnimator(AniFile ani, IReadOnlyList<ITexture> frames)
 
     /// <summary>The texture of the current frame; null when the animation points outside the sprite.</summary>
     public ITexture? Texture => Frame >= 0 && Frame < frames.Count ? frames[Frame] : null;
+
+    /// <summary>The shadow of the current frame; null without a shadow layer or outside it.</summary>
+    public ITexture? ShadowTexture => shadow is not null && Frame >= 0 && Frame < shadow.Count ? shadow[Frame] : null;
+
+    /// <summary>The soft edge of the current frame; null without an edge layer or outside it.</summary>
+    public ITexture? EdgeTexture => edge is not null && Frame >= 0 && Frame < edge.Count ? edge[Frame] : null;
 
     /// <summary>The anchor of the current frame; (0, 0) when there is none.</summary>
     public (int X, int Y) Anchor => Frame >= 0 && Frame < Ani.Frames.Count ? (Ani.Frames[Frame].AnchorX, Ani.Frames[Frame].AnchorY) : (0, 0);
