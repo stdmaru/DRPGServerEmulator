@@ -85,6 +85,27 @@ Despachante do mapa `0x00abc350`: índice = opcode − 2 na tabela de bytes `0xa
   - ✅ Digimon parado: contador `+0x1a0` + 1 por passo; no passo 200 troca para a animação **3** (1 chance em 4) ou **2**; no passo 320 volta para a 1 e zera (as espécies `0xfb` não trocam). Trocar de animação (`0x0085e4c0`) zera deslocamento e contador e recalcula o quadro.
 - ✅ **Passo de lógica**: `DAT_0135af08 = 30` (`0x00867ed0(30)`, objeto de tempo `0x135aed8`), o divisor do acumulador no quadro da cena. ❓ A unidade do tempo somado (`0x00867e40`) ainda não foi lida; o emulador calibrou o movimento a 60 passos/s.
 
+## BGM do mapa
+- ✅ `0x00ad3460`, chamado pela carga do mapa (`0x00ad3730`): **para a BGM atual** (`0x00b424a0`), escolhe o arquivo pelo id do mapa (tabelas fixas no binário), toca em laço (`0x00b42500(arquivo, 0)` + `0x00b42670(1)`) e aplica o volume da opção `[DAT_01158530]+8` (`0x00b42460`). Mapa sem entrada: nada toca (a anterior já parou). Tabela (id decimal → arquivo; "—" = sem música, "vazio" = caminho vazio):
+
+| Mapas | Arquivo | Mapas | Arquivo |
+|---|---|---|---|
+| 0, 14–17, 30–33 | vazio | 1, 5, 250 | `Sound\007.ogg` |
+| 2–4, 6–13, 24–29, 44–46, 79, 131 | `Sound\001.ogg` | 18, 19, 38, 39, 52, 53 | `Sound\009.ogg` |
+| 20, 40 | `Sound\020.ogg` | 21–23, 41–43 | `Sound\105.ogg` |
+| 34, 35, 99, 107, 132, 134 | `sound\035.ogg` | 36 | `sound\036.ogg` |
+| 37, 51 | `sound\037.ogg` | 60–65 | `Sound\060.ogg` |
+| 70 | `Sound\070.ogg` | 71–77, 95 | `Sound\071.ogg` |
+| 80–87, 89, 98, 112–116 | `Sound\080.ogg` | 96, 100, 101, 108 | `Sound\Ws_cave.ogg` |
+| 97, 102, 103, 109 | `Sound\WS_Ocean.ogg` | 104 | `Sound\WS_Passage.ogg` |
+| 105 | `Sound\WS_BossRoom.ogg` | 106 | `Sound\Riddle.ogg` |
+| 117, 119 | `sound\XUANWUMON_map.ogg` | 125–128 | `sound\SPIRALMOUNTAIN_map.ogg` |
+| 129 | `sound\DarkForest.ogg` | 130 | `sound\UnderForest.ogg` |
+| 133, 136–141 | `sound\ZhuqiaomonDungeon.ogg` | 135, 142 | `sound\MugenMountain.ogg` |
+| 143, 155, 156 | `sound\HellsField_Floor.ogg` | 144–149 | `sound\UnderGroundPassage_Hard.ogg` |
+| 150, 151 | `sound\Gehenna.ogg` | 152–154 | `sound\HellsField_Passage.ogg` |
+| 200–204 | `Sound\BZRoom.ogg` | resto | — |
+
 ## Câmera
 - ✅ `0x00afe310` (campo): chama a vtable `+0x24` do personagem e põe a rolagem do mapa (`0x00b36b80`) em **(`+0x168` − 400, `+0x16c` − 300)**, presa a `0..largura·64 − 800` e `0..altura·32 − 600`. Na batalha a rolagem é fixa (250, 206).
 
@@ -124,6 +145,6 @@ Escopo do marco 3 (decisão do dono): **painéis com os valores reais** do `0x02
 - ✅ **Chat** (`0x00b8e6a0`/`0x00b91a70`, modo do tamanho `+0x770a4` = 0 na entrada): fundo `dr2_main_000_018` quadro 0 em **(28, 460) recortado a 81 px de altura** (opção `[DAT_01158530]+1` → por `0x00b569f0` modo `0x14`, ❓ mistura; senão `0x00b56ff0` direto). Botões do modo de chat `000_023..027` (20×20) em (179, 572), (201, 572), (222, 572), (244, 572), (157, 572): quadro 3, e 0 no modo atual (0 → `000_025`); o `000_027` fica desabilitado com nível ≤ 4. Abas `000_037..040` (35×14) em (280, 574), (317, 574), (355, 574), (391, 574): quadro 2 na aba atual (0 na entrada), 0 nas outras.
 
 ## Ainda ❓ (fase A em andamento)
-- UI: fórmula das misturas `0x00b569f0` (modos −1 e `0x14`), sprite do ícone `+0x12df`, se o minimapa e o `w_tamer_menu` aparecem na entrada (precisa de uma captura de tela do original), `0x009b1640`, `0x00a0ceb0`; BGM do mapa.
+- UI: fórmula das misturas `0x00b569f0` (modos −1 e `0x14`), sprite do ícone `+0x12df`, se o minimapa e o `w_tamer_menu` aparecem na entrada (precisa de uma captura de tela do original), `0x009b1640`, `0x00a0ceb0`.
 - Montagem de `0x16`, `0x18`, `0x49`, `0x01`, resto do `0xF0`, e da conexão global (`0x64`).
 - Nome sobre o tamer (fonte, cor), sombra (opção) e o `0x00b57330`.
