@@ -64,7 +64,7 @@ Handlers (`[PacketHandler]`) e janelas (`[Window]`) são achados por um **gerado
 
 ## Instalação original (drop-in)
 - O executável roda **na pasta da instalação oficial** e acha os arquivos pelo diretório dele (ou `--game-dir`). `GameInstall` valida a pasta na partida: falta de arquivo obrigatório para com mensagem clara.
-- Os arquivos do jogo são **somente leitura**: o cliente nunca grava em `resource.pf`, `table.pf` nem nos `.ini` do original. Opções novas ficam em arquivo próprio (`drpg-client.ini`).
+- Os arquivos do jogo são **somente leitura**: o cliente nunca grava em `resource.pf`, `table.pf` nem nos `.ini` do original, **salvo onde o original grava** (comportamento 1:1, decisão do dono de 2026-11-27): o `option.ini` ao fechar o jogo, com as mesmas chaves (`0x00b429f0`, [janelas](../cliente/janelas.md#opções-janela-0xf)). Opções novas ficam em arquivo próprio (`drpg-client.ini`).
 - Linha de comando compatível com o `DigimonRPG.bin` ([servidores](../protocolo/servidores.md)).
 
 ## Erros no cliente

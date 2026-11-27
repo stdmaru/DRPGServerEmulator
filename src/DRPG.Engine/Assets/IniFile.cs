@@ -35,11 +35,26 @@ public static class IniFile
         File.Exists(path) ? Parse(File.ReadAllLines(path, Encoding.Latin1)) : new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Sets <paramref name="key"/> in <paramref name="section"/>, adding either when missing. Atomic write.</summary>
-    public static void Set(string path, string section, string key, string value)
+    public static void Set(string path, string section, string key, string value) => Set(path, [(section, key, value)]);
+
+    /// <summary>
+    /// Sets each entry in order, as that many <c>WritePrivateProfileString</c> calls would, in one atomic write. Sections and keys
+    /// match ignoring case; a missing one is added at the end of its section (or of the file).
+    /// </summary>
+    public static void Set(string path, IEnumerable<(string Section, string Key, string Value)> entries)
+    {
+        var lines = File.Exists(path) ? File.ReadAllLines(path, Encoding.Latin1).ToList() : [];
+        foreach (var (section, key, value) in entries)
+            SetLine(lines, section, key, value);
+        var temp = path + ".tmp";
+        File.WriteAllText(temp, string.Join("\r\n", lines) + "\r\n", Encoding.Latin1);
+        File.Move(temp, path, overwrite: true);
+    }
+
+    private static void SetLine(List<string> lines, string section, string key, string value)
     {
         if (value.AsSpan().IndexOfAny('\r', '\n') >= 0)
             throw new ArgumentException("INI values cannot span lines", nameof(value));
-        var lines = File.Exists(path) ? File.ReadAllLines(path, Encoding.Latin1).ToList() : [];
         int sectionStart = -1, sectionEnd = lines.Count;
         for (int i = 0; i < lines.Count; i++)
         {
@@ -81,10 +96,6 @@ public static class IniFile
                 lines.Insert(insert, entry);
             }
         }
-
-        var temp = path + ".tmp";
-        File.WriteAllText(temp, string.Join("\r\n", lines) + "\r\n", Encoding.Latin1);
-        File.Move(temp, path, overwrite: true);
     }
 
     private static string StripComment(string raw)

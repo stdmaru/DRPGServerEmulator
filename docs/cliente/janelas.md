@@ -65,7 +65,7 @@ UI interativa do campo no cliente novo (PR #51, marco 3, passo 2): botões da ba
 | Exit Game `dr2_sub_001_004` | (0x6f, 0x1c1) | — | abre a janela 6 e fecha as opções |
 
 - ✅ Os botões de baixo são desenhados **antes** de ler o mouse; as caixas e rádios leem e depois desenham a marca.
-- ✅ O original grava o `option.ini` ao fechar o jogo (`0x00b429f0`). O cliente nunca grava a instalação: a mudança vale até fechar o cliente (❓ decisão do dono pendente: [decisões](../projeto/decisoes.md)).
+- ✅ **Gravação**: quando o laço de mensagens termina (`0x00aa4a90` → `0x00aa27e0`), `0x00b429f0` grava no `option.ini`, nesta ordem e com `"%d"` (`0x00b32a00` → `WritePrivateProfileStringA`): `[SPRITE]` alpha, anti, shadow, card, Optimization; `[BGM]` bgm; `[GAME]` whisper, party, pvp, trade; `[BGM]` sound; `[LANGUAGE]` language. Window Mode e View My Item não são gravados. O cliente faz o mesmo ao sair do laço (uma escrita atômica, o resto do arquivo intacto; erro de escrita vai para o log). ❓ O laço também alterna o Window Mode com Alt+F12 fora da batalha: espera o teclado ter essas teclas.
 - Código: `Features/Options/OptionsWindow.cs`, `GameOptions.cs` (lido do `option.ini` por `0x00b42be0`), `SoundBank.SetMusicLevel`/`SetEffectLevel`.
 
 ## Minimapa, janela 5

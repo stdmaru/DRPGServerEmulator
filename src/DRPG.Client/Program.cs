@@ -69,6 +69,35 @@ internal static class Program
         var cursor = new CursorView(sprites);
 
         scenes.Switch(SceneId.Title);
+        try
+        {
+            return RunLoop(platform, renderer, game, scenes, cursor, audio, screenshot, screenshotAtMs);
+        }
+        finally
+        {
+            SaveOptions(game);
+        }
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00aa4a90</c>: once the message loop ends, the shutdown (<c>0x00aa27e0</c>) writes the options back to <c>option.ini</c>
+    /// (<c>0x00b429f0</c>). A file that cannot be written is logged: the game still closes.
+    /// </summary>
+    private static void SaveOptions(GameContext game)
+    {
+        try
+        {
+            game.Options.Save(game.Install.OptionsPath, game.SpriteOptions);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"option.ini: {e.Message}");
+        }
+    }
+
+    private static int RunLoop(SdlPlatform platform, IRenderer renderer, GameContext game, SceneManager scenes, CursorView cursor,
+        IAudio audio, string? screenshot, ulong screenshotAtMs)
+    {
         var events = new List<InputEvent>();
         ulong lastFrameMs = 0;
         ulong? loadedAtMs = null;                       // development clocks count from the end of the loading screen

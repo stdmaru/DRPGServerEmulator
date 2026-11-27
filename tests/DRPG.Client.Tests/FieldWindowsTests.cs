@@ -553,3 +553,54 @@ public sealed class FieldHudChatInteractionTests
         Assert.Equal(mode, hud.ChatMode);
     }
 }
+
+public sealed class GameOptionsSaveTests : IDisposable
+{
+    private readonly string _dir = Directory.CreateTempSubdirectory("drpg-options-").FullName;
+
+    [Fact]
+    public void The_options_are_written_back_with_the_original_keys_and_the_rest_of_the_file_is_kept()
+    {
+        var path = Path.Combine(_dir, "option.ini");
+        File.WriteAllText(path, "[SPRITE]\r\nalpha=1\r\nanti=1\r\nshadow=1\r\ncard=1\r\nOptimization=0\r\n[BGM]\r\nbgm=0\r\nsound=0\r\n"
+            + "[GAME]\r\nwhisper=0\r\nparty=0\r\npvp=0\r\ntrade=0\r\n[PATCH]\r\nmode=1\r\n[Member]\r\nid=1\r\n[LANGUAGE]\r\nlanguage=0\r\n");
+        var options = GameOptions.From(DRPG.Engine.Assets.IniFile.Read(path));
+        options.MusicLevel = 4;
+        options.EffectLevel = 2;
+        options.RefuseTrade = true;
+        options.Simplified = 2;
+        options.WindowMode = false;                                            // ✅ not written by 0x00b429f0
+
+        options.Save(path, SpriteOptions.Default with { Shadow = false });
+
+        var saved = DRPG.Engine.Assets.IniFile.Read(path);
+        Assert.Equal("0", saved["sprite.shadow"]);
+        Assert.Equal("2", saved["sprite.optimization"]);
+        Assert.Equal("4", saved["bgm.bgm"]);
+        Assert.Equal("2", saved["bgm.sound"]);
+        Assert.Equal("1", saved["game.trade"]);
+        Assert.Equal("1", saved["patch.mode"]);
+        Assert.Equal("1", saved["member.id"]);
+        Assert.False(saved.ContainsKey("sprite.windowmode"));
+        var reread = GameOptions.From(saved);
+        Assert.Equal((4, 2, true, 2), (reread.MusicLevel, reread.EffectLevel, reread.RefuseTrade, reread.Simplified));
+    }
+
+    [Fact]
+    public void The_twelve_keys_follow_the_original_order()
+    {
+        var keys = GameOptions.From(new Dictionary<string, string>()).Entries(SpriteOptions.Default).Select(e => $"{e.Section}.{e.Key}");
+        Assert.Equal(["SPRITE.alpha", "SPRITE.anti", "SPRITE.shadow", "SPRITE.card", "SPRITE.Optimization", "BGM.bgm", "GAME.whisper",
+            "GAME.party", "GAME.pvp", "GAME.trade", "BGM.sound", "LANGUAGE.language"], keys);
+    }
+
+    [Fact]
+    public void A_missing_file_is_created_with_the_sections()
+    {
+        var path = Path.Combine(_dir, "new.ini");
+        GameOptions.From(new Dictionary<string, string>()).Save(path, SpriteOptions.Default);
+        Assert.Equal("1", DRPG.Engine.Assets.IniFile.Read(path)["bgm.bgm"]);
+    }
+
+    public void Dispose() => Directory.Delete(_dir, recursive: true);
+}
