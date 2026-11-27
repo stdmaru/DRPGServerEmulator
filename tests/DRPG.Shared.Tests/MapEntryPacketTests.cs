@@ -52,6 +52,7 @@ public sealed class MapEntryPacketTests
         AssertRoundTrip(new MoveCharacterRequest(-1, short.MaxValue));
         AssertRoundTrip(new TeleportCharacterPacket(46, 15, 15));
         AssertRoundTrip(new TeleportCharacterPacket(0, -1, short.MaxValue));
+        AssertRoundTrip(new FieldDigimonPacket(new Serial(1, 2), "Yuramon", 14, 1, 2, 2, 4, 6, 25, 65, 28, 65));
         AssertRoundTrip(Character());
         AssertRoundTrip(new InventoryDataPacket(Bags()));
         AssertRoundTrip(new InventoryDataPacket(new InventoryBags(
@@ -103,6 +104,12 @@ public sealed class MapEntryPacketTests
         Assert.Equal(Convert.FromHexString("0500" + "3900" + "5B00" + new string('0', 28)), Payload(new MoveCharacterRequest(57, 91)));
         // ✅ captures.db 0xB0 S2C: map 0x2E (46), cell (15, 15)
         Assert.Equal(Convert.FromHexString("2E0000000F000F00"), Payload(new TeleportCharacterPacket(46, 15, 15)));
+        // ✅ captures.db 0x11 S2C: Yuramon species 14, stage 1, level 2, grade 2, state 1, dir 2, (25, 65) -> (25, 65)
+        var wildGolden = Convert.FromHexString("2E709CEA6897AE41B514A9EAAEAC2949597572616D6F6E0000000000000000000000000000000E0001000200020102001900410019004100");
+        var wildParsed = ClientPacket.Parse<FieldDigimonPacket>(wildGolden);
+        Assert.Equal(("Yuramon", (ushort)14, (ushort)1, (ushort)2, (byte)2, (byte)1, (ushort)2, (short)25, (short)65, (short)25, (short)65),
+            (wildParsed.Name, wildParsed.SpeciesId, wildParsed.Stage, wildParsed.Level, wildParsed.Grade, wildParsed.State, wildParsed.Direction, wildParsed.X, wildParsed.Y, wildParsed.DestX, wildParsed.DestY));
+        Assert.Equal(wildGolden, Payload(wildParsed));
         Assert.Equal(57, Payload(new JoinCharacterRequest("Tamer", "user")).Length);
 
         var item = Payload(new ItemRecordPacket(Item(7, 215)));
@@ -170,6 +177,8 @@ public sealed class MapEntryPacketTests
         Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<MoveCharacterRequest>(new byte[21]));
         Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<TeleportCharacterPacket>(new byte[7]));
         Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<TeleportCharacterPacket>(new byte[9]));
+        Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<FieldDigimonPacket>(new byte[55]));
+        Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<FieldDigimonPacket>(new byte[57]));
     }
 
     [Fact]

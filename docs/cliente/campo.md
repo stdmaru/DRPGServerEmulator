@@ -2,7 +2,7 @@
 
 RE da v322 para o passo 2 do marco 3 (PR #51, `feat/client-walk`): andar com pathfinding, digimons do servidor andando no cliente, NPCs, portais e o comportamento da UI do campo. Complementa a [cena de jogo](cena-jogo.md) (entrada no mapa, quadro, HUD) e o [movimento](../mecanicas/movimento.md) (lado do servidor). ✅ = lido no dump; ❓ = ainda não lido.
 
-> **Estado:** etapas 1 (andar + digimon seguidor + `0x20`/`0xB0`), 2 (colisões + ocupação) e 3 (pathfinding A* `0x00b43200`) **implementadas**. Próxima etapa: selvagens no campo (`0x11`).
+> **Estado:** etapas 1 (andar + digimon seguidor + `0x20`/`0xB0`), 2 (colisões + ocupação), 3 (pathfinding A* `0x00b43200`) e 4 (selvagens `0x11` no campo) **implementadas**. Restante do roteiro (NPCs, portais, UI do campo) para etapa seguinte.
 
 ## Como ler o binário
 - Dump decompilado: `work/re/v322/dump/decomp/XXXX/<endereço>.c`, com `functions.tsv` (entrada, tamanho, chamadores), `calls.tsv` (quem chama quem) e `strings.tsv`.
@@ -101,7 +101,6 @@ Cada passo chama, nesta ordem:
 
 ## Roteiro do que falta
 Pontos de entrada já localizados; ✅ quando lido.
-- **Selvagens no campo (etapa 4):** desenho `0x007e83d0` na fila de y, pacote `0x11` no `DRPG.Shared` e entidades na `GameScene`.
 - **NPCs:** criação em `0x00abb750`/`0x0085f090` ([NPCs do mapa](cena-jogo.md#npcs-do-mapa)), lista `+0x300`, atualização `+0x24` da vtable deles, sprite e nome.
 - **Portais:** `map_us` (+0x84, 4 portais, [NPCs do mapa](cena-jogo.md#npcs-do-mapa)); o desenho do redemoinho ❓ (procurar o sprite na fila de desenho `0x00a0d340`).
 - **Minimapa:** `WindowMiniMap`, marcadores em `0x00b9b930` e nomes em `0x00b9c4b0` ([minimapa](cena-jogo.md#minimapa-windowminimap-janela-5)).

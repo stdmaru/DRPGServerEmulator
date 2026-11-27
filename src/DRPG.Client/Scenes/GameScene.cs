@@ -55,6 +55,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private Serial _tamerSerial, _digimonSerial;
     private FieldEntity _tamerEntity = new(0, 0);
     private FieldEntity? _digimonEntity;
+    private readonly FieldWilds _wilds = new();
     private readonly MovePacketQueue _moveQueue = new();
     private (int X, int Y)? _lastClickCell;
     private bool _aborted, _lost;
@@ -77,6 +78,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     internal (int X, int Y) DigimonWorld => _digimonEntity is { } d ? (d.WorldX, d.WorldY) : (0, 0);
     internal FieldEntity TamerEntity => _tamerEntity;
     internal FieldEntity? DigimonEntity => _digimonEntity;
+    internal FieldWilds Wilds => _wilds;
     internal FrameStats Stats => _stats;
     internal WorldLoading Loading => _loading;
 
@@ -249,6 +251,9 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     /// </summary>
     private void HandleFieldInput(WorldSession session, ulong nowMs)
     {
+        while (session.TryReceiveFieldDigimon(out var wild))
+            _wilds.Apply(wild, game.World!.MapId, _collision, _animated.OpenDigimon, random);
+
         while (session.TryReceiveTeleport(out var teleport))
         {
             if (teleport.MapId == game.World!.MapId)
@@ -321,6 +326,8 @@ public sealed class GameScene(GameContext game, Random random) : IScene
             SyncAnimation(_digimonAnimation, _digimonEntity);
             _digimonAnimation?.Step(random.Next(4));                       // ✅ 1 in 4 for the animation 3
         }
+
+        _wilds.Step(_tamerEntity, _collision, _pathfinder, random);
     }
 
     private (int NextX, int NextY)? NextStep(int fromX, int fromY, int destX, int destY)
@@ -367,6 +374,8 @@ public sealed class GameScene(GameContext game, Random random) : IScene
 
         _queue.Clear();
         field.QueueObjects(_queue, cameraX, cameraY, SpriteEffects.ObjectLookOf(game.World!.MapId, game.SpriteOptions));
+        int currentMapId = game.World!.MapId;
+        _wilds.QueueDraw(_queue, cameraX, cameraY, LowerSpecies.Contains, (r, sprite, drawX, drawY) => DrawDigimon(r, sprite, currentMapId, drawX, drawY));
         if (_digimon?.Texture is { } frame && _digimonEntity is { } digimonEntity)
         {
             var (anchorX, anchorY) = _digimon.Anchor;               // ✅ the digimon is drawn by the anchor of the .ani

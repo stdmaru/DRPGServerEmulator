@@ -73,3 +73,62 @@ public sealed record TeleportCharacterPacket(int MapId, short X, short Y) : ITwo
         w.WriteI16(Y);
     }
 }
+
+/// <summary>
+/// ✅ 0x11 S2C (56 B, v322): wild digimon group update on the field (docs/mecanicas/selvagens.md, <c>0x00af25c0</c>).
+/// State: 1 standing, 4 walking, 8 defeated, 11 in battle, 12 leaving.
+/// </summary>
+public sealed record FieldDigimonPacket(
+    Serial Serial,
+    string Name,
+    ushort SpeciesId,
+    ushort Stage,
+    ushort Level,
+    byte Grade,
+    byte State,
+    ushort Direction,
+    short X,
+    short Y,
+    short DestX,
+    short DestY) : ITwoWayPacket<FieldDigimonPacket>
+{
+    public const int NameBytes = 21;
+
+    public static ushort Opcode => (ushort)MapOpcode.FieldDigimonUpdate;
+    public static PacketLength Length => PacketLength.Exact(56);
+
+    public static FieldDigimonPacket Read(PacketReader r)
+    {
+        var serial = Serial.Read(r);
+        var name = r.ReadFixedString(NameBytes);
+        r.ReadU8();
+        var speciesId = r.ReadU16();
+        var stage = r.ReadU16();
+        var level = r.ReadU16();
+        var grade = r.ReadU8();
+        var state = r.ReadU8();
+        var direction = r.ReadU16();
+        var x = r.ReadI16();
+        var y = r.ReadI16();
+        var destX = r.ReadI16();
+        var destY = r.ReadI16();
+        return new(serial, name, speciesId, stage, level, grade, state, direction, x, y, destX, destY);
+    }
+
+    public void Write(PacketWriter w)
+    {
+        Serial.Write(w);
+        w.WriteFixedString(Name, NameBytes);
+        w.WriteU8(0);
+        w.WriteU16(SpeciesId);
+        w.WriteU16(Stage);
+        w.WriteU16(Level);
+        w.WriteU8(Grade);
+        w.WriteU8(State);
+        w.WriteU16(Direction);
+        w.WriteI16(X);
+        w.WriteI16(Y);
+        w.WriteI16(DestX);
+        w.WriteI16(DestY);
+    }
+}
