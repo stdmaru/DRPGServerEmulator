@@ -13,10 +13,10 @@ namespace DRPG.Client.Scenes;
 /// <summary>
 /// <c>CSceneGame</c>, scene 5 (✅ v322 ctor <c>0x00b494f0</c>, init <c>0x00b4bab0</c>, frame <c>0x00b4e550</c>, field <c>0x00b4b550</c>;
 /// docs/cliente/cena-jogo.md): the map of the character's slot with the tamer and the leader digimon standing on it and the basic
-/// HUD. This step only enters the world: nothing moves and nothing reacts. Per frame: the connections are read (the server's <c>0x02</c>
-/// and <c>0x03</c> arrive), the map is loaded when they are in and the entry packets go out (<c>0x04</c>, <c>0xF0</c>, <c>0x121</c>, the global
-/// connection), then the logic runs in fixed steps, and the field is drawn: ground, the objects and the two characters sorted by y,
-/// the HUD. A lost connection shows the text <c>0xed0</c> in the middle of the screen until a click takes the player back to scene 2.
+/// HUD. This step only enters the world: nothing moves and nothing reacts. First the loading screen of the original's loading thread
+/// (<see cref="WorldLoading"/>): it sends the <c>0x01</c> when its first run ends, the map is loaded when the server's <c>0x02</c> and
+/// <c>0x03</c> are in, and the entry packets (<c>0x04</c>, <c>0xF0</c>, <c>0x121</c>, the global connection) go out when it ends. Then the
+/// logic runs in fixed steps, and the field is drawn: ground, the objects and the two characters sorted by y, the HUD. A lost connection shows the text <c>0xed0</c> in the middle of the screen until a click takes the player back to scene 2.
 /// </summary>
 public sealed class GameScene(GameContext game, Random random) : IScene
 {
@@ -42,6 +42,8 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private AnimatedSprites _animated = null!;                 // set in Init
     private FieldHud _hud = null!;                             // set in Init
     private MessageBox _box = null!;                           // set in Init
+    private LoadingScreen _screen = null!;                     // set in Init
+    private WorldLoading _loading = null!;                     // set in Init
     private FieldMap? _field;
     private FieldAnimator? _tamerAnimation, _digimonAnimation;
     private TamerDoll? _tamer;
@@ -70,6 +72,10 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     internal (int X, int Y) TamerWorld => _tamerWorld;
     internal (int X, int Y) DigimonWorld => _digimonWorld;
     internal FrameStats Stats => _stats;
+    internal WorldLoading Loading => _loading;
+
+    /// <summary>✅ The loading thread does not draw the cursor (no <c>0x00b3e3d0</c>).</summary>
+    public bool ShowCursor => _aborted || !_loading.Showing;
 
     public void Init()
     {
@@ -83,6 +89,8 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         _animated = new AnimatedSprites(game.Resource, game.Sprites, game.Log);
         _hud = new FieldHud(game);
         _box = new MessageBox(game.Sprites.Load("gui\\dr2_in_000_003.spr"), game.Text);
+        _screen = new LoadingScreen(game);
+        _loading = new WorldLoading(random, _screen.BackgroundCount);
         // ✅ the scene's sound effects (0x00b4bab0) are not registered yet: nothing in this step plays one
     }
 
@@ -102,8 +110,15 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         if (!_lost && (session.Step == WorldStep.Failed || game.Account is { Step: AccountStep.Failed }))
             Lose(session.FailureMessage ?? game.Account?.FailureMessage ?? "connection lost");
 
-        if (!_lost && _field is null && session.Step == WorldStep.DataReady)
-            LoadWorld(renderer, session, world, nowMs);
+        if (!_lost && _loading.Showing)
+        {
+            AdvanceLoading(renderer, session, world, nowMs);
+            if (!_lost && _loading.Showing)
+            {
+                _screen.Draw(renderer, _loading.Background, _loading.GaugeFrame, _screen.TipOf(_loading.Tip));
+                return;
+            }
+        }
 
         if (_field is not null && !_lost)
         {
@@ -121,11 +136,40 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     }
 
     /// <summary>
-    /// ✅ <c>0x00abbb20</c>: loads the map (<c>0x00ad3730</c> → <c>map\%s.map</c>), starts its music, puts the tamer and the digimon on their
-    /// cells (<c>0x0085e7b0</c>), sends <c>0x04</c>, <c>0xF0</c> and, on the first entry, <c>0x121</c>, opens the global connection and
-    /// starts the brightening of the screen.
+    /// ✅ The loading thread (<c>0x00b34ea0</c>) and the <c>0x03</c> handler (<c>0x00abbb20</c>): the <c>0x01</c> when the first run
+    /// ends (then the channel's <c>0x16</c>/<c>0x18</c>, <c>0x00ae8700</c>), the map load when the world data is in, the entry packets
+    /// when the second run ends.
     /// </summary>
-    private void LoadWorld(IRenderer renderer, WorldSession session, WorldEntry world, ulong nowMs)
+    private void AdvanceLoading(IRenderer renderer, WorldSession session, WorldEntry world, ulong nowMs)
+    {
+        if (_loading.Phase == LoadingPhase.WaitingForData && session.Step == WorldStep.DataReady)
+        {
+            _loading.DataArrived();
+            if (!LoadWorld(renderer, session, world))
+                return;
+            _loading.MapLoaded();
+        }
+        switch (_loading.Update(nowMs))
+        {
+            case LoadingAction.Join:
+                session.Join();
+                game.Account?.SendMapConnection(world.Slot.Name, HardwareAddresses.Read(3));   // the addresses are never logged
+                break;
+            case LoadingAction.EnterWorld:
+                session.EnterWorld();
+                game.HasEnteredWorld = true;
+                _startMs = nowMs;
+                _started = true;
+                _transition = FadeStart;
+                break;
+        }
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00abbb20</c>: loads the map (<c>0x00ad3730</c> → <c>map\%s.map</c>), starts its music, puts the tamer and the digimon on their
+    /// cells (<c>0x0085e7b0</c>). The entry packets wait for the end of the loading screen (<see cref="AdvanceLoading"/>).
+    /// </summary>
+    private bool LoadWorld(IRenderer renderer, WorldSession session, WorldEntry world)
     {
         var character = session.Character!;
         var path = game.Data?.MapFile(world.MapId);
@@ -142,7 +186,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         {
             game.Log($"LoadMap Error : {path}: {e.Message}");
             Lose($"map {world.MapId}: {e.Message}");
-            return;
+            return false;
         }
 
         // ✅ the BGM of the map load: the current one stops, the map's starts (no entry: silence)
@@ -154,11 +198,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         // ✅ the server clock: the offset of the server's time from the local clock (0x00abbd50)
         _clockOffset = DateTimeOffset.FromUnixTimeSeconds(character.ServerUnixTime) - DateTimeOffset.UtcNow;
         PlaceCharacters(character);
-        session.EnterWorld();
-        game.HasEnteredWorld = true;
-        _startMs = nowMs;
-        _started = true;
-        _transition = FadeStart;
+        return true;
     }
 
     /// <summary>✅ <c>0x0085e7b0</c>: the centre of the cell, <c>cx · 64 + 32</c> and <c>cy · 32 + 16</c>; the digimon one cell up and to the left.</summary>

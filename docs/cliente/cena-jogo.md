@@ -11,24 +11,35 @@ Marco 3 do [cliente novo](../planos/cliente-novo.md) (PR #49). Endereços da v32
 2. ✅ No fim do escurecimento (`0x00b47790`, `+0x14c4 > limite`):
    - confere o slot: `check ≠ offset + mapa + nível` → registra (`0x00ae0150`) e desconecta o channel (antitrapaça; não acontece com lista válida);
    - **conecta no servidor de mapa** (`0x00b3f9a0(ip, porta)`: objeto de conexão novo, `connect` síncrono);
-   - conectou → `0x00b8e690(0)`, **troca para a cena 5** e `[DAT_0135a1dc]+0x10 = 1`;
+   - conectou → `0x00b8e690(0)`, **troca para a cena 5** e `[DAT_0135a1dc]+0x10 = 1` (o laço principal `0x00aa4a90` vê a marca depois do quadro e abre a [tela de carga](#tela-de-carga-da-entrada-no-mundo));
    - não conectou → `+0x864 = 1`: mensagem `0xee6` "The server is under maintenance. Please try again later. 12" por 80 quadros, continua na seleção.
-3. ✅ Pelas capturas (sessão 52), **antes** de conectar no mapa o cliente manda no channel `0x16` (`MapConnectionConfirm`, 69 B) e `0x18` (`ClientHardwareInfo`, 88 B: endereços MAC). ❓ Onde são montados (candidatos: `0x00adb4f0`, `0x00ae8700` para `0x16`). ✅ Decisão do dono: o cliente novo manda os **MACs reais**, como o original (1:1). Só no pacote; nunca em log.
+3. ✅ O `0x16` (`MapConnectionConfirm`, 69 B) e o `0x18` (`ClientHardwareInfo`, 88 B: endereços MAC) vão no channel **junto com o `0x01`**, não antes da conexão: `0x00adca00` manda o `0x01` e chama `0x00ae8700` logo depois (pcaps `first-access` e `inventory_packet`: o `0x16` no mesmo milissegundo do `0x01`, o `0x18` 0,2 s depois). A captura do proxy (sessão 52) parecia mostrar o contrário porque o proxy só grava a conexão do mapa depois de conectar no servidor de cima, e os pacotes do cliente ficam no buffer até lá. ✅ Decisão do dono: o cliente novo manda os **MACs reais**, como o original (1:1). Só no pacote; nunca em log.
 
-## Sequência na rede (✅ captura `v322 login até o mapa`, conexões 87–89)
-Tempo a partir da conexão no mapa:
+## Tela de carga da entrada no mundo
+✅ Entre "Game Start" e o campo o original mostra a **mesma tela de carga genérica** da volta para a cena 2 ([cenas](cenas.md), `0x00b34250`), desenhada por uma thread do `CLoadingMgr` (`DAT_0135b150`, sprites de `0x00b34980`: `+0x7c` `loading_image_ENG`, `+0x44` `loading_gauge` (só a contagem de quadros, 12), `+0x658` `game_end_gauge`, `+0x5ec` `loading_under_line`). O corpo da thread é `0x00b34ea0`; ela roda **duas vezes** na entrada:
+
+1. **"PreMap Loading Thread"** (`0x00b34c10`, aberta pelo laço principal logo depois da troca para a cena 5; `+0x5e4 = 1`): fundo sorteado uma vez (`rand() % contagem`, `+0x5e0`), dica = pedaço **0** do texto `0xa6b`. Depois de **16 quadros** começa um cronômetro (contador de desempenho); quando passa de **1,0 s** (`DAT_0100f030`), a thread chama `0x00adca00`, que manda o **`0x01`** (nome + usuário, 43 B) e o `0x16`/`0x18` do channel, e termina. É por isso que o `0x01` sai 2,75–2,9 s depois da conexão nos pcaps, e o `0x49` e o eco do `0x0E` antes dele.
+2. Entre as duas: a thread acabou mas `+0x5e4` continua 1, e a cena 5 (`0x00b4e550`) não desenha nada enquanto `+10` ou `+0x5e4` estiverem ligados (só os textos de conexão perdida): **o último quadro fica parado na tela** até o `0x03`.
+3. **"Map Loading Thread"** (`0x00b34dc0`, chamada pelo tratador do `0x03` `0x00abbb20` quando `+10 == 0`): dica sorteada `rand() & 15` (`+0x624`), espera a primeira thread terminar, mantém o fundo e liga `+10`. O primeiro quadro ainda mostra a dica 0 e dorme 30 ms a mais (marca `[DAT_011584f0]+0xf803`, ligada por `0x00adca00` e desligada a cada quadro). O tratador carrega o `.map` (`0x00ad3730`, que termina com `0x00b348e0`: desliga `+10` e espera a thread), então a tela some só quando **o mapa carregou e já foram 16 quadros**. Só depois o tratador manda `0x04` e `0xF0` e põe `+0x34c = 0x5f` (o clareamento). Nos pcaps: `0x03` → `0x04` ≈ 2,0 s.
+
+Cada volta do laço: confere a saída; desenha o quadro (fundo em (0, 0), `game_end_gauge` quadro `+0x5cc` em (740, 540), `loading_under_line` em (0, 550), dica centrada em y 580 amarela com sombra, `0x00b55560` ignora o x recebido); `Sleep(80)`; avança o medidor (volta a 0 em 12, **sem zerar** entre as duas threads); `Sleep(10)`. O limitador de 30 FPS (`0x00867ed0(0x1e)`) nunca segura, então o quadro dura **90 ms** (≈ 115–125 ms no Windows, pela resolução de 15,6 ms do `Sleep`, como nos pcaps). Sem cursor. Mapa perdido durante a carga (`0x00b3fdf0() == 0`): texto `0xa8b` em (400, 300) e a thread sai.
+
+## Sequência na rede
+✅ Pcap `first-access` (sessão 4; `inventory_packet`, sessão 5, igual com 0,15 s a menos), tempo a partir do SYN do mapa. Os layouts vêm da captura do proxy `v322 login até o mapa` (sessão 52, conexões 87–89), cujos tempos do lado do mapa estão comprimidos (ver o passo 3 acima).
 
 | t (s) | Conexão | Sentido | Pacotes |
 |---|---|---|---|
-| −0,11 | channel | C2S | `0x16`, `0x18` |
-| 0,000 | map | C2S | `0x49` × 3 (32 B), `0x01` (71 B, entrar com o personagem) |
-| 0,156 | map | S2C | `0x0E` hello (30 B) |
-| 0,165 | map | C2S | `0x0E` eco (44 B) |
-| 0,257–0,904 | map | S2C | `0x33` × 3, `0x02` (personagem, 7614 B), `0x03` (inventário, 4430 B), `0x7E` × 7, `0x7F` × 7, `0x05`, `0xE6`, `0x74`, `0x152`, `0xB4` (digimon líder), `0x73` |
-| 1,952 | map | C2S | `0x04`, `0xF0`, `0x121` (❓ provavelmente no fim da carga do mapa: ~1 s depois do último S2C) |
-| 2,120 | global | C2S | `0x64` (128 B), `0xDE` × 2 → S2C `0x0E`, C2S `0x0E`, `0x7B`, `0x7C` → S2C `0xE1`, `0x65`, `0x7B`, `0x7C` |
-| 2,120–2,280 | map | S2C | `0x10`, `0xF0`, `0x121` (10318 B), depois `0x11` em rajadas (selvagens) |
-| 5,35 | map | S2C/C2S | `0xC4` keep-alive (~5 s) |
+| 0,000 | map | C2S | `0x49` (32 B) — começa a [tela de carga](#tela-de-carga-da-entrada-no-mundo) |
+| 0,152 | map | S2C/C2S | `0x0E` hello (30 B); mais dois `0x49`; `0x0E` eco (44 B) |
+| 2,896 | map | C2S | `0x01` (71 B, entrar com o personagem): fim da primeira thread de carga (16 quadros + 1 s) |
+| 2,896 / 3,108 | channel | C2S | `0x16`, `0x18` |
+| 3,27–3,59 | map | S2C | `0x33` × 3, `0x02` (personagem), `0x03` (inventário), `0x7E` × 7, `0x7F` × 7, `0x05`, `0xE6`, `0x74`, `0x152`, `0xB4` (digimon líder), `0x73` |
+| 5,297 | map | C2S | `0x04`, depois `0xF0`, `0x121`: fim da segunda thread de carga (mapa carregado + 16 quadros) |
+| 5,297 | global | C2S | `0x64` (128 B), `0xDE` × 2 → S2C `0x0E`, C2S `0x0E`, `0x7B`, `0x7C` → S2C `0xE1`, `0x65`, `0x7B`, `0x7C` |
+| 5,63 | map | S2C | `0x10`, `0xF0`, `0x121` (10318 B), depois `0x11` em rajadas (selvagens) |
+| +5 s | map | S2C/C2S | `0xC4` keep-alive (~5 s) |
+
+A sessão 10 (`login-into-map`) manda o `0x01` 0,16 s depois da conexão; ❓ ainda sem explicação (versão diferente do cliente?).
 
 - O emulador já responde a tudo isso (`MapSessionHandlers`, `MapSequences.WorldState`). O `0x0E` do mapa traz a semente da chave AES do `0xE6` (evento de EXP).
 - ❓ Por que o `0x49` sai 3 vezes: o envio `0x009b5840(n)` guarda `n` em `+0x1134` e só manda uma vez por `+0x1340`; os três vêm de chamadores diferentes (`0x009acd10`, `0x009b4d00`, `0x009b5590`, `0x009b55d0`).
@@ -118,7 +129,7 @@ Referência: captura de tela do original logo após entrar no Digital Administra
 - ✅ **Barra principal** = objeto global `DAT_01158508` (ctor `0x00b84b20`, vtable `0x01031724`, desenho `+0x28` = `0x00b8a850`, carga dos sprites e posições `+0x20` = `0x00b90570`). Visível por `+0x184` (1 no ctor; Ctrl+Z alterna). Janela 800 × altura de `dr2_main_000_000`, em y = 600 − 105 = **495**. Sprites `GUI\%s.spr` (o `_eng` quando existe).
 
 ### Ordem do desenho (`0x00b8a850`, modo campo, sem batalha)
-1. **Fundo** (`[+0x180]` vtable `+4` = `0x00b90520`): `dr2_main_000_000` quadro 0 em (0, 495); depois o quadro 1 no mesmo lugar por `0x00b569f0(1, spr, 0, 495, −1, 0x10, 0, 0, −1, −1, 0)` (modo −1: depende da opção `[DAT_01158530]+1`; ❓ fórmula exata da mistura — o quadro 1 é um brilho sobre a moldura).
+1. **Fundo** (`[+0x180]` vtable `+4` = `0x00b90520`): `dr2_main_000_000` quadro 0 em (0, 495); depois o quadro 1 no mesmo lugar por `0x00b569f0(1, spr, 0, 495, −1, 0x10, 0, 0, −1, −1, 0)`. ✅ Modo −1 com a opção `[DAT_01158530]+1` desligada = desenho normal (`0x008754f0`); ligada = **mistura alfa** `0x00875a00` → `0x00876a30` → `0x00874710` (555) / `0x008749d0` (565): `destino = (fonte·a + destino·(32 − a)) >> 5` por canal, com `a` = o 6º argumento limitado a 0..32 (aqui `0x10` = 50 %). Só os pixels opacos do sprite entram (as faixas transparentes do RLE são puladas). ❓ Valor padrão da opção `+1`.
 2. **Painel do tamer** (canto superior esquerdo, asm `0x00b8a964`):
    - `Interface\w_unitframe.spr` (129×38) quadro 0 em (0, 0);
    - retrato do tamer `0x00b1ec40(tamer)` **quadro 1** em (2, 2) (tabela de sprites por id `0x010d5624`, ❓ provavelmente `Sprite\icon_%03d.spr`, carregados em `0x00b21cd0`);
@@ -144,7 +155,7 @@ Referência: captura de tela do original logo após entrar no Digital Administra
    - os textos `"HP %d/%d"`, `"VP %d/%d"`, `"EVP %d/%d"`, `0x885` `"EXP %I64d/%I64d %.2f%%"` só aparecem com o **mouse sobre a barra** (`0x00b31aa0`), no painel de dica `0x007de1b0` (fora do marco).
    - entre EVP e EXP, `0x00b91720`: os **8 botões de menu** `dr2_main_000_010..017` (29×29) em (450, 515), (482, 515), (546, 514), (546, 548), (514, 515), (514, 548), (482, 548), (450, 548); quadro **3** com a janela fechada, 0 aberta (janelas 1, 3, 4, 0xf, 2, 0xcc, 0xa8, 0xb) → todos no quadro 3 na entrada.
 5. Botões no estado normal (quadro 0; `0x009b7260` = quadro `tabela[estado]`, estado 0/1/2 = normal/mouse em cima/pressionado): `000_042` SEAL (516, 439), `000_032` SHOP (516, 462), `000_041` DEPOSITORY (516, 485), `000_031` WORLD (451, 485). **REWARD** = `GUI\dr2_sub_016_005` (controle `+0x77478`, carregado em `0x00b91554`) em (451, 462), desenhado em `0x00b8d399` fora dos canais BATTLE ZONE: com `+0x77438` = 0 pelo estado do mouse; senão pisca (contador `+0x7743c`, há recompensa; ❓ quem liga).
-- ✅ **Chat** (`0x00b8e6a0`/`0x00b91a70`, modo do tamanho `+0x770a4` = 0 na entrada): fundo `dr2_main_000_018` quadro 0 em **(28, 460) recortado a 81 px de altura** (opção `[DAT_01158530]+1` → por `0x00b569f0` modo `0x14`, ❓ mistura; senão `0x00b56ff0` direto). Botões do modo de chat `000_023..027` (20×20) em (179, 572), (201, 572), (222, 572), (244, 572), (157, 572): quadro 3, e 0 no modo atual (0 → `000_025`); o `000_027` fica desabilitado com nível ≤ 4. Abas `000_037..040` (35×14) em (280, 574), (317, 574), (355, 574), (391, 574): quadro 2 na aba atual (0 na entrada), 0 nas outras.
+- ✅ **Chat** (`0x00b8e6a0`/`0x00b91a70`, modo do tamanho `+0x770a4` = 0 na entrada): fundo `dr2_main_000_018` quadro 0 em **(28, 460) recortado a 81 px de altura** (✅ opção `[DAT_01158530]+1` ligada → `0x00b569f0(0, spr, 28, 460, −1, 0x14, 0, 0, −1, 81, 0)`: a mesma mistura alfa do fundo da barra com `a = 0x14` = 20/32; desligada → `0x00b56ff0` direto, opaco). Botões do modo de chat `000_023..027` (20×20) em (179, 572), (201, 572), (222, 572), (244, 572), (157, 572): quadro 3, e 0 no modo atual (0 → `000_025`); o `000_027` fica desabilitado com nível ≤ 4. Abas `000_037..040` (35×14) em (280, 574), (317, 574), (355, 574), (391, 574): quadro 2 na aba atual (0 na entrada), 0 nas outras.
 
 ### Canto esquerdo: bônus de EXP, sino, W/E (`0x00b8ae36`…, dentro do desenho da barra)
 Só fora dos canais BATTLE ZONE (`0x00b39760`) e com `[DAT_01158504]+0x80` = 1 (campo).
@@ -234,18 +245,18 @@ Texto separado por `|` em `table.hf` ([arquivos de dados](arquivos-de-dados.md))
   O arquivo do v322 tem 3 linhas (as da captura). O `questdialog_us` do mesmo grupo é o texto dos diálogos de NPC, não os painéis.
 
 ## Ainda ❓ (fase A em andamento)
-- UI: fórmula das misturas `0x00b569f0` (modos −1, 6, `0x14`, `0x18`), sprite do ícone `+0x12df`, `w_tamer_menu` na entrada, `0x009b1640`, `0x00a0ceb0`; colunas ❓ das tabelas acima; sprite e animação do NPC (`0x0085f090`).
-- Montagem de `0x16`, `0x18`, `0x49`, `0x01`, resto do `0xF0`, e da conexão global (`0x64`).
+- UI: modos 5, 6, `0xe`, `0xf`/`0x10` do `0x00876a30` (✅ −1 é a mistura alfa, ver a barra de baixo; `0x14` e `0x18` dos chamadores são o alfa do modo −1, não modos), valor padrão da opção `[DAT_01158530]+1`, sprite do ícone `+0x12df`, `w_tamer_menu` na entrada, `0x009b1640`, `0x00a0ceb0`; colunas ❓ das tabelas acima; sprite e animação do NPC (`0x0085f090`).
+- Montagem de `0x18`, `0x49`, resto do `0xF0`, e da conexão global (`0x64`). ✅ O `0x01` é montado em `0x00adca00` (43 B: nome[21], `+0x493`[21], 1 B) e o `0x16` em `0x00ae8700`, logo depois.
 - Nome sobre o tamer (fonte, cor), sombra (opção) e o `0x00b57330`.
 
 ## Implementação no cliente novo (marco 3, fase C)
-Código: `GameScene` (cena 5), `WorldSession` (conexões de mapa e global), `MapDecoder`, `FieldMap`, `FieldAnimator`, `FieldHud`, `MapBgm`, `HardwareAddresses`; pacotes em `DRPG.Shared/Packets/Map/WorldEntryPackets.cs`, `Channel/ChannelPackets.cs`, `Global/GlobalPackets.cs`; leitores em `DRPG.Shared/Formats/Map`. Testes: `WorldSessionTests`, `GameSceneTests`, `EnterGameTests`, `MapDecoderTests`, `FieldTests`, `MapFormatTests`, `WorldEntryPacketTests` e, contra o emulador, `EmulatorTests.A_created_character_enters_the_world`.
+Código: `GameScene` (cena 5), `WorldLoading` e `LoadingScreen` (tela de carga), `WorldSession` (conexões de mapa e global), `MapDecoder`, `FieldMap`, `FieldAnimator`, `FieldHud`, `MapBgm`, `HardwareAddresses`; pacotes em `DRPG.Shared/Packets/Map/WorldEntryPackets.cs`, `Channel/ChannelPackets.cs`, `Global/GlobalPackets.cs`; leitores em `DRPG.Shared/Formats/Map`. Testes: `WorldLoadingTests`, `WorldSessionTests`, `GameSceneTests`, `EnterGameTests`, `MapDecoderTests`, `FieldTests`, `MapFormatTests`, `WorldEntryPacketTests` e, contra o emulador, `EmulatorTests.A_created_character_enters_the_world`.
 
 **Como a sequência da tabela acima é seguida**
 1. "Game Start" (`CharacterSelectScene.EnterGame`): registra `Map Server : <host> <porta>` (de `servers.map`, ❓ o original escolhe por uma tabela mundo × mapa do binário), guarda o personagem no `GameContext` e escurece como a seleção de mundo.
-2. No fim do escurecimento: `0x16` e `0x18` no channel, depois a conexão no mapa. Falhou → texto `0xee6` por 80 quadros e o jogador fica na seleção.
-3. Mapa: `0x49` × 3 e `0x01` (nome do personagem + usuário) na conexão; o `0x0E` do servidor é **ecoado** (a semente fica guardada para o `0xE6`); chegam `0x02`, `0x03`, `0x7E` × 7, `0x7F` × 7, `0x05`, `0xE6`, `0x74`, `0x152`, `0xB4`, `0x73` (os sem uso só têm o **tamanho** conferido, e um tamanho errado derruba a sessão).
-4. Com `0x02` e `0x03` a `GameScene` carrega o mapa (`Map` → coluna 4, `map\<código>.map`) e **só então** manda `0x04`, `0xF0` e, na primeira entrada da execução, `0x121`; abre o global (`0x64`, `0xDE` × 2). Mapa sem linha, sem arquivo ou corrompido = mundo perdido (`LoadMap Error`), sem enviar nada.
+2. No fim do escurecimento: a conexão no mapa e a troca para a cena 5. Falhou → texto `0xee6` por 80 quadros e o jogador fica na seleção.
+3. Mapa: `0x49` × 3 na conexão (❓ o original manda um e os outros dois com o `0x0E`); a `GameScene` começa pela tela de carga (`WorldLoading`, quadros de 90 ms pelo relógio, um por quadro da tela no máximo) e, no fim da primeira parte, manda o `0x01` (nome do personagem + usuário) e o `0x16`/`0x18` no channel. O `0x0E` do servidor é **ecoado** (a semente fica guardada para o `0xE6`); chegam `0x02`, `0x03`, `0x7E` × 7, `0x7F` × 7, `0x05`, `0xE6`, `0x74`, `0x152`, `0xB4`, `0x73` (os sem uso só têm o **tamanho** conferido, e um tamanho errado derruba a sessão).
+4. Com `0x02` e `0x03` a `GameScene` começa a segunda parte da tela de carga, carrega o mapa (`Map` → coluna 4, `map\<código>.map`) e, quando ela termina (mapa carregado e 16 quadros), manda `0x04`, `0xF0` e, na primeira entrada da execução, `0x121`; abre o global (`0x64`, `0xDE` × 2). Mapa sem linha, sem arquivo ou corrompido = mundo perdido (`LoadMap Error`), sem enviar nada.
 5. O `0xC4` do servidor é respondido na hora (✅ capturas: 5,35 s e 10,54 s).
 
 **Layouts tirados das capturas** (sessão 52, conexões 87 a 89; o RE do cliente não leu a montagem) ✅ conferidos byte a byte, ❓ nos campos que são zero ou constante:

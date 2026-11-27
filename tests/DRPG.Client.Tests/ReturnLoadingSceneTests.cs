@@ -37,7 +37,7 @@ public sealed class ReturnLoadingSceneTests
             Assert.Equal(40, gauge.Texture.Width);
             Assert.Contains(fixture.Renderer.Draws, d => (d.X, d.Y, d.Texture.Width) == (0, 0, 800));
             Assert.Contains(fixture.Renderer.Draws, d => (d.X, d.Y, d.Texture.Width) == (0, 550, 800));
-            gaugeFrames.Add(step % ReturnLoadingScene.GaugeFrames);
+            gaugeFrames.Add(step % DRPG.Client.Ui.LoadingScreen.GaugeFrames);
             Assert.Empty(switched);                       // nothing switches before the last step has run
             if (step < ReturnLoadingScene.Steps - 1)
                 Assert.False(fixture.Game.SkipReturnLoading);
@@ -55,5 +55,5 @@ public sealed class ReturnLoadingSceneTests
     [InlineData(3, "")]          // past the end
     [InlineData(-1, "")]
     public void The_tip_is_a_piece_of_the_text_split_at_the_line_breaks(int n, string expected) =>
-        Assert.Equal(expected, ReturnLoadingScene.Tip("\"a\", † \"b\", † \"c\"", n));
+        Assert.Equal(expected, DRPG.Client.Ui.LoadingScreen.Tip("\"a\", † \"b\", † \"c\"", n));
 }

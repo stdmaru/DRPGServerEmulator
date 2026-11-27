@@ -144,7 +144,7 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
         if (_fade is { } fade)
         {
             fade.Frame(renderer, 1f / FramesPerSecond);
-            AdvanceWorldEntry(account, fade);
+            AdvanceWorldEntry(fade);
         }
     }
 
@@ -483,10 +483,10 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
     }
 
     /// <summary>
-    /// ✅ At the end of the fade: <c>0x16</c> and <c>0x18</c> on the channel, then the map connection. Connected → scene 5; not
-    /// connected → text <c>0xee6</c> for 80 frames and the selection goes on.
+    /// ✅ At the end of the fade (<c>0x00b47790</c>): the map connection. Connected → scene 5 (its loading screen sends the <c>0x01</c> and
+    /// the channel's <c>0x16</c>/<c>0x18</c> later); not connected → text <c>0xee6</c> for 80 frames and the selection goes on.
     /// </summary>
-    private void AdvanceWorldEntry(AccountSession account, FadeOut fade)
+    private void AdvanceWorldEntry(FadeOut fade)
     {
         var world = game.World;
         if (world is null)
@@ -496,7 +496,6 @@ public sealed class CharacterSelectScene(GameContext game, Random random) : ISce
             if (!fade.Done)
                 return;
             _worldStarted = true;
-            account.SendMapConnection(world.Slot.Name, HardwareAddresses.Read(3));        // the addresses are never logged
             world.Session = new WorldSession(game.Settings, game.Command, game.Log);
             world.Session.Start(world.Slot.Name, firstEntry: !game.HasEnteredWorld);
             return;

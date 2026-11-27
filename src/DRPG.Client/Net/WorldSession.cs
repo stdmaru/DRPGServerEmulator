@@ -10,7 +10,13 @@ public enum WorldStep
     NotStarted,
     ConnectingMap,
 
-    /// <summary><c>0x49</c> ×3 and <c>0x01</c> are sent: the server answers with the world (<c>0x02</c>, <c>0x03</c>, …).</summary>
+    /// <summary>
+    /// The map server is connected and the <c>0x49</c> are sent; the loading screen is up and the <c>0x01</c> waits for
+    /// <see cref="WorldSession.Join"/>.
+    /// </summary>
+    Connected,
+
+    /// <summary>The <c>0x01</c> is sent: the server answers with the world (<c>0x02</c>, <c>0x03</c>, …).</summary>
     Joining,
 
     /// <summary>The <c>0x02</c> and the <c>0x03</c> are in: the scene loads the map and calls <see cref="WorldSession.EnterWorld"/>.</summary>
@@ -24,7 +30,8 @@ public enum WorldStep
 /// <summary>
 /// The map and global connections of the world entry (✅ docs/cliente/cena-jogo.md#sequência-na-rede, captures.db session 52,
 /// connections 88 and 89), driven by the game scene once per frame with <see cref="Update"/> (the connect tasks are polled).
-/// <see cref="Start"/> connects to the map server and sends <c>0x49</c> ×3 and <c>0x01</c>; the server's <c>0x0E</c> is echoed;
+/// <see cref="Start"/> connects to the map server and sends <c>0x49</c> ×3; the server's <c>0x0E</c> is echoed; <see cref="Join"/>
+/// sends the <c>0x01</c> when the first loading screen ends (✅ <c>0x00adca00</c>, 2.75–2.9 s after the connection in the pcaps);
 /// after the <c>0x02</c> and <c>0x03</c> the scene loads the map and calls <see cref="EnterWorld"/> (✅ <c>0x00abbb20</c>:
 /// the <c>0x04</c>, the <c>0xF0</c>, on the first entry the <c>0x121</c>, and the global connection with <c>0x64</c> and <c>0xDE</c> ×2).
 /// The server's <c>0xC4</c> ping is answered. Nothing here logs a key, a password or an address of the machine.
@@ -65,7 +72,7 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
     public bool GlobalConnected { get; private set; }
 
     /// <summary>True from the moment the map server is connected: the scene may start; false while connecting and after a failure.</summary>
-    public bool MapConnected => Step is WorldStep.Joining or WorldStep.DataReady or WorldStep.InWorld;
+    public bool MapConnected => Step is WorldStep.Connected or WorldStep.Joining or WorldStep.DataReady or WorldStep.InWorld;
 
     /// <summary>Opens the map connection for <paramref name="characterName"/>.</summary>
     public void Start(string characterName, bool firstEntry)
@@ -77,6 +84,18 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
         log($"connecting to {settings.Map}");
         _connectingMap = ClientConnection.ConnectAsync(settings.Map, MapDecoder.Map, _cancel.Token);
         Step = WorldStep.ConnectingMap;
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00adca00</c>, called by the loading thread when its 1 s timer runs out: sends the <c>0x01</c> (the character and the user).
+    /// </summary>
+    public void Join()
+    {
+        if (Step != WorldStep.Connected)
+            throw new InvalidOperationException($"joining the world while {Step}");
+        _map!.Send(new JoinCharacterRequest(_characterName, command.Username));
+        Step = WorldStep.Joining;
+        CheckDataReady();                     // a server that sent the world before the 0x01 does not leave the entry hanging
     }
 
     /// <summary>✅ <c>0x00abbb20</c> after the map is loaded: sends <c>0x04</c>, <c>0xF0</c> and <c>0x121</c> and opens the global connection.</summary>
@@ -107,11 +126,10 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
                 return;
             }
             _map = task.Result;
-            // ✅ the capture: 0x49 three times and 0x01, all at the same millisecond
+            // ✅ the pcaps: 0x49 at the connection (❓ two of the three go out with the server's 0x0E; their callers are not read)
             for (int i = 0; i < JoinHandshakeRequest.Times; i++)
                 _map.Send(new JoinHandshakeRequest());
-            _map.Send(new JoinCharacterRequest(_characterName, command.Username));
-            Step = WorldStep.Joining;
+            Step = WorldStep.Connected;
         }
         if (_map?.Failure is { } mapFailure)
         {
@@ -173,6 +191,11 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
                 }
                 break;
         }
+        CheckDataReady();
+    }
+
+    private void CheckDataReady()
+    {
         if (Step == WorldStep.Joining && Character is not null && Inventory is not null)
         {
             Step = WorldStep.DataReady;

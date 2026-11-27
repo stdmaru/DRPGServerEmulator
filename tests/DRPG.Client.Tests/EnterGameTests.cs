@@ -201,7 +201,7 @@ public sealed partial class EnterGameTests : IDisposable
     }
 
     [Fact]
-    public void At_the_end_of_the_fade_the_channel_gets_0x16_then_0x18_and_the_scene_switches_to_the_game()
+    public void At_the_end_of_the_fade_the_map_is_connected_and_the_scene_switches_to_the_game()
     {
         Open();
         SelectFirstSlot();
@@ -209,13 +209,38 @@ public sealed partial class EnterGameTests : IDisposable
 
         ClickGameStart();
         RunFrames(() => _switches.Contains(SceneId.Game));
+        Thread.Sleep(100);
 
-        Assert.Equal([MapConnectionConfirm, HardwareInfo], _channel.Received.Skip(before));
+        Assert.Equal(before, _channel.Received.Count);                // ✅ the 0x16/0x18 wait for the 0x01 of the loading screen
         var session = _fixture.Game.World!.Session!;
         Assert.True(session.MapConnected);
+        Assert.Equal(WorldStep.Connected, session.Step);
         Assert.Equal([SceneId.Game], _switches);
         Assert.Contains($"connecting to {_map.Address}", _fixture.Log);
         Assert.True(_fixture.Renderer.Darkens.Count > 0);
+    }
+
+    [Fact]
+    public void The_loading_screen_sends_the_0x01_then_the_channel_gets_0x16_and_0x18()
+    {
+        Open();
+        SelectFirstSlot();
+        int before = _channel.Received.Count;
+        ClickGameStart();
+        RunFrames(() => _switches.Contains(SceneId.Game));
+        using var game = new GameScene(_fixture.Game, new FixedRandom());
+        game.Init();
+
+        ulong t = 0;
+        for (int guard = 0; game.Loading.Phase == DRPG.Client.World.LoadingPhase.PreMap && guard < 100; guard++, t += DRPG.Client.World.WorldLoading.FrameMs)
+            game.Frame(_fixture.Renderer, t);
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while ((_channel.Received.Skip(before).Count(op => op != 0xC4) < 2 || _map.Received.Count < 4) && DateTime.UtcNow < deadline)
+            Thread.Sleep(5);
+
+        Assert.Equal(0x01, _map.Received[3]);
+        Assert.Equal([MapConnectionConfirm, HardwareInfo], _channel.Received.Skip(before).Where(op => op != 0xC4));   // the keep-alive goes on
+        Assert.DoesNotContain(_fixture.Log, line => MacAddress().IsMatch(line));
     }
 
     [Fact]

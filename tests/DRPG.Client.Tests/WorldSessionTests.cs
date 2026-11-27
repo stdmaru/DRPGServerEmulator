@@ -46,12 +46,25 @@ public sealed class WorldSessionTests : IDisposable
 
     private static void Hello(FakeServer server) => server.Send(new SeedHelloPacket(Enumerable.Range(1, 16).Select(i => (byte)i).ToArray()));
 
+    /// <summary>Connects, then joins as the loading screen does: <c>0x49</c> ×3 and the <c>0x01</c> are in.</summary>
+    private static void StartAndJoin(WorldSession session, bool firstEntry)
+    {
+        session.Start(CharacterName, firstEntry);
+        Pump(session, () => session.Step == WorldStep.Connected);
+        session.Join();
+    }
+
+    private void StartAndJoinAndWait(WorldSession session, bool firstEntry)
+    {
+        StartAndJoin(session, firstEntry);
+        Pump(session, () => _map.Received.Count >= 4);
+    }
+
     /// <summary>Connected and joined: the server said hello, then sent the character and the bags.</summary>
     private WorldSession JoinedSession(bool firstEntry = true)
     {
         var session = NewSession();
-        session.Start(CharacterName, firstEntry);
-        Pump(session, () => _map.Received.Count >= 4);
+        StartAndJoinAndWait(session, firstEntry);
         Hello(_map);
         _map.Send(Character());
         _map.Send(Inventory());
@@ -60,23 +73,39 @@ public sealed class WorldSessionTests : IDisposable
     }
 
     [Fact]
-    public void Joining_sends_the_handshake_three_times_then_the_character()
+    public void Connecting_sends_the_handshake_three_times_and_the_character_waits_for_the_join()
     {
         using var session = NewSession();
         session.Start(CharacterName, firstEntry: true);
-        Pump(session, () => _map.Received.Count >= 4);
+        Pump(session, () => session.Step == WorldStep.Connected && _map.Received.Count >= 3);
+        Thread.Sleep(100);
 
-        Assert.Equal(WorldStep.Joining, session.Step);
         Assert.True(session.MapConnected);
-        Assert.Equal([(ushort)MapOpcode.JoinHandshakeReq, 0x49, 0x49, (ushort)MapOpcode.JoinCharacter], _map.Received.Take(4));
+        Assert.Equal([(ushort)MapOpcode.JoinHandshakeReq, 0x49, 0x49], _map.Received);        // ✅ no 0x01 before the loading screen asks
+
+        session.Join();
+        Pump(session, () => _map.Received.Count >= 4);
+        Assert.Equal(WorldStep.Joining, session.Step);
+        Assert.Equal((ushort)MapOpcode.JoinCharacter, _map.Received[3]);
+    }
+
+    [Fact]
+    public void Joining_before_the_connection_or_twice_is_refused()
+    {
+        using var session = NewSession();
+        Assert.Throws<InvalidOperationException>(session.Join);
+        session.Start(CharacterName, firstEntry: true);
+        Assert.Throws<InvalidOperationException>(session.Join);                 // still connecting
+        Pump(session, () => session.Step == WorldStep.Connected);
+        session.Join();
+        Assert.Throws<InvalidOperationException>(session.Join);
     }
 
     [Fact]
     public void The_hello_is_echoed_and_its_seed_is_kept()
     {
         using var session = NewSession();
-        session.Start(CharacterName, firstEntry: true);
-        Pump(session, () => _map.Received.Count >= 4);
+        StartAndJoinAndWait(session, true);
         Hello(_map);
         Pump(session, () => _map.Received.Count >= 5);
 
@@ -88,8 +117,7 @@ public sealed class WorldSessionTests : IDisposable
     public void The_world_data_is_ready_after_the_character_and_the_bags()
     {
         using var session = NewSession();
-        session.Start(CharacterName, firstEntry: true);
-        Pump(session, () => _map.Received.Count >= 4);
+        StartAndJoinAndWait(session, true);
 
         _map.Send(Character());
         Pump(session, () => session.Character is not null);
@@ -174,8 +202,7 @@ public sealed class WorldSessionTests : IDisposable
     public void A_packet_with_the_wrong_size_fails_the_session(int opcode, int size)
     {
         using var session = NewSession();
-        session.Start(CharacterName, firstEntry: true);
-        Pump(session, () => _map.Received.Count >= 4);
+        StartAndJoinAndWait(session, true);
 
         _map.SendRaw(Frame((ushort)opcode, new byte[size]));
         Pump(session, () => session.Step == WorldStep.Failed);
@@ -189,8 +216,7 @@ public sealed class WorldSessionTests : IDisposable
     public void A_map_server_that_closes_fails_the_session()
     {
         using var session = NewSession();
-        session.Start(CharacterName, firstEntry: true);
-        Pump(session, () => _map.Received.Count >= 4);
+        StartAndJoinAndWait(session, true);
 
         _map.CloseClient();
         Pump(session, () => session.Step == WorldStep.Failed);
@@ -234,8 +260,7 @@ public sealed class WorldSessionTests : IDisposable
         using var session = NewSession();
         Assert.Throws<InvalidOperationException>(session.EnterWorld);
 
-        session.Start(CharacterName, firstEntry: true);
-        Pump(session, () => _map.Received.Count >= 4);
+        StartAndJoinAndWait(session, true);
         Assert.Throws<InvalidOperationException>(session.EnterWorld);
     }
 

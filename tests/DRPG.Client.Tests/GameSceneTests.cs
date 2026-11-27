@@ -2,6 +2,7 @@ using DRPG.Client.Net;
 using DRPG.Client.Scenes;
 using DRPG.Client.Startup;
 using DRPG.Client.Text;
+using DRPG.Client.World;
 using DRPG.Engine.Platform;
 using DRPG.Shared.Formats.Pack;
 using DRPG.Shared.Formats.Sprite;
@@ -83,8 +84,8 @@ public sealed class GameSceneTests : IDisposable
         return packet;
     }
 
-    /// <summary>A world entry whose session is connected, joined and has the character and the bags: the scene may load the map.</summary>
-    private WorldSession ReadySession(CharacterDataPacket? character = null, int mapId = MapId, bool firstEntry = true)
+    /// <summary>A world entry whose session is connected to the map (the <c>0x49</c> ×3 are in): the scene may start.</summary>
+    private WorldSession ConnectedSession(int mapId = MapId, bool firstEntry = true)
     {
         var settings = new ClientSettings(ClientSettings.Local.Login, ClientSettings.Local.Channel, _map.Address, _global.Address);
         _session = new WorldSession(settings, _fixture.Game.Command, _fixture.Log.Add);
@@ -92,11 +93,39 @@ public sealed class GameSceneTests : IDisposable
             LeaderName: "Agumon", TotalBattles: 0, TotalWins: 0, Slot: 0, MapId: (byte)mapId, CheckOffset: 0);
         _fixture.Game.World = new WorldEntry(slot, 0) { Session = _session };
         _session.Start(CharacterName, firstEntry);
+        Pump(() => _session.Step == WorldStep.Connected && _map.Received.Count >= 3);
+        return _session;
+    }
+
+    /// <summary>Frames of the loading screen, one every <see cref="WorldLoading.FrameMs"/>, from <paramref name="t"/> while <paramref name="go"/>.</summary>
+    private ulong FramesWhile(GameScene scene, ulong t, Func<bool> go)
+    {
+        for (int guard = 0; go() && guard < 10_000; guard++, t += WorldLoading.FrameMs)
+            scene.Frame(_fixture.Renderer, t);
+        return t;
+    }
+
+    /// <summary>
+    /// The whole loading screen: the first run until the <c>0x01</c>, the fake server's character and bags, the second run until the field
+    /// (or a lost world). Returns the time of the frame that ended it.
+    /// </summary>
+    private ulong RunLoading(GameScene scene, CharacterDataPacket? character = null)
+    {
+        ulong t = FramesWhile(scene, 0, () => scene.Loading.Phase == LoadingPhase.PreMap);
         Pump(() => _map.Received.Count >= 4);
         _map.Send(character ?? Character());
         _map.Send(ClientPacket.Parse<InventoryDataPacket>(new byte[InventoryDataPacket.Length.Min]));
-        Pump(() => _session.Step == WorldStep.DataReady);
-        return _session;
+        Pump(() => _session!.Step == WorldStep.DataReady);
+        t = FramesWhile(scene, t, () => scene.Loading.Showing && !scene.ConnectionLost);
+        return t - WorldLoading.FrameMs;
+    }
+
+    /// <summary>Connected, scene up, loading screen run: the world is entered at the returned time.</summary>
+    private (GameScene Scene, ulong Entered) Enter(CharacterDataPacket? character = null, int mapId = MapId, bool firstEntry = true, int rand = 0)
+    {
+        ConnectedSession(mapId, firstEntry);
+        var scene = NewScene(rand);
+        return (scene, RunLoading(scene, character));
     }
 
     private void Pump(Func<bool> done)
@@ -146,18 +175,114 @@ public sealed class GameSceneTests : IDisposable
         Assert.Equal([SceneId.Server], _switches);
     }
 
+
+    [Fact]
+    public void The_loading_screen_shows_before_the_field_and_hides_the_cursor()
+    {
+        UseData();
+        ConnectedSession();
+        using var scene = NewScene();
+
+        scene.Frame(_fixture.Renderer, 0);
+
+        Assert.True(scene.Loading.Showing);
+        Assert.False(scene.ShowCursor);
+        Assert.Contains(_fixture.Renderer.Draws, d => (d.X, d.Y, d.Texture.Width) == (0, 0, 800));       // loading_image
+        Assert.Contains(_fixture.Renderer.Draws, d => (d.X, d.Y, d.Texture.Width) == (0, 550, 800));     // loading_under_line
+        Assert.Contains(_fixture.Renderer.Draws, d => (d.X, d.Y) == (740, 540));                         // game_end_gauge
+        Assert.False(scene.WorldEntered);
+    }
+
+    [Fact]
+    public void The_0x01_goes_out_after_16_frames_and_one_more_second()
+    {
+        UseData();
+        var session = ConnectedSession();
+        using var scene = NewScene();
+
+        // ✅ frames every 90 ms; the 16th (t = 1350) starts the 1 s timer at its end (1430); the first loop at or past 2430 joins
+        FramesWhile(scene, 0, () => scene.Loading.FramesDrawn < 27);
+        Assert.Equal(WorldStep.Connected, session.Step);
+        Assert.Equal(LoadingPhase.PreMap, scene.Loading.Phase);
+        Assert.Equal(0, scene.Loading.Tip);
+
+        scene.Frame(_fixture.Renderer, 2430);
+        Assert.Equal(WorldStep.Joining, session.Step);
+        Assert.Equal(LoadingPhase.WaitingForData, scene.Loading.Phase);
+        Pump(() => _map.Received.Count >= 4);
+        Assert.Equal((ushort)MapOpcode.JoinCharacter, _map.Received[3]);
+    }
+
+    [Fact]
+    public void Frames_that_come_faster_than_the_loading_loop_do_not_speed_it_up()
+    {
+        UseData();
+        ConnectedSession();
+        using var scene = NewScene();
+
+        for (ulong t = 0; t < 900; t += 16)                             // a 60 FPS display: 57 frames in 0.9 s
+            scene.Frame(_fixture.Renderer, t);
+
+        Assert.Equal(10, scene.Loading.FramesDrawn);                   // one loading frame per 90 ms
+        Assert.Contains(_fixture.Renderer.Draws, d => (d.X, d.Y) == (740, 540));   // the screen is drawn on every display frame
+    }
+
+    [Fact]
+    public void The_map_loading_lasts_at_least_16_frames_and_the_entry_packets_wait_for_its_end()
+    {
+        UseData();
+        var session = ConnectedSession();
+        using var scene = NewScene(rand: 7);
+        ulong t = FramesWhile(scene, 0, () => scene.Loading.Phase == LoadingPhase.PreMap);
+        Pump(() => _map.Received.Count >= 4);
+        _map.Send(Character());
+        _map.Send(ClientPacket.Parse<InventoryDataPacket>(new byte[InventoryDataPacket.Length.Min]));
+        Pump(() => session.Step == WorldStep.DataReady);
+        int before = scene.Loading.FramesDrawn;
+
+        scene.Frame(_fixture.Renderer, t);                               // the map loads at once, the screen stays
+        Assert.Equal(LoadingPhase.Map, scene.Loading.Phase);
+        Assert.Equal(0, scene.Loading.Tip);                               // ✅ +0xf803: the frame after the 0x01 shows tip 0
+        t += WorldLoading.FrameMs + WorldLoading.JoinedFrameExtraMs;
+        scene.Frame(_fixture.Renderer, t);
+        Assert.Equal(7, scene.Loading.Tip);                               // then rand() & 15
+
+        FramesWhile(scene, t + WorldLoading.FrameMs, () => scene.Loading.Showing);
+        Assert.Equal(WorldLoading.MinimumFrames, scene.Loading.FramesDrawn - before);
+        Assert.True(scene.WorldEntered);
+        Assert.True(scene.ShowCursor);
+        Assert.Equal(WorldStep.InWorld, session.Step);
+        Pump(() => _map.Received.Count >= 7);
+        Assert.Equal([(ushort)MapOpcode.RefreshCharacterInfoReq, (ushort)MapOpcode.Rename, (ushort)MapOpcode.Unknown121], _map.Received.Skip(4).Take(3));
+    }
+
+    [Fact]
+    public void A_world_sent_before_the_0x01_is_kept_and_used_after_the_join()
+    {
+        UseData();
+        var session = ConnectedSession();
+        _map.Send(Character());                                           // a server that does not wait for the 0x01
+        _map.Send(ClientPacket.Parse<InventoryDataPacket>(new byte[InventoryDataPacket.Length.Min]));
+        Pump(() => session.Inventory is not null);
+        Assert.Equal(WorldStep.Connected, session.Step);
+        using var scene = NewScene();
+
+        ulong t = FramesWhile(scene, 0, () => scene.Loading.Phase == LoadingPhase.PreMap);
+        Assert.Equal(WorldStep.DataReady, session.Step);
+        FramesWhile(scene, t, () => scene.Loading.Showing);
+        Assert.True(scene.WorldEntered);
+    }
+
     [Fact]
     public void The_map_is_loaded_when_the_world_data_is_in_and_the_entry_packets_go_out_in_order()
     {
         UseData();
-        var session = ReadySession();
-        using var scene = NewScene();
-
-        scene.Frame(_fixture.Renderer, 1000);
+        var (scene, _) = Enter();
+        using var owned = scene;
 
         Assert.True(scene.WorldEntered);
         Assert.False(scene.ConnectionLost);
-        Assert.Equal(WorldStep.InWorld, session.Step);
+        Assert.Equal(WorldStep.InWorld, _session!.Step);
         Assert.True(_fixture.Game.HasEnteredWorld);
         Assert.Equal(20 * 64, scene.Field!.PixelWidth);
         Pump(() => _map.Received.Count >= 7);
@@ -169,19 +294,19 @@ public sealed class GameSceneTests : IDisposable
     public void The_entry_packets_are_not_sent_while_the_data_is_missing()
     {
         UseData();
-        var settings = new ClientSettings(ClientSettings.Local.Login, ClientSettings.Local.Channel, _map.Address, _global.Address);
-        _session = new WorldSession(settings, _fixture.Game.Command, _fixture.Log.Add);
-        _fixture.Game.World = new WorldEntry(new CharacterListSlot(7, 1, CharacterName, 1, 0, 0, 3, 1, "A", 0, 0, 0, MapId, 0), 0) { Session = _session };
-        _session.Start(CharacterName, true);
+        ConnectedSession();
+        using var scene = NewScene();
+        ulong t = FramesWhile(scene, 0, () => scene.Loading.Phase == LoadingPhase.PreMap);
         Pump(() => _map.Received.Count >= 4);
         _map.Send(Character());                                        // the bags are missing
-        Pump(() => _session.Character is not null);
-        using var scene = NewScene();
+        Pump(() => _session!.Character is not null);
 
-        scene.Frame(_fixture.Renderer, 1000);
+        int frames = 0;
+        FramesWhile(scene, t, () => frames++ < 40);                    // 3.6 s of frames with no bags
         Thread.Sleep(100);
 
         Assert.False(scene.WorldEntered);
+        Assert.Equal(LoadingPhase.WaitingForData, scene.Loading.Phase);
         Assert.Equal(4, _map.Received.Count);
         Assert.False(_fixture.Game.HasEnteredWorld);
     }
@@ -190,10 +315,9 @@ public sealed class GameSceneTests : IDisposable
     public void The_121_goes_only_on_the_first_entry_of_the_run()
     {
         UseData();
-        ReadySession(firstEntry: false);
-        using var scene = NewScene();
+        var (scene, _) = Enter(firstEntry: false);
+        using var owned = scene;
 
-        scene.Frame(_fixture.Renderer, 1000);
         Pump(() => _map.Received.Count >= 6);
         Thread.Sleep(100);
 
@@ -204,10 +328,8 @@ public sealed class GameSceneTests : IDisposable
     public void The_tamer_and_the_digimon_stand_on_the_centre_of_their_cells()
     {
         UseData();
-        ReadySession();
-        using var scene = NewScene();
-
-        scene.Frame(_fixture.Renderer, 1000);
+        var (scene, _) = Enter();
+        using var owned = scene;
 
         Assert.Equal((5 * 64 + 32, 6 * 32 + 16), scene.TamerWorld);
         Assert.Equal((4 * 64 + 32, 5 * 32 + 16), scene.DigimonWorld);          // one cell up and to the left
@@ -222,10 +344,8 @@ public sealed class GameSceneTests : IDisposable
     public void These_tamers_have_no_digimon_on_the_map(int tamerId)
     {
         UseData();
-        ReadySession(Character((byte)tamerId));
-        using var scene = NewScene();
-
-        scene.Frame(_fixture.Renderer, 1000);
+        var (scene, _) = Enter(Character((byte)tamerId));
+        using var owned = scene;
 
         Assert.True(scene.WorldEntered);
         Assert.Null(scene.DigimonAnimation);
@@ -235,10 +355,8 @@ public sealed class GameSceneTests : IDisposable
     public void A_character_with_no_leader_has_no_digimon_on_the_map()
     {
         UseData();
-        ReadySession(Character(withLeader: false));
-        using var scene = NewScene();
-
-        scene.Frame(_fixture.Renderer, 1000);
+        var (scene, _) = Enter(Character(withLeader: false));
+        using var owned = scene;
 
         Assert.True(scene.WorldEntered);
         Assert.Null(scene.DigimonAnimation);
@@ -249,10 +367,8 @@ public sealed class GameSceneTests : IDisposable
     public void The_initial_phase_of_the_loop_is_a_random_number_below_8()
     {
         UseData();
-        ReadySession();
-        using var scene = NewScene(rand: 1234);
-
-        scene.Frame(_fixture.Renderer, 1000);
+        var (scene, _) = Enter(rand: 1234);
+        using var owned = scene;
 
         Assert.Equal(1234 % 8, scene.TamerAnimation!.Offset);
         Assert.Equal(1234 % 8, scene.DigimonAnimation!.Offset);
@@ -262,18 +378,17 @@ public sealed class GameSceneTests : IDisposable
     public void The_logic_runs_in_fixed_steps_of_the_real_time()
     {
         UseData();
-        ReadySession();
-        using var scene = NewScene();
-        scene.Frame(_fixture.Renderer, 1000);                           // the world loads here: the clock of the logic starts
+        var (scene, entered) = Enter();                                 // the clock of the logic starts when the loading screen ends
+        using var owned = scene;
         Assert.Equal(0, scene.DigimonAnimation!.IdleCounter);
 
-        scene.Frame(_fixture.Renderer, 1000 + 500);                     // half a second: 30 steps
+        scene.Frame(_fixture.Renderer, entered + 500);                  // half a second: 30 steps
         Assert.Equal(30, scene.DigimonAnimation.IdleCounter);
 
-        scene.Frame(_fixture.Renderer, 1000 + 500 + 8);                 // 8 ms are not a whole step (16.6 ms)
+        scene.Frame(_fixture.Renderer, entered + 500 + 8);              // 8 ms are not a whole step (16.6 ms)
         Assert.Equal(30, scene.DigimonAnimation.IdleCounter);
 
-        scene.Frame(_fixture.Renderer, 1000 + 1000);                    // a second since the start: 60 steps in all
+        scene.Frame(_fixture.Renderer, entered + 1000);                 // a second since the start: 60 steps in all
         Assert.Equal(60, scene.DigimonAnimation.IdleCounter);
     }
 
@@ -281,13 +396,12 @@ public sealed class GameSceneTests : IDisposable
     public void A_stall_of_many_seconds_runs_at_most_the_cap_of_steps_in_one_frame()
     {
         UseData();
-        ReadySession();
-        using var scene = NewScene();
-        scene.Frame(_fixture.Renderer, 0);
+        var (scene, entered) = Enter();
+        using var owned = scene;
 
         // 1000 s = 60000 due steps: the frame runs 10000 of them and the next frames go on from the real time, not from a backlog
-        scene.Frame(_fixture.Renderer, 1_000_000);
-        scene.Frame(_fixture.Renderer, 1_000_000 + 1000);
+        scene.Frame(_fixture.Renderer, entered + 1_000_000);
+        scene.Frame(_fixture.Renderer, entered + 1_000_000 + 1000);
 
         Assert.Equal(0, scene.Transition);                              // the fade (105 steps) is over, and stays over
         Assert.Equal((10_000 + 60) % 320, scene.DigimonAnimation!.IdleCounter);
@@ -311,10 +425,9 @@ public sealed class GameSceneTests : IDisposable
     public void The_entry_starts_dark_and_ends_clear()
     {
         UseData();
-        ReadySession();
-        using var scene = NewScene();
+        var (scene, _) = Enter();
+        using var owned = scene;
 
-        scene.Frame(_fixture.Renderer, 1000);
         Assert.Equal(GameScene.FadeStart, scene.Transition);
         Assert.Contains(255, _fixture.Renderer.Darkens);
 
@@ -327,30 +440,28 @@ public sealed class GameSceneTests : IDisposable
     public void The_field_and_the_hud_are_drawn_every_frame_of_the_scene()
     {
         UseData();
-        ReadySession();
-        using var scene = NewScene();
-        scene.Frame(_fixture.Renderer, 1000);
+        var (scene, entered) = Enter();
+        using var owned = scene;
         _fixture.Renderer.Draws.Clear();
 
-        scene.Frame(_fixture.Renderer, 1016);
+        scene.Frame(_fixture.Renderer, entered + 16);
 
         Assert.NotEmpty(_fixture.Renderer.Draws);
+        Assert.DoesNotContain(_fixture.Renderer.Draws, d => (d.X, d.Y) == (740, 540));   // the loading screen is gone
     }
 
     [Fact]
     public void A_map_the_table_does_not_know_is_a_lost_world_and_nothing_is_sent_to_the_server()
     {
         UseData(mapId: 99);                                            // the character's map (1) has no row
-        ReadySession();
-        using var scene = NewScene();
-
-        scene.Frame(_fixture.Renderer, 1000);
+        var (scene, _) = Enter();
+        using var owned = scene;
         Thread.Sleep(100);
 
         Assert.True(scene.ConnectionLost);
         Assert.False(scene.WorldEntered);
         Assert.False(_fixture.Game.HasEnteredWorld);
-        Assert.Equal(4, _map.Received.Count);                          // no 0x04, no 0xF0
+        Assert.Equal(4, _map.Received.Count);                          // 0x49 ×3 and 0x01; no 0x04, no 0xF0
         Assert.Contains(_fixture.Log, line => line.Contains("LoadMap Error"));
     }
 
@@ -358,9 +469,8 @@ public sealed class GameSceneTests : IDisposable
     public void A_map_without_a_code_or_missing_from_the_pack_is_a_lost_world()
     {
         UseData(code: "");
-        ReadySession();
-        using var scene = NewScene();
-        scene.Frame(_fixture.Renderer, 1000);
+        var (scene, _) = Enter();
+        using var owned = scene;
         Assert.True(scene.ConnectionLost);
     }
 
@@ -368,10 +478,8 @@ public sealed class GameSceneTests : IDisposable
     public void A_corrupt_map_file_is_a_lost_world_not_a_crash()
     {
         UseData(code: "R002");                                        // map\r002.map is three bytes
-        ReadySession();
-        using var scene = NewScene();
-
-        scene.Frame(_fixture.Renderer, 1000);
+        var (scene, _) = Enter();
+        using var owned = scene;
 
         Assert.True(scene.ConnectionLost);
         Assert.False(scene.WorldEntered);
@@ -379,23 +487,40 @@ public sealed class GameSceneTests : IDisposable
     }
 
     [Fact]
+    public void A_connection_lost_during_the_loading_screen_ends_it()
+    {
+        UseData();
+        ConnectedSession();
+        using var scene = NewScene();
+        scene.Frame(_fixture.Renderer, 0);
+
+        _map.CloseClient();
+        Pump(() => _session!.Step == WorldStep.Failed);
+        _fixture.Renderer.Draws.Clear();
+        scene.Frame(_fixture.Renderer, 90);
+
+        Assert.True(scene.ConnectionLost);
+        Assert.DoesNotContain(_fixture.Renderer.Draws, d => (d.X, d.Y) == (740, 540));
+        Assert.Equal(3, _map.Received.Count);                          // the 0x01 never went out
+    }
+
+    [Fact]
     public void A_lost_connection_shows_the_text_and_a_click_goes_back_to_the_world_selection()
     {
         UseData();
-        ReadySession();
-        using var scene = NewScene();
-        scene.Frame(_fixture.Renderer, 1000);
+        var (scene, entered) = Enter();
+        using var owned = scene;
         Pump(() => _map.Received.Count >= 7);
 
         _map.CloseClient();
         Pump(() => _session!.Step == WorldStep.Failed);
-        scene.Frame(_fixture.Renderer, 1100);
+        scene.Frame(_fixture.Renderer, entered + 100);
         Assert.True(scene.ConnectionLost);
         Assert.Empty(_switches);                                       // not yet: the text waits for the click
 
-        _fixture.Game.Mouse.Handle(new MouseButtonEvent(400, 300, true), 1200);
-        scene.Frame(_fixture.Renderer, 1200);
-        _fixture.Game.Scenes.Frame(_fixture.Renderer, 1200);
+        _fixture.Game.Mouse.Handle(new MouseButtonEvent(400, 300, true), entered + 200);
+        scene.Frame(_fixture.Renderer, entered + 200);
+        _fixture.Game.Scenes.Frame(_fixture.Renderer, entered + 200);
 
         Assert.Equal([SceneId.Server], _switches);
         Assert.Null(_fixture.Game.World);
@@ -405,10 +530,8 @@ public sealed class GameSceneTests : IDisposable
     public void The_scene_logs_its_frame_statistics_when_it_ends()
     {
         UseData();
-        ReadySession();
-        var scene = NewScene();
-        scene.Frame(_fixture.Renderer, 1000);
-        scene.Frame(_fixture.Renderer, 1016);
+        var (scene, entered) = Enter();
+        scene.Frame(_fixture.Renderer, entered + 16);
 
         scene.Dispose();
 
