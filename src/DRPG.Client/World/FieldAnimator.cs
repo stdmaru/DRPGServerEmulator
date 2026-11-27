@@ -11,8 +11,8 @@ namespace DRPG.Client.World;
 /// </summary>
 public sealed class FieldAnimator
 {
-    /// <summary>✅ Animation 1 = standing; 2 and 3 are the idle variations of the digimon.</summary>
-    public const int Standing = 1, IdleA = 2, IdleB = 3;
+    /// <summary>✅ Animation 1 = standing; 2 and 3 = digimon idle variations; 4 = walk; 5 = run; 0x0f = fast.</summary>
+    public const int Standing = 1, IdleA = 2, IdleB = 3, Walk = 4, Run = 5, Fast = 0x0f;
 
     /// <summary>✅ The digimon changes animation at this step of its idle counter and comes back at <see cref="BackStep"/>.</summary>
     public const int ChangeStep = 200, BackStep = 320;
@@ -39,10 +39,12 @@ public sealed class FieldAnimator
         _species = species;
         _offset = initialOffset;
         Animation = Standing;
-        _view.ShowFrame(Standing, FrameOf(Standing));
+        _view.ShowFrame(Standing, FrameOf(Standing, Direction));
     }
 
     public int Animation { get; private set; }
+
+    public int Direction { get; private set; }
 
     public int Offset => _offset;
 
@@ -52,12 +54,28 @@ public sealed class FieldAnimator
 
     public SpriteAnimator View => _view;
 
-    private int FrameOf(int animation) => _view.Ani.Range(animation, 0).Start + _offset;
+    private int FrameOf(int animation, int direction) => _view.Ani.Range(animation, direction).Start + _offset;
+
+    /// <summary>Updates the facing direction (0..7) and refreshes the shown frame if it changed.</summary>
+    public void SetDirection(int direction)
+    {
+        if (direction is < 0 or >= 8 || direction == Direction)
+            return;
+        Direction = direction;
+        var range = _view.Ani.Range(Animation, Direction);
+        if (range.Count == 0)
+            return;
+        if (_offset > range.Count - 1)
+            _offset = 0;
+        _view.ShowFrame(Animation, range.Start + _offset);
+    }
 
     /// <summary>One logic step. <paramref name="idleRoll"/> is the 1-in-4 draw of the change at step 200 (0 = the animation 3).</summary>
     public void Step(int idleRoll = 1)
     {
-        var range = _view.Ani.Range(Animation, 0);
+        var range = _view.Ani.Range(Animation, Direction);
+        if (range.Count == 0)
+            range = _view.Ani.Range(Animation, 0);
         if (_offset > range.Count - 1)
             _offset = 0;
         int frame = range.Start + _offset;
@@ -75,7 +93,8 @@ public sealed class FieldAnimator
         if (_offset > range.Count - 1)
             _offset = 0;
 
-        if (!_digimon || _species == NoIdleSpecies)
+        // ✅ 0x007f3df0: idle counter runs only while standing/idle (state < 4)
+        if (!_digimon || _species == NoIdleSpecies || Animation >= Walk)
             return;
         _idle++;
         if (_idle == ChangeStep)
@@ -90,12 +109,17 @@ public sealed class FieldAnimator
     /// <summary>✅ <c>0x0085e4c0</c>: zeroes the offset and the counter and shows the first frame of the animation (an animation the sprite lacks is not played).</summary>
     public void Switch(int animation)
     {
-        if (_view.Ani.Range(animation, 0).Count == 0)
+        var range = _view.Ani.Range(animation, Direction);
+        if (range.Count == 0)
+            range = _view.Ani.Range(animation, 0);
+        if (range.Count == 0)
             return;
         Animation = animation;
         _offset = 0;
         _counter = 0;
-        _view.ShowFrame(animation, FrameOf(animation));
+        if (animation >= Walk)
+            _idle = 0;
+        _view.ShowFrame(animation, range.Start);
     }
 
     private int DurationOf(int frame) =>

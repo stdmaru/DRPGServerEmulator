@@ -2,7 +2,7 @@
 
 RE da v322 para o passo 2 do marco 3 (PR #51, `feat/client-walk`): andar com pathfinding, digimons do servidor andando no cliente, NPCs, portais e o comportamento da UI do campo. Complementa a [cena de jogo](cena-jogo.md) (entrada no mapa, quadro, HUD) e o [movimento](../mecanicas/movimento.md) (lado do servidor). ✅ = lido no dump; ❓ = ainda não lido.
 
-> **Estado:** fase A **em andamento**. Feito: o laço de passos e o ciclo de vida dos selvagens (`0x11`). O resto está no [roteiro](#roteiro-do-que-falta) com os pontos de entrada.
+> **Estado:** etapa 1 (andar do tamer + digimon seguidor + `0x20`/`0xB0`) **implementada**. Feito na RE: laço de passos, selvagens (`0x11`), física por célula (`0x0085e5b0`), tamer do jogador (`0x008671c0`, `0x00b4c1a0`, `0x00b4d290`, `0x00b4b360`), digimon seguidor e velocidade confirmada em `captures.db`. Próximas etapas: colisão, pathfinding (`0x00b43200`) e selvagens no campo.
 
 ## Como ler o binário
 - Dump decompilado: `work/re/v322/dump/decomp/XXXX/<endereço>.c`, com `functions.tsv` (entrada, tamanho, chamadores), `calls.tsv` (quem chama quem) e `strings.tsv`.
@@ -11,7 +11,7 @@ RE da v322 para o passo 2 do marco 3 (PR #51, `feat/client-walk`): andar com pat
 
 ## Ritmo da lógica
 - ✅ O laço principal (`0x00aa4a90`) limita o jogo a **30 quadros por segundo** (`0x00867ed0(0x1e)`, `0x00867eb0`, `0x00868020`), e a cena faz **exatamente um passo de lógica por quadro**. O acumulador de `0x00b4e550` soma `DAT_0135af08 − 0x00867e40()`, mas `0x00867e40` devolve a taxa medida (`0x00867fb0`, uma vez por segundo) ou 30.0 (`0x01007860`) quando ela está abaixo de 30. A soma nunca é positiva, então os passos extras nunca acontecem: abaixo de 30 FPS o jogo fica mais lento. O cliente novo roda 30 passos/s pelo relógio (PR #49).
-- ✅ **Consequência para o movimento:** a [física](../mecanicas/movimento.md) dá 1/8 de célula por eixo e por quadro no andar normal. A 30 quadros/s isso é **3,75 células/s**, não os 7,5 da wiki (que supôs 60). ❓ Conferir nas capturas (distância entre `0x20` seguidos, ~0,87 s) antes de mudar a validação do emulador (`Game/World/Movement.cs`).
+- ✅ **Consequência para o movimento:** a [física](../mecanicas/movimento.md) dá 1/8 de célula por eixo e por quadro no andar normal (`0x05`). A 30 quadros/s isso é **3,75 células/s** (8 passos/célula). Confirmado em `captures.db` (v322, 9312 pares consecutivos de `0x20`): mediana de **3 células** (3206×) e **4 células** (2401×) em **0,867 s** (`3,75 × 0,867 = 3,25`; mediana de 3,46 células/s). Como o `0x20` envia a célula clicada (e um clique na borda da tela pode ficar a 7–10 células), a validação do emulador (`Movement.cs`) continua com folga para não gerar teleporte falso.
 
 ## Passos por quadro (`0x00b4e550`)
 Cada passo chama, nesta ordem:
@@ -65,13 +65,27 @@ Cada passo chama, nesta ordem:
   - **6** e os seguintes (batalha, por espécie): fora deste passo.
 - Implementação no cliente novo: cada selvagem é uma entidade com essa fila. O `0x11` empilha, e a entidade só lê o próximo comando quando chega ao centro de uma célula. Por isso o selvagem termina o passo de célula antes de virar.
 
+## Tamer do jogador e digimon seguidor (etapa 1 ✅)
+- ✅ **Vtable do tamer** (`0x0102fccc`, ctor `0x00b58eb0` / base `0x00863ff0`): `+0x24` atualização `0x008671c0`, `+0x30` estado → animação `0x00867790`, `+0x34` passo da animação `0x00867a60`, `+0x38` fila `0x00b5a890`.
+- ✅ **Física e direções** (`0x0085e5b0`, `0x007f3880`, `0x0085e890`, `0x0085e8e0`, `0x0085e940`):
+  - Direções `0..7`: `0 = S (0, +2)`, `1 = SW (-4, +2)`, `2 = W (-4, 0)`, `3 = NW (-4, -2)`, `4 = N (0, -2)`, `5 = NE (+4, -2)`, `6 = E (+4, 0)`, `7 = SE (+4, +2)`.
+  - No campo (`+4 != 0`), o passo por quadro é multiplicado por: `×1` no estado `4` (andar devagar, 16 passos/célula), `×2` no estado `5` (correr normal, 8 passos/célula = **3,75 células/s** a 30 FPS) e `×4` no estado `0x0f` (fantasia de velocidade, 4 passos/célula = **7,5 células/s**; no meio da célula `0x008671c0` alinha `worldX % 16 == 8` e `worldY % 8 == 4`).
+  - Ao chegar no centro de uma célula (`0x00b35f00`: `px % 64 == 32 && py % 32 == 16`), atualiza `(cellX, cellY)` (`0x00b36c20`). Quando `cell == dest`, zera velocidade e volta para o estado `1` (`0x0085e4c0(1, 0)`).
+- ✅ **Clique, segurar e `0x20`** (`0x00b4c1a0`, `0x00b4e550`, `0x00b4d290`, `0x00b4b360`, `0x00ae1000`):
+  - Clique esquerdo (`0x00b4c1a0`) e manter o botão pressionado (`0x00b4e550`) convertem `(mouse + câmera)` em célula e chamam `0x00b4d290(cellX, cellY)` (ignorado sobre o chat `0x00b91ec0` ou barra inferior `y >= 495`; deduplicado contra a última célula clicada `DAT_0135b288/8c`).
+  - `0x00b4d290` chama `0x008656b0` (define destino e estado) e empilha na fila `DAT_01158504 + 0x2d20` (`0x00b4fde0`).
+  - A cada quadro (`0x00b4b550` → `0x00b4b360`), se a fila não estiver vazia e o cooldown de **800 ms** (`800 < GetTickCount() - last`) tiver acabado, tira o **último** destino, limpa o resto da fila e envia `0x20` (`0x00ae1000`, 20 B: `i16 estado, i16 destX, i16 destY, 14 zeros`).
+- ✅ **Câmera** (`0x00afe310` → `0x00b36b80`): centraliza em `(worldX − 400, worldY − 300)` dentro de `[0..pixelWidth−800] × [0..pixelHeight−600]`.
+- ✅ **Digimon seguidor** (`0x008671c0` linhas 93–172, `param_1[0xc2]`):
+  - No centro da célula do tamer andando (`4`, `5`, `0x0f`): se distância Chebyshev `<= 1`, apenas vira na direção do tamer (se parado); se `>= 2`, calcula a célula **1 passo atrás** de `tamer.dest` na direção `tamer.cell → tamer.dest` e empilha comando na fila do digimon (`0x007f3b30`).
+  - Se a distância Chebyshev `> 5`, teleporta para `(tamer.cellX − 1, tamer.cellY − 1)` (`0x0085e890`) e para (`1`).
+  - Roda a atualização `+0x24` (`0x007f3df0`): lê a fila no centro da célula (`0x00859340`, teleporte `> 6` células), anda com `0x0085e5b0` e pausa o contador de idle enquanto `state >= 4`.
+
 ## Roteiro do que falta
 Pontos de entrada já localizados; ✅ quando lido.
-- **Física e caminho:** `0x0085e5b0..0x0085e73b` (passo por quadro, já resumido em [movimento](../mecanicas/movimento.md)), `+0x28` do selvagem `0x007f4b10`, `0x0085e940`, `0x0085e890` (pôr numa célula), `0x0085e8e0`.
-- **Tamer do jogador** (`DAT_011584f0`): `0x00afe310` (atualização no passo), a vtable do objeto e o clique no chão. Comece pelo `Handle` da cena 5 (vtable da cena, ctor `0x00b494f0`) e pelas mensagens de mouse do laço principal. Depois: pathfinding, envio do `0x20` (~0,87 s, ver [movimento](../mecanicas/movimento.md)) e câmera.
-- **Digimon do tamer seguindo:** o digimon líder (`[DAT_011584f0]+0x7a0` é usado no quadro da cena).
+- **Colisão e pathfinding (etapas 2 e 3):** `0x00b35b30` (célula andável), `0x00b43200` (pathfinding usado por `0x008671c0`, `0x00b4d290` e `0x007f4b10`).
+- **Selvagens no campo (etapa 4):** desenho `0x007e83d0` na fila de y, pacote `0x11` no `DRPG.Shared` e entidades na `GameScene`.
 - **NPCs:** criação em `0x00abb750`/`0x0085f090` ([NPCs do mapa](cena-jogo.md#npcs-do-mapa)), lista `+0x300`, atualização `+0x24` da vtable deles, sprite e nome.
 - **Portais:** `map_us` (+0x84, 4 portais, [NPCs do mapa](cena-jogo.md#npcs-do-mapa)); o desenho do redemoinho ❓ (procurar o sprite na fila de desenho `0x00a0d340`).
 - **Minimapa:** `WindowMiniMap`, marcadores em `0x00b9b930` e nomes em `0x00b9c4b0` ([minimapa](cena-jogo.md#minimapa-windowminimap-janela-5)).
 - **Botões e dicas da UI:** desenho da barra `0x00b8a850`, tamanho do chat `0x00b8e2a0`, abas `0x00b91a80`; hover, clique e dica ❓.
-- **Desenho dos selvagens:** `0x007e83d0` (sombra e borda já lidas no #49), na fila de y.

@@ -89,7 +89,7 @@ public class PacketSizeTests
             (new ItemDestroyPacket(header, item), 240),                // ✅ v322 (0xBD)
             (new BattleItemReceivePacket([item]), 444),                // ✅ v322 (0xC8)
             (new InventoryRefreshPacket(character), 4424),             // ✅ v322 (0xFC)
-            (new TeleportCharacterPacket(79, 1, 1), 8),
+            (new DRPG.Server.Network.Packets.Map.TeleportCharacterPacket(79, 1, 1), 8),
             (new RefreshDigimonStatusPacket(digimon), 696),            // ✅ v322 (sessão 56)
             (new SingleDigimonInfoPacket(digimon), 696),               // ✅ v322 (0xB4)
             (new KeepAlivePacket(0xC4), 0),

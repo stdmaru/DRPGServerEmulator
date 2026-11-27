@@ -48,6 +48,7 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
     private bool _firstEntry;
     private bool _disposed;
     private readonly List<ushort> _unknownLogged = [];
+    private readonly Queue<TeleportCharacterPacket> _teleports = new();
 
     public WorldStep Step { get; private set; }
 
@@ -111,6 +112,16 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
         _connectingGlobal = ClientConnection.ConnectAsync(settings.Global, MapDecoder.Global, _cancel.Token);
         Step = WorldStep.InWorld;
     }
+
+    /// <summary>✅ <c>0x00ae1000</c>: sends <c>0x20</c> with the destination cell to the map server.</summary>
+    public void SendMove(short x, short y)
+    {
+        if (Step == WorldStep.InWorld && _map is not null)
+            _map.Send(new MoveCharacterRequest(x, y));
+    }
+
+    /// <summary>Dequeues the next <c>0xB0</c> teleport / position-correction packet received from the map server.</summary>
+    public bool TryReceiveTeleport(out TeleportCharacterPacket packet) => _teleports.TryDequeue(out packet!);
 
     /// <summary>One step; call every frame.</summary>
     public void Update()
@@ -179,6 +190,9 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
                 break;
             case MapPing:
                 map.Send(new Shared.Packets.Channel.KeepAliveRequest());        // ✅ answered at once in the capture
+                break;
+            case TeleportCharacterPacket teleport:
+                _teleports.Enqueue(teleport);
                 break;
             case IgnoredPacket ignored:
                 IgnoredCounts[ignored.Opcode] = IgnoredCounts.GetValueOrDefault(ignored.Opcode) + 1;

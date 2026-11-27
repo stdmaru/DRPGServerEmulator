@@ -49,9 +49,10 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private TamerDoll? _tamer;
     private SpriteAnimator? _digimon;
     private int _digimonSpecies;
-    private (int X, int Y) _tamerWorld;
-    private (int X, int Y) _digimonWorld;
-    private bool _hasDigimon;
+    private FieldEntity _tamerEntity = new(0, 0);
+    private FieldEntity? _digimonEntity;
+    private readonly MovePacketQueue _moveQueue = new();
+    private (int X, int Y)? _lastClickCell;
     private bool _aborted, _lost;
     private long _stepsRun;
     private ulong _startMs;
@@ -67,8 +68,10 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     internal FieldMap? Field => _field;
     internal FieldAnimator? TamerAnimation => _tamerAnimation;
     internal FieldAnimator? DigimonAnimation => _digimonAnimation;
-    internal (int X, int Y) TamerWorld => _tamerWorld;
-    internal (int X, int Y) DigimonWorld => _digimonWorld;
+    internal (int X, int Y) TamerWorld => (_tamerEntity.WorldX, _tamerEntity.WorldY);
+    internal (int X, int Y) DigimonWorld => _digimonEntity is { } d ? (d.WorldX, d.WorldY) : (0, 0);
+    internal FieldEntity TamerEntity => _tamerEntity;
+    internal FieldEntity? DigimonEntity => _digimonEntity;
     internal FrameStats Stats => _stats;
     internal WorldLoading Loading => _loading;
 
@@ -120,6 +123,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
 
         if (_field is not null && !_lost)
         {
+            HandleFieldInput(session, nowMs);
             RunLogic(nowMs);
             DrawField(renderer, session);
         }
@@ -202,18 +206,23 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     /// <summary>✅ <c>0x0085e7b0</c>: the centre of the cell, <c>cx · 64 + 32</c> and <c>cy · 32 + 16</c>; the digimon one cell up and to the left.</summary>
     private void PlaceCharacters(CharacterDataPacket character)
     {
-        _tamerWorld = CellCenter(character.X, character.Y);
+        _tamerEntity = new FieldEntity(character.X, character.Y);
+        _moveQueue.Reset();
+        _lastClickCell = null;
         _tamer = _animated.OpenTamer(character.TamerId);
         if (_tamer is not null)
             _tamerAnimation = new FieldAnimator(_tamer.Body, digimon: false, species: 0, random.Next(8));       // ✅ rand() % 8
 
         // ✅ 0x00abbd50: a tamer of 5, 6 or 7 has no digimon on the map
         var leader = character.Party[0];
-        _hasDigimon = character.TamerId is not (5 or 6 or 7) && !leader.IsEmpty;
-        if (!_hasDigimon)
+        bool hasDigimon = character.TamerId is not (5 or 6 or 7) && !leader.IsEmpty;
+        if (!hasDigimon)
+        {
+            _digimonEntity = null;
             return;
+        }
         _digimonSpecies = leader.SpeciesId;
-        _digimonWorld = CellCenter(character.X - 1, character.Y - 1);
+        _digimonEntity = new FieldEntity(character.X - 1, character.Y - 1);
         _digimon = _animated.OpenDigimon(leader.SpeciesId);
         if (_digimon is not null)
             _digimonAnimation = new FieldAnimator(_digimon, digimon: true, leader.SpeciesId, random.Next(8));
@@ -221,6 +230,47 @@ public sealed class GameScene(GameContext game, Random random) : IScene
 
     internal static (int X, int Y) CellCenter(int cellX, int cellY) =>
         (cellX * MapFile.CellWidth + MapFile.CellWidth / 2, cellY * MapFile.CellHeight + MapFile.CellHeight / 2);
+
+    /// <summary>
+    /// ✅ <c>0x00b4c1a0</c> / <c>0x00b4d290</c> / <c>0x00b4e550</c> / <c>0x00b4b360</c>: processes ground clicks and holds,
+    /// drains throttled <c>0x20</c> packets and applies same-map <c>0xB0</c> position corrections.
+    /// </summary>
+    private void HandleFieldInput(WorldSession session, ulong nowMs)
+    {
+        while (session.TryReceiveTeleport(out var teleport))
+        {
+            if (teleport.MapId == game.World!.MapId)
+            {
+                _tamerEntity.PlaceAt(teleport.X, teleport.Y);
+                _digimonEntity?.PlaceAt(teleport.X - 1, teleport.Y - 1);
+                _moveQueue.Reset();
+                _lastClickCell = null;
+            }
+        }
+
+        var mouse = game.Mouse;
+        if (!mouse.Down)
+            _lastClickCell = null;
+
+        if ((mouse.Pressed || mouse.Down) && mouse.X >= 0 && mouse.Y >= 0 && mouse.X < IRenderer.FrameWidth && mouse.Y < IRenderer.FrameHeight
+            && !FieldHud.Covers(mouse.X, mouse.Y))
+        {
+            var field = _field!;
+            var (cameraX, cameraY) = field.Camera(_tamerEntity.WorldX, _tamerEntity.WorldY);
+            int cellX = (mouse.X + cameraX) / MapFile.CellWidth;
+            int cellY = (mouse.Y + cameraY) / MapFile.CellHeight;
+            if (cellX >= 0 && cellX < field.Map.Width && cellY >= 0 && cellY < field.Map.Height
+                && _lastClickCell != (cellX, cellY))
+            {
+                _lastClickCell = (cellX, cellY);
+                _tamerEntity.SetDestination(cellX, cellY);
+                _moveQueue.Enqueue((short)cellX, (short)cellY);
+            }
+        }
+
+        if (_moveQueue.TryDequeue(nowMs, out short sendX, out short sendY))
+            session.SendMove(sendX, sendY);
+    }
 
     /// <summary>✅ <c>0x00b4e550</c>: the logic in fixed steps from the real time, never more than <see cref="MaxStepsPerFrame"/> at once.</summary>
     private void RunLogic(ulong nowMs)
@@ -236,23 +286,48 @@ public sealed class GameScene(GameContext game, Random random) : IScene
 
     internal void Step()
     {
+        _tamerEntity.StepPhysics();
+        SyncAnimation(_tamerAnimation, _tamerEntity);
         _tamerAnimation?.Step();
-        _digimonAnimation?.Step(random.Next(4));                       // ✅ 1 in 4 for the animation 3
+
+        if (_digimonEntity is not null)
+        {
+            _digimonEntity.FollowLeader(_tamerEntity);
+            SyncAnimation(_digimonAnimation, _digimonEntity);
+            _digimonAnimation?.Step(random.Next(4));                       // ✅ 1 in 4 for the animation 3
+        }
+    }
+
+    private static void SyncAnimation(FieldAnimator? animator, FieldEntity entity)
+    {
+        if (animator is null)
+            return;
+        animator.SetDirection(entity.Direction);
+        if (entity.IsMoving)
+        {
+            int target = (int)entity.State;
+            if (animator.Animation != target)
+                animator.Switch(target);
+        }
+        else if (animator.Animation >= FieldAnimator.Walk)
+        {
+            animator.Switch(FieldAnimator.Standing);
+        }
     }
 
     /// <summary>✅ <c>0x00b4b550</c>: the camera on the tamer, the ground, then the queue with the objects, the digimon and the tamer, then the HUD.</summary>
     private void DrawField(IRenderer renderer, WorldSession session)
     {
         var field = _field!;
-        var (cameraX, cameraY) = field.Camera(_tamerWorld.X, _tamerWorld.Y);
+        var (cameraX, cameraY) = field.Camera(_tamerEntity.WorldX, _tamerEntity.WorldY);
         field.DrawGround(renderer, cameraX, cameraY);
 
         _queue.Clear();
         field.QueueObjects(_queue, cameraX, cameraY, SpriteEffects.ObjectLookOf(game.World!.MapId, game.SpriteOptions));
-        if (_digimon?.Texture is { } frame && _hasDigimon)
+        if (_digimon?.Texture is { } frame && _digimonEntity is { } digimonEntity)
         {
             var (anchorX, anchorY) = _digimon.Anchor;               // ✅ the digimon is drawn by the anchor of the .ani
-            int x = _digimonWorld.X - cameraX, y = _digimonWorld.Y - cameraY;
+            int x = digimonEntity.WorldX - cameraX, y = digimonEntity.WorldY - cameraY;
             int lower = LowerSpecies.Contains(_digimonSpecies) ? 32 : 0;
             var digimon = _digimon;
             int mapId = game.World!.MapId;
@@ -261,7 +336,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         if (_tamer is not null)
         {
             // ✅ the paper doll of the character selection, by the top-left corner at (x − 120, y − 162), no anchor
-            int x = _tamerWorld.X - cameraX, y = _tamerWorld.Y - cameraY;
+            int x = _tamerEntity.WorldX - cameraX, y = _tamerEntity.WorldY - cameraY;
             var tamer = _tamer;
             bool mapHasShadow = SpriteEffects.TamerHasShadow(game.World!.MapId);
             _queue.Add(new DrawItem(y, null, x - 120, y - 162, (r, drawX, drawY) => tamer.Draw(r, drawX, drawY, game.SpriteOptions, mapHasShadow)));
@@ -273,7 +348,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         var leader = character.Party[0];
         _hud.Draw(renderer, new HudValues(
             character.Name, character.TamerId, character.TamerClass, character.Level, game.ChannelName, game.World!.MapId, game.Data?.MapName(game.World.MapId) ?? "",
-            character.X, character.Y, leader.IsEmpty ? null : leader, DateTime.UtcNow + _clockOffset));
+            _tamerEntity.CellX, _tamerEntity.CellY, leader.IsEmpty ? null : leader, DateTime.UtcNow + _clockOffset));
     }
 
     /// <summary>

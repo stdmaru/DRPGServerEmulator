@@ -57,3 +57,19 @@ public sealed record MoveCharacterRequest(short X, short Y) : ITwoWayPacket<Move
         w.WriteZeros(14);
     }
 }
+
+/// <summary>✅ 0xB0 S2C (8 B, v322): teleport or position correction. i32 mapId, i16 x, i16 y (captures.db: 2E000000 0F00 0F00).</summary>
+public sealed record TeleportCharacterPacket(int MapId, short X, short Y) : ITwoWayPacket<TeleportCharacterPacket>
+{
+    public static ushort Opcode => (ushort)MapOpcode.TeleportCharacter;
+    public static PacketLength Length => PacketLength.Exact(8);
+
+    public static TeleportCharacterPacket Read(PacketReader r) => new(r.ReadI32(), r.ReadI16(), r.ReadI16());
+
+    public void Write(PacketWriter w)
+    {
+        w.WriteI32(MapId);
+        w.WriteI16(X);
+        w.WriteI16(Y);
+    }
+}

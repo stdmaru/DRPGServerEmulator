@@ -50,6 +50,8 @@ public static class MapDecoder
                 if (frame.Payload.Length != 0)
                     throw new PacketFormatException($"keep-alive with {frame.Payload.Length} B");
                 return new MapPing();
+            case (ushort)MapOpcode.TeleportCharacter:
+                return ClientPacket.Parse<TeleportCharacterPacket>(frame.Payload);
         }
         if (IgnoredSizes.TryGetValue(frame.Opcode, out int size))
         {

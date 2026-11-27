@@ -50,6 +50,8 @@ public sealed class MapEntryPacketTests
         AssertRoundTrip(new JoinCharacterRequest("Tamer", "user"));
         AssertRoundTrip(new MoveCharacterRequest(57, 91));
         AssertRoundTrip(new MoveCharacterRequest(-1, short.MaxValue));
+        AssertRoundTrip(new TeleportCharacterPacket(46, 15, 15));
+        AssertRoundTrip(new TeleportCharacterPacket(0, -1, short.MaxValue));
         AssertRoundTrip(Character());
         AssertRoundTrip(new InventoryDataPacket(Bags()));
         AssertRoundTrip(new InventoryDataPacket(new InventoryBags(
@@ -99,6 +101,8 @@ public sealed class MapEntryPacketTests
     {
         // ✅ docs/protocolo/opcodes.md: 0x20 is i16 5, x, y and 14 zero bytes
         Assert.Equal(Convert.FromHexString("0500" + "3900" + "5B00" + new string('0', 28)), Payload(new MoveCharacterRequest(57, 91)));
+        // ✅ captures.db 0xB0 S2C: map 0x2E (46), cell (15, 15)
+        Assert.Equal(Convert.FromHexString("2E0000000F000F00"), Payload(new TeleportCharacterPacket(46, 15, 15)));
         Assert.Equal(57, Payload(new JoinCharacterRequest("Tamer", "user")).Length);
 
         var item = Payload(new ItemRecordPacket(Item(7, 215)));
@@ -164,6 +168,8 @@ public sealed class MapEntryPacketTests
         Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<JoinCharacterRequest>(new byte[58]));
         Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<MoveCharacterRequest>(new byte[19]));
         Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<MoveCharacterRequest>(new byte[21]));
+        Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<TeleportCharacterPacket>(new byte[7]));
+        Assert.Throws<PacketFormatException>(() => ClientPacket.Parse<TeleportCharacterPacket>(new byte[9]));
     }
 
     [Fact]
