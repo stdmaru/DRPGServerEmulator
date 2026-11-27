@@ -88,7 +88,13 @@ Despachante do mapa `0x00abc350`: índice = opcode − 2 na tabela de bytes `0xa
 ## Câmera
 - ✅ `0x00afe310` (campo): chama a vtable `+0x24` do personagem e põe a rolagem do mapa (`0x00b36b80`) em **(`+0x168` − 400, `+0x16c` − 300)**, presa a `0..largura·64 − 800` e `0..altura·32 − 600`. Na batalha a rolagem é fixa (250, 206).
 
+## UI do campo (em andamento)
+- ✅ Bloco de UI do campo (`0x00b4b550` passo 3): `0x00a45230(0)`/`(1)` são as **camadas de efeitos** (lista de efeitos com tipo `+0x3c` = camada; desenho por tabela de saltos `0x00a47e80` ou `0x00b569f0`), não janelas. `0x009b6010` → `0x009b1640`: um objeto com modos 1..4 (`+8`; ❓ qual janela). `0x00b42f60` é vazio. `0x007dca50` → `0x00b641b0` ×2, `0x00b40340` (texto de aviso que gira a cada 7 s em (centrado, 40)), `0x007de4b0` (`Interface\w_tamer_menu.spr`), **`0x00b9a7c0` (gerenciador de janelas: desenha cada janela visível pela vtable `+0x28`)**.
+- ✅ **Barra principal** = objeto global `DAT_01158508` (ctor `0x00b84b20`, vtable `0x01031724`, desenho `+0x28` = **`0x00b8a850`**, 1391 linhas). Ligada/desligada por `+0x184` (Ctrl+Z alterna). Sprites `GUI\dr2_main_000_*` (`_eng` quando existe): `000_000` barra de baixo 800×105 (chat, retrato do digimon, HP/VP/EVP, EXP), `000_018` fundo do chat 409×190, botões 29×29 (`000_010..017`) e 20×20 (`000_023..027`).
+- ✅ Começo do desenho no campo (asm `0x00b8a964`): painel do tamer no canto superior esquerdo — sprite `[barra+0xfd8]` quadro 0 em (0, 0); retrato do tamer (`0x00b1ec40(tamer)`) quadro 1 em (2, 2); nome (vtable `+0xc`) em (33, 4) cor `0x80ffff` com sombra (`0x00b55760`); ícone `0x00a14910(+0x12df, 33, 20)`; texto `0x1031f64` em (50, 22) branco; nível (`+0x12e0`) em (90, 22) cor `0x80ffff`; texto da versão em (130, 1) e o nome do servidor (`[DAT_011584f4]+0xafc60`) em (130, 14). ❓ Resto: próximo passo.
+- `GUI\dr2_main_001_*` (carregador `0x00b64540`): `001_000` 170×145 (❓ minimapa), `001_001` "COMMAND" com 3 botões, `001_009` 272×72.
+
 ## Ainda ❓ (fase A em andamento)
-- UI básica da entrada (`0x00a45230`, `0x009b6010`, `0x00b42f60`, `0x00a0ceb0`, `0x007dca50`), BGM do mapa.
+- UI: resto da barra principal `0x00b8a850`, quais janelas o gerenciador `0x00b9a7c0` mostra na entrada, `0x009b1640`, `0x00a0ceb0`; BGM do mapa.
 - Montagem de `0x16`, `0x18`, `0x49`, `0x01`, resto do `0xF0`, e da conexão global (`0x64`).
 - Nome sobre o tamer (fonte, cor), sombra (opção) e o `0x00b57330`.
