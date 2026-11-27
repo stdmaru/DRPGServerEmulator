@@ -44,7 +44,7 @@ internal static class Program
             double? fraction = screenshotPatch is null ? null : double.Parse(screenshotPatch, System.Globalization.CultureInfo.InvariantCulture);
             renderer.BeginFrame();
             bool patchComplete = fraction is null;
-            login.PatchComplete = patchComplete;
+            login.PanelAvailable = patchComplete;
             var sampleNews = new PatchConfiguration.NewsItem[]
             {
                 new() { Category = "Event", Title = "Double EXP weekend in Digital World" },
@@ -95,7 +95,8 @@ internal static class Program
         while (!login.CloseRequested)
         {
             var state = flow.Snapshot;
-            login.PatchComplete = state.PatchComplete;
+            login.PanelAvailable = state.PatchComplete
+                && state.Stage is LauncherStage.Ready or LauncherStage.LoggingIn or LauncherStage.LoggedIn;
             login.Interactive = state.Stage == LauncherStage.Ready; // connected to the server and idle
             if (previousStage == LauncherStage.LoggingIn && state.Stage != LauncherStage.LoggingIn)
                 login.ClearPassword(); // refused or failed: typed again; on success it is not needed any more

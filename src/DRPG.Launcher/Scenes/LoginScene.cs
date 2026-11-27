@@ -79,8 +79,9 @@ public sealed class LoginScene : IDisposable
     /// are drawn grey and ignore input; CANCEL, Esc and closing the window always work.</summary>
     public bool Interactive { get; set; }
 
-    /// <summary>False while the auto-patcher has not finished: the entire login panel is drawn greyed out.</summary>
-    public bool PatchComplete { get; set; }
+    /// <summary>False while patching, connecting or disconnected (e.g. server unreachable): the entire login panel
+    /// and its mascots are drawn greyed out.</summary>
+    public bool PanelAvailable { get; set; }
 
     /// <summary>After a failed login: the password is typed again, the ID stays.</summary>
     public void ClearPassword()
@@ -254,7 +255,7 @@ public sealed class LoginScene : IDisposable
 
     public void DrawPanel(IRenderer r, ulong nowMs)
     {
-        bool greyPanel = !PatchComplete;
+        bool greyPanel = !PanelAvailable;
         r.Draw(greyPanel ? _panelDisabled : _panel, PanelX, PanelY);
         var mascotA = greyPanel ? _mascotADisabled : _mascotA;
         var mascotB = greyPanel ? _mascotBDisabled : _mascotB;
@@ -262,7 +263,7 @@ public sealed class LoginScene : IDisposable
         int frameB = greyPanel ? 0 : (int)(nowMs / MascotBFrameMs % (ulong)mascotB.Length);
         r.Draw(mascotA[frameA], PanelX + 225, PanelY + 2);
         r.Draw(mascotB[frameB], PanelX + 270, PanelY - 2);
-        bool enabled = Interactive && PatchComplete;
+        bool enabled = Interactive && PanelAvailable;
         if (!enabled && !greyPanel)
             r.Draw(_fieldsDisabled, PanelX, PanelY);
         if (_remember.Remember)
