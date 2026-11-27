@@ -13,9 +13,9 @@ public enum PatchPhase { FetchingConfiguration, Downloading, Applying }
 
 public abstract record PatchOutcome
 {
-    public sealed record UpToDate(PatchConfiguration Configuration) : PatchOutcome;
-    public sealed record Maintenance(string Title, string Message) : PatchOutcome;
-    public sealed record NeedsReinstall(int Installed, int Minimum) : PatchOutcome;
+    public sealed record UpToDate(PatchConfiguration Configuration, int InstalledVersion = 0, IReadOnlyList<NewsItem>? News = null) : PatchOutcome;
+    public sealed record Maintenance(string Title, string Message, IReadOnlyList<NewsItem>? News = null) : PatchOutcome;
+    public sealed record NeedsReinstall(int Installed, int Minimum, IReadOnlyList<NewsItem>? News = null) : PatchOutcome;
     public sealed record Failed(string Reason) : PatchOutcome;
 }
 
@@ -33,6 +33,9 @@ public sealed class Patcher(HttpClient http, string installDirectory, bool allow
 
     private string WorkDirectory => Path.Combine(installDirectory, "patch-download");
 
+    /// <summary>Raised as soon as the news feed from <c>MainUrl.NewsPageUrl</c> is loaded (before patch downloads start).</summary>
+    public event Action<IReadOnlyList<NewsItem>>? NewsLoaded;
+
     public async Task<PatchOutcome> RunAsync(string configUrl, IProgress<PatchProgress> progress, CancellationToken ct)
     {
         try
@@ -40,25 +43,48 @@ public sealed class Patcher(HttpClient http, string installDirectory, bool allow
             progress.Report(new PatchProgress(PatchPhase.FetchingConfiguration, 0, 0, 0, 0, 0));
             CheckScheme(configUrl);
             var configuration = PatchConfiguration.Parse(await http.GetStringAsync(configUrl, ct));
+            var news = await FetchNewsAsync(configuration.MainUrl.NewsPageUrl, ct);
+            if (news is { Count: > 0 })
+                NewsLoaded?.Invoke(news);
             if (configuration.ServerInfo.Maintenance)
-                return new PatchOutcome.Maintenance(configuration.ServerInfo.Message.Title, configuration.ServerInfo.Message.Msg);
+                return new PatchOutcome.Maintenance(configuration.ServerInfo.Message.Title, configuration.ServerInfo.Message.Msg, news);
 
             int installed = VersionInfo.Read(Path.Combine(installDirectory, "VersionInfo.ini"));
             var steps = configuration.PendingPatches(installed);
             if (steps is null)
-                return new PatchOutcome.NeedsReinstall(installed, configuration.PatchInfo.MinPatchVersion);
+                return new PatchOutcome.NeedsReinstall(installed, configuration.PatchInfo.MinPatchVersion, news);
 
             for (int i = 0; i < steps.Count; i++)
                 await ApplyAsync(steps[i], i, steps.Count, progress, ct);
             if (Directory.Exists(WorkDirectory))
                 Directory.Delete(WorkDirectory, recursive: true);
-            return new PatchOutcome.UpToDate(configuration);
+            int finalVersion = steps.Count > 0 ? steps[^1].Version : installed;
+            return new PatchOutcome.UpToDate(configuration, finalVersion, news);
         }
         catch (Exception e) when (e is HttpRequestException or IOException or InvalidDataException
                                       or PatchConfigurationException or Shared.Formats.Pack.PackFormatException
                                       or TaskCanceledException && !ct.IsCancellationRequested)
         {
             return new PatchOutcome.Failed(e.Message);
+        }
+    }
+
+    private async Task<IReadOnlyList<NewsItem>?> FetchNewsAsync(string url, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return null;
+        try
+        {
+            CheckScheme(url);
+            var json = await http.GetStringAsync(url, ct);
+            var items = NewsFeed.Parse(json);
+            return items.Count > 0 ? items : null;
+        }
+        catch (Exception e) when (e is HttpRequestException or IOException or PatchConfigurationException
+                                      or TaskCanceledException && !ct.IsCancellationRequested)
+        {
+            Console.Error.WriteLine($"News fetch failed ({url}): {e.Message}");
+            return null;
         }
     }
 

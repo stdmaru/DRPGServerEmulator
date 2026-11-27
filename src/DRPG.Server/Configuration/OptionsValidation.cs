@@ -127,6 +127,7 @@ public sealed class GameOptionsValidator : IValidateOptions<GameOptions>
         e.Range(o.ExpRate, 0, 1000, $"{s}:ExpRate");
         e.Range(o.BitRate, 0, 1000, $"{s}:BitRate");
         e.Range(o.CaptureChance, 0, 1, $"{s}:CaptureChance");
+        e.Check(Enum.IsDefined(o.SecondaryPasswordMode), $"{s}:SecondaryPasswordMode inválido");
         e.Range(o.FourthStarterDigimon, 0, 3, $"{s}:FourthStarterDigimon");
         e.Range(o.StartPosX, 0, short.MaxValue, $"{s}:StartPosX");
         e.Range(o.StartPosY, 0, short.MaxValue, $"{s}:StartPosY");

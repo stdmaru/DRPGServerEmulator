@@ -76,6 +76,8 @@ services.AddSingleton<AccountRepository>();
 services.AddSingleton<IAccountStore>(sp => sp.GetRequiredService<AccountRepository>());
 services.AddSingleton<AccountAuthenticator>();
 services.AddSingleton<ILauncherAccountStore>(sp => sp.GetRequiredService<AccountRepository>());
+services.AddSingleton<ISecondaryPasswordStore>(sp => sp.GetRequiredService<AccountRepository>());
+services.AddSingleton<SecondaryPasswordService>();
 services.AddSingleton<LauncherServerKey>();
 services.AddSingleton<LoginAttemptLimiter>();
 services.AddSingleton<LauncherLoginService>();

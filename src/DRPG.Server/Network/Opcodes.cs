@@ -1,3 +1,5 @@
+using DRPG.Shared.Protocol;
+
 namespace DRPG.Server.Network;
 
 /// <summary>Os quatro servidores do jogo (ver docs/protocolo/servidores.md).</summary>
@@ -7,28 +9,6 @@ public enum ServerRole : byte
     Channel = 2,
     Map = 3,
     Global = 4,
-}
-
-public enum LoginOpcode : ushort
-{
-    Handshake = 0x05,
-
-    /// <summary>Launcher login (docs/protocolo/launcher.md); values from <see cref="DRPG.Shared.Protocol.Launcher.LauncherOpcode"/>.</summary>
-    LauncherHello = (ushort)DRPG.Shared.Protocol.Launcher.LauncherOpcode.Hello,
-    LauncherLogin = (ushort)DRPG.Shared.Protocol.Launcher.LauncherOpcode.Login,
-}
-
-public enum ChannelOpcode : ushort
-{
-    ChannelSelect = 0x03,
-    Authenticate = 0x04,
-    CharacterCreate = 0x10,
-    CharacterDelete = 0x11,
-    CharacterList = 0x12,
-    UserCheck = 0x14,
-    MapConnectionConfirm = 0x16,
-    ClientHardwareInfo = 0x18,     // C2S: endereços MAC do cliente; sem resposta
-    KeepAlive = 0xC4,
 }
 
 public enum MapOpcode : ushort

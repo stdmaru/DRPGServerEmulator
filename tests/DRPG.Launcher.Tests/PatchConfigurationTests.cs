@@ -12,7 +12,7 @@ public sealed class PatchConfigurationTests
                          "LauncherFileName": "DigimonRPG.exe", "RunExeFileName": "DigimonRPG.bin" },
       "PatchInfo": { "DownloadUrl": "https://x/PatchFiles/Live/", "MinPatchVersion": 0, "PatchVersion": 242,
                      "DownloadFileHeader": "Patch_%d.zip", "PatchFileHeader": "Patch_%d" },
-      "MainUrl": { "HomePageUrl": "http://a", "MainPageUrl": "http://b" },
+      "MainUrl": { "HomePageUrl": "http://a", "MainPageUrl": "http://b", "NewsPageUrl": "https://x/news.json" },
       "LoginServer": { "Host": "127.0.0.1", "Port": 7001,
                        "KeyFingerprint": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" }
     }
@@ -26,6 +26,7 @@ public sealed class PatchConfigurationTests
         Assert.Equal("DigimonRPG.bin", c.LauncherInfo.RunExeFileName);
         Assert.Equal(242, c.PatchInfo.PatchVersion);
         Assert.Equal(7001, c.LoginServer!.Port);
+        Assert.Equal("https://x/news.json", c.MainUrl.NewsPageUrl);
         Assert.False(c.ServerInfo.Maintenance);
     }
 
@@ -63,7 +64,29 @@ public sealed class PatchConfigurationTests
         Assert.Equal("Patch_%d.zip", c.PatchInfo.DownloadFileHeader);
         Assert.Equal("", c.ServerInfo.Message.Title);
         Assert.Equal("", c.LauncherInfo.RunExeFileName);
+        Assert.Equal("", c.MainUrl.NewsPageUrl);
         Assert.Null(c.LoginServer);
+    }
+
+    [Fact]
+    public void NewsFeed_parses_normalizes_and_sanitizes_urls()
+    {
+        var items = NewsFeed.Parse("""
+        [
+          { "Category": "event", "Title": "  Double EXP  ", "Date": " 11/26 ", "URL": "https://example.com/event" },
+          { "Category": "UPDATE", "Title": "Patch 322", "Date": "11/25", "URL": "http://example.com/patch" },
+          { "Category": "unknown", "Title": "Unsafe link", "Date": "", "URL": "javascript:alert(1)" },
+          { "Category": "Info", "Title": "   ", "Date": "11/24", "URL": "https://example.com/skip" }
+        ]
+        """);
+
+        Assert.Equal(3, items.Count);
+        Assert.Equal(("Event", "Double EXP", "11/26", "https://example.com/event"),
+            (items[0].Category, items[0].Title, items[0].Date, items[0].Url));
+        Assert.Equal(("Update", "Patch 322", "11/25", "http://example.com/patch"),
+            (items[1].Category, items[1].Title, items[1].Date, items[1].Url));
+        Assert.Equal(("Info", "Unsafe link", "", ""),
+            (items[2].Category, items[2].Title, items[2].Date, items[2].Url));
     }
 
     [Fact]

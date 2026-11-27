@@ -104,8 +104,40 @@ public sealed class LauncherFlowTests : IDisposable
 
         var state = flow.Snapshot;
         Assert.Equal(LauncherStage.Ready, state.Stage);
+        Assert.True(state.PatchComplete);
+        Assert.Equal(1.0, state.PatchFraction);
+        Assert.Contains("Up to date", state.PatchStatus);
         Assert.Equal("Enter your ID and password.", state.Status);
         Assert.False(flow.IsBusy);
+
+        int firstVersion = state.StatusVersion;
+        flow.Login("player", "", default);
+        Assert.True(flow.Snapshot.StatusVersion > firstVersion);
+    }
+
+    [Fact]
+    public async Task Too_many_attempts_locks_out_login_inputs()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var server = AnswerHelloAndLoginStatus(listener, LauncherLoginStatus.TooManyAttempts);
+        var flow = Flow(((IPEndPoint)listener.LocalEndpoint).Port);
+        flow.Start(default);
+        await WaitFor(flow, LauncherStage.Ready);
+
+        flow.Login("player", "wrong", default);
+
+        var locked = await WaitFor(flow, LauncherStage.LockedOut);
+        Assert.Equal(LauncherStage.LockedOut, locked.Stage);
+        Assert.Contains("Too many attempts", locked.Status);
+        Assert.False(flow.IsBusy);
+
+        // Further login attempts are ignored while locked out
+        int version = locked.StatusVersion;
+        flow.Login("player", "wrong", default);
+        Assert.Equal(LauncherStage.LockedOut, flow.Snapshot.Stage);
+        Assert.Equal(version, flow.Snapshot.StatusVersion);
+        await server;
     }
 
     [Fact]
@@ -140,20 +172,42 @@ public sealed class LauncherFlowTests : IDisposable
     private Task AnswerHello(TcpListener listener) => Task.Run(async () =>
     {
         using var socket = await listener.AcceptTcpClientAsync();
+        await HandleHelloAsync(socket.GetStream());
+    });
+
+    private Task AnswerHelloAndLoginStatus(TcpListener listener, LauncherLoginStatus status) => Task.Run(async () =>
+    {
+        using var socket = await listener.AcceptTcpClientAsync();
         var stream = socket.GetStream();
+        var nonce = await HandleHelloAsync(stream);
+        var request = await ReadPacketAsync<LauncherLogin>(stream);
+        var credentials = LauncherCredentials.Decode(LauncherCrypto.Open(_key, nonce, request));
+        var reply = LauncherCrypto.SealReply(credentials.ResponseKey, LauncherLoginResult.Failure(status).Encode());
+        await stream.WriteAsync(TwoWayPacket.Encode(reply));
+    });
+
+    private async Task<byte[]> HandleHelloAsync(NetworkStream stream)
+    {
+        await ReadPacketAsync<LauncherHello>(stream);
+        var nonce = RandomNumberGenerator.GetBytes(LauncherLimits.NonceBytes);
+        var reply = new LauncherHelloReply(LauncherLimits.ProtocolVersion, LauncherHelloStatus.Ok,
+            nonce, _key.PublicKey.ExportSubjectPublicKeyInfo());
+        await stream.WriteAsync(TwoWayPacket.Encode(reply));
+        return nonce;
+    }
+
+    private static async Task<T> ReadPacketAsync<T>(NetworkStream stream) where T : ITwoWayPacket<T>
+    {
         var buffer = new byte[PacketHeader.MaxPacketSize];
         int have = 0;
         while (true)
         {
             var seq = new ReadOnlySequence<byte>(buffer, 0, have);
-            if (PacketFramer.TryRead(ref seq, out _, out _) == FrameStatus.Complete)
-                break;
+            if (PacketFramer.TryRead(ref seq, out var frame, out _) == FrameStatus.Complete)
+                return ClientPacket.Parse<T>(frame!.Payload);
             have += await stream.ReadAsync(buffer.AsMemory(have));
         }
-        var reply = new LauncherHelloReply(LauncherLimits.ProtocolVersion, LauncherHelloStatus.Ok,
-            RandomNumberGenerator.GetBytes(LauncherLimits.NonceBytes), _key.PublicKey.ExportSubjectPublicKeyInfo());
-        await stream.WriteAsync(TwoWayPacket.Encode(reply));
-    });
+    }
 
     private sealed class OneFile(byte[] body) : HttpMessageHandler
     {

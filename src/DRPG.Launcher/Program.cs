@@ -1,9 +1,11 @@
-using DRPG.Launcher.Assets;
+using System.Diagnostics;
+using DRPG.Engine.Assets;
 using DRPG.Launcher.Login;
 using DRPG.Launcher.Patching;
-using DRPG.Launcher.Platform;
-using DRPG.Launcher.Rendering;
-using DRPG.Launcher.Rendering.Backends;
+using DRPG.Engine.Platform;
+using DRPG.Engine.Rendering;
+using DRPG.Engine.Rendering.Backends;
+using DRPG.Engine.Scenes;
 using DRPG.Launcher.Scenes;
 using DRPG.Shared.Formats.Pack;
 
@@ -12,6 +14,7 @@ namespace DRPG.Launcher;
 internal static class Program
 {
     private const uint LauncherVersion = 1;
+    private const ulong TransientStatusDurationMs = 5_000;
 
     private static int Main(string[] args)
     {
@@ -34,15 +37,31 @@ internal static class Program
         using IFont? font = OpenUiFont();
         var remembered = RememberedLogin.Load(Path.Combine(install.Directory, "option.ini"));
         using var login = new LoginScene(sprites, remembered, font, renderer);
-        var patchView = new PatchView(sprites);
+        using var newsView = new NewsView(sprites, font, renderer);
+        using var patchView = new PatchView(sprites, font, renderer);
         var cursor = new CursorView(sprites);
 
         if (screenshot is not null)
         {
             double? fraction = screenshotPatch is null ? null : double.Parse(screenshotPatch, System.Globalization.CultureInfo.InvariantCulture);
             renderer.BeginFrame();
-            var stage = fraction is null ? LauncherStage.Connecting : LauncherStage.Patching;
-            DrawFrame(renderer, login, patchView, stage, fraction ?? 0, 0, "Connecting to server...");
+            bool patchComplete = fraction is null;
+            login.PanelAvailable = patchComplete;
+            var sampleNews = new NewsItem[]
+            {
+                new() { Category = "Event", Title = "Double EXP weekend in Digital World", Date = "11/26", Url = "https://example.com/event" },
+                new() { Category = "Update", Title = "Client v322 character creation and deletion", Date = "11/25", Url = "https://example.com/update" },
+                new() { Category = "Info", Title = "Welcome to Digimon RPG Preservation Server", Date = "11/24", Url = "https://example.com/info" },
+            };
+            var sampleState = new LauncherFlow.State(
+                patchComplete ? LauncherStage.Connecting : LauncherStage.Patching,
+                patchComplete ? "Connecting to server..." : "",
+                null,
+                patchComplete ? "Up to date (v322) - Ready" : "Downloading Patch_322.zip (1/1)  12.3 / 27.1 MB",
+                fraction ?? 1.0,
+                patchComplete,
+                sampleNews);
+            DrawFrame(renderer, login, newsView, patchView, sampleState, 0, 0);
             var pixels = renderer.Capture();
             renderer.EndFrame();
             Screenshot.WritePpm(screenshot, pixels, IRenderer.FrameWidth, IRenderer.FrameHeight);
@@ -75,9 +94,19 @@ internal static class Program
 
         var events = new List<InputEvent>();
         var previousStage = LauncherStage.Patching;
+        int lastStatusVersion = -1;
+        ulong statusShownAtMs = 0;
         while (!login.CloseRequested)
         {
             var state = flow.Snapshot;
+            ulong nowMs = SdlPlatform.TicksMs;
+            if (state.StatusVersion != lastStatusVersion)
+            {
+                lastStatusVersion = state.StatusVersion;
+                statusShownAtMs = nowMs;
+            }
+            login.PanelAvailable = state.PatchComplete
+                && state.Stage is LauncherStage.Ready or LauncherStage.LoggingIn or LauncherStage.LoggedIn or LauncherStage.LockedOut;
             login.Interactive = state.Stage == LauncherStage.Ready; // connected to the server and idle
             if (previousStage == LauncherStage.LoggingIn && state.Stage != LauncherStage.LoggingIn)
                 login.ClearPassword(); // refused or failed: typed again; on success it is not needed any more
@@ -101,7 +130,13 @@ internal static class Program
                 if (e is QuitEvent)
                     return Quit(stop);
                 login.Handle(e);
+                newsView.Handle(e);
                 cursor.Handle(e);
+            }
+            if (newsView.ClickedUrl is { } newsUrl)
+            {
+                newsView.ClickedUrl = null;
+                OpenUrl(newsUrl);
             }
             if (login.SubmitRequested)
             {
@@ -110,22 +145,30 @@ internal static class Program
             }
 
             renderer.BeginFrame();
-            DrawFrame(renderer, login, patchView, state.Stage, state.Progress?.Fraction ?? 0, SdlPlatform.TicksMs, state.Status);
-            cursor.Draw(renderer, SdlPlatform.TicksMs);
+            DrawFrame(renderer, login, newsView, patchView, state, nowMs, statusShownAtMs);
+            cursor.Draw(renderer, nowMs);
             renderer.EndFrame();
         }
         return Quit(stop);
     }
 
-    private static void DrawFrame(IRenderer r, LoginScene login, PatchView patch, LauncherStage stage, double fraction, ulong nowMs, string status)
+    private static void DrawFrame(
+        IRenderer r,
+        LoginScene login,
+        NewsView news,
+        PatchView patch,
+        LauncherFlow.State state,
+        ulong nowMs,
+        ulong statusShownAtMs)
     {
         login.DrawBackground(r);
-        if (stage == LauncherStage.Patching)
-            patch.Draw(r, fraction);
-        else
-            login.DrawPanel(r, nowMs);
-        if (status.Length > 0)
-            login.DrawStatusBox(r, status);
+        news.Draw(r, state.News, loading: state.Stage == LauncherStage.Patching && !state.PatchComplete);
+        patch.Draw(r, state.PatchStatus, state.PatchDetail, state.PatchFraction, state.PatchComplete);
+        login.DrawPanel(r, nowMs);
+        bool transientExpired = state.Stage == LauncherStage.Ready && nowMs >= statusShownAtMs + TransientStatusDurationMs;
+        bool animateDots = state.Stage is LauncherStage.Connecting or LauncherStage.LoggingIn or LauncherStage.LoggedIn;
+        if (state.PatchComplete && state.Status.Length > 0 && !transientExpired)
+            login.DrawStatusBox(r, state.Status, nowMs, animateDots);
     }
 
     /// <summary>Text is optional: without a usable font the launcher still works, only without labels.</summary>
@@ -150,6 +193,23 @@ internal static class Program
         }
     }
 
+    private static void OpenUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("https" or "http"))
+            return;
+        try
+        {
+            if (OperatingSystem.IsLinux())
+                Process.Start(new ProcessStartInfo { FileName = "xdg-open", ArgumentList = { uri.AbsoluteUri }, UseShellExecute = false });
+            else
+                Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+        }
+        catch (Exception e)
+        {
+            Console.Error.WriteLine($"Could not open URL ({uri.AbsoluteUri}): {e.Message}");
+        }
+    }
+
     private static int Quit(CancellationTokenSource stop)
     {
         stop.Cancel();
@@ -160,27 +220,5 @@ internal static class Program
     {
         int i = Array.IndexOf(args, name);
         return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
-    }
-}
-
-/// <summary>Binary PPM: no image library needed, every viewer and Pillow read it.</summary>
-internal static class Screenshot
-{
-    public static void WritePpm(string path, uint[] rgba, int width, int height)
-    {
-        using var f = File.Create(path);
-        f.Write(System.Text.Encoding.ASCII.GetBytes($"P6\n{width} {height}\n255\n"));
-        var row = new byte[width * 3];
-        for (int y = 0; y < height; y++)
-        {
-            for (int x = 0; x < width; x++)
-            {
-                uint p = rgba[y * width + x];
-                row[x * 3] = (byte)p;
-                row[x * 3 + 1] = (byte)(p >> 8);
-                row[x * 3 + 2] = (byte)(p >> 16);
-            }
-            f.Write(row);
-        }
     }
 }

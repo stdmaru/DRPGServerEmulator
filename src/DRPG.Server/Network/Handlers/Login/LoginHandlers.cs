@@ -1,4 +1,5 @@
-using DRPG.Server.Network.Packets.Login;
+using DRPG.Shared.Packets.Login;
+using DRPG.Shared.Protocol;
 
 namespace DRPG.Server.Network.Handlers;
 
@@ -8,7 +9,7 @@ public sealed class LoginHandshakeHandler : SessionHandler<LoginHandshakeRequest
 {
     protected override ValueTask HandleAsync(Session session, LoginHandshakeRequest request, CancellationToken ct)
     {
-        session.Send(new HandshakePacket(request.Username));
+        session.Send(new LoginHandshakeReply(request.Username));
         return ValueTask.CompletedTask;
     }
 }

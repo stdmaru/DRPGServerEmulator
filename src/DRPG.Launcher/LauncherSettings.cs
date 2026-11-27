@@ -1,3 +1,4 @@
+using DRPG.Engine.Assets;
 namespace DRPG.Launcher;
 
 /// <summary>

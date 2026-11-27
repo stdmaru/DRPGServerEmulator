@@ -51,6 +51,19 @@ public sealed class PacketWriter
     }
 
     /// <summary>
+    /// Fixed-length string that may fill the whole field, with no \0 (✅ the 40 hex characters of the auth key).
+    /// A longer value is truncated, a shorter one is padded with \0.
+    /// </summary>
+    public void WriteFullFixedString(string? value, int length)
+    {
+        var span = Grow(length);
+        span.Clear();
+        if (string.IsNullOrEmpty(value))
+            return;
+        FixedString.Encoding.GetBytes(value.AsSpan(0, Math.Min(value.Length, length)), span);
+    }
+
+    /// <summary>
     /// Writes a zeroed block of <paramref name="length"/> bytes except for the given runs
     /// (offsets relative to the block start). For captured regions not understood yet.
     /// </summary>

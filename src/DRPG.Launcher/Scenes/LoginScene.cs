@@ -1,6 +1,6 @@
-using DRPG.Launcher.Assets;
-using DRPG.Launcher.Platform;
-using DRPG.Launcher.Rendering;
+using DRPG.Engine.Assets;
+using DRPG.Engine.Platform;
+using DRPG.Engine.Rendering;
 
 namespace DRPG.Launcher.Scenes;
 
@@ -10,8 +10,11 @@ namespace DRPG.Launcher.Scenes;
 /// </summary>
 public sealed class LoginScene : IDisposable
 {
-    private const int PanelX = 243, PanelY = 151;
-    private const int StatusX = 278, StatusY = 392;
+    private const int PanelX = 455, PanelY = 165, PanelWidth = 315;
+    private const int StatusX = PanelX, StatusY = 392, StatusWidth = PanelWidth;
+    private const int StatusPaddingX = 14, StatusPaddingY = 12, StatusLineGap = 4;
+    private const ulong StatusDotStepMs = 180;
+    private const int StatusMaxDots = 5;
 
     // Each mascot runs its own clock, so they never move in step (as in the original).
     private const ulong MascotAFrameMs = 300, MascotBFrameMs = 200;
@@ -26,17 +29,21 @@ public sealed class LoginScene : IDisposable
     public const int MaxLoginLength = RememberedLogin.MaxLoginLength;
     public const int MaxPasswordLength = 64;
 
-    private readonly ITexture _background, _panel, _status, _check;
+    private readonly ITexture _background, _panel, _panelDisabled, _check;
     private readonly ITexture _fieldsDisabled, _checkDisabled;
-    private readonly ITexture[] _mascotA, _mascotB;
+    private readonly ITexture[] _mascotA, _mascotB, _mascotADisabled, _mascotBDisabled;
     private readonly ITexture? _rememberLabel, _rememberLabelDisabled;
     private readonly Button _ok, _cancel;
     private readonly TextField _id, _password;
     private readonly RememberedLogin _remember;
     private readonly IFont? _font;
     private readonly IRenderer _renderer;
-    private ITexture? _statusText;
+    private readonly List<ITexture> _statusLines = [];
+    private readonly List<ITexture> _animatedStatusFrames = [];
+    private ITexture? _statusBg;
+    private int _statusBgHeight;
     private string? _statusTextValue;
+    private bool _statusAnimated;
 
     public LoginScene(SpriteStore sprites, RememberedLogin remember, IFont? font, IRenderer renderer)
     {
@@ -45,9 +52,11 @@ public sealed class LoginScene : IDisposable
         _renderer = renderer;
         _background = sprites.Gui("dr2_in_000_000")[0];
         _panel = sprites.Gui("dr2_in_003_000")[0];
+        _panelDisabled = sprites.GuiDisabled("dr2_in_003_000")[0];
         _mascotA = sprites.Gui("dr2_in_003_001");
         _mascotB = sprites.Gui("dr2_in_003_002");
-        _status = sprites.Gui("dr_friend_016")[0];
+        _mascotADisabled = sprites.GuiDisabled("dr2_in_003_001");
+        _mascotBDisabled = sprites.GuiDisabled("dr2_in_003_002");
         _check = sprites.Gui("dr2_sub_001_001")[0];
         // the ID and password fields and the checkbox square, seeded at their centres (panel coordinates)
         _fieldsDisabled = sprites.GuiDisabledRegions("dr2_in_003_000", (211, 91), (211, 137), (30, 170));
@@ -74,6 +83,10 @@ public sealed class LoginScene : IDisposable
     /// are drawn grey and ignore input; CANCEL, Esc and closing the window always work.</summary>
     public bool Interactive { get; set; }
 
+    /// <summary>False while patching, connecting or disconnected (e.g. server unreachable): the entire login panel
+    /// and its mascots are drawn greyed out.</summary>
+    public bool PanelAvailable { get; set; }
+
     /// <summary>After a failed login: the password is typed again, the ID stays.</summary>
     public void ClearPassword()
     {
@@ -83,7 +96,7 @@ public sealed class LoginScene : IDisposable
 
     public void Handle(InputEvent e)
     {
-        if (e is KeyEvent { Key: LauncherKey.Escape })
+        if (e is KeyEvent { Key: GameKey.Escape })
         {
             CloseRequested = true;
             return;
@@ -114,13 +127,13 @@ public sealed class LoginScene : IDisposable
                 if (b.Down && _password.Contains(b.X, b.Y)) Focus(_password);
                 if (_ok.Press(b.X, b.Y, b.Down)) SubmitRequested = true;
                 break;
-            case KeyEvent { Key: LauncherKey.Enter }:
+            case KeyEvent { Key: GameKey.Enter }:
                 SubmitRequested = true;
                 break;
-            case KeyEvent { Key: LauncherKey.Tab }:
+            case KeyEvent { Key: GameKey.Tab }:
                 Focus(_id.Focused ? _password : _id);
                 break;
-            case KeyEvent { Key: LauncherKey.Backspace }:
+            case KeyEvent { Key: GameKey.Backspace }:
                 FocusedField.Backspace();
                 break;
             case TextEvent t:
@@ -139,34 +152,154 @@ public sealed class LoginScene : IDisposable
 
     public void DrawBackground(IRenderer r) => r.Draw(_background, 0, 0);
 
-    /// <summary>Only while there is something to say (connecting, errors, login progress): the caller skips it
-    /// otherwise. A text wider than the box shows its middle.</summary>
-    public void DrawStatusBox(IRenderer r, string text)
+    /// <summary>
+    /// Expandable authentication status box styled to match the <c>dr2_in_003_000</c> login panel (deep blue translucent
+    /// fill with a crisp light-blue border): word-wraps long messages and grows vertically to fit all lines.
+    /// When <paramref name="animateDots"/> is true, animates 1..5 trailing dots rapidly while keeping the base text anchored.
+    /// </summary>
+    public void DrawStatusBox(IRenderer r, string text, ulong nowMs = 0, bool animateDots = false)
     {
-        r.Draw(_status, StatusX, StatusY);
-        if (_font is null || text.Length == 0)
+        if (text.Length == 0)
             return;
-        if (_statusTextValue != text)
+        int innerWidth = StatusWidth - 2 * StatusPaddingX;
+        int lineHeight = _font?.LineHeight ?? 14;
+
+        if (animateDots)
         {
-            _statusText?.Dispose();
-            _statusText = _font.Render(_renderer, text, TextColor);
-            _statusTextValue = text;
+            string baseText = text.TrimEnd('.');
+            if (_font is not null && (!_statusAnimated || _statusTextValue != baseText))
+            {
+                ClearStatusLines();
+                for (int dots = 1; dots <= StatusMaxDots; dots++)
+                    _animatedStatusFrames.Add(_font.Render(_renderer, baseText + new string('.', dots), TextColor));
+                _statusTextValue = baseText;
+                _statusAnimated = true;
+            }
+
+            int boxHeight = Math.Max(36, lineHeight + 2 * StatusPaddingY);
+            r.Draw(StatusBackground(r, StatusWidth, boxHeight), StatusX, StatusY);
+            if (_animatedStatusFrames.Count == StatusMaxDots)
+            {
+                var frame = _animatedStatusFrames[(int)(nowMs / StatusDotStepMs % StatusMaxDots)];
+                int maxFrameWidth = Math.Min(_animatedStatusFrames[^1].Width, innerWidth);
+                int x = StatusX + Math.Max(StatusPaddingX, (StatusWidth - maxFrameWidth) / 2);
+                int y = StatusY + (boxHeight - lineHeight) / 2;
+                r.DrawPart(frame, x, y, 0, Math.Min(frame.Width, innerWidth));
+            }
+            return;
         }
-        var t = _statusText!;
-        int inner = _status.Width - 8;
-        int width = Math.Min(t.Width, inner);
-        int x = StatusX + (_status.Width - width) / 2;
-        int y = StatusY + (_status.Height - _font.LineHeight + 1) / 2;
-        r.DrawPart(t, x, y, (t.Width - width) / 2, width);
+
+        if (_font is not null && (_statusAnimated || _statusTextValue != text))
+        {
+            ClearStatusLines();
+            foreach (var line in WrapText(text, innerWidth))
+                _statusLines.Add(_font.Render(_renderer, line, TextColor));
+            _statusTextValue = text;
+            _statusAnimated = false;
+        }
+
+        int lineCount = Math.Max(1, _statusLines.Count);
+        int contentHeight = lineCount * lineHeight + (lineCount - 1) * StatusLineGap;
+        int staticBoxHeight = Math.Max(36, contentHeight + 2 * StatusPaddingY);
+        r.Draw(StatusBackground(r, StatusWidth, staticBoxHeight), StatusX, StatusY);
+
+        int staticY = StatusY + (staticBoxHeight - contentHeight) / 2;
+        foreach (var line in _statusLines)
+        {
+            int x = StatusX + Math.Max(StatusPaddingX, (StatusWidth - line.Width) / 2);
+            r.DrawPart(line, x, staticY, 0, Math.Min(line.Width, innerWidth));
+            staticY += lineHeight + StatusLineGap;
+        }
+    }
+
+    private ITexture StatusBackground(IRenderer r, int width, int height)
+    {
+        if (_statusBg is not null && _statusBgHeight == height)
+            return _statusBg;
+        _statusBg?.Dispose();
+        const uint fill = 0xE6783C0A;       // translucent deep blue matching dr2_in_003_000 (RGBA8888, R low)
+        const uint border = 0xFFDEC890;     // crisp light-blue border
+        var pixels = new uint[width * height];
+        Array.Fill(pixels, fill);
+        for (int x = 0; x < width; x++)
+        {
+            pixels[x] = border;
+            pixels[(height - 1) * width + x] = border;
+        }
+        for (int y = 0; y < height; y++)
+        {
+            pixels[y * width] = border;
+            pixels[y * width + (width - 1)] = border;
+        }
+        _statusBg = r.CreateTexture(width, height, pixels);
+        _statusBgHeight = height;
+        return _statusBg;
+    }
+
+    private List<string> WrapText(string text, int maxWidth)
+    {
+        var lines = new List<string>();
+        foreach (var paragraph in text.Replace("\r\n", "\n").Split('\n'))
+        {
+            string current = "";
+            foreach (var word in paragraph.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string candidate = current.Length == 0 ? word : $"{current} {word}";
+                if (MeasureWidth(candidate) <= maxWidth)
+                {
+                    current = candidate;
+                    continue;
+                }
+                if (current.Length > 0)
+                    lines.Add(current);
+                current = word;
+                while (current.Length > 1 && MeasureWidth(current) > maxWidth)
+                {
+                    int fit = current.Length - 1;
+                    while (fit > 1 && MeasureWidth(current[..fit]) > maxWidth)
+                        fit--;
+                    lines.Add(current[..fit]);
+                    current = current[fit..];
+                }
+            }
+            if (current.Length > 0)
+                lines.Add(current);
+        }
+        if (lines.Count == 0)
+            lines.Add(text);
+        return lines;
+    }
+
+    private int MeasureWidth(string text)
+    {
+        if (_font is null)
+            return text.Length * 7;
+        using var t = _font.Render(_renderer, text, TextColor);
+        return t.Width;
+    }
+
+    private void ClearStatusLines()
+    {
+        foreach (var line in _statusLines)
+            line.Dispose();
+        _statusLines.Clear();
+        foreach (var frame in _animatedStatusFrames)
+            frame.Dispose();
+        _animatedStatusFrames.Clear();
     }
 
     public void DrawPanel(IRenderer r, ulong nowMs)
     {
-        r.Draw(_panel, PanelX, PanelY);
-        r.Draw(_mascotA[(int)(nowMs / MascotAFrameMs % (ulong)_mascotA.Length)], PanelX + 225, PanelY + 2);
-        r.Draw(_mascotB[(int)(nowMs / MascotBFrameMs % (ulong)_mascotB.Length)], PanelX + 270, PanelY - 2);
-        bool enabled = Interactive;
-        if (!enabled)
+        bool greyPanel = !PanelAvailable;
+        r.Draw(greyPanel ? _panelDisabled : _panel, PanelX, PanelY);
+        var mascotA = greyPanel ? _mascotADisabled : _mascotA;
+        var mascotB = greyPanel ? _mascotBDisabled : _mascotB;
+        int frameA = greyPanel ? 0 : (int)(nowMs / MascotAFrameMs % (ulong)mascotA.Length);
+        int frameB = greyPanel ? 0 : (int)(nowMs / MascotBFrameMs % (ulong)mascotB.Length);
+        r.Draw(mascotA[frameA], PanelX + 225, PanelY + 2);
+        r.Draw(mascotB[frameB], PanelX + 270, PanelY - 2);
+        bool enabled = Interactive && PanelAvailable;
+        if (!enabled && !greyPanel)
             r.Draw(_fieldsDisabled, PanelX, PanelY);
         if (_remember.Remember)
             r.Draw(enabled ? _check : _checkDisabled, CheckX, CheckY);
@@ -185,7 +318,8 @@ public sealed class LoginScene : IDisposable
 
     public void Dispose()
     {
-        _statusText?.Dispose();
+        ClearStatusLines();
+        _statusBg?.Dispose();
         _rememberLabel?.Dispose();
         _rememberLabelDisabled?.Dispose();
     }

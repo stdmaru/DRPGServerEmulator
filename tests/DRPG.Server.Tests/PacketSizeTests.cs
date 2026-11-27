@@ -1,10 +1,12 @@
 using DRPG.Server.Game;
 using DRPG.Server.Game.Battle;
 using DRPG.Server.Game.Entities;
-using DRPG.Server.Network.Packets.Channel;
 using DRPG.Server.Network.Packets.Global;
-using DRPG.Server.Network.Packets.Login;
 using DRPG.Server.Network.Packets.Map;
+using DRPG.Server.Network.Handlers;
+using DRPG.Server.Network.Packets;
+using DRPG.Shared.Packets.Channel;
+using DRPG.Shared.Packets.Login;
 using DRPG.Shared.Protocol;
 
 namespace DRPG.Server.Tests;
@@ -15,6 +17,8 @@ namespace DRPG.Server.Tests;
 /// </summary>
 public class PacketSizeTests
 {
+    private static TwoWayServerPacket<T> Wrap<T>(T packet) where T : ITwoWayPacket<T> => new(packet);
+
     [Fact]
     public void Payload_sizes_match_captures()
     {
@@ -28,12 +32,12 @@ public class PacketSizeTests
 
         var packets = new (ServerPacket Packet, int Size)[]
         {
-            (new HandshakePacket("user"), 28),
-            (new ChannelSelectPacket(0), 52),
-            (new AuthenticationPacket(0, "user"), 448),
-            (new CharacterCreatePacket(0, new CharacterCreateHeader(3, 0x4F, 0x3E, 0x38), 1, "a", 10, "b"), 64),
-            (new CharacterListPacket([null, null, null, null], new Random(1)), 500),
-            (new UserCheckPacket("user"), 22),
+            (Wrap(new LoginHandshakeReply("user")), 28),
+            (Wrap(new ChannelSelectReply(0)), 52),
+            (Wrap(new AuthenticateReply(0, "user")), 448),
+            (Wrap(new CharacterCreateReply(0, new CharacterCreateHeader(3, 0x4F, 0x3E, 0x38), 1, "a", 10, "b")), 64),
+            (Wrap(CharacterListService.BuildList([null, null, null, null], new Random(1))), 500),
+            (Wrap(new UserCheckReply("user")), 22),
             (new CharacterDataPacket(character, TestSupport.Clock.UnixNow), 7600),                // ✅ v322 (sessão 52)
             (new InventoryDataPacket(TestSupport.EmptyInventory(999)), 4416),
             (new Unknown05Packet(), 164),
@@ -128,7 +132,7 @@ public class PacketSizeTests
     public void Character_create_echoes_request_header()
     {
         // ✅ sessão 53: resultado 2/0 e os 6 bytes do pedido (slot 3, mapa 0x4F, 0x3E, 0x38)
-        var payload = new CharacterCreatePacket(0, new CharacterCreateHeader(3, 0x4F, 0x3E, 0x38), 1, "a", 31, "b").EncodePayload();
+        var payload = TwoWayPacket.EncodePayload(new CharacterCreateReply(0, new CharacterCreateHeader(3, 0x4F, 0x3E, 0x38), 1, "a", 31, "b"));
         Assert.Equal(Convert.FromHexString("0200000000000000034F3E003800"), payload[..14]);
     }
 
@@ -137,7 +141,7 @@ public class PacketSizeTests
     {
         // ✅ 18 listas v322 (sessões 52–56): check − deslocamento = mapa + nível, e slot vazio leva só o índice
         var summary = new CharacterSummary(7, 0, "a", 1, 14, 6, 57, 91, 5, 6, 619, 12, "b");
-        var payload = new CharacterListPacket([summary, null, null, null], new Random(1)).EncodePayload();
+        var payload = TwoWayPacket.EncodePayload(CharacterListService.BuildList([summary, null, null, null], new Random(1)));
         for (int slot = 0; slot < 4; slot++)
         {
             var b = payload.AsSpan(4 + 124 * slot, 124);

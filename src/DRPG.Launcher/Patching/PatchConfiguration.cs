@@ -55,6 +55,7 @@ public sealed record PatchConfiguration
     {
         public string HomePageUrl { get; init; } = "";
         public string MainPageUrl { get; init; } = "";
+        public string NewsPageUrl { get; init; } = "";
     }
 
     public sealed record LoginServerSection
@@ -112,7 +113,12 @@ public sealed record PatchConfiguration
                 DownloadFileHeader = patch.DownloadFileHeader ?? defaults.DownloadFileHeader,
                 PatchFileHeader = patch.PatchFileHeader ?? defaults.PatchFileHeader,
             },
-            MainUrl = new MainUrlSection { HomePageUrl = main.HomePageUrl ?? "", MainPageUrl = main.MainPageUrl ?? "" },
+            MainUrl = new MainUrlSection
+            {
+                HomePageUrl = main.HomePageUrl ?? "",
+                MainPageUrl = main.MainPageUrl ?? "",
+                NewsPageUrl = main.NewsPageUrl ?? "",
+            },
             LoginServer = LoginServer is null ? null : LoginServer with
             {
                 Host = LoginServer.Host ?? "",

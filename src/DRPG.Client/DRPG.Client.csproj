@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The game client (docs/planos/cliente-novo.md, milestone 2). Drop-in for DigimonRPG.bin: same command line,
+       reads the official install. NativeAOT, no single-file, no compression, no obfuscation (antivirus false positives). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DRPG.Client</RootNamespace>
+    <AssemblyName>DigimonRPG</AssemblyName>
+    <Product>DRPG Client</Product>
+    <Version>0.1.0</Version>
+    <PublishAot>true</PublishAot>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DRPG.Shared\DRPG.Shared.csproj" />
+    <ProjectReference Include="..\DRPG.Engine\DRPG.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Startup\preload-*.txt" LogicalName="%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="drpg-client.ini.example" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- The original executable is DigimonRPG.bin on every system (Windows included: it is an .exe renamed). The AOT
+       publish names it DigimonRPG[.exe]; this renames it so the client is a drop-in for the original. -->
+  <Target Name="NameTheBinaryLikeTheOriginal" AfterTargets="Publish" Condition="'$(PublishAot)' == 'true'">
+    <PropertyGroup>
+      <PublishedBinary>$(PublishDir)$(TargetName)$(NativeBinaryExt)</PublishedBinary>
+    </PropertyGroup>
+    <Copy SourceFiles="$(PublishedBinary)" DestinationFiles="$(PublishDir)DigimonRPG.bin" Condition="Exists('$(PublishedBinary)')" />
+    <Delete Files="$(PublishedBinary)" Condition="Exists('$(PublishedBinary)')" />
+  </Target>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DRPG.Client.Tests" />
+  </ItemGroup>
+
+</Project>

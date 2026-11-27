@@ -1,0 +1,7 @@
+; DRPG client settings. Copy to drpg-client.ini next to the client. The official install files are never written.
+
+[Servers]
+; ❓ The original reads these from a table inside DigimonRPG.bin (docs/protocolo/servidores.md); the new client reads
+; them from here. Defaults are the local emulator.
+Login=127.0.0.1:7001
+Channel=127.0.0.1:7000

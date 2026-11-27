@@ -1,5 +1,4 @@
-using DRPG.Launcher.Rendering;
-
+using DRPG.Engine.Assets;
 namespace DRPG.Launcher.Tests;
 
 public sealed class RememberedLoginTests : IDisposable
@@ -86,18 +85,5 @@ public sealed class RememberedLoginTests : IDisposable
         var state = RememberedLogin.Load(Ini);
         Assert.True(state.Remember);
         Assert.Equal("", state.Login);
-    }
-
-    [Fact]
-    public void Font_search_prefers_the_name_order_over_the_directory_order()
-    {
-        var a = Directory.CreateDirectory(Path.Combine(_dir, "a", "deep")).FullName;
-        var b = Directory.CreateDirectory(Path.Combine(_dir, "b")).FullName;
-        File.WriteAllText(Path.Combine(a, "DejaVuSans.ttf"), "");
-        File.WriteAllText(Path.Combine(b, "gulim.ttc"), "");
-
-        Assert.Equal(Path.Combine(b, "gulim.ttc"),
-            FontLocator.Find([Path.Combine(_dir, "a"), b, Path.Combine(_dir, "missing")], ["gulim.ttc", "DejaVuSans.ttf"]));
-        Assert.Null(FontLocator.Find([b], ["nothing.ttf"]));
     }
 }

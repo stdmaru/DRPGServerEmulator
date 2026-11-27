@@ -1,6 +1,6 @@
 # Arquitetura do cliente
 
-❓ **Ainda não existe código.** Esta página é o contrato que o cliente segue desde a primeira linha ([plano](../planos/cliente-novo.md)). Visão geral em [arquitetura](README.md), regras de código em [padrões](padroes-de-codigo.md).
+Esta página é o contrato que o cliente segue desde a primeira linha ([plano](../planos/cliente-novo.md)). ✅ **Marco 2, fase A** (`src/DRPG.Client`): linha de comando, janela, cursor, gerenciador de cenas, carga, `ClientConnection` e a sequência login → channel até a lista de personagens (`AccountSession`). O resto abaixo ainda é contrato, sem código (features, registro automático, `ClientOptions`). Visão geral em [arquitetura](README.md), regras de código em [padrões](padroes-de-codigo.md).
 
 ## Princípio
 O cliente **mostra** o que o servidor decidiu e **pede** o que o jogador quer. Não tem regra de jogo: não calcula dano, não decide se um item cabe, não muda inventário por conta própria. Uma checagem local (ex.: botão desabilitado sem espaço) é só conforto de interface e nunca substitui a resposta do servidor.
@@ -72,3 +72,18 @@ Handlers (`[PacketHandler]`) e janelas (`[Window]`) são achados por um **gerado
 - Handlers e estado: alimentados com pacotes do `DRPG.Shared` (inclusive os dourados), sem janela e sem GPU.
 - Layout de janela: a árvore de UI é calculada sem GPU e as posições são comparadas com as do original.
 - Leitores de formato: no `DRPG.Shared.Tests`. O visualizador (`DRPG.Tools`) gera PNG para comparar com screenshot do original.
+
+## Rede do marco 2 (✅ implementado)
+- `ClientConnection` (`Net/`): um TCP por servidor; a tarefa de recepção corta com `PacketFramer`, decodifica em pacote **tipado** (`AccountDecoder` por servidor: opcode fora da lista = erro) e põe na fila; a thread do jogo esvazia com `TryReceive`. Envio por fila, sem bloquear o frame. Pacote inválido, mais de 1024 pacotes na fila, socket fechado ou erro de I/O terminam a conexão com uma mensagem (`Failure`).
+- `AccountSession` (`Net/`): máquina de estados chamada **uma vez por frame** (sem `await` no frame, as conexões são `Task` consultadas). Ordem das capturas ✅ (sessão 56): login `0x05` → fecha → channel `0x03` → `0x04` (usuário + chave) → `0x12` e `0x14` pedidos juntos → lista. Depois da lista, keep-alive `0xC4` a cada 166,5 s ✅. Timeout de 15 s por passo ❓ (o do original é desconhecido). A chave nunca vai para o log nem para a mensagem de falha.
+- Endereços: `drpg-client.ini` ([decisões](../projeto/decisoes.md)).
+- ✅ **Fase C:** `ServerScene` e `CharacterSelectScene` seguem a especificação do RE ([cenas](../cliente/cenas.md#implementação-fase-c-)). O `AccountSession` virou uma máquina por passos (`StartLogin`, `SelectChannel`, `Authenticate`, `RequestCharacterList`, `Reset`) e **as cenas** decidem quando cada passo roda, como o original.
+
+## Teste de ponta a ponta
+- `AccountSessionTests` e `AccountDecoderTests`: servidores falsos em loopback (ordem dos pacotes, chave recusada, opcode desconhecido, lista forjada, servidor que fecha ou não responde, keep-alive) e entradas hostis. Rodam no CI.
+- `EmulatorTests` (ponta a ponta, **não** roda sem configuração): contra o emulador de verdade. No devcontainer:
+  1. suba o emulador com um banco descartável: `docker exec -w /workspaces/DRPGServer -d -e DRPG_Database__Name=drpg_e2e server_devcontainer-server-1 dotnet run --project src/DRPG.Server`;
+  2. crie uma conta com chave: `INSERT INTO account (username, auth_key, authority) VALUES ('e2e', '<40 caracteres>', 0)` em `drpg_e2e`;
+  3. `docker exec -w /workspaces/DRPGServer -e DRPG_E2E_USER=e2e -e DRPG_E2E_KEY=<chave> server_devcontainer-server-1 dotnet test tests/DRPG.Client.Tests --filter EmulatorTests`.
+  Opcionais: `DRPG_E2E_LOGIN` e `DRPG_E2E_CHANNEL` (`host:porta`). Sem as variáveis os testes aparecem como pulados.
+- O executável NativeAOT também foi rodado contra o emulador com a instalação real (`DRPG_GAME_DIR`, `SDL_VIDEO_DRIVER=offscreen`, `SDL_AUDIODRIVER=dummy`): chega em `step: Ready` e `character list: 0 of 4 slots in use`. Para ver a tela sem janela: `DRPG_SCREENSHOT=<arquivo.ppm> DRPG_SCREENSHOT_MS=<ms>` (só desenvolvimento).
