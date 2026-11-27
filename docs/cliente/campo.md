@@ -2,7 +2,7 @@
 
 RE da v322 para o passo 2 do marco 3 (PR #51, `feat/client-walk`): andar com pathfinding, digimons do servidor andando no cliente, NPCs, portais e o comportamento da UI do campo. Complementa a [cena de jogo](cena-jogo.md) (entrada no mapa, quadro, HUD) e o [movimento](../mecanicas/movimento.md) (lado do servidor). ✅ = lido no dump; ❓ = ainda não lido.
 
-> **Estado:** etapa 1 (andar do tamer + digimon seguidor + `0x20`/`0xB0`) **implementada**. Feito na RE: laço de passos, selvagens (`0x11`), física por célula (`0x0085e5b0`), tamer do jogador (`0x008671c0`, `0x00b4c1a0`, `0x00b4d290`, `0x00b4b360`), digimon seguidor e velocidade confirmada em `captures.db`. Próximas etapas: colisão, pathfinding (`0x00b43200`) e selvagens no campo.
+> **Estado:** etapas 1 (andar + digimon seguidor + `0x20`/`0xB0`) e 2 (colisões estáticas e grade de ocupação) **implementadas**. Próximas etapas: pathfinding A* (`0x00b43200`) e selvagens no campo (`0x11`).
 
 ## Como ler o binário
 - Dump decompilado: `work/re/v322/dump/decomp/XXXX/<endereço>.c`, com `functions.tsv` (entrada, tamanho, chamadores), `calls.tsv` (quem chama quem) e `strings.tsv`.
@@ -81,9 +81,18 @@ Cada passo chama, nesta ordem:
   - Se a distância Chebyshev `> 5`, teleporta para `(tamer.cellX − 1, tamer.cellY − 1)` (`0x0085e890`) e para (`1`).
   - Roda a atualização `+0x24` (`0x007f3df0`): lê a fila no centro da célula (`0x00859340`, teleporte `> 6` células), anda com `0x0085e5b0` e pausa o contador de idle enquanto `state >= 4`.
 
+## Colisões e ocupação (etapa 2 ✅)
+- ✅ **Limites do mapa** (`0x00b35f80`): `0 <= x < width && 0 <= y < height`.
+- ✅ **Colisão estática** (`0x00b35f40` → `0x00b35ea0`): uma célula é andável sse está nos limites e o byte `+0x14` (`Flags & 0xFF`) é diferente de zero. Objetos do mapa não têm máscara separada no andar — o editor já grava os bloqueios no byte `+0x14` do `.map`.
+- ✅ **Grade de ocupação por entidade** (`0x00b35e10`, `0x00b36550`, `0x00b365c0`): matriz de `Serial` (16 B) por célula (`+0x511c7c`). Ao ocupar `(x, y)`, grava o serial em `(x, y)` e também em `(x, y − 1)` se estiver vazia; ao sair, limpa `(x, y)` e limpa `(x, y − 1)` se tiver o mesmo serial.
+- ✅ **Célula livre** (`0x00b35b30`): andável (`0x00b35f40`) **e** sem serial na grade de ocupação (`0x00b35e10 == zero`).
+- ✅ **Destino bloqueado ou ocupado** (`0x00b432d0`, `0x00b4d290`, `0x008671c0`, `0x007f4b10`):
+  - No pathfinding (`0x00b432d0`), células intermediárias precisam passar em `0x00b35f40` (andável estático), mas a **célula de destino** é sempre permitida (`x == destX && y == destY`).
+  - No passo efetivo (`0x008671c0`, `0x007f4b10`) e no clique (`0x00b4d290`), se o próximo passo já é o destino e `!0x00b35b30(next)` (bloqueada ou ocupada), a entidade **para antes de entrar** (ou ignora o clique se já está adjacente).
+
 ## Roteiro do que falta
 Pontos de entrada já localizados; ✅ quando lido.
-- **Colisão e pathfinding (etapas 2 e 3):** `0x00b35b30` (célula andável), `0x00b43200` (pathfinding usado por `0x008671c0`, `0x00b4d290` e `0x007f4b10`).
+- **Pathfinding (etapa 3):** A* em `0x00b43200` → `0x00b430f0` → `0x00b433d0` (8 vizinhos) → `0x00b43520` / `0x00b436e0`, limite `min(2 * manhattan + 1, 25)`.
 - **Selvagens no campo (etapa 4):** desenho `0x007e83d0` na fila de y, pacote `0x11` no `DRPG.Shared` e entidades na `GameScene`.
 - **NPCs:** criação em `0x00abb750`/`0x0085f090` ([NPCs do mapa](cena-jogo.md#npcs-do-mapa)), lista `+0x300`, atualização `+0x24` da vtable deles, sprite e nome.
 - **Portais:** `map_us` (+0x84, 4 portais, [NPCs do mapa](cena-jogo.md#npcs-do-mapa)); o desenho do redemoinho ❓ (procurar o sprite na fila de desenho `0x00a0d340`).

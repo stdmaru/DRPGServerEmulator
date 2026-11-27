@@ -7,6 +7,7 @@ using DRPG.Engine.Rendering;
 using DRPG.Shared.Formats.Map;
 using DRPG.Shared.Formats.Pack;
 using DRPG.Shared.Packets.Map;
+using DRPG.Shared.Protocol;
 
 namespace DRPG.Client.Scenes;
 
@@ -45,10 +46,12 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private LoadingScreen _screen = null!;                     // set in Init
     private WorldLoading _loading = null!;                     // set in Init
     private FieldMap? _field;
+    private FieldCollision? _collision;
     private FieldAnimator? _tamerAnimation, _digimonAnimation;
     private TamerDoll? _tamer;
     private SpriteAnimator? _digimon;
     private int _digimonSpecies;
+    private Serial _tamerSerial, _digimonSerial;
     private FieldEntity _tamerEntity = new(0, 0);
     private FieldEntity? _digimonEntity;
     private readonly MovePacketQueue _moveQueue = new();
@@ -66,6 +69,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     internal bool WorldEntered => _field is not null;
     internal bool ConnectionLost => _lost;
     internal FieldMap? Field => _field;
+    internal FieldCollision? Collision => _collision;
     internal FieldAnimator? TamerAnimation => _tamerAnimation;
     internal FieldAnimator? DigimonAnimation => _digimonAnimation;
     internal (int X, int Y) TamerWorld => (_tamerEntity.WorldX, _tamerEntity.WorldY);
@@ -181,6 +185,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
                 throw new MapFormatException($"map {world.MapId} has no file in the pack");
             var map = MapFile.Parse(game.Resource.ReadEntry(path));
             _field = new FieldMap(map, game.Resource, renderer, game.Log);
+            _collision = new FieldCollision(map);
             if (map.InvalidCellReferences > 0)
                 game.Log($"{path}: {map.InvalidCellReferences} cell references outside the lists were cleared");
         }
@@ -206,7 +211,9 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     /// <summary>✅ <c>0x0085e7b0</c>: the centre of the cell, <c>cx · 64 + 32</c> and <c>cy · 32 + 16</c>; the digimon one cell up and to the left.</summary>
     private void PlaceCharacters(CharacterDataPacket character)
     {
+        _tamerSerial = character.Serial;
         _tamerEntity = new FieldEntity(character.X, character.Y);
+        _collision?.Occupy(_tamerEntity.CellX, _tamerEntity.CellY, _tamerSerial);
         _moveQueue.Reset();
         _lastClickCell = null;
         _tamer = _animated.OpenTamer(character.TamerId);
@@ -219,10 +226,13 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         if (!hasDigimon)
         {
             _digimonEntity = null;
+            _digimonSerial = default;
             return;
         }
         _digimonSpecies = leader.SpeciesId;
+        _digimonSerial = leader.Serial;
         _digimonEntity = new FieldEntity(character.X - 1, character.Y - 1);
+        _collision?.Occupy(_digimonEntity.CellX, _digimonEntity.CellY, _digimonSerial);
         _digimon = _animated.OpenDigimon(leader.SpeciesId);
         if (_digimon is not null)
             _digimonAnimation = new FieldAnimator(_digimon, digimon: true, leader.SpeciesId, random.Next(8));
@@ -241,8 +251,14 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         {
             if (teleport.MapId == game.World!.MapId)
             {
+                _collision?.Vacate(_tamerEntity.CellX, _tamerEntity.CellY);
+                if (_digimonEntity is not null)
+                    _collision?.Vacate(_digimonEntity.CellX, _digimonEntity.CellY);
                 _tamerEntity.PlaceAt(teleport.X, teleport.Y);
                 _digimonEntity?.PlaceAt(teleport.X - 1, teleport.Y - 1);
+                _collision?.Occupy(_tamerEntity.CellX, _tamerEntity.CellY, _tamerSerial);
+                if (_digimonEntity is not null)
+                    _collision?.Occupy(_digimonEntity.CellX, _digimonEntity.CellY, _digimonSerial);
                 _moveQueue.Reset();
                 _lastClickCell = null;
             }
@@ -263,8 +279,11 @@ public sealed class GameScene(GameContext game, Random random) : IScene
                 && _lastClickCell != (cellX, cellY))
             {
                 _lastClickCell = (cellX, cellY);
-                _tamerEntity.SetDestination(cellX, cellY);
-                _moveQueue.Enqueue((short)cellX, (short)cellY);
+                if (NextStep(_tamerEntity.CellX, _tamerEntity.CellY, cellX, cellY) is not null)
+                {
+                    _tamerEntity.SetDestination(cellX, cellY);
+                    _moveQueue.Enqueue((short)cellX, (short)cellY);
+                }
             }
         }
 
@@ -286,16 +305,40 @@ public sealed class GameScene(GameContext game, Random random) : IScene
 
     internal void Step()
     {
-        _tamerEntity.StepPhysics();
+        int oldTamerX = _tamerEntity.CellX, oldTamerY = _tamerEntity.CellY;
+        _tamerEntity.StepPhysics(NextStep);
+        UpdateOccupancy(oldTamerX, oldTamerY, _tamerEntity, _tamerSerial);
         SyncAnimation(_tamerAnimation, _tamerEntity);
         _tamerAnimation?.Step();
 
         if (_digimonEntity is not null)
         {
-            _digimonEntity.FollowLeader(_tamerEntity);
+            int oldDigiX = _digimonEntity.CellX, oldDigiY = _digimonEntity.CellY;
+            _digimonEntity.FollowLeader(_tamerEntity, NextStep);
+            UpdateOccupancy(oldDigiX, oldDigiY, _digimonEntity, _digimonSerial);
             SyncAnimation(_digimonAnimation, _digimonEntity);
             _digimonAnimation?.Step(random.Next(4));                       // ✅ 1 in 4 for the animation 3
         }
+    }
+
+    private (int NextX, int NextY)? NextStep(int fromX, int fromY, int destX, int destY)
+    {
+        if (fromX == destX && fromY == destY)
+            return null;
+        int nextX = fromX + Math.Sign(destX - fromX);
+        int nextY = fromY + Math.Sign(destY - fromY);
+        if (_collision is not null && !_collision.CanStepTo(nextX, nextY, destX, destY))
+            return null;
+        return (nextX, nextY);
+    }
+
+    private void UpdateOccupancy(int oldX, int oldY, FieldEntity entity, Serial serial)
+    {
+        if (_collision is null)
+            return;
+        if (entity.CellX != oldX || entity.CellY != oldY)
+            _collision.Vacate(oldX, oldY);
+        _collision.Occupy(entity.CellX, entity.CellY, serial);
     }
 
     private static void SyncAnimation(FieldAnimator? animator, FieldEntity entity)
