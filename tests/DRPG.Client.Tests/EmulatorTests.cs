@@ -24,7 +24,9 @@ internal static class EmulatorEnvironment
     /// <summary>The emulator of the devcontainer unless <c>DRPG_E2E_LOGIN</c> / <c>DRPG_E2E_CHANNEL</c> say otherwise.</summary>
     public static ClientSettings Settings => new(
         ServerAddress.Parse(Environment.GetEnvironmentVariable("DRPG_E2E_LOGIN")) ?? ClientSettings.Local.Login,
-        ServerAddress.Parse(Environment.GetEnvironmentVariable("DRPG_E2E_CHANNEL")) ?? ClientSettings.Local.Channel);
+        ServerAddress.Parse(Environment.GetEnvironmentVariable("DRPG_E2E_CHANNEL")) ?? ClientSettings.Local.Channel,
+        ServerAddress.Parse(Environment.GetEnvironmentVariable("DRPG_E2E_MAP")) ?? ClientSettings.Local.Map,
+        ServerAddress.Parse(Environment.GetEnvironmentVariable("DRPG_E2E_GLOBAL")) ?? ClientSettings.Local.Global);
 }
 
 /// <summary>

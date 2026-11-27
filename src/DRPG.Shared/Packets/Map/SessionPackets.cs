@@ -4,7 +4,7 @@ namespace DRPG.Shared.Packets.Map;
 
 /// <summary>
 /// ✅ 0x01 C2S (57 B, v322): enter the map. Character[21], user[21], u8 and 14 trailing bytes.
-/// ❓ The u8 is never used by the emulator and no sample documents it: it is skipped on read and written as 0.
+/// ❓ The u8 is never used by the emulator and no sample documents it: it is skipped on read; the client writes 1, like the capture.
 /// </summary>
 public sealed record JoinCharacterRequest(string CharacterName, string Username) : ITwoWayPacket<JoinCharacterRequest>
 {
@@ -26,7 +26,7 @@ public sealed record JoinCharacterRequest(string CharacterName, string Username)
     {
         w.WriteFixedString(CharacterName, NameBytes);
         w.WriteFixedString(Username, NameBytes);
-        w.WriteU8(0);                           // ❓
+        w.WriteU8(1);                           // ❓ 1 in the capture
         w.WriteZeros(14);
     }
 }

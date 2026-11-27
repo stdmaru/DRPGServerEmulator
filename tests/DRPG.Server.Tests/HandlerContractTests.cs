@@ -1,3 +1,4 @@
+using DRPG.Shared.Packets.Map;
 using DRPG.Shared.Packets.Channel;
 using System.Reflection;
 using DRPG.Server.Game.Entities;

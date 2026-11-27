@@ -23,7 +23,23 @@ public sealed class ClientSettingsTests : IDisposable
         Assert.Equal(new ServerAddress("game.example.org", 7100), settings.Channel);
     }
 
+    [Fact]
+    public void The_map_and_global_addresses_are_read_and_default_to_the_local_emulator()
+    {
+        File.WriteAllText(_path, "[Servers]\nMap=10.0.0.5:7102\nGlobal=game.example.org:7103\n");
+
+        var settings = ClientSettings.Load(_path);
+
+        Assert.Equal(new ServerAddress("10.0.0.5", 7102), settings.Map);
+        Assert.Equal(new ServerAddress("game.example.org", 7103), settings.Global);
+        Assert.Equal(ClientSettings.Local.Login, settings.Login);
+        Assert.Equal(new ServerAddress("127.0.0.1", 7002), ClientSettings.Local.Map);
+        Assert.Equal(new ServerAddress("127.0.0.1", 7003), ClientSettings.Local.Global);
+    }
+
     [Theory]
+    [InlineData("Map=nonsense")]
+    [InlineData("Global=host:0")]
     [InlineData("Login=nonsense")]
     [InlineData("Login=host:0")]
     [InlineData("Login=host:70000")]

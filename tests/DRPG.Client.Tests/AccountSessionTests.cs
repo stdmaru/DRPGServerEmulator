@@ -121,7 +121,7 @@ public sealed class AccountSessionTests : IDisposable
     }
 
     private AccountSession NewSession() =>
-        new(new ClientSettings(_login.Address, _channel.Address), new GameCommandLine(Username, Key), _log.Add);
+        new(new ClientSettings(_login.Address, _channel.Address, ClientSettings.Local.Map, ClientSettings.Local.Global), new GameCommandLine(Username, Key), _log.Add);
 
     private static CharacterListReply List(params CharacterListSlot[] used)
     {
@@ -516,7 +516,7 @@ public sealed class AccountSessionTests : IDisposable
         closed.Start();
         var address = new ServerAddress("127.0.0.1", ((IPEndPoint)closed.LocalEndpoint).Port);
         closed.Stop();
-        using var session = new AccountSession(new ClientSettings(address, address), new GameCommandLine(Username, Key), _log.Add);
+        using var session = new AccountSession(new ClientSettings(address, address, address, address), new GameCommandLine(Username, Key), _log.Add);
 
         session.StartLogin(_now);
         ToStep(session, AccountStep.Failed);

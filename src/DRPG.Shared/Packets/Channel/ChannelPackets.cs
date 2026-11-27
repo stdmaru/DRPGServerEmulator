@@ -285,6 +285,37 @@ public sealed record MapConnectionConfirmRequest(string Username, string Charact
     }
 }
 
+/// <summary>
+/// ✅ 0x18 C2S (74 B, v322): the MAC addresses of the machine as text <c>"AA-BB-CC-DD-EE-FF"</c>, three fields of 20 bytes,
+/// and 14 zero bytes (❓ the code that builds it is not read; the capture has three adapters). Owner decision: the new client sends
+/// the real addresses, like the original. They never go to a log: <see cref="ToString"/> shows only the count.
+/// </summary>
+public sealed record ClientHardwareInfoRequest(IReadOnlyList<string> MacAddresses) : ITwoWayPacket<ClientHardwareInfoRequest>
+{
+    public const int FieldCount = 3, FieldBytes = 20;
+
+    public static ushort Opcode => (ushort)ChannelOpcode.ClientHardwareInfo;
+    public static PacketLength Length => PacketLength.Exact(FieldCount * FieldBytes + 14);
+
+    public static ClientHardwareInfoRequest Read(PacketReader r)
+    {
+        var macs = new List<string>(FieldCount);
+        for (int i = 0; i < FieldCount; i++)
+            macs.Add(r.ReadFixedString(FieldBytes));
+        r.Skip(14);
+        return new(macs);
+    }
+
+    public void Write(PacketWriter w)
+    {
+        for (int i = 0; i < FieldCount; i++)
+            w.WriteFixedString(i < MacAddresses.Count ? MacAddresses[i] : "", FieldBytes);
+        w.WriteZeros(14);
+    }
+
+    public override string ToString() => $"{nameof(ClientHardwareInfoRequest)}({MacAddresses.Count} addresses)";
+}
+
 /// <summary>✅ 0xC4 C2S on channel, map and global (14 B zero, v322): keep-alive ping of the client.</summary>
 public sealed record KeepAliveRequest : ITwoWayPacket<KeepAliveRequest>
 {

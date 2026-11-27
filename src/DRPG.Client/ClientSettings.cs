@@ -24,11 +24,12 @@ public readonly record struct ServerAddress(string Host, int Port)
 /// (docs/protocolo/servidores.md); the new client takes the login and channel addresses from this file. Missing file or
 /// key: the local emulator. A value that is not <c>host:port</c> is an error, not a silent default.
 /// </summary>
-public sealed record ClientSettings(ServerAddress Login, ServerAddress Channel)
+public sealed record ClientSettings(ServerAddress Login, ServerAddress Channel, ServerAddress Map, ServerAddress Global)
 {
     public const string FileName = "drpg-client.ini";
 
-    public static readonly ClientSettings Local = new(new ServerAddress("127.0.0.1", 7001), new ServerAddress("127.0.0.1", 7000));
+    public static readonly ClientSettings Local = new(
+        new ServerAddress("127.0.0.1", 7001), new ServerAddress("127.0.0.1", 7000), new ServerAddress("127.0.0.1", 7002), new ServerAddress("127.0.0.1", 7003));
 
     public static ClientSettings Load(string path)
     {
@@ -37,7 +38,9 @@ public sealed record ClientSettings(ServerAddress Login, ServerAddress Channel)
         var values = IniFile.Parse(File.ReadAllLines(path));
         return new ClientSettings(
             Address(values, "servers.login", Local.Login),
-            Address(values, "servers.channel", Local.Channel));
+            Address(values, "servers.channel", Local.Channel),
+            Address(values, "servers.map", Local.Map),
+            Address(values, "servers.global", Local.Global));
     }
 
     private static ServerAddress Address(Dictionary<string, string> values, string key, ServerAddress fallback)

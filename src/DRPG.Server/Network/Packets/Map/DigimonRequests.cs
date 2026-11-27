@@ -1,4 +1,5 @@
 using DRPG.Server.Game;
+using DRPG.Shared.Packets.Map;
 using DRPG.Shared.Protocol;
 
 namespace DRPG.Server.Network.Packets.Map;
@@ -125,26 +126,6 @@ public sealed record PartySwapRequest(ushort Button) : IClientPacket<PartySwapRe
         var button = r.ReadU16();
         r.Skip(18);
         return new(button);
-    }
-}
-
-/// <summary>
-/// ✅ 0xF0 (C2S 42 B, v322): renomear. u8 0, u8 tipo (1 tamer, 2 digimon), u16 0, u32 uid, nome[20] e 14 B finais.
-/// Sem nome é consulta.
-/// </summary>
-public sealed record RenameRequest(RenameKind Kind, uint Uid, string Name) : IClientPacket<RenameRequest>
-{
-    public static PacketLength Length => PacketLength.Exact(8 + RenamePacket.NameLength + 14);
-
-    public static RenameRequest Read(PacketReader r)
-    {
-        r.ReadU8();
-        var kind = (RenameKind)r.ReadU8();
-        r.ReadU16();
-        var uid = r.ReadU32();
-        var name = r.ReadFixedString(RenamePacket.NameLength);
-        r.Skip(14);
-        return new(kind, uid, name);
     }
 }
 

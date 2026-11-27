@@ -1,20 +1,7 @@
+using DRPG.Shared.Packets.Global;
 using DRPG.Shared.Protocol;
 
 namespace DRPG.Server.Network.Packets.Global;
-
-/// <summary>✅ 0x64 (C2S 114 B, v322): primeiro pacote no global. Usuário[21], personagem[21] e 72 B finais.</summary>
-public sealed record GlobalUserAuthRequest(string Username, string CharacterName) : IClientPacket<GlobalUserAuthRequest>
-{
-    public static PacketLength Length => PacketLength.Exact(114);
-
-    public static GlobalUserAuthRequest Read(PacketReader r)
-    {
-        var username = r.ReadFixedString(21);
-        var character = r.ReadFixedString(21);
-        r.Skip(72);
-        return new(username, character);
-    }
-}
 
 /// <summary>
 /// ✅ 0x7B (C2S 1120 B, v322): dados cifrados em AES-128-ECB (u32 uid do digimon + u8 owned[1100]; ❓ o que sobra

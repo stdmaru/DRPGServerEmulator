@@ -1,3 +1,4 @@
+using DRPG.Shared.Packets.Map;
 using DRPG.Server.Game;
 using DRPG.Server.Game.Battle;
 using DRPG.Server.Game.Entities;
