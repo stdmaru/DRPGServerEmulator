@@ -44,7 +44,7 @@ public class PacketSizeTests
             (new Unknown05Packet(), 164),
             (new HelloPacket(0x0E), 16),
             (new RefreshCharacterInfoPacket(character), 204),          // ✅ v322
-            (new WildDigimonUpdatePacket(wild), 56),
+            (Wrap(WildDigimonUpdate.Of(wild)), 56),
             (new ItemDropPacket(drop), 112),
             (new ItemDropPacket(drop, removed: true), 112),
             (new ChatNormalPacket("[server]", "ok"), 277),             // ✅ v322 (0x21, DigimonRPG.bin @ 0x00ABE221)
@@ -89,7 +89,7 @@ public class PacketSizeTests
             (new ItemDestroyPacket(header, item), 240),                // ✅ v322 (0xBD)
             (new BattleItemReceivePacket([item]), 444),                // ✅ v322 (0xC8)
             (new InventoryRefreshPacket(character), 4424),             // ✅ v322 (0xFC)
-            (new DRPG.Server.Network.Packets.Map.TeleportCharacterPacket(79, 1, 1), 8),
+            (Wrap(new TeleportCharacterPacket(79, 1, 1)), 8),
             (new RefreshDigimonStatusPacket(digimon), 696),            // ✅ v322 (sessão 56)
             (new SingleDigimonInfoPacket(digimon), 696),               // ✅ v322 (0xB4)
             (new KeepAlivePacket(0xC4), 0),

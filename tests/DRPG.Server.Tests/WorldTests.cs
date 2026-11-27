@@ -6,6 +6,7 @@ using DRPG.Server.Game.Stats;
 using DRPG.Server.Game.World;
 using DRPG.Server.Network;
 using DRPG.Server.Network.Handlers;
+using DRPG.Shared.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DRPG.Server.Tests;

@@ -160,6 +160,9 @@ public sealed record FieldNpcPacket(short MapId, short NpcId, short X, short Y, 
     public const byte ActionRemove = 0;
     public const byte ActionAdd = 1;
 
+    /// <summary>✅ <c>0x00acfed0</c>: a removal with map id 0 removes the NPC from every map.</summary>
+    public const short AllMaps = 0;
+
     public static ushort Opcode => (ushort)MapOpcode.FieldNpcUpdate;
     public static PacketLength Length => PacketLength.Exact(10);
 

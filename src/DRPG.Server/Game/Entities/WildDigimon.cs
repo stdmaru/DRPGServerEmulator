@@ -1,5 +1,6 @@
 using DRPG.Server.Data.GameData;
 using DRPG.Server.Game.Stats;
+using DRPG.Shared.Protocol;
 
 namespace DRPG.Server.Game.Entities;
 
