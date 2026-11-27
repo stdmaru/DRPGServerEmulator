@@ -195,6 +195,14 @@ public sealed class FieldWildsTests
         Assert.Equal(MoveState.Standing, wild.Entity.State);
         Assert.Equal((2, 3), (wild.Entity.CellX, wild.Entity.CellY));
         Assert.Equal(4, wild.Entity.Direction);
+
+        // ✅ 0x007f3df0 lines 22-55: while playing IdleA/IdleB (state 2/3), a Standing 0x11 keeps IdleA and applies
+        // cmd.Direction without triggering 0x007f4b10 until state returns to Standing (1).
+        wild.Entity.SetIdleState(MoveState.IdleA);
+        wilds.Apply(WildPacket(serial, 1, 2, 2, 2, 2, dir: 5), mapId: 79, collision, _ => null, rng);
+        wilds.Step(tamer, collision, pathfinder, rng);
+        Assert.Equal(MoveState.IdleA, wild.Entity.State);
+        Assert.Equal(5, wild.Entity.Direction);
     }
 
     [Fact]

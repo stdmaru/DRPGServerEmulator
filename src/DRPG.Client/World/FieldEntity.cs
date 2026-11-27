@@ -132,6 +132,13 @@ public sealed class FieldEntity
         _commands.Clear();
     }
 
+    /// <summary>✅ <c>0x007f3df0</c> lines 34-55: syncs idle variation states (<c>Standing</c>/<c>IdleA</c>/<c>IdleB</c>) into <c>+0x149</c>.</summary>
+    public void SetIdleState(MoveState state)
+    {
+        if (!IsMoving && state is MoveState.Standing or MoveState.IdleA or MoveState.IdleB)
+            State = state;
+    }
+
     /// <summary>✅ <c>0x008656b0</c>: sets a new destination and enters the walking/running state.</summary>
     public void SetDestination(int destX, int destY, MoveState state = MoveState.Run)
     {

@@ -137,6 +137,8 @@ public sealed class FieldWilds
                     animator.Switch(FieldAnimator.Standing);
                 }
                 animator.Step(random.Next(4));
+                if (!wild.Entity.IsMoving && animator.Animation is FieldAnimator.Standing or FieldAnimator.IdleA or FieldAnimator.IdleB)
+                    wild.Entity.SetIdleState((MoveState)animator.Animation);
             }
         }
     }
