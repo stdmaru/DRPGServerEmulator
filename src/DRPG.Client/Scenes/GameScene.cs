@@ -29,9 +29,6 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     /// <summary>✅ <c>0x00b4e550</c>: at most 10000 steps in one frame.</summary>
     public const int MaxStepsPerFrame = 10_000;
 
-    /// <summary>✅ <c>0x00abbb20</c>: the transition counter <c>+0x34c</c> starts at 0x5f; from 100 to 199 the screen brightens (❓ the curve).</summary>
-    public const int FadeStart = 0x5f, FadeFullyDark = 100, FadeEnd = 200;
-
     /// <summary>✅ The text shown when the connection is lost (<c>0xed0</c>), at the middle of the screen.</summary>
     public const int ConnectionLostText = 0xed0;
     private const int MessageCenterX = 400, MessageCenterY = 300;
@@ -56,7 +53,6 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private long _stepsRun;
     private ulong _startMs;
     private bool _started;
-    private int _transition = FadeStart;
     private TimeSpan _clockOffset;
     private readonly List<DrawItem> _queue = [];
     private readonly FrameStats _stats = new();
@@ -65,7 +61,6 @@ public sealed class GameScene(GameContext game, Random random) : IScene
 
     internal bool WorldEntered => _field is not null;
     internal bool ConnectionLost => _lost;
-    internal int Transition => _transition;
     internal FieldMap? Field => _field;
     internal FieldAnimator? TamerAnimation => _tamerAnimation;
     internal FieldAnimator? DigimonAnimation => _digimonAnimation;
@@ -131,8 +126,6 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         }
         if (_lost)
             DrawLost(renderer);
-        else if (_field is not null)
-            DrawFade(renderer);
     }
 
     /// <summary>
@@ -160,7 +153,9 @@ public sealed class GameScene(GameContext game, Random random) : IScene
                 game.HasEnteredWorld = true;
                 _startMs = nowMs;
                 _started = true;
-                _transition = FadeStart;
+                // ✅ no brightening: the 0x03 handler (0x00abbb20) sets +0x34c = 0x5f, and the first field frame (0x00b4e550) sees the
+                // marker, runs the entry logic (0x00aba410, quests: a later step) and sets it back to 0 at once. The darkening of
+                // 100..0x71 (0x00b55f10) belongs to coming back from a battle or an event (0x18395/0x18396), outside this milestone.
                 break;
         }
     }
@@ -240,10 +235,6 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     {
         _tamerAnimation?.Step();
         _digimonAnimation?.Step(random.Next(4));                       // ✅ 1 in 4 for the animation 3
-        if (_transition is > 0 and < FadeEnd)                          // 0 = the brightening is over: it does not start again
-            _transition++;
-        if (_transition >= FadeEnd)
-            _transition = 0;
     }
 
     /// <summary>✅ <c>0x00b4b550</c>: the camera on the tamer, the ground, then the queue with the objects, the digimon and the tamer, then the HUD.</summary>
@@ -295,17 +286,6 @@ public sealed class GameScene(GameContext game, Random random) : IScene
             options.DrawBlended(renderer, edge, x, y, SpriteEffects.DigimonEdgeAlpha(mapId));
         if (digimon.Texture is { } frame)
             renderer.Draw(frame, x, y);
-    }
-
-    /// <summary>❓ The darkness: black until the counter reaches 100, then it fades out linearly until 200.</summary>
-    internal static int DarknessOf(int transition) => transition is <= 0 or >= FadeEnd ? 0
-        : transition < FadeFullyDark ? 255
-        : 255 * (FadeEnd - transition) / (FadeEnd - FadeFullyDark);
-
-    private void DrawFade(IRenderer renderer)
-    {
-        if (DarknessOf(_transition) is > 0 and var amount)
-            renderer.Darken(amount);
     }
 
     private void Lose(string reason)

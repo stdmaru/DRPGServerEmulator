@@ -20,7 +20,7 @@ Marco 3 do [cliente novo](../planos/cliente-novo.md) (PR #49). Endereços da v32
 
 1. **"PreMap Loading Thread"** (`0x00b34c10`, aberta pelo laço principal logo depois da troca para a cena 5; `+0x5e4 = 1`): fundo sorteado uma vez (`rand() % contagem`, `+0x5e0`), dica = pedaço **0** do texto `0xa6b`. Depois de **16 quadros** começa um cronômetro (contador de desempenho); quando passa de **1,0 s** (`DAT_0100f030`), a thread chama `0x00adca00`, que manda o **`0x01`** (nome + usuário, 43 B) e o `0x16`/`0x18` do channel, e termina. É por isso que o `0x01` sai 2,75–2,9 s depois da conexão nos pcaps, e o `0x49` e o eco do `0x0E` antes dele.
 2. Entre as duas: a thread acabou mas `+0x5e4` continua 1, e a cena 5 (`0x00b4e550`) não desenha nada enquanto `+10` ou `+0x5e4` estiverem ligados (só os textos de conexão perdida): **o último quadro fica parado na tela** até o `0x03`.
-3. **"Map Loading Thread"** (`0x00b34dc0`, chamada pelo tratador do `0x03` `0x00abbb20` quando `+10 == 0`): dica sorteada `rand() & 15` (`+0x624`), espera a primeira thread terminar, mantém o fundo e liga `+10`. O primeiro quadro ainda mostra a dica 0 e dorme 30 ms a mais (marca `[DAT_011584f0]+0xf803`, ligada por `0x00adca00` e desligada a cada quadro). O tratador carrega o `.map` (`0x00ad3730`, que termina com `0x00b348e0`: desliga `+10` e espera a thread), então a tela some só quando **o mapa carregou e já foram 16 quadros**. Só depois o tratador manda `0x04` e `0xF0` e põe `+0x34c = 0x5f` (o clareamento). Nos pcaps: `0x03` → `0x04` ≈ 2,0 s.
+3. **"Map Loading Thread"** (`0x00b34dc0`, chamada pelo tratador do `0x03` `0x00abbb20` quando `+10 == 0`): dica sorteada `rand() & 15` (`+0x624`), espera a primeira thread terminar, mantém o fundo e liga `+10`. O primeiro quadro ainda mostra a dica 0 e dorme 30 ms a mais (marca `[DAT_011584f0]+0xf803`, ligada por `0x00adca00` e desligada a cada quadro). O tratador carrega o `.map` (`0x00ad3730`, que termina com `0x00b348e0`: desliga `+10` e espera a thread), então a tela some só quando **o mapa carregou e já foram 16 quadros**. Só depois o tratador manda `0x04` e `0xF0` e põe `+0x34c = 0x5f` (a marca de entrada; não há clareamento, ver o quadro da cena). Nos pcaps: `0x03` → `0x04` ≈ 2,0 s.
 
 Cada volta do laço: confere a saída; desenha o quadro (fundo em (0, 0), `game_end_gauge` quadro `+0x5cc` em (740, 540), `loading_under_line` em (0, 550), dica centrada em y 580 amarela com sombra, `0x00b55560` ignora o x recebido); `Sleep(80)`; avança o medidor (volta a 0 em 12, **sem zerar** entre as duas threads); `Sleep(10)`. O limitador de 30 FPS (`0x00867ed0(0x1e)`) nunca segura, então o quadro dura **90 ms** (≈ 115–125 ms no Windows, pela resolução de 15,6 ms do `Sleep`, como nos pcaps). Sem cursor. Mapa perdido durante a carga (`0x00b3fdf0() == 0`): texto `0xa8b` em (400, 300) e a thread sai.
 
@@ -53,7 +53,7 @@ A sessão 10 (`login-into-map`) manda o `0x01` 0,16 s depois da conexão; ❓ ai
   2. Perda de conexão (channel `0x00b3fde0`, mapa `0x00b3fdf0`, global `0x00ad2870`) → `+0x348 = 1` e motivo em `+0x349`/`+0x34a`; mostra `0xed0`/`0xed1`/`0xed2` em (400, 300) até a saída.
   3. **Lógica em passo fixo**: acumula o tempo real e roda `0x00afdba0` (rede) + `0x00afe1c0` (mundo) + `0x00a49b10` uma vez por passo de `DAT_0135af08` ms (no máximo 10000 passos por quadro). ❓ Valor de `DAT_0135af08` (o emulador calibrou o movimento a 60 passos/s).
   4. Desenho conforme o modo `[DAT_01158504]+0x80`: **1 = campo `0x00b4b550`**, 2 = batalha `0x00b498d0`.
-  5. Transição de mapa (`+0x34c`: ≥ 200 escurece, 100..199 clareia com `FUN_00b55f10`, 500..650 mensagem `+0x352`): portais, fora deste marco.
+  5. Contador `+0x34c`: **`0x5f`** = marca da entrada (do `0x03`): o primeiro quadro chama `0x00aba410` (lógica de entrada: missões) e zera, **sem escurecer**; ≥ 200 conta até as marcas `0x18395`/`0x18396` (valor 200 vem do `0x00ab9df0`) e passa a 100; **100..`0x71`** escurece com `FUN_00b55f10(min(8, (0x74 − (v+1)) / 2))`, um passo por quadro (14 quadros, da volta de batalha ou evento); 500..650 mensagem `+0x352`. Fora deste marco, salvo o `0x5f`.
   6. Texto de aviso por tipo de célula sob o tamer (`0x00b35e60`; `0xed3`..`0xed7` para nível < 5/6 em certas áreas).
   7. Nome sob o cursor (`0x00b377d0`/`0x00b37810`, Ctrl/Alt), clique no chão (`0x00b4d290` andar), cursor, `0x00b3e3d0`, fim do quadro.
 - ✅ **campo `0x00b4b550`**, na ordem (cada bloco cronometrado em `+0x40..+0x58`):
@@ -78,7 +78,7 @@ Despachante do mapa `0x00abc350`: índice = opcode − 2 na tabela de bytes `0xa
   2. `0x00adcc50`: conecta no servidor **global** e manda o `0x64`.
   3. Manda no mapa **`0x04`** (16 B: o id de 16 B do personagem, vtable `+0x14` = `0x00865100`, que devolve `+0x1a0`).
   4. Manda **`0xF0`** (28 B, primeiro u32 = `0x100`; ❓ resto).
-  5. `+0x34c = 0x5f` (clareia a tela a partir de 95, ver o quadro da cena).
+  5. `+0x34c = 0x5f` (marca de entrada, zerada no primeiro quadro da cena sem escurecer nada).
   6. Só na primeira entrada (`+0x3f15 == 0`): `0x00ae07b0(0x121)` (pacote vazio) e marca o sinal.
   - Isso explica o atraso de ~1 s na captura: `0x04`/`0xF0`/`0x121` só saem depois da carga do `.map`.
 
@@ -266,8 +266,8 @@ Código: `GameScene` (cena 5), `WorldLoading` e `LoadingScreen` (tela de carga),
 - `0x0E` C2S: a semente recebida e 14 B zero. `0x16` C2S (55 B): usuário[21], personagem[21], 13 B zero ❓. `0x18` C2S (74 B): três campos de 20 B com os MAC `AA-BB-CC-DD-EE-FF` e 14 B zero. Decisão do dono: **MAC reais**, só no pacote, nunca em log.
 - Global `0x64` C2S (114 B): usuário[21], personagem[21], zeros, `u32 3, u32 1, u32 1` ❓ e o uid do personagem no byte 96; `0xDE` C2S (50 B): `u32 3`, personagem[20], `u32 x`, `u32 y` (a célula do tamer), duas vezes.
 
-**Provisório (❓)** no código, para a conferência lado a lado: curva do clareamento (escuro até 100, linear até 200), nome do servidor (texto do link do canal), passo da lógica de 60/s no lugar de `DAT_0135af08 = 30` e saída da tela de conexão perdida (um clique volta à cena 2).
+**Provisório (❓)** no código, para a conferência lado a lado: nome do servidor (texto do link do canal), passo da lógica de 60/s no lugar de `DAT_0135af08 = 30` e saída da tela de conexão perdida (um clique volta à cena 2).
 
 **Tempo de quadro** (`FrameStats`, escrito na saída de erro ao sair da cena; alvo 60 FPS, p99 < 16,6 ms): primeira medição em 2026-11-27, no Linux, com o renderizador `gpu`, contra o emulador local, parado no mapa 7: **3218 quadros, média 7,21 ms, p99 7,75 ms, máximo 431 ms**. O máximo é o quadro da tela de carga em que o `.map` e os tiles são carregados (`AdvanceLoading`), escondido atrás da tela de carga como no original; com o jogador parado, ainda não há jogadores, selvagens nem movimento na medição.
 
-**Corrigido ao testar**: o contador do clareamento (`+0x34c`) zerava ao chegar em 200 e o passo seguinte o somava de novo, escurecendo a tela outra vez em ciclo; agora 0 = terminado.
+**Corrigido ao testar**: o clareamento ao entrar (preto até 100, linear até 200) não existe no original; o dono notou na conferência e ele saiu: `0x5f` é só a marca de entrada, zerada no primeiro quadro (`0x00b4e550`).

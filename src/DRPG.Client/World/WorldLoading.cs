@@ -19,7 +19,7 @@ public enum LoadingPhase
     /// <summary>
     /// ✅ "Map Loading Thread" (<c>0x00b34dc0</c>, from the <c>0x03</c> handler <c>0x00abbb20</c>, <c>+10 = 1</c>): a random tip while
     /// the <c>.map</c> loads; it ends once the map is loaded (<c>0x00b348e0</c> clears <c>+10</c>) and 16 frames have been shown. Only
-    /// then does the handler send <c>0x04</c> and <c>0xF0</c> and start the brightening.
+    /// then does the handler send <c>0x04</c> and <c>0xF0</c> and set the entry marker (+0x34c = 0x5f, no brightening).
     /// </summary>
     Map,
 

@@ -404,37 +404,22 @@ public sealed class GameSceneTests : IDisposable
         scene.Frame(_fixture.Renderer, entered + 1_000_000);
         scene.Frame(_fixture.Renderer, entered + 1_000_000 + 1000);
 
-        Assert.Equal(0, scene.Transition);                              // the fade (105 steps) is over, and stays over
         Assert.Equal((10_000 + 60) % 320, scene.DigimonAnimation!.IdleCounter);
         Assert.False(scene.ConnectionLost);
     }
 
-    [Theory]
-    [InlineData(-5, 0)]
-    [InlineData(0, 0)]
-    [InlineData(95, 255)]
-    [InlineData(99, 255)]
-    [InlineData(100, 255)]
-    [InlineData(150, 127)]
-    [InlineData(199, 2)]
-    [InlineData(200, 0)]
-    [InlineData(5000, 0)]
-    public void The_darkness_of_the_entry_goes_from_black_to_clear(int transition, int darkness) =>
-        Assert.Equal(darkness, GameScene.DarknessOf(transition));
-
     [Fact]
-    public void The_entry_starts_dark_and_ends_clear()
+    public void The_field_shows_up_at_once_without_a_brightening()
     {
         UseData();
-        var (scene, _) = Enter();
+        var (scene, entered) = Enter();
         using var owned = scene;
 
-        Assert.Equal(GameScene.FadeStart, scene.Transition);
-        Assert.Contains(255, _fixture.Renderer.Darkens);
-
-        for (int step = 0; step < GameScene.FadeEnd; step++)
-            scene.Step();
-        Assert.Equal(0, scene.Transition);
+        // ✅ 0x00b4e550: the 0x5f marker of the 0x03 handler goes back to 0 on the first field frame, nothing darkens the screen
+        Assert.Empty(_fixture.Renderer.Darkens);
+        scene.Frame(_fixture.Renderer, entered + 1000);
+        scene.Frame(_fixture.Renderer, entered + 2000);
+        Assert.Empty(_fixture.Renderer.Darkens);
     }
 
     /// <summary>The field's draws of the digimon (003_1, 80 wide) and of the tamer's body (a_00, 100 wide), in order.</summary>
