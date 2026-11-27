@@ -1,17 +1,5 @@
 namespace DRPG.Server.Game.Entities;
 
-public enum Direction : ushort
-{
-    South = 0,
-    SouthWest = 1,
-    West = 2,
-    NorthWest = 3,
-    North = 4,
-    NorthEast = 5,
-    East = 6,
-    SouthEast = 7,
-}
-
 public enum Rank : byte
 {
     GoldDigizoid = 1,

@@ -40,6 +40,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Padrões de código](arquitetura/padroes-de-codigo.md): nomes e sufixos, tamanho, tipos e erros, recursos permitidos/proibidos, testes, garantias automáticas (analyzers, APIs banidas, testes de arquitetura).
 - [Biblioteca compartilhada](arquitetura/shared.md): pacotes de mão dupla com ida e volta e testes dourados, leitores de formato, versões do oficial.
 - [Cliente](arquitetura/cliente.md): camadas, fatia de feature (`State`/`Handlers`/`Actions`/`Window`), frame, registro compatível com NativeAOT, resolução e UI ancorada.
+- [Fidelidade e resolução](arquitetura/resolucao.md): espaço original 800×600, UI fracionária com âncoras, mundo inteiro, assets HD, guia de tradução de coordenadas do decompilado.
 - [Como estender](arquitetura/extensao.md): receitas fechadas (item, C2S, S2C, janela, domínio, formato, opção, patch do oficial) e os únicos pontos de registro manuais.
 
 ### Emulador
@@ -67,6 +68,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Formato `.spr`](cliente/formato-spr.md): sprites em RGB565 codificados por linha, sombra opcional.
 - [Tela de login do launcher](cliente/tela-login-launcher.md): sprites antigos, medidas do painel e layout escolhido.
 - [Cenas do cliente](cliente/cenas.md): sequência até a seleção de personagens (marco 2): carga, seleção de mundo, seleção de personagens, GUI, texto e som. Inclui o que a fase C implementou e o que ficou ❓.
+- [Campo](cliente/campo.md): andar, selvagens (`0x11`, fila de comandos), entidades e UI do campo (marco 3, passo 2; RE em andamento).
 - [Cena de jogo](cliente/cena-jogo.md): entrada no mapa (marco 3): "Game Start", conexão no servidor de mapa, sequência de pacotes, `CSceneGame` (init, quadro, campo), UI básica e a [implementação no cliente novo](cliente/cena-jogo.md#implementação-no-cliente-novo-marco-3-fase-c).
 - [Carga inicial](cliente/carga-inicial.md): passos da tela de carga e alvo da barra (39/70/90/99/101), as 39 tabelas, listas de pré-carga.
 - [Formato `.ani`](cliente/formato-ani.md): `DCANIMATION0.5`, âncoras por quadro, 20 animações × 8 direções.
@@ -80,6 +82,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 ### Planos
 - [Cliente novo](planos/cliente-novo.md): em andamento (PR #42: marco 1 Loading → Login; launcher de login + patch). Source port em C# .NET 10 + SDL3/SDL_GPU (Vulkan/D3D12), Windows/Linux x64/arm64, regras de desempenho, RE de formatos e marcos.
 - [Cards e Card Slash](planos/card-slash.md): especificação do sistema de cards.
+- [Widescreen e resoluções maiores](planos/widescreen.md): escopo definido, começa depois do PR #51. Apresentação entre 4:3 e 2,39, UI fracionária com âncoras, assets HD, migração do que já existe.
 
 ### Ferramentas de RE
 - [Dump de RE](ferramentas/dump-re.md): Ghidra headless → decompilado por função, strings, chamadas e símbolos em `work/re/<versão>/dump`, consultados com `grep`; pontos conhecidos da v322 (WinMain, linha de comando, cenas).

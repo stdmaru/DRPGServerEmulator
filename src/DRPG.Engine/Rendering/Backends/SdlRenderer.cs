@@ -124,6 +124,15 @@ public sealed unsafe class SdlRenderer : IRenderer
         SDL_SetTextureColorMod(t.Handle, 255, 255, 255);
     }
 
+    /// <summary>✅ v322 mode 5 (<c>0x00876a30</c>): additive RGB (<c>min(dst + src, 255)</c>) for portals and glow effects.</summary>
+    public void DrawAdditive(ITexture texture, int x, int y)
+    {
+        var t = (Texture)texture;
+        SDL_SetTextureBlendMode(t.Handle, SDL_BlendMode.SDL_BLENDMODE_ADD);
+        Draw(texture, x, y);
+        SDL_SetTextureBlendMode(t.Handle, SDL_BlendMode.SDL_BLENDMODE_BLEND);
+    }
+
     public void Darken(int amount)
     {
         amount = Math.Clamp(amount, 0, 255);

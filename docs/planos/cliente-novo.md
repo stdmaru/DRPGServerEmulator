@@ -73,7 +73,8 @@ DRPG.Client   loop SDL3 + SDL_GPU
 1. **Launcher** ([acima](#launcher-login--auto-patcher-marco-1)): leitura e gravação de `.hf/.pf` no `DRPG.Shared`, patch a partir do `DR_Configuration.json`, mesclagem no `resource`, tela de login antiga, login com chave de 5 h e início do jogo. Valida SDL_GPU + NativeAOT em Windows e Linux.
 2. **Cliente: Loading → Login do jogo** ✅ (PR #46): janela, carga real, `ServerScene` e `CharacterSelectScene` 1:1 com a v322 (incluindo criar, apagar e senha secundária) e a sequência login → channel → lista. Ver [cenas](../cliente/cenas.md#implementação-fase-c-).
 3. **Entrar no mapa (com a UI básica)** ✅ feito (PR #49, `feat/client-m3`; conferido lado a lado pelo dono; parado no mapa 7, p99 do quadro 7,75 ms): "Game Start" → conexão no servidor de mapa → cena de jogo (cena 5) mostrando o mapa, o próprio tamer e digimon e a UI básica do original, parados. Daqui em diante, dentro do mundo, **um passo por vez** (cada um um PR): andar, ver jogadores e selvagens, primeira medição de desempenho, e assim por diante.
-4. HUD e chat com TTF; resolução, tela cheia e escala de UI.
+   - **Passo 2: andar, entidades do mapa e UI do campo** (em andamento, `feat/client-walk`): andar com o tamer (clique, pathfinding, `0x20`, câmera, digimon seguindo), os digimons que o servidor manda andando pelo lado do cliente, NPCs, portais e demais entidades do lado do cliente, e o comportamento da UI básica (dicas, hover/clique dos botões, minimapa). Janelas ficam para o marco 6.
+4. HUD e chat com TTF; resolução, tela cheia e escala de UI ([plano de widescreen](widescreen.md), depois do PR #51).
 5. Batalha PvE completa.
 6. Janelas uma a uma (inventário, loja, depósito, evolução, party, quests), comparando com o original.
 7. Efeitos de skill, cenas de evolução, sons, vídeos.

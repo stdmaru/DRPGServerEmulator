@@ -103,7 +103,7 @@ public sealed class WorldEntry(CharacterListSlot slot, int slotIndex) : IDisposa
     public int SlotIndex { get; } = slotIndex;
 
     /// <summary>✅ The map of the slot (<c>[DAT_011584f8]+0x511c98</c>).</summary>
-    public int MapId => Slot.MapId;
+    public int MapId { get; set; } = slot.MapId;
 
     public WorldSession? Session { get; set; }
 

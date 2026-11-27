@@ -34,6 +34,10 @@ Toda funcionalidade tem a mesma forma, em `Features/<Domínio>/`. Exemplo para o
 - Feature que precisa de outra lê o **estado** dela (ex.: a batalha lê `PartyState`). Nunca chama a janela de outra feature.
 - **Previsão local** (agir antes da resposta) só onde o original faz, com evidência. Exemplo: o movimento anda antes do `0x20` voltar. Cada previsão é documentada na página da feature.
 
+✅ **Primeira fatia: `Features/Field/`** (PR #51, [campo](../cliente/campo.md#código-no-cliente-novo)): `FieldState` (o mapa carregado, o tamer e o digimon, os NPCs de quest, a troca de mapa), `FieldHandlers` (`0x11`, `0x09`, `0xB0`), `FieldActions` (clique no chão e `0x20`, o único `Send` da feature) e `FieldView` (desenha o estado; o campo não tem janela). As peças sem regra de feature (entidade, colisão, A*, selvagens, NPCs, portais, desenho por tipo de entidade) ficam em `World/`, sem pacote e sem dependência opcional.
+
+**Entrega dos pacotes, até o gerador de registro existir** ([decisão de 2026-11-27](../projeto/decisoes.md)): o `MapDecoder` tipa o opcode; o `WorldSession` trata só os pacotes da sessão (`0x0E`, `0x02`, `0x03`, `0xC4`) e põe **todo outro pacote tipado** numa fila única (`TryReceive`); a cena esvazia a fila e entrega cada pacote ao `Handle(object)` do `<Domínio>Handlers`, que tem um `case` por pacote e um método tipado para cada. Pacote sem handler vai para o log. Nada de fila ou `TryReceiveX` por opcode.
+
 ## Threads e o frame
 - **Thread principal** dona de todo o estado, da UI e da GPU.
 - **Rede:** uma tarefa de recepção por conexão corta e faz o parse do pacote, e põe o pacote **já tipado** na fila da thread principal. Pacote inválido fecha a conexão e mostra a mensagem.
@@ -52,10 +56,12 @@ Sem `async`/`await` dentro do frame. Sem alocação por frame no caminho quente 
 Handlers (`[PacketHandler]`) e janelas (`[Window]`) são achados por um **gerador de código** do projeto, que monta a tabela em tempo de compilação. Não é reflexão em runtime, que o NativeAOT corta. Criar o arquivo basta. Testes de contrato conferem que todo S2C do `DRPG.Shared` tem handler no cliente ou está na lista explícita de ignorados, com o motivo.
 
 ## Tela e resolução
-- O mundo é desenhado em coordenadas de mapa, e a câmera tem viewport livre e zoom. Tela maior mostra mais mapa.
-- Cada janela guarda a **posição original em 800×600** (constante com a evidência: classe `CWindow_*` e endereço) e uma **âncora** (canto, borda ou centro). A posição final = âncora + posição original × escala da UI (1×, 1,5×, 2×; padrão 1×).
-- Arte de tela cheia de 800×600 e telas fixas em 4:3 (login, seleção de personagem, loading) são **centralizadas** num quadro de 800×600, com bordas pretas, por um único utilitário (`FixedScreen`). Nada de esticar.
-- Texto sempre por `Font` (TTF), com tamanho em pontos multiplicado pela escala da UI.
+Regras completas e o guia de tradução de coordenadas do decompilado em [fidelidade e resolução](resolucao.md). Resumo:
+- Área de apresentação recortada entre **4:3 e 2,39**, com barras pretas fora disso.
+- **Mundo:** escala inteira (padrão 1×), `Viewport` = área / escala; tela maior mostra mais mapa nos dois eixos. Zoom inteiro para alturas > 600 fica para depois.
+- **UI:** escala fracionária `altura / 600` (altura lógica sempre 600), assets HD 2×/3×/4× com o tamanho exato do original × n. Cada janela guarda a **posição original em 800×600** (constante com a evidência: classe `CWindow_*` e endereço) dentro de um `UiGroup` com **âncora**; a feature nunca faz a conta da adaptação.
+- Arte de tela cheia de 800×600 e telas fixas em 4:3 (login, seleção de personagem, loading) são **centralizadas** num quadro de 800×600, com bordas pretas (`FixedScreen`). Nada de esticar.
+- Texto sempre por `Font` (TTF), rasterizado no tamanho físico (pontos × escala da UI).
 - **Modo padrão = original.** Modernidades (resolução, escala, zoom, fontes) ficam em `ClientOptions`, validadas na partida.
 
 ## Instalação original (drop-in)

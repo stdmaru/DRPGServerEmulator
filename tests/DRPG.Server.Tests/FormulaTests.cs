@@ -141,7 +141,7 @@ public class CombatFormulaTests
         Assert.Equal(WildFormulas.Veteran(11), wild.Leader.Stats);
         Assert.Equal(WildFormulas.GradeVeteran, wild.Leader.WildGrade);
 
-        var fieldPayload = new Network.Packets.Map.WildDigimonUpdatePacket(wild).EncodePayload();
+        var fieldPayload = Network.Packets.Map.WildDigimonUpdate.Packet(wild).EncodePayload();
         Assert.Equal(WildFormulas.GradeVeteran, fieldPayload[44]);
 
         var statusPayload = new Network.Packets.Map.BattleDigimonStatusPacket(wild.Leader).EncodePayload();

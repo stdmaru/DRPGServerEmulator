@@ -36,6 +36,9 @@ public enum LoadingAction
 
     /// <summary>The loading screen is over: send <c>0x04</c>/<c>0xF0</c>/<c>0x121</c> and show the field.</summary>
     EnterWorld,
+
+    /// <summary>A cross-map transition loading screen (<c>0x00aba410</c>) is over: send <c>0x04</c>/<c>0xB0</c> and resume the field.</summary>
+    MapTransitionDone,
 }
 
 /// <summary>
@@ -71,6 +74,7 @@ public sealed class WorldLoading
     private bool _mapLoaded;
     private int _mapTip;
     private bool _started;
+    private bool _isTransition;
 
     public WorldLoading(Random random, int backgroundCount)
     {
@@ -80,8 +84,8 @@ public sealed class WorldLoading
 
     public LoadingPhase Phase { get; private set; } = LoadingPhase.PreMap;
 
-    /// <summary>The background image of the whole entry.</summary>
-    public int Background { get; }
+    /// <summary>The background image of the whole entry or transition.</summary>
+    public int Background { get; private set; }
 
     /// <summary>The gauge frame on the screen (<c>+0x5cc</c>); it does not go back to 0 between the two runs.</summary>
     public int GaugeFrame { get; private set; }
@@ -115,6 +119,23 @@ public sealed class WorldLoading
         _mapLoaded = true;
     }
 
+    /// <summary>
+    /// ✅ <c>0x00aba410</c> → <c>0x00b34dc0</c>: starts the Map Loading Thread for a cross-map <c>0xB0</c> transition
+    /// (new random background &amp; tip, 16 minimum frames, no PreMap phase).
+    /// </summary>
+    public void BeginMapTransition(int backgroundCount)
+    {
+        _isTransition = true;
+        Phase = LoadingPhase.Map;
+        Background = backgroundCount > 0 ? _random.Next(backgroundCount) : -1;
+        _mapTip = _random.Next(MapTips);
+        _counter = 0;
+        _minimumShown = false;
+        _mapLoaded = false;
+        _started = false;
+        _joinedFrame = false;
+    }
+
     public LoadingAction Update(ulong nowMs)
     {
         if (!_started)
@@ -134,7 +155,7 @@ public sealed class WorldLoading
         if (Phase == LoadingPhase.Map && _mapLoaded && _minimumShown)
         {
             Phase = LoadingPhase.Done;
-            return LoadingAction.EnterWorld;
+            return _isTransition ? LoadingAction.MapTransitionDone : LoadingAction.EnterWorld;
         }
 
         // one frame of the loop

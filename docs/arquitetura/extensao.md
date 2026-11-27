@@ -35,13 +35,13 @@ Card, título e buff seguem a mesma receita (efeito ou `StatModifierKind` novo).
 ## Pacote S2C novo (servidor informa algo)
 1. **Shared:** `Opcodes` + o pacote no arquivo do domínio. Ida e volta + dourado.
 2. **Servidor:** o serviço do domínio monta e envia (método de fábrica a partir das entidades). Sequência que o oficial manda junta fica num método só.
-3. **Cliente:** um método em `<Domínio>Handlers` que atualiza `<Domínio>State`. A janela já lê o estado.
+3. **Cliente:** o `case` do opcode no `MapDecoder` (ou no decodificador do servidor) e um método em `<Domínio>Handlers` que atualiza `<Domínio>State`, com o `case` no `Handle(object)` do mesmo arquivo enquanto o gerador de registro não existe ([cliente](cliente.md#a-fatia-de-feature)). A janela já lê o estado.
 4. **Wiki:** catálogo de opcodes.
 
 ## Janela nova (cliente)
-1. `Features/<Domínio>/<Nome>Window.cs` com `[Window]`, posição original em 800×600 com evidência (`CWindow_*`, endereço) e âncora.
+1. `Features/<Domínio>/<Nome>Window.cs` com `[Window]`, posição original em 800×600 com evidência (`CWindow_*`, endereço) e o `UiGroup` com a âncora, seguindo o [guia de coordenadas](resolucao.md#guia-do-decompilado-para-o-nosso-código). O número do original entra como está.
 2. O que ela pede vai no `<Domínio>Actions`; o que ela mostra vem do `<Domínio>State`.
-3. Teste de layout sem GPU.
+3. Teste de layout sem GPU em 800×600 (igual ao original), 1920×1080 e 1280×1024 ([testes](resolucao.md#testes)).
 4. Se abre sozinha numa cena, uma linha na cena. Se abre por um botão, a janela do botão chama `windows.Open<NomeWindow>()`.
 
 ## Domínio novo (ex.: guilda)

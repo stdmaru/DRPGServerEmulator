@@ -7,6 +7,7 @@ Páginas desta seção:
 - [Padrões de código](padroes-de-codigo.md): como o código C# é escrito, o que é permitido e proibido, e como as regras são garantidas automaticamente.
 - [Biblioteca compartilhada](shared.md): protocolo, pacotes de mão dupla, formatos de arquivo e versões do oficial.
 - [Cliente](cliente.md): camadas, threads e a fatia de feature do cliente.
+- [Fidelidade e resolução](resolucao.md): 800×600 como referência, widescreen só na apresentação, e o guia para traduzir coordenadas do decompilado.
 - [Como estender](extensao.md): receitas fechadas (item, opcode, janela, efeito, patch do oficial), com a lista exata de arquivos de cada uma.
 - O detalhe do servidor continua em [emulador](../emulador/arquitetura.md), [handlers](../emulador/handlers.md), [dados](../emulador/dados.md) e [segurança](../emulador/seguranca.md).
 

@@ -61,7 +61,12 @@ public sealed class FieldHud(GameContext game)
     /// </summary>
     private const int ChatSizeSprite = 1, ChatSizeY = 0x225, ChatSizeFirstX = 0x18e, ChatSizeSecondX = 0x190, ChatSizeGap = 2;
 
-    private const int ChatX = 28, ChatY = 460, ChatHeight = 81;
+    private const int ChatX = 28, ChatY = 460, ChatWidth = 409, ChatHeight = 81;
+    private const int BarY = 495;
+
+    /// <summary>✅ <c>0x00b91ec0</c> + bottom bar (<c>y &gt;= 495</c>): true when the point hits the HUD so a ground click is ignored.</summary>
+    public static bool Covers(int x, int y) =>
+        y >= BarY || (x >= ChatX && x < ChatX + ChatWidth && y >= ChatY && y < ChatY + ChatHeight);
 
     /// <summary>
     /// ✅ The alphas (of 32) of the two blends of the bar with the <c>alpha</c> option on: the bar's frame 1 (<c>0x00b569f0(1, …, −1, 0x10, …)</c>)

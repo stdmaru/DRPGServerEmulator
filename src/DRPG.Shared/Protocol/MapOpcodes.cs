@@ -9,6 +9,7 @@ public enum MapOpcode : ushort
     RefreshCharacterInfoReq = 0x04,
     Unknown05 = 0x05,
     Unknown07 = 0x07,
+    FieldNpcUpdate = 0x09,         // S2C ✅ (10 B): adicionar (1) ou remover (0) NPC dinâmico no mapa (0x00abb9e0 / 0x00acfed0)
     Hello = 0x0E,                  // S2C ao conectar; C2S ecoa
     RefreshCharacterInfo = 0x10,   // S2C, resposta ao 0x04
     FieldDigimonUpdate = 0x11,

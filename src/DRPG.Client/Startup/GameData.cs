@@ -24,6 +24,9 @@ public sealed class GameData(
     /// <summary>Rows of each table by lower case name (<c>textattach</c>, <c>map</c>, …); a table the pack lacks is absent.</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string[]>> Tables { get; } = tables;
 
+    /// <summary>The NPCs of <c>npc_info_us</c>, checked when the tables load.</summary>
+    public NpcTable Npcs { get; } = NpcTable.From(tables);
+
     /// <summary>Raw <c>Language\*_US.bin</c> files by file name. ❓ Only <c>TextAttach</c> and <c>ProhibitedWords</c> are applied so far.</summary>
     public IReadOnlyDictionary<string, byte[]> Language { get; } = language;
 
@@ -56,3 +59,4 @@ public sealed class GameData(
         return null;
     }
 }
+
