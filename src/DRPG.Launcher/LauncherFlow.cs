@@ -145,7 +145,10 @@ public sealed class LauncherFlow(
             if (left <= TimeSpan.Zero)
                 return;
             int seconds = (int)Math.Ceiling(left.TotalSeconds);
-            Set(LauncherStage.Failed, $"{_failure} Retrying in {seconds} s...", log: false);
+            string text = $"{_failure} Retrying in {seconds} s...";
+            if (!_patchComplete)
+                SetPatch(text, _patchFraction, complete: false);
+            Set(LauncherStage.Failed, text, log: false);
             await Task.Delay(left < TimeSpan.FromSeconds(1) ? left : TimeSpan.FromSeconds(1), ct);
         }
     }
@@ -167,12 +170,18 @@ public sealed class LauncherFlow(
                 await ConnectAsync(ct);
                 break;
             case PatchOutcome.Maintenance m:
-                SetPatch($"Maintenance: {m.Title}", 0, complete: false);
-                Fail($"{m.Title}: {m.Message.Trim()}", () => PatchAsync(ct));
+                if (m.News is not null)
+                    _news = m.News;
+                string maint = string.IsNullOrWhiteSpace(m.Message) ? m.Title : $"{m.Title}: {m.Message.Trim()}";
+                SetPatch(maint, 0, complete: false);
+                Fail(maint, () => PatchAsync(ct));
                 break;
             case PatchOutcome.NeedsReinstall r:
-                SetPatch($"Version {r.Installed} too old (min {r.Minimum})", 0, complete: false);
-                Fail($"Version {r.Installed} is too old (minimum {r.Minimum}). Please reinstall the game.", null);
+                if (r.News is not null)
+                    _news = r.News;
+                string old = $"Version {r.Installed} is too old (minimum {r.Minimum}). Please reinstall the game.";
+                SetPatch(old, 0, complete: false);
+                Fail(old, null);
                 break;
             case PatchOutcome.Failed f:
                 SetPatch($"Update failed: {f.Reason}", 0, complete: false);

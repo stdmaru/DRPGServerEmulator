@@ -10,8 +10,9 @@ namespace DRPG.Launcher.Scenes;
 /// </summary>
 public sealed class LoginScene : IDisposable
 {
-    private const int PanelX = 455, PanelY = 165;
-    private const int StatusX = 490, StatusY = 392;
+    private const int PanelX = 455, PanelY = 165, PanelWidth = 315;
+    private const int StatusX = PanelX, StatusY = 392, StatusWidth = PanelWidth;
+    private const int StatusPaddingX = 14, StatusPaddingY = 12, StatusLineGap = 4;
 
     // Each mascot runs its own clock, so they never move in step (as in the original).
     private const ulong MascotAFrameMs = 300, MascotBFrameMs = 200;
@@ -26,7 +27,8 @@ public sealed class LoginScene : IDisposable
     public const int MaxLoginLength = RememberedLogin.MaxLoginLength;
     public const int MaxPasswordLength = 64;
 
-    private readonly ITexture _background, _panel, _panelDisabled, _status, _check;
+    private readonly ITexture _background, _panel, _panelDisabled, _check;
+    private readonly NineSliceBox _statusBox;
     private readonly ITexture _fieldsDisabled, _checkDisabled;
     private readonly ITexture[] _mascotA, _mascotB, _mascotADisabled, _mascotBDisabled;
     private readonly ITexture? _rememberLabel, _rememberLabelDisabled;
@@ -35,7 +37,7 @@ public sealed class LoginScene : IDisposable
     private readonly RememberedLogin _remember;
     private readonly IFont? _font;
     private readonly IRenderer _renderer;
-    private ITexture? _statusText;
+    private readonly List<ITexture> _statusLines = [];
     private string? _statusTextValue;
 
     public LoginScene(SpriteStore sprites, RememberedLogin remember, IFont? font, IRenderer renderer)
@@ -50,7 +52,7 @@ public sealed class LoginScene : IDisposable
         _mascotB = sprites.Gui("dr2_in_003_002");
         _mascotADisabled = sprites.GuiDisabled("dr2_in_003_001");
         _mascotBDisabled = sprites.GuiDisabled("dr2_in_003_002");
-        _status = sprites.Gui("dr_friend_016")[0];
+        _statusBox = new NineSliceBox(sprites.Load("gui\\dr2_in_000_003.spr"));
         _check = sprites.Gui("dr2_sub_001_001")[0];
         // the ID and password fields and the checkbox square, seeded at their centres (panel coordinates)
         _fieldsDisabled = sprites.GuiDisabledRegions("dr2_in_003_000", (211, 91), (211, 137), (30, 170));
@@ -145,25 +147,85 @@ public sealed class LoginScene : IDisposable
 
     public void DrawBackground(IRenderer r) => r.Draw(_background, 0, 0);
 
-    /// <summary>Only while there is something to say (connecting, errors, login progress): the caller skips it
-    /// otherwise. A text wider than the box shows its middle.</summary>
+    /// <summary>
+    /// Expandable 9-slice authentication status box under the login panel: word-wraps long messages so nothing is
+    /// clipped and grows vertically to fit all lines.
+    /// </summary>
     public void DrawStatusBox(IRenderer r, string text)
     {
-        r.Draw(_status, StatusX, StatusY);
-        if (_font is null || text.Length == 0)
+        if (text.Length == 0)
             return;
-        if (_statusTextValue != text)
+        int innerWidth = StatusWidth - 2 * StatusPaddingX;
+        if (_font is not null && _statusTextValue != text)
         {
-            _statusText?.Dispose();
-            _statusText = _font.Render(_renderer, text, TextColor);
+            ClearStatusLines();
+            foreach (var line in WrapText(text, innerWidth))
+                _statusLines.Add(_font.Render(_renderer, line, TextColor));
             _statusTextValue = text;
         }
-        var t = _statusText!;
-        int inner = _status.Width - 8;
-        int width = Math.Min(t.Width, inner);
-        int x = StatusX + (_status.Width - width) / 2;
-        int y = StatusY + (_status.Height - _font.LineHeight + 1) / 2;
-        r.DrawPart(t, x, y, (t.Width - width) / 2, width);
+
+        int lineHeight = _font?.LineHeight ?? 14;
+        int lineCount = Math.Max(1, _statusLines.Count);
+        int contentHeight = lineCount * lineHeight + (lineCount - 1) * StatusLineGap;
+        int boxHeight = Math.Max(42, contentHeight + 2 * StatusPaddingY);
+        _statusBox.Draw(r, StatusX, StatusY, StatusWidth, boxHeight);
+
+        int y = StatusY + (boxHeight - contentHeight) / 2;
+        foreach (var line in _statusLines)
+        {
+            int x = StatusX + Math.Max(StatusPaddingX, (StatusWidth - line.Width) / 2);
+            r.DrawPart(line, x, y, 0, Math.Min(line.Width, innerWidth));
+            y += lineHeight + StatusLineGap;
+        }
+    }
+
+    private List<string> WrapText(string text, int maxWidth)
+    {
+        var lines = new List<string>();
+        foreach (var paragraph in text.Replace("\r\n", "\n").Split('\n'))
+        {
+            string current = "";
+            foreach (var word in paragraph.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string candidate = current.Length == 0 ? word : $"{current} {word}";
+                if (MeasureWidth(candidate) <= maxWidth)
+                {
+                    current = candidate;
+                    continue;
+                }
+                if (current.Length > 0)
+                    lines.Add(current);
+                current = word;
+                while (current.Length > 1 && MeasureWidth(current) > maxWidth)
+                {
+                    int fit = current.Length - 1;
+                    while (fit > 1 && MeasureWidth(current[..fit]) > maxWidth)
+                        fit--;
+                    lines.Add(current[..fit]);
+                    current = current[fit..];
+                }
+            }
+            if (current.Length > 0)
+                lines.Add(current);
+        }
+        if (lines.Count == 0)
+            lines.Add(text);
+        return lines;
+    }
+
+    private int MeasureWidth(string text)
+    {
+        if (_font is null)
+            return text.Length * 7;
+        using var t = _font.Render(_renderer, text, TextColor);
+        return t.Width;
+    }
+
+    private void ClearStatusLines()
+    {
+        foreach (var line in _statusLines)
+            line.Dispose();
+        _statusLines.Clear();
     }
 
     public void DrawPanel(IRenderer r, ulong nowMs)
@@ -196,7 +258,7 @@ public sealed class LoginScene : IDisposable
 
     public void Dispose()
     {
-        _statusText?.Dispose();
+        ClearStatusLines();
         _rememberLabel?.Dispose();
         _rememberLabelDisabled?.Dispose();
     }

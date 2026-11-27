@@ -14,8 +14,8 @@ public enum PatchPhase { FetchingConfiguration, Downloading, Applying }
 public abstract record PatchOutcome
 {
     public sealed record UpToDate(PatchConfiguration Configuration, int InstalledVersion = 0) : PatchOutcome;
-    public sealed record Maintenance(string Title, string Message) : PatchOutcome;
-    public sealed record NeedsReinstall(int Installed, int Minimum) : PatchOutcome;
+    public sealed record Maintenance(string Title, string Message, IReadOnlyList<PatchConfiguration.NewsItem>? News = null) : PatchOutcome;
+    public sealed record NeedsReinstall(int Installed, int Minimum, IReadOnlyList<PatchConfiguration.NewsItem>? News = null) : PatchOutcome;
     public sealed record Failed(string Reason) : PatchOutcome;
 }
 
@@ -40,13 +40,14 @@ public sealed class Patcher(HttpClient http, string installDirectory, bool allow
             progress.Report(new PatchProgress(PatchPhase.FetchingConfiguration, 0, 0, 0, 0, 0));
             CheckScheme(configUrl);
             var configuration = PatchConfiguration.Parse(await http.GetStringAsync(configUrl, ct));
+            var news = configuration.News.Count > 0 ? configuration.News : null;
             if (configuration.ServerInfo.Maintenance)
-                return new PatchOutcome.Maintenance(configuration.ServerInfo.Message.Title, configuration.ServerInfo.Message.Msg);
+                return new PatchOutcome.Maintenance(configuration.ServerInfo.Message.Title, configuration.ServerInfo.Message.Msg, news);
 
             int installed = VersionInfo.Read(Path.Combine(installDirectory, "VersionInfo.ini"));
             var steps = configuration.PendingPatches(installed);
             if (steps is null)
-                return new PatchOutcome.NeedsReinstall(installed, configuration.PatchInfo.MinPatchVersion);
+                return new PatchOutcome.NeedsReinstall(installed, configuration.PatchInfo.MinPatchVersion, news);
 
             for (int i = 0; i < steps.Count; i++)
                 await ApplyAsync(steps[i], i, steps.Count, progress, ct);

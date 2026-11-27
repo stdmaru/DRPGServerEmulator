@@ -4,15 +4,16 @@ using DRPG.Engine.Rendering;
 namespace DRPG.Launcher.Scenes;
 
 /// <summary>
-/// Left-column bottom panel of the launcher: always-visible auto-patcher status (download/apply progress or "Up to date")
-/// with the progress bar <c>dr2_in_001_002</c> and percentage.
+/// Left-column bottom panel of the launcher: always-visible auto-patcher status (download/apply progress, maintenance
+/// notice, or "Up to date") with a full-width progress bar built from <c>dr2_in_001_002</c> and percentage.
 /// </summary>
 public sealed class PatchView : IDisposable
 {
     public const int BoxX = 30, BoxY = 392, BoxWidth = 400, BoxHeight = 98;
     private const int PaddingX = 16;
     private const int StatusY = BoxY + 18;
-    private const int BarY = BoxY + 46;
+    private const int BarY = BoxY + 48;
+    private const int BarCapWidth = 8;
 
     private const uint NormalColor = 0xFFFFFFFF;
     private const uint CompleteColor = 0xFF6EE66E;
@@ -26,6 +27,7 @@ public sealed class PatchView : IDisposable
     private uint _statusColor;
     private ITexture? _percentTexture;
     private string? _percentText;
+    private uint _percentColor;
 
     public PatchView(SpriteStore sprites, IFont? font, IRenderer renderer)
     {
@@ -41,10 +43,25 @@ public sealed class PatchView : IDisposable
 
         double clamped = Math.Clamp(fraction, 0, 1);
         int innerWidth = BoxWidth - 2 * PaddingX;
+        uint color = complete ? CompleteColor : NormalColor;
+
+        int percentReserve = 0;
+        if (_font is not null)
+        {
+            string percent = $"{(int)Math.Round(clamped * 100)}%";
+            if (_percentTexture is null || _percentText != percent || _percentColor != color)
+            {
+                _percentTexture?.Dispose();
+                _percentTexture = _font.Render(_renderer, percent, color);
+                _percentText = percent;
+                _percentColor = color;
+            }
+            percentReserve = _percentTexture.Width + 8;
+            r.Draw(_percentTexture, BoxX + BoxWidth - PaddingX - _percentTexture.Width, StatusY);
+        }
 
         if (_font is not null && status.Length > 0)
         {
-            uint color = complete ? CompleteColor : NormalColor;
             if (_statusTexture is null || _statusText != status || _statusColor != color)
             {
                 _statusTexture?.Dispose();
@@ -52,32 +69,59 @@ public sealed class PatchView : IDisposable
                 _statusText = status;
                 _statusColor = color;
             }
-            r.DrawPart(_statusTexture, BoxX + PaddingX, StatusY, 0, Math.Min(_statusTexture.Width, innerWidth));
+            int maxStatusWidth = Math.Max(0, innerWidth - percentReserve);
+            r.DrawPart(_statusTexture, BoxX + PaddingX, StatusY, 0, Math.Min(_statusTexture.Width, maxStatusWidth));
         }
 
         if (_bar.Length > 0)
         {
-            var fill = _bar[0];
             int barX = BoxX + PaddingX;
-            int fillWidth = (int)Math.Round(fill.Width * clamped);
+            int fillWidth = (int)Math.Round(innerWidth * clamped);
             if (fillWidth > 0)
-                r.DrawPart(fill, barX, BarY, 0, fillWidth);
+                DrawStretchedBar(r, _bar[0], barX, BarY, innerWidth, fillWidth);
             if (_bar.Length > 1)
-                r.Draw(_bar[1], barX, BarY);
+                DrawStretchedBar(r, _bar[1], barX, BarY, innerWidth, innerWidth);
+        }
+    }
 
-            if (_font is not null)
-            {
-                string percent = $"{(int)Math.Round(clamped * 100)}%";
-                if (_percentTexture is null || _percentText != percent)
-                {
-                    _percentTexture?.Dispose();
-                    _percentTexture = _font.Render(_renderer, percent, complete ? CompleteColor : NormalColor);
-                    _percentText = percent;
-                }
-                int percentX = barX + fill.Width + 10;
-                int percentY = BarY + (fill.Height - _font.LineHeight + 1) / 2;
-                r.Draw(_percentTexture, percentX, percentY);
-            }
+    /// <summary>
+    /// Draws a horizontal bar sprite (<c>dr2_in_001_002</c>, 231×23) stretched to <paramref name="totalWidth"/> by
+    /// preserving the left/right caps and tiling the middle segment, clipped at <paramref name="visibleWidth"/>.
+    /// </summary>
+    private static void DrawStretchedBar(IRenderer r, ITexture tex, int x, int y, int totalWidth, int visibleWidth)
+    {
+        if (visibleWidth <= 0 || totalWidth <= 0 || tex.Width <= 0)
+            return;
+
+        int cap = Math.Min(BarCapWidth, tex.Width / 2);
+        int middleSrcW = tex.Width - 2 * cap;
+        if (middleSrcW <= 0)
+        {
+            r.DrawPart(tex, x, y, 0, Math.Min(visibleWidth, tex.Width));
+            return;
+        }
+
+        // Left cap
+        int leftW = Math.Min(cap, visibleWidth);
+        if (leftW > 0)
+            r.DrawPart(tex, x, y, 0, leftW);
+
+        // Middle tiled section
+        int middleEnd = Math.Min(totalWidth - cap, visibleWidth);
+        int cursor = cap;
+        while (cursor < middleEnd)
+        {
+            int chunk = Math.Min(middleSrcW, middleEnd - cursor);
+            r.DrawPart(tex, x + cursor, y, cap, chunk);
+            cursor += chunk;
+        }
+
+        // Right cap
+        int rightStart = totalWidth - cap;
+        if (visibleWidth > rightStart)
+        {
+            int rightW = Math.Min(cap, visibleWidth - rightStart);
+            r.DrawPart(tex, x + rightStart, y, tex.Width - cap, rightW);
         }
     }
 

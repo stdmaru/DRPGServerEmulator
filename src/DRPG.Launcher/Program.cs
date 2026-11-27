@@ -142,7 +142,7 @@ internal static class Program
         news.Draw(r, state.News, loading: state.Stage == LauncherStage.Patching && !state.PatchComplete);
         patch.Draw(r, state.PatchStatus, state.PatchFraction, state.PatchComplete);
         login.DrawPanel(r, nowMs);
-        if (state.Stage != LauncherStage.Patching && state.Status.Length > 0)
+        if (state.PatchComplete && state.Status.Length > 0)
             login.DrawStatusBox(r, state.Status);
     }
 
