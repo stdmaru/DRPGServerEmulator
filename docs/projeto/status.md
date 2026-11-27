@@ -54,5 +54,5 @@
 - ❓ O método de dump do Themida é manual e não está documentado. Necessário a cada atualização do oficial.
 - ✅ O stub do XIGNCODE funciona contra o oficial na v322 até a seleção de servidor (login com sucesso). ❓ Falta confirmar canal e mapa.
 - Os endereços em [binário](../cliente/binario.md) são da v242 (o dispatcher etc.). Refazer na v322.
-- Atributos confirmados só até rookie; champion em diante ❓. Bônus de equipamento/título/buff ainda não aplicados.
+- Atributos confirmados de in-training a ultimate (crescimento cumulativo por janela + herança de pontos distribuídos); bônus extra de mega ❓.
 - Protocolo alvo **v322**. Entrada no mapa já bate em tamanho com a sessão 52; o conteúdo de vários pacotes ainda é cópia de captura ou zero.

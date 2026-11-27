@@ -18,7 +18,7 @@ Cada digimon tem **um uid** e cada forma (espécie da linha evolutiva) tem **sta
 | Campo | Por forma | Compartilhado | Evidência |
 |---|---|---|---|
 | espécie (20), estágio (160) | ✅ | | uid 0x32610: 635 rookie ↔ 735 champion |
-| STR/AGI/CON/INT (48) | ✅ | | 0x32610: rookie (91,76,70,69), champion (114,98,91,91); ao voltar, o rookie mantém os seus |
+| STR/AGI/CON/INT (48) | ✅ | | 0x32610: rookie (91,76,70,69), champion (114,98,91,91); cada forma herda o base acumulado e os pontos distribuídos das formas anteriores da linha (0x38a85: gastar AP no rookie/champion propaga para estágios acima) |
 | pontos de atributo (272) | ✅ | | 0x32610: rookie 6, champion 0. 0x38a85 (L160): mega 238, rookie 40; cada um gastou os seus |
 | ATK/DEF/BR, MaxHP/MaxVP | ✅ (derivados dos atributos da forma) | | |
 | skills (276…) | ✅ | | rookie skill 144, champion 146 (nível 1) |
@@ -50,7 +50,7 @@ Cada digimon tem **um uid** e cada forma (espécie da linha evolutiva) tem **sta
 Banco: `digimon.digimon_id` = forma-base, `digimon.unlocked_stage`, tabela `digimon_form` (migração `0003`).
 
 ## ❓ Em aberto
-- Atributos de champion em diante (STR/AGI não seguem a fórmula do rookie).
+- Bônus extra de Mega (+2 por nível em todos os atributos na amostra única `921` L160).
 - HP/VP ao voltar à forma-base: o emulador mantém a mesma proporção do máximo (V-mon 285/319 depois de lutar como XV-mon).
 - Taxa e intervalo da drenagem de EVP; item Aura.
 - Se vitórias/batalhas são por forma ou do digimon.

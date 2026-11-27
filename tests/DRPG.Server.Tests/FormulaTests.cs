@@ -75,6 +75,32 @@ public class CombatFormulaTests
         Assert.Equal((atk, def, br, hp, vp), (s.Atk, s.Def, s.Br, s.MaxHp, s.MaxVp));
     }
 
+    [Fact]
+    public void Cumulative_base_attributes_match_official_champion_and_ultimate_captures()
+    {
+        // ✅ sessão 56, uid 0x32610: V-mon (635, 3/2/2/1) → XV-mon (735, 3/2/1/2) no L21
+        var vmon = new Data.GameData.DigimonSpecies(635, "V-mon(Tamed)", StatFormulas.Rookie, 1, new Attributes(3, 2, 2, 1), 144, 145);
+        var xvmon = new Data.GameData.DigimonSpecies(735, "XV-mon(Tamed)", StatFormulas.Champion, 1, new Attributes(3, 2, 1, 2), 146, 147);
+
+        var xvmonBase = StatFormulas.BaseAttributes([vmon, xvmon], level: 21);
+        Assert.Equal(new Attributes(110, 90, 89, 71), xvmonBase);
+
+        // + 34 pontos distribuídos no V-mon (+4 STR, +8 AGI, +2 CON, +20 INT) = (114, 98, 91, 91)
+        var xvmonTotal = xvmonBase + new Attributes(4, 8, 2, 20);
+        Assert.Equal(new Attributes(114, 98, 91, 91), xvmonTotal);
+        var xvmonCombat = StatFormulas.Combat(xvmonTotal, level: 21);
+        Assert.Equal((481, 264, 399, 362, 349), (xvmonCombat.Atk, xvmonCombat.Def, xvmonCombat.Br, xvmonCombat.MaxHp, xvmonCombat.MaxVp));
+
+        // ✅ sessão 56, uid 0x38a85: Bearmon (674) → Gryzmon (781) → Grappu Leomon (886) no L160 (sem pontos)
+        var bearmon = new Data.GameData.DigimonSpecies(674, "Bearmon", StatFormulas.Rookie, 1, new Attributes(3, 2, 2, 1), 393, 394);
+        var gryzmon = new Data.GameData.DigimonSpecies(781, "Gryzmon", StatFormulas.Champion, 1, new Attributes(3, 2, 2, 1), 395, 396);
+        var grappu = new Data.GameData.DigimonSpecies(886, "Grappu Leomon", StatFormulas.Ultimate, 1, new Attributes(3, 2, 2, 1), 397, 398);
+
+        Assert.Equal(new Attributes(87, 68, 68, 49), StatFormulas.BaseAttributes([bearmon], level: 160));
+        Assert.Equal(new Attributes(137, 108, 108, 79), StatFormulas.BaseAttributes([bearmon, gryzmon], level: 160));
+        Assert.Equal(new Attributes(187, 148, 148, 109), StatFormulas.BaseAttributes([bearmon, gryzmon, grappu], level: 160));
+    }
+
     [Theory]
     [InlineData(1, 11, 3, 11, 1.05)]  // Vacina > Vírus
     [InlineData(3, 11, 2, 11, 1.05)]  // Vírus > Dados
