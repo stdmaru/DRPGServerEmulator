@@ -4,6 +4,7 @@ using DRPG.Client.Ui;
 using DRPG.Client.World;
 using DRPG.Engine.Platform;
 using DRPG.Engine.Rendering;
+using DRPG.Engine.Scenes;
 using DRPG.Shared.Formats.Map;
 using DRPG.Shared.Formats.Pack;
 using DRPG.Shared.Packets.Map;
@@ -60,6 +61,9 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private FieldPortals _portals = null!;                     // set in Init
     private readonly MovePacketQueue _moveQueue = new();
     private (int X, int Y)? _lastClickCell;
+    private TeleportCharacterPacket? _pendingTransition;
+    private bool _transitionWaitingStop, _transitionReadyToLoad, _inputLockedForTransition;
+    private CursorKind _cursor = CursorKind.Normal;
     private bool _aborted, _lost;
     private long _stepsRun;
     private ulong _startMs;
@@ -88,6 +92,9 @@ public sealed class GameScene(GameContext game, Random random) : IScene
 
     /// <summary>✅ The loading thread does not draw the cursor (no <c>0x00b3e3d0</c>).</summary>
     public bool ShowCursor => _aborted || !_loading.Showing;
+
+    /// <summary>✅ <c>0x00b4e550</c> + <c>0x00b3e3d0</c> case 10: <c>cursor_door.spr</c> over portal cells.</summary>
+    public CursorKind Cursor => _cursor;
 
     public void Init()
     {
@@ -135,16 +142,21 @@ public sealed class GameScene(GameContext game, Random random) : IScene
 
         if (_field is not null && !_lost)
         {
-            HandleFieldInput(renderer, session, nowMs);
-            if (_lost || _loading.Showing)
+            HandleFieldInput(session, nowMs);
+            RunLogic(nowMs);
+            if (_transitionReadyToLoad && _pendingTransition is { } pending)
             {
-                if (!_lost)
-                    _screen.Draw(renderer, _loading.Background, _loading.GaugeFrame, _screen.TipOf(_loading.Tip));
-                else
+                _pendingTransition = null;
+                _transitionReadyToLoad = false;
+                _inputLockedForTransition = false;
+                BeginMapTransition(renderer, world, pending, nowMs);
+                if (_lost)
                     DrawLost(renderer);
+                else if (_loading.Showing)
+                    _screen.Draw(renderer, _loading.Background, _loading.GaugeFrame, _screen.TipOf(_loading.Tip));
                 return;
             }
-            RunLogic(nowMs);
+            UpdateCursor();
             DrawField(renderer, session);
         }
         else if (_field is not null)
@@ -267,10 +279,10 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         (cellX * MapFile.CellWidth + MapFile.CellWidth / 2, cellY * MapFile.CellHeight + MapFile.CellHeight / 2);
 
     /// <summary>
-    /// ✅ <c>0x00b4c1a0</c> / <c>0x00b4d290</c> / <c>0x00b4e550</c> / <c>0x00b4b360</c> / <c>0x00aba410</c>: processes ground clicks
-    /// and holds, drains throttled <c>0x20</c> packets and applies <c>0xB0</c> position corrections and cross-map transitions.
+    /// ✅ <c>0x00b4c1a0</c> / <c>0x00b4d290</c> / <c>0x00b4e550</c> / <c>0x00b4b360</c> / <c>0x00af0d70</c>: processes ground clicks
+    /// and holds, drains throttled <c>0x20</c> packets and applies <c>0xB0</c> position corrections or queues cross-map transitions.
     /// </summary>
-    private void HandleFieldInput(IRenderer renderer, WorldSession session, ulong nowMs)
+    private void HandleFieldInput(WorldSession session, ulong nowMs)
     {
         while (session.TryReceiveFieldDigimon(out var wild))
             _wilds.Apply(wild, game.World!.MapId, _collision, _animated.OpenDigimon, random);
@@ -295,10 +307,19 @@ public sealed class GameScene(GameContext game, Random random) : IScene
             }
             else
             {
-                BeginMapTransition(renderer, game.World!, teleport, nowMs);
-                return;
+                // ✅ 0x00acb072 → 0x00af0d70: lock field clicks (+0x772 = 0), keep walking until stopped (+0x771 = 1),
+                // then play effect 0xa8 (Effect\effect_map.spr) before starting the loading screen (0x00aba410).
+                _pendingTransition = teleport;
+                _transitionWaitingStop = true;
+                _transitionReadyToLoad = false;
+                _inputLockedForTransition = true;
+                _moveQueue.Reset();
+                _lastClickCell = null;
             }
         }
+
+        if (_inputLockedForTransition)
+            return;
 
         var mouse = game.Mouse;
         if (!mouse.Down)
@@ -411,6 +432,33 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         _wilds.Step(_tamerEntity, _collision, _pathfinder, random);
         _npcs.Step(random);
         _portals.Step();
+
+        // ✅ 0x00afe310 lines 49-53: once the tamer stops walking on a pending 0xB0 transition, trigger effect 0xa8 (effect_map.spr)
+        if (_transitionWaitingStop && !_tamerEntity.IsMoving)
+        {
+            _transitionWaitingStop = false;
+            _portals.StartWarpEffect();
+        }
+        // ✅ 0x00a4ab73..0x00a4ab91: when effect 0xa8 finishes its frames, run 0x00aba410 (loading screen + map reload)
+        if (_portals.IsWarpPlaying && _portals.StepWarpEffect())
+            _transitionReadyToLoad = true;
+    }
+
+    /// <summary>✅ <c>0x00b4e550</c> lines 604-606: switches the cursor to <see cref="CursorKind.Portal"/> when hovering a portal cell.</summary>
+    private void UpdateCursor()
+    {
+        _cursor = CursorKind.Normal;
+        if (_field is not { } field || _loading.Showing || _lost)
+            return;
+        var mouse = game.Mouse;
+        if (mouse.X < 0 || mouse.Y < 0 || mouse.X >= IRenderer.FrameWidth || mouse.Y >= IRenderer.FrameHeight || FieldHud.Covers(mouse.X, mouse.Y))
+            return;
+        var (cameraX, cameraY) = field.Camera(_tamerEntity.WorldX, _tamerEntity.WorldY);
+        int cellX = (mouse.X + cameraX) / MapFile.CellWidth;
+        int cellY = (mouse.Y + cameraY) / MapFile.CellHeight;
+        if (cellX >= 0 && cellX < field.Map.Width && cellY >= 0 && cellY < field.Map.Height
+            && FieldPortals.IsPortalCursorType(field.Map[cellX, cellY].Type))
+            _cursor = CursorKind.Portal;
     }
 
     private (int NextX, int NextY)? NextStep(int fromX, int fromY, int destX, int destY)
@@ -481,6 +529,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         FieldMap.Sort(_queue);
         FieldMap.DrawQueue(renderer, _queue);
         _portals.DrawOverlay(renderer, field, cameraX, cameraY, game.SpriteOptions);
+        _portals.DrawWarpEffect(renderer, _tamerEntity.WorldX, _tamerEntity.WorldY, cameraX, cameraY, game.SpriteOptions);
 
         var character = session.Character!;
         var leader = character.Party[0];

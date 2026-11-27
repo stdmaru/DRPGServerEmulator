@@ -72,6 +72,53 @@ public sealed class FieldPortalsTests : IDisposable
     }
 
     [Fact]
+    public void Portal_cursor_matches_cell_type_range_1_to_8999()
+    {
+        Assert.False(FieldPortals.IsPortalCursorType(0));
+        Assert.True(FieldPortals.IsPortalCursorType(1));
+        Assert.True(FieldPortals.IsPortalCursorType(FieldPortals.TypeStandard));
+        Assert.True(FieldPortals.IsPortalCursorType(8999));
+        Assert.False(FieldPortals.IsPortalCursorType(9000));
+    }
+
+    [Fact]
+    public void Cross_map_0xB0_waits_for_tamer_to_stop_walking_before_starting_loading()
+    {
+        UseTwoMaps();
+        var session = Connect(mapId: 1);
+        var scene = new GameScene(_fixture.Game, new Random(0));
+        scene.Init();
+        ulong t = EnterWorld(scene, session);
+
+        // Start walking 2 cells east (16 logic steps at Run speed)
+        scene.TamerEntity.SetDestination(7, 6);
+        scene.Step();
+        Assert.True(scene.TamerEntity.IsMoving);
+
+        // Server sends cross-map 0xB0 while tamer is still walking to the portal
+        _map.Send(new TeleportCharacterPacket(2, 4, 5));
+        t += 34;
+        Pump(() =>
+        {
+            scene.Frame(_fixture.Renderer, t);
+            t += 34;
+            // Must NOT snap to loading while tamer is still walking
+            return !scene.TamerEntity.IsMoving || scene.Loading.Showing;
+        });
+
+        // After stopping on the portal cell, the warp effect triggers and then loading begins
+        Assert.False(scene.TamerEntity.IsMoving);
+        Pump(() =>
+        {
+            scene.Frame(_fixture.Renderer, t);
+            t += WorldLoading.FrameMs;
+            return scene.Loading.Showing;
+        });
+        Assert.Equal(2, _fixture.Game.World!.MapId);
+        Assert.Equal((4, 5), (scene.TamerEntity.CellX, scene.TamerEntity.CellY));
+    }
+
+    [Fact]
     public void Cross_map_0xB0_shows_loading_reloads_map_clears_wilds_swaps_npcs_and_sends_0x04_and_0xB0()
     {
         UseTwoMaps();

@@ -110,15 +110,19 @@ Cada passo chama, nesta ordem:
   - `action == 0` (`0x00acfed0`): remove da lista ativa (se `mapId == 0` ou `mapId == currentMapId`) e da lista persistente, desocupando a célula.
 
 ## Portais e transição de área (`0xB0`) (✅)
-- ✅ **Renderização e animação** (`0x00b380d0`, `0x00a159a0`, `0x00a121f0`): lidos do campo `MapCell.Type` (`+8`) nas células visíveis (margem `-15..+30` em X, `-20..+40` em Y):
-  - `1000` / `1005`: `Effect\effect_portal.spr`, camada de chão (antes das entidades), centrado na célula `(cx, cy)`, alfa `16/32`, avança a cada 2 passos (30 FPS).
-  - `1001`: `Effect\effect_portal2.spr`, camada de chão, canto `(screenX − 11, screenY + 19 − h)`, alfa `16/32`, mesmo contador.
-  - `1002`: `Effect\effect_portal3.spr`, camada de topo (depois das entidades), canto `(screenX − 46, screenY + 21 − h)`, alfa `16/32`, mesmo contador.
+- ✅ **Renderização e animação** (`0x00b380d0`, `0x00a159a0`, `0x00a121f0`, `0x00876a30` modo 5): lidos do campo `MapCell.Type` (`+8`) nas células visíveis (margem `-15..+30` em X, `-20..+40` em Y):
+  - `1000` / `1005`: `Effect\effect_portal.spr`, camada de chão (antes das entidades), centrado na célula `(cx, cy)`, **modo 5 aditivo** (`min(dst + src, 255)` via `IRenderer.DrawAdditive`), avança a cada 2 passos (30 FPS).
+  - `1001`: `Effect\effect_portal2.spr`, camada de chão, canto `(screenX − 11, screenY + 19 − h)`, **modo 5 aditivo**, mesmo contador.
+  - `1002`: `Effect\effect_portal3.spr`, camada de topo (depois das entidades), canto `(screenX − 46, screenY + 21 − h)`, **modo 5 aditivo**, mesmo contador.
   - `1003`: `Effect\effect_portal_square.spr`, camada de chão, centrado na célula, opaco, avança a cada 4 passos.
-- ✅ **Gatilho**: o cliente apenas anda até o portal enviando `C2S 0x20`; o servidor detecta o portal (`ZoneSystem.Move`) e responde com `S2C 0xB0` (`TeleportCharacterPacket`, 8 B: `i32 mapId, i16 x, i16 y`).
-- ✅ **Transição de mapa no cliente** (`0x00acb072` → `0x00af0d70` → `0x00aba410`):
+- ✅ **Cursor sobre portal** (`0x00b4e550` linhas 604–606, `0x00b3e3d0` caso 10, `0x00b3ebf0`): quando o mouse passa sobre uma célula com `1 <= cell.Type <= 8999`, o cursor troca para `Interface\cursor_door.spr` (avançando 1 quadro a cada 8 frames a 30 FPS).
+- ✅ **Gatilho**: o cliente anda até o portal enviando `C2S 0x20`; o servidor detecta o portal (`ZoneSystem.Move`) e responde com `S2C 0xB0` (`TeleportCharacterPacket`, 8 B: `i32 mapId, i16 x, i16 y`).
+- ✅ **Transição de mapa no cliente** (`0x00acb072` → `0x00af0d70` → `0x00afe310` → `0x00a1b670(0xa8)` → `0x00a4a9d7` / `0x00a46e0a` → `0x00aba410`):
   - Mesmo mapa: reposiciona tamer em `(x, y)` e digimon parceiro em `(x − 1, y − 1)` na `FieldCollision` e limpa fila de movimento.
-  - Outro mapa: para a BGM, limpa selvagens e NPCs do mapa anterior, abre a tela de carga (`WorldLoading.BeginMapTransition`, 16 quadros × 90 ms), carrega o novo `.map`, colisão, pathfinder, NPCs (auto-spawn + dinâmicos `0x09`) e BGM, posiciona tamer/digimon na célula de destino e, ao fim da tela de carga, envia `C2S 0x04` (`RefreshCharacterInfoRequest`) e `C2S 0xB0` (`TeleportAckRequest`, 14 bytes zero — confirmado em `captures.db` pacote 1658 e `0x00aba757`).
+  - Outro mapa:
+    1. `0x00af0d70` trava cliques no campo (`+0x772 = 0`), marca transição pendente (`+0x771 = 1`) e **deixa o tamer terminar de andar até a célula do portal** (sem snap instantâneo).
+    2. Assim que o tamer para (`state < 4`, `0x00afe310` linha 49), dispara o efeito `0xa8` (`Effect\effect_map.spr`, `0x00a26b72`), desenhado sobre o tamer em `(worldX − cameraX − w/2, worldY − cameraY − h + 100)` em **modo 5 aditivo** (`0x00a46e0a`), com `delay = 1` (2 passos por quadro, `0x00a1be69` + `0x00a4ab1c`).
+    3. Ao terminar todos os quadros do `effect_map.spr` (`0x00a4ab91`), executa `0x00aba410`: para a BGM, limpa selvagens e NPCs do mapa anterior, abre a tela de carga (`WorldLoading.BeginMapTransition`, 16 quadros × 90 ms), carrega o novo `.map`, colisão, pathfinder, NPCs e BGM, posiciona tamer/digimon na célula de destino e, ao fim da tela de carga, envia `C2S 0x04` (`RefreshCharacterInfoRequest`) e `C2S 0xB0` (`TeleportAckRequest`, 14 bytes zero — `0x00aba757`).
 
 ## Roteiro do que falta
 Pontos de entrada já localizados; ✅ quando lido.

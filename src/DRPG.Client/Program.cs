@@ -100,7 +100,7 @@ internal static class Program
             scenes.Frame(renderer, now);
             game.Mouse.EndFrame();
             if (scenes.Current?.ShowCursor ?? true)
-                cursor.Draw(renderer, now);
+                cursor.Draw(renderer, now, scenes.Current?.Cursor ?? CursorKind.Normal);
             if (screenshot is not null && loadedAtMs is { } shotLoaded && now - shotLoaded >= screenshotAtMs)
             {
                 Screenshot.WritePpm(screenshot, renderer.Capture(), IRenderer.FrameWidth, IRenderer.FrameHeight);

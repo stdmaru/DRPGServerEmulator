@@ -20,7 +20,7 @@ internal sealed class FakeTexture(int width, int height) : ITexture
 /// <summary>An <see cref="IRenderer"/> that records the draw calls of a frame.</summary>
 internal sealed class FakeRenderer : IRenderer
 {
-    public sealed record DrawCall(FakeTexture Texture, int X, int Y, int? PartWidth = null, int Alpha = IRenderer.OpaqueAlpha, int? PartHeight = null, bool Halved = false);
+    public sealed record DrawCall(FakeTexture Texture, int X, int Y, int? PartWidth = null, int Alpha = IRenderer.OpaqueAlpha, int? PartHeight = null, bool Halved = false, bool Additive = false);
 
     public List<DrawCall> Draws { get; } = [];
     public string BackendName => "fake";
@@ -44,6 +44,8 @@ internal sealed class FakeRenderer : IRenderer
         Draws.Add(new DrawCall((FakeTexture)texture, x, y, width, alpha, height));
 
     public void DrawHalved(ITexture texture, int x, int y) => Draws.Add(new DrawCall((FakeTexture)texture, x, y, Halved: true));
+
+    public void DrawAdditive(ITexture texture, int x, int y) => Draws.Add(new DrawCall((FakeTexture)texture, x, y, Additive: true));
 
     public List<int> Darkens { get; } = [];
 

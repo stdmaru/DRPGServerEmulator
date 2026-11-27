@@ -1,5 +1,6 @@
 using DRPG.Engine.Platform;
 using DRPG.Engine.Rendering;
+using DRPG.Engine.Scenes;
 
 namespace DRPG.Client.Scenes;
 
@@ -14,6 +15,9 @@ public interface IScene : IDisposable
 
     /// <summary>Whether the game cursor is drawn over this scene (✅ <c>0x00b34250</c> hides it during the 3 s return loading).</summary>
     bool ShowCursor => true;
+
+    /// <summary>Cursor appearance for the current frame (✅ <c>0x00b3e3d0</c>).</summary>
+    CursorKind Cursor => CursorKind.Normal;
 
     void Init();
 
