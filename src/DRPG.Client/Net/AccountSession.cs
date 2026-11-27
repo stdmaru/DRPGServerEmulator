@@ -61,6 +61,15 @@ public sealed class AccountSession(ClientSettings settings, GameCommandLine comm
     /// <summary>Set when the list arrives.</summary>
     public CharacterListReply? Characters { get; private set; }
 
+    /// <summary>Incremented every time a <c>0x12</c> character list arrives (initial load, after create, after delete).</summary>
+    public int CharacterListVersion { get; private set; }
+
+    /// <summary>Error code of the last failed <c>0x10</c> create reply, until taken by the scene.</summary>
+    public int? LastCreateError { get; private set; }
+
+    /// <summary>Error code of the last failed <c>0x11</c> delete reply, until taken by the scene.</summary>
+    public int? LastDeleteError { get; private set; }
+
     /// <summary>True once the server confirmed the user (<c>0x14</c>).</summary>
     public bool UserConfirmed { get; private set; }
 
@@ -110,6 +119,41 @@ public sealed class AccountSession(ClientSettings settings, GameCommandLine comm
         Advance(AccountStep.WaitingCharacterList, nowMs);
     }
 
+    /// <summary>✅ Sends <c>0x10</c> to create a character (<c>0x00b45990</c>). Allowed once the list is ready.</summary>
+    public void CreateCharacter(CharacterCreateRequest request)
+    {
+        if (Step != AccountStep.Ready)
+            throw new InvalidOperationException($"character create requested while {Step}");
+        LastCreateError = null;
+        _connection!.Send(request);
+    }
+
+    /// <summary>
+    /// ✅ Sends <c>0x11</c> to delete a character (<c>0x00b46020</c>). Allowed once the list is ready.
+    /// Neither the password nor its MD5 is ever logged.
+    /// </summary>
+    public void DeleteCharacter(uint characterUid, string passwordMd5)
+    {
+        if (Step != AccountStep.Ready)
+            throw new InvalidOperationException($"character delete requested while {Step}");
+        LastDeleteError = null;
+        _connection!.Send(new CharacterDeleteRequest(characterUid, passwordMd5));
+    }
+
+    public int? TakeCreateError()
+    {
+        var code = LastCreateError;
+        LastCreateError = null;
+        return code;
+    }
+
+    public int? TakeDeleteError()
+    {
+        var code = LastDeleteError;
+        LastDeleteError = null;
+        return code;
+    }
+
     /// <summary>Drops the connections and starts over from <see cref="AccountStep.NotStarted"/> (Back, or a failure).</summary>
     public void Reset()
     {
@@ -121,6 +165,9 @@ public sealed class AccountSession(ClientSettings settings, GameCommandLine comm
         Step = AccountStep.NotStarted;
         FailureMessage = null;
         Characters = null;
+        CharacterListVersion = 0;
+        LastCreateError = null;
+        LastDeleteError = null;
         UserConfirmed = false;
         AuthenticationRefusal = null;
     }
@@ -191,11 +238,27 @@ public sealed class AccountSession(ClientSettings settings, GameCommandLine comm
                 DisposeConnection();
                 Advance(AccountStep.LoggedIn, nowMs);
                 break;
-            case (CharacterListReply list, AccountStep.WaitingCharacterList):
+            case (CharacterListReply list, AccountStep.WaitingCharacterList or AccountStep.Ready):
                 Characters = list;
+                CharacterListVersion++;
                 _lastKeepAliveMs = nowMs;
-                Advance(AccountStep.Ready, nowMs);
+                if (Step == AccountStep.WaitingCharacterList)
+                    Advance(AccountStep.Ready, nowMs);
                 log($"character list: {list.Slots.Count(slot => !slot.IsEmpty)} of {list.Slots.Count} slots in use");
+                break;
+            case (CharacterCreateReply reply, AccountStep.Ready):
+                if (reply.ErrorCode != ChannelError.None)
+                {
+                    LastCreateError = reply.ErrorCode;
+                    log($"character create refused: {reply.ErrorCode}");
+                }
+                break;
+            case (CharacterDeleteReply reply, AccountStep.Ready):
+                if (reply.ErrorCode != ChannelError.None)
+                {
+                    LastDeleteError = reply.ErrorCode;
+                    log($"character delete refused: {reply.ErrorCode}");
+                }
                 break;
             case (UserCheckReply, AccountStep.WaitingCharacterList or AccountStep.Ready):
                 UserConfirmed = true;

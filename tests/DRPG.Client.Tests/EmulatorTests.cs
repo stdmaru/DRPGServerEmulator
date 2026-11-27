@@ -1,4 +1,7 @@
 using DRPG.Client.Net;
+using DRPG.Client.Scenes;
+using DRPG.Client.Ui;
+using DRPG.Shared.Packets.Channel;
 
 namespace DRPG.Client.Tests;
 
@@ -81,5 +84,45 @@ public sealed class EmulatorTests
 
         Assert.NotNull(session.AuthenticationRefusal);
         Assert.Null(session.Characters);
+    }
+
+    [EmulatorFact]
+    public void Creating_and_deleting_a_character_updates_the_character_list()
+    {
+        var log = new List<string>();
+        using var session = new AccountSession(EmulatorEnvironment.Settings, new GameCommandLine(EmulatorEnvironment.User!, EmulatorEnvironment.Key!), log.Add);
+        ulong now = 0;
+
+        session.StartLogin(now);
+        Pump(session, ref now, () => session.Step is AccountStep.LoggedIn or AccountStep.Failed);
+        session.SelectChannel(now);
+        Pump(session, ref now, () => session.Step is AccountStep.ChannelSelected or AccountStep.Failed);
+        session.Authenticate(now);
+        Pump(session, ref now, () => session.Step is AccountStep.Authenticated or AccountStep.Failed);
+        session.RequestCharacterList(now);
+        Pump(session, ref now, () => session.Step == AccountStep.Ready && session.UserConfirmed);
+
+        Assert.Equal(AccountStep.Ready, session.Step);
+        int targetSlot = CharacterNameRules.PickTargetSlot(session.Characters!.Slots, selectedSlot: -1);
+        Assert.True(targetSlot >= 0, "E2E account has no empty character slot");
+
+        string name = $"E2e{Random.Shared.Next(100000, 999999)}";
+        int beforeCreate = session.CharacterListVersion;
+        var header = CharacterNameRules.BuildCreateHeader((byte)targetSlot, Random.Shared);
+        session.CreateCharacter(new CharacterCreateRequest(header, TamerId: 1, name, DigimonId: 10, DigimonName: "Gigimon"));
+        Pump(session, ref now, () => session.CharacterListVersion > beforeCreate || session.LastCreateError is not null || session.Step == AccountStep.Failed);
+
+        Assert.Null(session.FailureMessage);
+        Assert.Null(session.LastCreateError);
+        var created = session.Characters!.Slots.FirstOrDefault(s => !s.IsEmpty && s.Name == name);
+        Assert.NotNull(created);
+
+        int beforeDelete = session.CharacterListVersion;
+        session.DeleteCharacter(created!.Uid, DeleteCharacterDialog.ComputePasswordMd5(""));
+        Pump(session, ref now, () => session.CharacterListVersion > beforeDelete || session.LastDeleteError is not null || session.Step == AccountStep.Failed);
+
+        Assert.Null(session.FailureMessage);
+        Assert.Null(session.LastDeleteError);
+        Assert.DoesNotContain(session.Characters!.Slots, s => !s.IsEmpty && s.Uid == created.Uid);
     }
 }

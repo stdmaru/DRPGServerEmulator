@@ -95,6 +95,12 @@ internal sealed class FakeInstall : IDisposable
             ("gui\\dr2_ch_000_007_eng.spr", Sprite(150, 40, 3)),
             ("gui\\dr2_ch_000_008_eng.spr", Sprite(100, 40, 3)),
             ("gui\\dr2_ch_000_009_eng.spr", Sprite(100, 30, 3)),
+            // character creation
+            ("gui\\dr2_ch_001_000_eng.spr", Sprite(800, 600)),
+            ("gui\\dr2_ch_001_001_eng.spr", Sprite(100, 40, 3)),
+            ("gui\\dr2_ch_001_002_eng.spr", Sprite(100, 40, 3)),
+            ("gui\\dr2_ch_001_003.spr", Sprite(107, 154, 3)),
+            ("gui\\dr2_ch_001_004.spr", Sprite(107, 154, 3)),
             ("gui\\loading_image_eng.spr", Sprite(800, 550, 3)),
             ("gui\\loading_under_line.spr", Sprite(800, 50)),
             ("gui\\game_end_gauge.spr", Sprite(40, 40, 12)),

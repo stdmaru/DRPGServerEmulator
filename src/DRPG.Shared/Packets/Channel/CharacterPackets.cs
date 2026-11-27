@@ -230,25 +230,28 @@ public sealed record CharacterDeleteRequest(uint CharacterUid, string PasswordMd
     public override string ToString() => $"{nameof(CharacterDeleteRequest)}({CharacterUid})";
 }
 
-/// <summary>✅ 0x11 S2C (52 B, v322, session 53): result 2/0 and the uid and MD5 of the request, echoed.</summary>
-public sealed record CharacterDeleteReply(uint CharacterUid, string PasswordMd5) : ITwoWayPacket<CharacterDeleteReply>
+/// <summary>✅ 0x11 S2C (52 B, v322, session 53): result (2/0 on success, 3/code on failure) and the uid and MD5 of the request, echoed.</summary>
+public sealed record CharacterDeleteReply(int ErrorCode, uint CharacterUid, string PasswordMd5) : ITwoWayPacket<CharacterDeleteReply>
 {
     public static ushort Opcode => (ushort)ChannelOpcode.CharacterDelete;
     public static PacketLength Length => PacketLength.Exact(8 + 4 + CharacterDeleteRequest.Md5Bytes);
 
+    public bool Succeeded => ErrorCode == ChannelError.None;
+
     public static CharacterDeleteReply Read(PacketReader r)
     {
-        ChannelResult.Read(r);
+        var errorCode = ChannelResult.Read(r);
         var uid = r.ReadU32();
-        return new(uid, r.ReadFixedString(CharacterDeleteRequest.Md5Bytes));
+        return new(errorCode, uid, r.ReadFixedString(CharacterDeleteRequest.Md5Bytes));
     }
 
     public void Write(PacketWriter w)
     {
-        ChannelResult.Write(w, ChannelError.None);
+        ChannelResult.Write(w, ErrorCode);
         w.WriteU32(CharacterUid);
         w.WriteFixedString(PasswordMd5, CharacterDeleteRequest.Md5Bytes);
     }
 
-    public override string ToString() => $"{nameof(CharacterDeleteReply)}({CharacterUid})";
+    /// <summary>Never prints the password hash.</summary>
+    public override string ToString() => $"{nameof(CharacterDeleteReply)}({ErrorCode}, {CharacterUid})";
 }

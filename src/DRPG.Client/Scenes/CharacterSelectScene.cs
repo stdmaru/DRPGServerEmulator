@@ -10,13 +10,13 @@ namespace DRPG.Client.Scenes;
 
 /// <summary>
 /// <c>CSceneCharSel</c>, the character selection (✅ v322 <c>0x00b43f20</c>, docs/cliente/cenas.md#cscenecharsel-seleção-de-personagens-):
-/// the four slots with the tamer and the digimon animated, their texts, and the Delete / Create / Exchange Password /
-/// Game Start / Back buttons. Asks for the list (<c>0x12</c> + <c>0x14</c>) when it opens; Back returns to the world
-/// selection; Game Start fades out and logs the map server (entering the map is milestone 3).
-/// ❓ Not done here: the character creation mode, the delete confirmation and the password change (next milestone: the
-/// buttons are drawn and their click is only logged), and the sprite shadow option.
+/// mode 0 shows the four slots with the tamer and digimon animated, their texts, and the Delete / Create / Exchange
+/// Password / Game Start / Back buttons plus the delete confirmation dialog; mode 1 is character creation
+/// (<see cref="CharacterCreatePanel"/>). Asks for the list (<c>0x12</c> + <c>0x14</c>) when it opens; Back returns to
+/// the world selection; Game Start fades out and logs the map server (entering the map is milestone 3).
+/// ❓ Not done here: Exchange Password (next milestone: click is only logged) and the sprite shadow option.
 /// </summary>
-public sealed class CharacterSelectScene(GameContext game) : IScene
+public sealed class CharacterSelectScene(GameContext game, Random random) : IScene
 {
     private const int SlotCount = CharacterListReply.SlotCount;
     private const int FramesPerSecond = 30;
@@ -31,8 +31,16 @@ public sealed class CharacterSelectScene(GameContext game) : IScene
 
     private const int DeleteX = 26, CreateX = 134, ExchangeX = 246, ButtonsY = 565, GameStartX = 520, BackX = 681, BackY = 549, GameStartY = 549;
 
-    // ✅ text ids
+    // ✅ text ids & message durations (0x00b48840, 0x00b45c30)
     private const int LevelText = 0xef1, WinLoseText = 0xef2;
+    public const int NameTakenText = 0xee4;
+    public const int ConsignmentActiveText = 0xeb1a;
+    private const int NameTakenFrames = 160;
+    private const int MessageCenterX = 400, MessageCenterY = 300;
+
+    // ✅ reply error codes (0x00b45c30)
+    public const int DeletePasswordMismatchError = 2000;
+    public const int DeleteConsignmentActiveError = 105;
 
     private const int MapLineHeight = 18, MapMaxWidth = 140, MapMaxLines = 2;
 
@@ -42,12 +50,24 @@ public sealed class CharacterSelectScene(GameContext game) : IScene
     private readonly SpriteAnimator?[] _digimon = new SpriteAnimator?[SlotCount];
     private readonly TamerDoll?[] _tamers = new TamerDoll?[SlotCount];
     private AnimatedSprites _animated = null!;                 // set in Init
-    private bool _requested, _loadedSlots;
+    private MessageBox _box = null!;                           // set in Init
+    private CharacterCreatePanel _createPanel = null!;         // set in Init
+    private readonly DeleteCharacterDialog _deleteDialog = new();
+
+    private bool _requested;
+    private int _loadedListVersion;
+    private int _mode;                                         // ✅ +0x85c: 0 = selection, 1 = creation
     private int _selected = -1;
+    private string? _message;
+    private int _messageFrames;                                // 0 = until click; > 0 = countdown or click
     private FadeOut? _fade;
-    private ulong _lastFrameMs;
 
     public int FrameIntervalMs => 1000 / FramesPerSecond;
+    internal int Mode => _mode;
+    internal int SelectedSlot => _selected;
+    internal string? ActiveMessage => _message;
+    internal DeleteCharacterDialog DeleteDialog => _deleteDialog;
+    internal CharacterCreatePanel CreatePanel => _createPanel;
 
     public void Init()
     {
@@ -65,11 +85,21 @@ public sealed class CharacterSelectScene(GameContext game) : IScene
         _gameStart = new Button(sprites.Gui("dr2_ch_000_007"), GameStartX, GameStartY);
         _back = new Button(sprites.Gui("dr2_ch_000_008"), BackX, BackY);
         _animated = new AnimatedSprites(game.Resource, sprites, game.Log);
+        _box = new MessageBox(sprites.Load("gui\\dr2_in_000_003.spr"), game.Text);
+        _createPanel = new CharacterCreatePanel(game, _animated, random);
+        _createPanel.Init();
         game.Sounds.Register(SelectSound, "Sound\\menu-1.wav");     // ✅ the music does not change: title.ogg goes on
     }
 
     public void Handle(InputEvent input)
     {
+        if (_deleteDialog.IsOpen)
+        {
+            _deleteDialog.Handle(input);
+            return;
+        }
+        if (_mode == 1)
+            _createPanel.Handle(input);
     }
 
     public void Frame(IRenderer renderer, ulong nowMs)
@@ -88,34 +118,163 @@ public sealed class CharacterSelectScene(GameContext game) : IScene
             game.Scenes.Switch(SceneId.Server);
             return;
         }
-        if (account.Characters is { } list && !_loadedSlots)
-            LoadSlots(list);
 
-        renderer.Draw(_background, 0, 0);
-        bool interactive = _fade is null;
-        DrawSlots(renderer, account, interactive);
-        DrawButtons(renderer, account, interactive);
+        ProcessAccountEvents(account);
+
+        if (_mode == 1)
+            FrameCreateMode(renderer, account, nowMs);
+        else
+            FrameSelectMode(renderer, account);
+
+        DrawMessage(renderer);
         game.DrawVersion(renderer, 1);
         if (_fade is { } fade)
-        {
             fade.Frame(renderer, 1f / FramesPerSecond);
-        }
-        _lastFrameMs = nowMs;
     }
 
-    /// <summary>✅ Arrival of the list: nothing selected, the animations of the species and tamers opened (<c>0x00b45c30</c>, case <c>0x12</c>).</summary>
-    private void LoadSlots(CharacterListReply list)
+    private void ProcessAccountEvents(AccountSession account)
     {
-        _loadedSlots = true;
-        _selected = -1;
-        for (int i = 0; i < SlotCount && i < list.Slots.Count; i++)
+        if (account.Characters is { } list && account.CharacterListVersion != _loadedListVersion)
+            LoadSlots(list, account.CharacterListVersion);
+
+        if (account.TakeCreateError() is { } createError)
+            HandleCreateError(createError);
+
+        if (account.TakeDeleteError() is { } deleteError)
+            HandleDeleteError(deleteError);
+    }
+
+    /// <summary>✅ <c>0x00b45c30</c> case <c>0x10</c>: only error 102 (<c>NameTaken</c>) is handled.</summary>
+    internal void HandleCreateError(int errorCode)
+    {
+        if (errorCode != ChannelError.NameTaken)
+            return;
+        ShowMessage(game.Texts[NameTakenText], NameTakenFrames);
+        _createPanel.ClearAndFocusTamer();
+    }
+
+    /// <summary>✅ <c>0x00b45c30</c> case <c>0x11</c>: error 2000 opens state 1; error 105 shows <c>0xeb1a</c> until click.</summary>
+    internal void HandleDeleteError(int errorCode)
+    {
+        switch (errorCode)
         {
+            case DeletePasswordMismatchError:
+                _deleteDialog.OpenPasswordMismatch();
+                break;
+            case DeleteConsignmentActiveError:
+                ShowMessage(game.Texts[ConsignmentActiveText], frames: 0);
+                break;
+        }
+    }
+
+    private void FrameSelectMode(IRenderer renderer, AccountSession account)
+    {
+        renderer.Draw(_background, 0, 0);
+        // ✅ +0x318 (delete dialog open) locks all mode 0 buttons and slots
+        bool interactive = _fade is null && !_deleteDialog.IsOpen && _message is null;
+        DrawSlots(renderer, account, interactive);
+        DrawButtons(renderer, account, interactive);
+
+        if (_deleteDialog.IsOpen)
+        {
+            var action = _deleteDialog.Frame(renderer, _box, game.Text, game.Texts, game.Mouse);
+            if (action == DeleteDialogAction.ConfirmDelete)
+                SendDelete(account);
+        }
+    }
+
+    private void FrameCreateMode(IRenderer renderer, AccountSession account, ulong nowMs)
+    {
+        bool hasList = account.Characters is not null;
+        bool interactive = _fade is null && _message is null;
+        var action = _createPanel.Frame(renderer, nowMs, hasList, interactive);
+        switch (action)
+        {
+            case CreatePanelAction.Cancel:
+                ExitCreateMode();
+                break;
+            case CreatePanelAction.ValidationError error:
+                ShowMessage(game.Texts[error.TextId], frames: 0);
+                break;
+            case CreatePanelAction.Submit submit when account.Step == AccountStep.Ready:
+                account.CreateCharacter(submit.Request);
+                break;
+        }
+    }
+
+    private void SendDelete(AccountSession account)
+    {
+        if (account.Step != AccountStep.Ready || account.Characters is not { } list)
+            return;
+        if (_selected < 0 || _selected >= list.Slots.Count)
+            return;
+        var slot = list.Slots[_selected];
+        if (slot.IsEmpty || string.IsNullOrEmpty(slot.Name))
+            return;
+        // ✅ 0x00b46020: v322 skips state 0 so the box text is "", MD5 = d41d8cd98f00b204e9800998ecf8427e
+        account.DeleteCharacter(slot.Uid, DeleteCharacterDialog.ComputePasswordMd5(""));
+    }
+
+    /// <summary>✅ Arrival of the list: mode 0, nothing selected, the animations of the species and tamers opened (<c>0x00b45c30</c>, case <c>0x12</c>).</summary>
+    private void LoadSlots(CharacterListReply list, int version)
+    {
+        _loadedListVersion = version;
+        _mode = 0;
+        _selected = -1;
+        _deleteDialog.Close();
+        for (int i = 0; i < SlotCount; i++)
+        {
+            _digimon[i] = null;
+            _tamers[i] = null;
+            if (i >= list.Slots.Count)
+                continue;
             var slot = list.Slots[i];
             if (slot.IsEmpty || slot.TamerId == 0)
                 continue;
             _digimon[i] = _animated.OpenDigimon(slot.LeaderSpeciesId);
             _tamers[i] = _animated.OpenTamer(slot.TamerId);
         }
+    }
+
+    private void TryEnterCreateMode(AccountSession account)
+    {
+        if (account.Characters is not { } list)
+            return;
+        int targetSlot = CharacterNameRules.PickTargetSlot(list.Slots, _selected);
+        if (targetSlot < 0)
+        {
+            ShowMessage(game.Texts[CharacterNameRules.NoEmptySlotText], frames: 0);
+            return;
+        }
+        _createPanel.Enter(targetSlot, account.FourthStarter);
+        _mode = 1;
+    }
+
+    private void ExitCreateMode()
+    {
+        _mode = 0;
+        _selected = -1;
+    }
+
+    private void ShowMessage(string text, int frames)
+    {
+        _message = text;
+        _messageFrames = frames;
+    }
+
+    private void DrawMessage(IRenderer renderer)
+    {
+        if (_message is null)
+            return;
+        _box.Draw(renderer, _message, MessageCenterX, MessageCenterY);
+        if (game.Mouse.Pressed)
+        {
+            _message = null;
+            _messageFrames = 0;
+            return;
+        }
+        if (_messageFrames > 0 && --_messageFrames == 0)
+            _message = null;
     }
 
     private void DrawSlots(IRenderer renderer, AccountSession account, bool interactive)
@@ -244,10 +403,12 @@ public sealed class CharacterSelectScene(GameContext game) : IScene
         _back.Update(game.Mouse, interactive);
         _back.Draw(renderer);
 
-        if (_delete.Clicked && _selected >= 0)
-            game.Log("Delete Character: the confirmation comes with the next milestone");        // ❓
-        if (_create.Clicked && !game.IsBattleZone)
-            game.Log("Create Character: the creation screen comes with the next milestone");     // ❓
+        if (!interactive)
+            return;
+        if (_delete.Clicked && _selected >= 0 && hasList)
+            _deleteDialog.OpenConfirm();
+        if (_create.Clicked && !game.IsBattleZone && hasList)
+            TryEnterCreateMode(account);
         if (_exchange.Clicked)
             game.Log("Exchange Password: it comes with the next milestone");                      // ❓
         if (_gameStart.Clicked && _selected >= 0 && hasList)
@@ -271,7 +432,5 @@ public sealed class CharacterSelectScene(GameContext game) : IScene
         game.Log("Map Server : (not known yet, milestone 3) 0");
     }
 
-    public void Dispose()
-    {
-    }
+    public void Dispose() => _createPanel?.Dispose();
 }

@@ -12,7 +12,7 @@ namespace DRPG.Client.Ui;
 /// </summary>
 public sealed class UiText(IFont? font) : IDisposable
 {
-    public const uint White = 0xFFFFFF, Yellow = 0xFFFF, Black = 0;
+    public const uint White = 0xFFFFFF, Yellow = 0xFFFF, Orange = 0x4080FF, NameHighlight = 0x63CBFF, Black = 0;
 
     /// <summary>Lines kept before the cache is emptied; the scenes draw a few dozen different lines.</summary>
     private const int MaxCached = 400;
@@ -85,6 +85,44 @@ public sealed class UiText(IFont? font) : IDisposable
         if (shadow)
             renderer.Draw(Line(renderer, text, shadowColorRef), x + 1, y + 1);
         renderer.Draw(Line(renderer, text, colorRef), x, y);
+    }
+
+    /// <summary>Draws <paramref name="text"/> at (x, y) clipped horizontally to <paramref name="maxWidth"/> px.</summary>
+    public void DrawClipped(IRenderer renderer, string text, int x, int y, int maxWidth, uint colorRef = White, bool shadow = true, uint shadowColorRef = Black)
+    {
+        if (font is null || text.Length == 0 || maxWidth <= 0)
+            return;
+        y += CellAscent - font.Ascent;
+        if (shadow)
+        {
+            var shadowLine = Line(renderer, text, shadowColorRef);
+            renderer.DrawPart(shadowLine, x + 1, y + 1, 0, Math.Min(shadowLine.Width, maxWidth));
+        }
+        var line = Line(renderer, text, colorRef);
+        renderer.DrawPart(line, x, y, 0, Math.Min(line.Width, maxWidth));
+    }
+
+    /// <summary>
+    /// Draws the tail of <paramref name="text"/> that fits within <paramref name="maxWidth"/> px (for edit boxes so the
+    /// caret stays visible) and returns the drawn width in pixels.
+    /// </summary>
+    public int DrawTail(IRenderer renderer, string text, int x, int y, int maxWidth, uint colorRef = White, bool shadow = true, uint shadowColorRef = Black)
+    {
+        if (text.Length == 0 || maxWidth <= 0)
+            return 0;
+        if (font is null)
+            return Math.Min(text.Length * FallbackCharacterWidth, maxWidth);
+        y += CellAscent - font.Ascent;
+        var line = Line(renderer, text, colorRef);
+        int shown = Math.Min(line.Width, maxWidth);
+        int sourceX = line.Width - shown;
+        if (shadow)
+        {
+            var shadowLine = Line(renderer, text, shadowColorRef);
+            renderer.DrawPart(shadowLine, x + 1, y + 1, sourceX, shown);
+        }
+        renderer.DrawPart(line, x, y, sourceX, shown);
+        return shown;
     }
 
     private ITexture Line(IRenderer renderer, string text, uint colorRef)

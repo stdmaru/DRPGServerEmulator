@@ -37,7 +37,9 @@ public sealed class LoginChannelPacketTests
         AssertRoundTrip(new CharacterCreateRequest(new CharacterCreateHeader(3, 0x4F, 0x3E, 0x38), 1, "Tamer", 10, "Agumon"));
         AssertRoundTrip(new CharacterCreateReply(ChannelError.NameTaken, new CharacterCreateHeader(3, 0x4F, 0x3E, 0x38), 1, "Tamer", 10, "Agumon"));
         AssertRoundTrip(new CharacterDeleteRequest(7, new string('c', 40)));
-        AssertRoundTrip(new CharacterDeleteReply(7, new string('c', 40)));
+        AssertRoundTrip(new CharacterDeleteReply(ChannelError.None, 7, new string('c', 40)));
+        AssertRoundTrip(new CharacterDeleteReply(2000, 7, new string('c', 40)));
+        AssertRoundTrip(new CharacterDeleteReply(105, 7, new string('c', 40)));
     }
 
     [Fact]

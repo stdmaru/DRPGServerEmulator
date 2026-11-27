@@ -171,7 +171,7 @@ public sealed class CharacterDeleteHandler(CharacterRepository characters, Chara
         var uid = request.CharacterUid;
         if (!await characters.DeleteAsync(uid, account.Uid, ct)) return;
         log.LogInformation("{Username} apagou o personagem {Uid}", account.Username, uid);
-        session.Send(new CharacterDeleteReply(uid, request.PasswordMd5));
+        session.Send(new CharacterDeleteReply(ChannelError.None, uid, request.PasswordMd5));
         await list.SendAsync(session, account.Uid, ct);
     }
 }

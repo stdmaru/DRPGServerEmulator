@@ -15,6 +15,7 @@ public sealed class GameData(
     IReadOnlyDictionary<string, IReadOnlyList<string[]>> tables,
     IReadOnlyDictionary<string, byte[]> language,
     TextAttach texts,
+    ProhibitedWords prohibitedWords,
     IReadOnlyDictionary<string, SpriteFile> sprites)
 {
     public PackArchive Resource { get; } = resource;
@@ -23,10 +24,12 @@ public sealed class GameData(
     /// <summary>Rows of each table by lower case name (<c>textattach</c>, <c>map</c>, …); a table the pack lacks is absent.</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string[]>> Tables { get; } = tables;
 
-    /// <summary>Raw <c>Language\*_US.bin</c> files by file name. ❓ Only <c>TextAttach</c> is applied so far.</summary>
+    /// <summary>Raw <c>Language\*_US.bin</c> files by file name. ❓ Only <c>TextAttach</c> and <c>ProhibitedWords</c> are applied so far.</summary>
     public IReadOnlyDictionary<string, byte[]> Language { get; } = language;
 
     public TextAttach Texts { get; } = texts;
+
+    public ProhibitedWords ProhibitedWords { get; } = prohibitedWords;
 
     /// <summary>The sprites decoded while loading, by pack path; <c>SpriteStore.Adopt</c> takes them.</summary>
     public IReadOnlyDictionary<string, SpriteFile> Sprites { get; } = sprites;

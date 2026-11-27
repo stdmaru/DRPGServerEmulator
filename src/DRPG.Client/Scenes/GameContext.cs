@@ -28,6 +28,7 @@ public sealed class GameContext(
     public const int FirstBattleZoneLine = 7, LastBattleZoneLine = 12;
 
     private static readonly TextAttach NoTexts = new();
+    private static readonly ProhibitedWords NoProhibitedWords = new();
 
     public GameInstall Install { get; } = install;
     public PackArchive Resource { get; } = resource;
@@ -46,6 +47,9 @@ public sealed class GameContext(
 
     /// <summary>The interface texts by id; <c>Null Text</c> for all of them until the loading screen is done.</summary>
     public TextAttach Texts => Data?.Texts ?? NoTexts;
+
+    /// <summary>Prohibited substrings for character and digimon names; empty until the loading screen is done.</summary>
+    public ProhibitedWords ProhibitedWords => Data?.ProhibitedWords ?? NoProhibitedWords;
 
     /// <summary>The login → channel connection, owned by the server scene and used by the character selection.</summary>
     public AccountSession? Account { get; set; }

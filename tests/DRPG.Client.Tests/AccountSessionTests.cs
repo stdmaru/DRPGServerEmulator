@@ -393,6 +393,95 @@ public sealed class AccountSessionTests : IDisposable
     }
 
     [Fact]
+    public void Create_and_delete_send_requests_update_the_list_and_never_log_the_md5()
+    {
+        var initial = List();
+        var afterCreate = List(Tamer(0));
+        var afterDelete = List();
+        CharacterCreateRequest? seenCreate = null;
+        CharacterDeleteRequest? seenDelete = null;
+        ScriptHappyServers(initial);
+        var happy = _channel.OnFrame!;
+        _channel.OnFrame = (server, frame) =>
+        {
+            switch ((ChannelOpcode)frame.Opcode)
+            {
+                case ChannelOpcode.CharacterCreate:
+                    seenCreate = ClientPacket.Parse<CharacterCreateRequest>(frame.Payload);
+                    server.Send(new CharacterCreateReply(ChannelError.None, seenCreate.Header, seenCreate.TamerId, seenCreate.Name, seenCreate.DigimonId, seenCreate.DigimonName));
+                    server.Send(afterCreate);
+                    break;
+                case ChannelOpcode.CharacterDelete:
+                    seenDelete = ClientPacket.Parse<CharacterDeleteRequest>(frame.Payload);
+                    server.Send(new CharacterDeleteReply(ChannelError.None, seenDelete.CharacterUid, seenDelete.PasswordMd5));
+                    server.Send(afterDelete);
+                    break;
+                default:
+                    happy(server, frame);
+                    break;
+            }
+        };
+
+        using var session = NewSession();
+        ReachTheList(session);
+        Assert.Equal(1, session.CharacterListVersion);
+
+        var header = new CharacterCreateHeader(0, 0x4F, 61, 56);
+        session.CreateCharacter(new CharacterCreateRequest(header, 1, "Marcus", 10, "Agumon"));
+        Pump(session, () => session.CharacterListVersion == 2);
+
+        Assert.Equal(2, session.CharacterListVersion);
+        Assert.Equal("Marcus", session.Characters!.Slots[0].Name);
+        Assert.Null(session.TakeCreateError());
+
+        const string md5 = "d41d8cd98f00b204e9800998ecf8427e";
+        session.DeleteCharacter(7, md5);
+        Pump(session, () => session.CharacterListVersion == 3);
+
+        Assert.Equal(3, session.CharacterListVersion);
+        Assert.True(session.Characters!.Slots[0].IsEmpty);
+        Assert.Equal(md5, seenDelete!.PasswordMd5);
+        Assert.DoesNotContain(_log, line => line.Contains(md5, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Create_and_delete_error_replies_expose_the_error_code()
+    {
+        ScriptHappyServers(List(Tamer(0)));
+        var happy = _channel.OnFrame!;
+        _channel.OnFrame = (server, frame) =>
+        {
+            switch ((ChannelOpcode)frame.Opcode)
+            {
+                case ChannelOpcode.CharacterCreate:
+                    var create = ClientPacket.Parse<CharacterCreateRequest>(frame.Payload);
+                    server.Send(new CharacterCreateReply(ChannelError.NameTaken, create.Header, create.TamerId, create.Name, create.DigimonId, create.DigimonName));
+                    break;
+                case ChannelOpcode.CharacterDelete:
+                    var delete = ClientPacket.Parse<CharacterDeleteRequest>(frame.Payload);
+                    server.Send(new CharacterDeleteReply(2000, delete.CharacterUid, delete.PasswordMd5));
+                    break;
+                default:
+                    happy(server, frame);
+                    break;
+            }
+        };
+
+        using var session = NewSession();
+        ReachTheList(session);
+
+        session.CreateCharacter(new CharacterCreateRequest(new CharacterCreateHeader(1, 0x4F, 60, 56), 1, "Marcus", 10, "Gigi"));
+        Pump(session, () => session.LastCreateError is not null);
+        Assert.Equal(ChannelError.NameTaken, session.TakeCreateError());
+        Assert.Null(session.TakeCreateError());
+
+        session.DeleteCharacter(7, "d41d8cd98f00b204e9800998ecf8427e");
+        Pump(session, () => session.LastDeleteError is not null);
+        Assert.Equal(2000, session.TakeDeleteError());
+        Assert.Null(session.TakeDeleteError());
+    }
+
+    [Fact]
     public void A_server_that_never_answers_times_out()
     {
         _login.OnFrame = (_, _) => { };

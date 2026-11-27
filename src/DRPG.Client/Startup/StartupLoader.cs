@@ -47,7 +47,7 @@ public sealed class StartupLoader(GameInstall install, PackArchive resource, Loa
         log($"load: screen GUI {timer.ElapsedMilliseconds} ms");
 
         var table = PackArchive.Open(install.TablePath);
-        var (tables, language, texts) = LoadTables(table, ct);
+        var (tables, language, texts, prohibitedWords) = LoadTables(table, ct);
         progress.Raise(AfterTables);
         log($"load: tables {timer.ElapsedMilliseconds} ms");
 
@@ -65,10 +65,10 @@ public sealed class StartupLoader(GameInstall install, PackArchive resource, Loa
         log($"load: {_sprites.Count} sprites, {tables.Count} tables in {timer.ElapsedMilliseconds} ms");
         if (SkippedFiles.Count > 0)
             log($"load: {SkippedFiles.Count} listed files are not in resource.hf and were skipped");
-        return new GameData(resource, table, tables, language, texts, _sprites);
+        return new GameData(resource, table, tables, language, texts, prohibitedWords, _sprites);
     }
 
-    private (Dictionary<string, IReadOnlyList<string[]>> Tables, Dictionary<string, byte[]> Language, TextAttach Texts) LoadTables(PackArchive table, CancellationToken ct)
+    private (Dictionary<string, IReadOnlyList<string[]>> Tables, Dictionary<string, byte[]> Language, TextAttach Texts, ProhibitedWords ProhibitedWords) LoadTables(PackArchive table, CancellationToken ct)
     {
         var tables = new Dictionary<string, IReadOnlyList<string[]>>(StringComparer.OrdinalIgnoreCase);
         var language = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
@@ -92,7 +92,13 @@ public sealed class StartupLoader(GameInstall install, PackArchive resource, Loa
             texts.AddTableRows(rows);
         if (language.TryGetValue(TableList.LanguageFile("TextAttach"), out var bytes))
             texts.AddLanguageFile(bytes);
-        return (tables, language, texts);
+
+        var prohibitedWords = new ProhibitedWords();
+        if (tables.TryGetValue("ProhibitedWords", out var prohibitedRows))
+            prohibitedWords.AddTableRows(prohibitedRows);
+        if (language.TryGetValue(TableList.LanguageFile("ProhibitedWords"), out var prohibitedBytes))
+            prohibitedWords.AddLanguageFile(prohibitedBytes);
+        return (tables, language, texts, prohibitedWords);
     }
 
     /// <summary>

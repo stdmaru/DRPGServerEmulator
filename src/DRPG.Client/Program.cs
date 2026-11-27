@@ -127,7 +127,7 @@ internal static class Program
     {
         SceneId.Title => new TitleScene(game),
         SceneId.Server => ServerOrReturnLoading(game),
-        SceneId.CharacterSelect => new CharacterSelectScene(game),
+        SceneId.CharacterSelect => new CharacterSelectScene(game, Random.Shared),
         SceneId.Game => throw new NotSupportedException("the map scene comes with milestone 3"),
         _ => throw new ArgumentOutOfRangeException(nameof(id), id, "unknown scene"),
     };
