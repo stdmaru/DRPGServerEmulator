@@ -1,19 +1,18 @@
 using DRPG.Server.Data.GameData;
 using DRPG.Server.Game.Entities;
 using DRPG.Server.Game.Stats;
+using DRPG.Shared.Packets.Map;
 using DRPG.Shared.Protocol;
 
 namespace DRPG.Server.Network.Packets.Map;
 
 /// <summary>
-/// Registro de item de 108 bytes (0x03, 0x13, 0x91, 0x97, 0xBD, 0xC9, 0xFC). ✅ Campos tirados do <c>item_info_us</c>
-/// (21 itens das sessões 52–61, ver docs/protocolo/structs/inventario.md):
-/// uid, item, u8 tipo (col. 2), u8 subtipo (3), u16 0, quantidade, pilha (26), preço (17), venda (18), ❓, nível (20),
-/// 52 B de efeitos ❓, u16 9999 (32000 nos do tipo 7), u16 col. 15, u32 col. 16, col. 23, 24, 0, 32, checagem uid + item, 0.
+/// Monta o registro de item de 108 bytes (<see cref="ItemData"/>, no <c>DRPG.Shared</c>) a partir do inventário.
+/// ✅ Campos tirados do <c>item_info_us</c> (21 itens das sessões 52–61, ver docs/protocolo/structs/inventario.md).
 /// </summary>
 public static class ItemRecord
 {
-    public const int Length = 108;
+    public const int Length = ItemData.Length;
 
     /// <summary>❓ u32 em +28: 10000 nas sementes e lágrimas, 500 no Double Burger, 100 no ticket; o resto 0.</summary>
     private static uint Unknown28(uint itemId) => itemId switch
@@ -24,40 +23,29 @@ public static class ItemRecord
         _ => 0,
     };
 
-    public static void Write(PacketWriter w, InventoryItem item) =>
-        Write(w, item.Uid, item.ItemId, item.Info, item.Amount, item.ExpiresAt);
+    /// <summary>O item de uma posição, ou o registro vazio (zeros).</summary>
+    public static ItemData Of(InventoryItem? item) =>
+        item is null ? ItemData.Empty : Of(item.Uid, item.ItemId, item.Info, item.Amount, item.ExpiresAt);
 
-    public static void Write(PacketWriter w, uint uid, uint itemId, ItemInfo? info, uint amount, uint expiresAt = 0)
+    public static ItemData Of(uint uid, uint itemId, ItemInfo? info, uint amount, uint expiresAt = 0)
     {
         info ??= new ItemInfo(itemId, "");
         bool isTimed = expiresAt > 0;
-        uint wireAmount = isTimed ? expiresAt : amount;
-        uint wireStack = isTimed
-            ? Math.Max(Inventory.MinClientDurationSeconds, info.DurationSeconds)
-            : info.MaxStack;
-
-        w.WriteU32(uid);                         // 0
-        w.WriteU32(itemId);                      // 4
-        w.WriteU8(info.Type);                    // 8
-        w.WriteU8(info.SubType);
-        w.WriteU16(0);
-        w.WriteU32(wireAmount);                  // 12 ✅ quantidade ou Unix timestamp UTC de expiração (conn=238/428)
-        w.WriteU32(wireStack);                   // 16 ✅ pilha (1..999) ou duração em segundos (> 999)
-        w.WriteU32(info.BuyPrice);               // 20
-        w.WriteU32(info.SellPrice);              // 24
-        w.WriteU32(Unknown28(itemId));           // 28 ❓
-        w.WriteU32(info.Level);                  // 32
-        WriteEffectTriplets(w, info.Modifiers);      // 36..87 (52 B): até 4 triplas (id, statCode, value) + 4 zeros
-        w.WriteU16(Unknown88(info));                // 88 ❓
-        w.WriteU16(info.CoinPrice);                  // 90
-        w.WriteU32(info.LadderPrice);                  // 92
-        w.WriteU8(info.UnknownCol23);                  // 96
-        w.WriteU8(info.UnknownCol24);
-        w.WriteU8(0);
-        w.WriteU8(info.UnknownCol32);
-        w.WriteU32(uid + itemId);                // 100 checagem
-        w.WriteU32(0);                           // 104
+        return new ItemData(
+            uid, itemId, info.Type, info.SubType,
+            Amount: isTimed ? expiresAt : amount,       // ✅ quantidade ou Unix timestamp UTC de expiração (conn=238/428)
+            Stack: isTimed                              // ✅ pilha (1..999) ou duração em segundos (> 999)
+                ? Math.Max(Inventory.MinClientDurationSeconds, info.DurationSeconds)
+                : info.MaxStack,
+            info.BuyPrice, info.SellPrice, Unknown28(itemId), info.Level,
+            Effects(info.Modifiers), Unknown88(info), info.CoinPrice, info.LadderPrice,
+            info.UnknownCol23, info.UnknownCol24, info.UnknownCol32);
     }
+
+    public static void Write(PacketWriter w, InventoryItem item) => Of(item).Write(w);
+
+    public static void Write(PacketWriter w, uint uid, uint itemId, ItemInfo? info, uint amount, uint expiresAt = 0) =>
+        Of(uid, itemId, info, amount, expiresAt).Write(w);
 
     /// <summary>
     /// ❓ <c>+88</c> (<c>u16</c>): 9999 ou 32000 nas capturas, sem coluna da tabela que explique. Não segue o tipo: há
@@ -70,56 +58,39 @@ public static class ItemRecord
     /// ✅ Capturas v322 (<c>conn=234/238/428</c>): offsets +36..83 guardam até 4 triplas <c>(effectId, statCode, value)</c>:
     /// 1=STR, 2=AGI, 3=CON, 4=INT (Digimental #215), 301=ATK, 302=DEF, 303=BR (Crest #107), 304=HP, 305=VP.
     /// </summary>
-    private static void WriteEffectTriplets(PacketWriter w, StatModifiers bonus)
+    private static ItemEffect[] Effects(StatModifiers bonus)
     {
-        if (bonus.IsEmpty)
-        {
-            w.WriteZeros(52);
-            return;
-        }
+        if (bonus.IsEmpty) return [];
 
-        Span<(uint Id, uint Code, int Value)> triplets = stackalloc (uint, uint, int)[4];
-        int count = 0;
-
+        var effects = new List<ItemEffect>(ItemData.MaxEffects);
         var attributes = bonus.Attributes;
         int atk = bonus.Flat(StatModifierKind.Atk), def = bonus.Flat(StatModifierKind.Def), br = bonus.Flat(StatModifierKind.Br);
         int hp = bonus.Flat(StatModifierKind.Hp), vp = bonus.Flat(StatModifierKind.Vp);
-        AddTriplet(triplets, ref count, (uint)attributes.Str, 1, attributes.Str);
-        AddTriplet(triplets, ref count, (uint)attributes.Agi, 2, attributes.Agi);
-        AddTriplet(triplets, ref count, (uint)attributes.Con, 3, attributes.Con);
-        AddTriplet(triplets, ref count, (uint)attributes.Int, 4, attributes.Int);
-        AddTriplet(triplets, ref count, (uint)(10_000 + atk), 301, atk);
-        AddTriplet(triplets, ref count, (uint)(20_000 + def), 302, def);
-        AddTriplet(triplets, ref count, (uint)(30_000 + br), 303, br);
-        AddTriplet(triplets, ref count, (uint)(40_000 + hp), 304, hp);
-        AddTriplet(triplets, ref count, (uint)(50_000 + vp), 305, vp);
-
-        for (int i = 0; i < count; i++)
-        {
-            w.WriteU32(triplets[i].Id);
-            w.WriteU32(triplets[i].Code);
-            w.WriteI32(triplets[i].Value);
-        }
-        w.WriteZeros(52 - count * 12);
+        Add(effects, (uint)attributes.Str, 1, attributes.Str);
+        Add(effects, (uint)attributes.Agi, 2, attributes.Agi);
+        Add(effects, (uint)attributes.Con, 3, attributes.Con);
+        Add(effects, (uint)attributes.Int, 4, attributes.Int);
+        Add(effects, (uint)(10_000 + atk), 301, atk);
+        Add(effects, (uint)(20_000 + def), 302, def);
+        Add(effects, (uint)(30_000 + br), 303, br);
+        Add(effects, (uint)(40_000 + hp), 304, hp);
+        Add(effects, (uint)(50_000 + vp), 305, vp);
+        return effects.ToArray();
     }
 
-    private static void AddTriplet(Span<(uint Id, uint Code, int Value)> triplets, ref int count, uint id, uint code, int value)
+    private static void Add(List<ItemEffect> effects, uint id, uint code, int value)
     {
-        if (value > 0 && count < triplets.Length)
-            triplets[count++] = (id, code, value);
+        if (value > 0 && effects.Count < ItemData.MaxEffects) effects.Add(new ItemEffect(id, code, value));
     }
 }
 
 /// <summary>
-/// Registro de card de 76 bytes (0x02 offsets 784..1239, 0x03/0xFC primeiros 24 slots, 0x90, 0xC8).
-/// ✅ Layout confirmado contra capturas v322 (cards #74 Golden Drill X, #19 Recovery Floppy L, #3 Attack Plug-In, #5 Defense Plug-In C):
-/// +0 uid, +4 cardId, +8 tipo (col 2), +9 subtipo (col 3), +10 flag19 (col 19), +11 trigger (col 23: 1 ataque / 2 defesa),
-/// +12 restrição (col 24), +13 zero, +14 u16 quantidade, +16 pilha (col 21), +20 preço (col 12), +24 venda (col 13),
-/// +28..39 (duração, código e valor de efeito), +40..63 zeros, +64 u16 9999, +66 col 26, +68 col 28, +72..75 flags (col 27/29/30).
+/// Monta o registro de card de 76 bytes (<see cref="CardData"/>, no <c>DRPG.Shared</c>). ✅ Layout confirmado contra
+/// capturas v322 (cards #74 Golden Drill X, #19 Recovery Floppy L, #3 Attack Plug-In, #5 Defense Plug-In C).
 /// </summary>
 public static class CardRecord
 {
-    public const int Length = 76;
+    public const int Length = CardData.Length;
 
     private static (uint Duration, uint Code, uint Value) EffectFields(uint cardId) => cardId switch
     {
@@ -130,35 +101,22 @@ public static class CardRecord
         _ => (0, 0, 0),
     };
 
-    public static void Write(PacketWriter w, InventoryItem item)
+    /// <summary>O card de uma posição, ou o registro vazio (zeros).</summary>
+    public static CardData Of(InventoryItem? item)
     {
+        if (item is null) return CardData.Empty;
         var card = item.CardInfo ?? FallbackCard(item);
         var (duration, code, value) = EffectFields(item.ItemId);
-
-        w.WriteU32(item.Uid);                           // 0
-        w.WriteU32(item.ItemId);                        // 4
-        w.WriteU8(card.Type);                           // 8
-        w.WriteU8(card.SubType);                        // 9
-        w.WriteU8(card.UnknownCol19);                         // 10
-        w.WriteU8((byte)card.Trigger);                  // 11
-        w.WriteU8(card.Restriction);                    // 12
-        w.WriteU8(0);                                   // 13
-        w.WriteU16((ushort)item.Amount);                // 14
-        w.WriteU32(card.MaxStack);                      // 16
-        w.WriteU32(card.BuyPrice);                      // 20
-        w.WriteU32(card.SellPrice);                     // 24
-        w.WriteU32(duration);                           // 28
-        w.WriteU32(code);                               // 32
-        w.WriteU32(value);                              // 36
-        w.WriteZeros(24);                               // 40..63
-        w.WriteU16(9999);                               // 64
-        w.WriteU16(card.CoinPrice);                         // 66
-        w.WriteU32(card.LadderPrice);                         // 68
-        w.WriteU8(card.UnknownCol30 != 0 ? card.UnknownCol27 : (byte)0); // 72
-        w.WriteU8(card.UnknownCol30 != 0 ? card.UnknownCol29 : (byte)0); // 73
-        w.WriteU8(0);                                   // 74
-        w.WriteU8(card.UnknownCol30);                          // 75
+        return new CardData(
+            item.Uid, item.ItemId, card.Type, card.SubType, card.UnknownCol19, (byte)card.Trigger, card.Restriction,
+            (ushort)item.Amount, card.MaxStack, card.BuyPrice, card.SellPrice, duration, code, value,
+            Unknown64: 9999, card.CoinPrice, card.LadderPrice,
+            Flag72: card.UnknownCol30 != 0 ? card.UnknownCol27 : (byte)0,
+            Flag73: card.UnknownCol30 != 0 ? card.UnknownCol29 : (byte)0,
+            Flag75: card.UnknownCol30);
     }
+
+    public static void Write(PacketWriter w, InventoryItem item) => Of(item).Write(w);
 
     /// <summary>Card fora do <c>card_info_us</c>: monta o registro com o que o item tiver.</summary>
     private static CardInfo FallbackCard(InventoryItem item)
@@ -180,30 +138,29 @@ public static class CardRecord
 /// <summary>As duas bolsas como no 0x03: 24 × 76 (bolsa de batalha) e 24 × 108 (inventário), pela posição.</summary>
 internal static class InventoryLayout
 {
-    public const int Length = Inventory.Size * (CardRecord.Length + ItemRecord.Length);
+    public const int Length = InventoryBags.Length;
 
-    public static void Write(PacketWriter w, Inventory inventory)
+    public static InventoryBags Of(Inventory inventory)
     {
-        for (int slot = 0; slot < Inventory.Size; slot++)
+        var cards = new CardData[InventoryBags.Size];
+        var items = new ItemData[InventoryBags.Size];
+        for (int slot = 0; slot < InventoryBags.Size; slot++)
         {
-            if (inventory.Battle[slot] is { } b) CardRecord.Write(w, b);
-            else w.WriteZeros(CardRecord.Length);
+            cards[slot] = CardRecord.Of(inventory.Battle[slot]);
+            items[slot] = ItemRecord.Of(inventory.Main[slot]);
         }
-        for (int slot = 0; slot < Inventory.Size; slot++)
-        {
-            if (inventory.Main[slot] is { } item) ItemRecord.Write(w, item);
-            else w.WriteZeros(ItemRecord.Length);
-        }
+        return new(cards, items);
     }
+
+    public static void Write(PacketWriter w, Inventory inventory) => Of(inventory).Write(w);
 }
 
-/// <summary>0x03: inventário na entrada do mapa (4416 bytes). ✅ sessões 52–56.</summary>
-public sealed class InventoryDataPacket(Inventory inventory) : ServerPacket
+/// <summary>0x03: inventário na entrada do mapa (4416 bytes). ✅ sessões 52–56. O pacote é o <see cref="InventoryDataPacket"/> do Shared.</summary>
+public static class InventoryData
 {
     public const int EvolutionRecord = CardRecord.Length;
 
-    public override ushort Opcode => (ushort)MapOpcode.InventoryData;
-    protected override void Write(PacketWriter w) => InventoryLayout.Write(w, inventory);
+    public static InventoryDataPacket Of(Inventory inventory) => new(InventoryLayout.Of(inventory));
 }
 
 /// <summary>0xFC (4424 bytes): ✅ f64 bits + as bolsas como no 0x03. O oficial manda depois de cada 0xC9.</summary>

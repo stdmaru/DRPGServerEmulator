@@ -1,8 +1,7 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
-using DRPG.Shared.Protocol;
 
-namespace DRPG.Server.Game;
+namespace DRPG.Shared.Protocol;
 
 /// <summary>
 /// Identificador de 16 bytes que o protocolo usa para personagens, digimons, batalhas e

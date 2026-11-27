@@ -35,7 +35,7 @@ public class MapSequencesTests
         await harness.RunAsync(() => character.Wallet.Credit(CurrencyKind.Coins, 5, Gm));
         var withCoins = await harness.InvokeAsync(() => MapSequences.WorldState(player, null).Select(p => p.GetType()).ToList());
 
-        Type[] head = [typeof(CharacterDataPacket), typeof(InventoryDataPacket)];
+        Type[] head = [typeof(DRPG.Server.Network.Packets.TwoWayServerPacket<Shared.Packets.Map.CharacterDataPacket>), typeof(DRPG.Server.Network.Packets.TwoWayServerPacket<Shared.Packets.Map.InventoryDataPacket>)];
         Type[] tail = [typeof(Unknown05Packet), typeof(ExpEventPacket), typeof(Unknown74Packet), typeof(Unknown152Packet),
             typeof(SingleDigimonInfoPacket), typeof(Unknown73Packet)];
         var pages = MapSequences.ListPages().Select(p => p.GetType());

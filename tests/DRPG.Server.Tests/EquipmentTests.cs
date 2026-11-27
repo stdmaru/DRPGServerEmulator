@@ -187,7 +187,7 @@ public class EquipmentTests
         inv.Equipment.Place(watch);
 
         // S2C 0x02 (7600 B)
-        var p02 = new CharacterDataPacket(player.Character, TestSupport.Clock.UnixNow).EncodePayload();
+        var p02 = TwoWayPacket.EncodePayload(CharacterData.Of(player.Character, TestSupport.Clock.UnixNow));
         Assert.Equal(7600, p02.Length);
         Assert.Equal(c1.Uid, BinaryPrimitives.ReadUInt32LittleEndian(p02.AsSpan(100)));
         Assert.Equal(107u, BinaryPrimitives.ReadUInt32LittleEndian(p02.AsSpan(104)));

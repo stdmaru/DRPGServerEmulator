@@ -15,21 +15,6 @@ public sealed record JoinHandshakeRequest : IClientPacket<JoinHandshakeRequest>
     }
 }
 
-/// <summary>✅ 0x01 (C2S 57 B, v322): entrar no mapa. Personagem[21], usuário[21], u8 e 14 B finais.</summary>
-public sealed record JoinCharacterRequest(string CharacterName, string Username) : IClientPacket<JoinCharacterRequest>
-{
-    public static PacketLength Length => PacketLength.Exact(57);
-
-    public static JoinCharacterRequest Read(PacketReader r)
-    {
-        var character = r.ReadFixedString(21);
-        var username = r.ReadFixedString(21);
-        r.ReadU8();
-        r.Skip(14);
-        return new(character, username);
-    }
-}
-
 /// <summary>✅ 0x04 (C2S 30 B, v322): pedir os dados do personagem. Serial do personagem (16 B) e 14 B finais.</summary>
 public sealed record RefreshCharacterInfoRequest(Serial Character) : IClientPacket<RefreshCharacterInfoRequest>
 {
@@ -40,21 +25,6 @@ public sealed record RefreshCharacterInfoRequest(Serial Character) : IClientPack
         var serial = Serial.Read(r);
         r.Skip(14);
         return new(serial);
-    }
-}
-
-/// <summary>✅ 0x20 (C2S 20 B, v322): andar. i16 (sempre 5), i16 x, i16 y e 14 B zerados.</summary>
-public sealed record MoveCharacterRequest(short X, short Y) : IClientPacket<MoveCharacterRequest>
-{
-    public static PacketLength Length => PacketLength.Exact(20);
-
-    public static MoveCharacterRequest Read(PacketReader r)
-    {
-        r.ReadI16();                            // ✅ sempre 5
-        var x = r.ReadI16();
-        var y = r.ReadI16();
-        r.Skip(14);
-        return new(x, y);
     }
 }
 

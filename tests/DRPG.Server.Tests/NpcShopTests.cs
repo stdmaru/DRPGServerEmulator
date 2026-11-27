@@ -302,7 +302,7 @@ public class NpcShopTests
         // 4. CharacterDataPacket (S2C 0x02) inclui LadderPoints (+0x5C), Medals (+0x19A8) e Coins (+0x19AA)
         player.Character.SetMedals(77);
         player.Character.SetCoins(50);
-        var charPayload = new CharacterDataPacket(player.Character, TestSupport.Clock.UnixNow).Encode().AsSpan(PacketHeader.Length);
+        var charPayload = TwoWayPacket.Encode(CharacterData.Of(player.Character, TestSupport.Clock.UnixNow)).AsSpan(PacketHeader.Length);
         Assert.Equal(7600, charPayload.Length);
         Assert.Equal(500u, BinaryPrimitives.ReadUInt32LittleEndian(charPayload.Slice(0x5C)));
         Assert.Equal((ushort)77, BinaryPrimitives.ReadUInt16LittleEndian(charPayload.Slice(0x19A8)));

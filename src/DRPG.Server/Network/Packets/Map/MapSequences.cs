@@ -15,8 +15,8 @@ public static class MapSequences
     public static IEnumerable<ServerPacket> WorldState(Player player, ActiveExpEvent? expEvent)
     {
         var character = player.Character;
-        yield return new CharacterDataPacket(character, character.Inventory.Clock.UnixNow);
-        yield return new InventoryDataPacket(character.Inventory);
+        yield return TwoWayServerPacket.Of(CharacterData.Of(character, character.Inventory.Clock.UnixNow));
+        yield return TwoWayServerPacket.Of(InventoryData.Of(character.Inventory));
         if (character.Wallet.Medals > 0 || character.Wallet.Coins > 0)
             yield return new CurrencyUpdatePacket(character);
         foreach (var packet in ListPages())

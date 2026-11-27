@@ -1,131 +1,47 @@
 using DRPG.Server.Game;
 using DRPG.Server.Game.Entities;
 using DRPG.Server.Game.Stats;
+using DRPG.Shared.Packets.Map;
 using DRPG.Shared.Protocol;
 
 namespace DRPG.Server.Network.Packets.Map;
 
-/// <summary>0x02: dados completos do personagem e do digimon líder. Obrigatório para carregar o mapa.</summary>
-public sealed class CharacterDataPacket(Character character, long serverUnixTime) : ServerPacket
+/// <summary>
+/// 0x02: dados completos do personagem e do digimon líder. Obrigatório para carregar o mapa. O pacote é o
+/// <see cref="CharacterDataPacket"/> do Shared; aqui só se monta a partir do <see cref="Character"/>.
+/// </summary>
+public static class CharacterData
 {
-    public override ushort Opcode => (ushort)MapOpcode.CharacterData;
-
-    protected override void Write(PacketWriter w)
+    public static CharacterDataPacket Of(Character c, long serverUnixTime)
     {
-        var c = character;
-        w.WriteU32(c.Uid);
-        c.Serial.Write(w);
-        w.WriteFixedString(c.Name, 21);
-        w.WriteU8(c.TamerId);
-        w.WriteU16(1);                          // ?
-        w.WriteU16(c.Level);
-        w.WriteZeros(2);
-        w.WriteI32(0);                          // fama
-        w.WriteI32(0);                          // EXP do tamer ❓ não persistido
-        w.WriteI32((int)ExpFormulas.TamerExpToNext(c.Level)); // EXP para o próximo nível do tamer ✅ 5·(L + 1)
-        w.WriteZeros(4);
-        w.WriteF64(c.Wallet.Bits);
-        w.WriteI32(c.TotalWins);
-        w.WriteI32(c.TotalBattles);
-        w.WriteI16(0);                          // vitórias ranqueadas
-        w.WriteI16(0);                          // batalhas ranqueadas
-        w.WriteI32(1800);                       // pontos ranqueados (84..87 = 0x54)
-        w.WriteU16((ushort)Rank.ChromeDigizoid);// 88..89 (0x58) ✅ WORD [player+0x12AC]
-        w.WriteZeros(2);                        // 90..91 (0x5A)
-        w.WriteU32(c.Wallet.LadderPoints);            // 92..95 (0x5C) ✅ DWORD [player+0x12B0] (DigimonRPG.bin @ 0x00B5C119)
-        w.WriteZeros(4);                        // 96..99 (0x60)
-        // 100..747: ✅ 6 equipamentos primários (Crests 4..6 + Digimentals 7..9; 6 × 108 = 648 B, conn=238/428)
-        foreach (var place in EquipmentSlots.PrimarySlots)
-        {
-            if (c.Inventory.EquippedAt(place) is { } eq) ItemRecord.Write(w, eq);
-            else w.WriteZeros(ItemRecord.Length);
-        }
-        w.WriteZeros(36);                       // 748..783
-        // 784..1239: ✅ 6 Card Slots equipados (6 × 76 = 456 bytes, conn=428/437/442/446)
-        for (int slot = 0; slot < Inventory.CardSlotCount; slot++)
-        {
-            if (c.Inventory.CardSlots[slot] is { } card) CardRecord.Write(w, card);
-            else w.WriteZeros(CardRecord.Length);
-        }
+        // 100..747: ✅ 6 equipamentos primários (Crests 4..6 + Digimentals 7..9; conn=238/428)
+        var primary = EquipmentSlots.PrimarySlots.Select(place => ItemRecord.Of(c.Inventory.EquippedAt(place))).ToArray();
+        // 784..1239: ✅ 6 Card Slots equipados (conn=428/437/442/446)
+        var cards = new CardData[Inventory.CardSlotCount];
+        for (int slot = 0; slot < cards.Length; slot++)
+            cards[slot] = CardRecord.Of(c.Inventory.CardSlots[slot]);
+        // 1240: ✅ 5 blocos de status, um por posição do time (líder na 0; pode haver posição vazia, sessão 56).
+        // O bloco do time manda sempre 1 em 162 (máscara de elemento).
+        var party = c.Party.Select(d => d is null ? DigimonStatus.Empty : DigimonStatusBlock.Of(d, elementMask: 1)).ToArray();
+        // 4724..7599: ✅ 23 slots de equipamento do Tamer (DigimonRPG.bin @ 0x00B5BF21..0x00B5C150)
+        var tail = EquipmentSlots.TailSlots.Select(slot => ItemRecord.Of(c.Inventory.EquippedAt(slot.Place))).ToArray();
 
-        // 1240: ✅ 5 blocos de status, um por posição do time (líder na 0; pode haver posição vazia, sessão 56)
-        foreach (var d in c.Party)
-        {
-            if (d is null) DigimonStatusBlock.WriteEmpty(w);
-            else WritePartyBlock(w, d);
-        }
-
-        w.WriteI16(c.X);                        // 4720 na v322 (4680 na v242)
-        w.WriteI16(c.Y);
-        // 4724..7599 (2876 B): ✅ 23 slots de equipamento do Tamer (DigimonRPG.bin @ 0x00B5BF21..0x00B5C150)
-        // + Medals (0x19A8), Coins (0x19AA) e serverTime UTC (0x19B0)
-        WriteEquipmentTail(w, c, serverUnixTime);
-    }
-
-    private static void WriteEquipmentTail(PacketWriter w, Character character, long serverUnixTime)
-    {
-        const int tailLength = 2876;
-        // ✅ DigimonRPG.bin @ 0x00B5C028 / 0x00B5C044 / 0x00ABE028 & captures.db (conn=238/428):
-        //   0x19A8 (4724 + 1844): u16 Medals (WORD [player+0x4070])
-        //   0x19AA (4724 + 1846): u16 Coins  (WORD [player+0x4072])
-        //   0x19B0 (4724 + 1852): u32 Unix timestamp UTC do servidor (para itens de período)
-        const int currenciesTailOffset = 0x19A8 - 4724; // 1844 (logo após Spirit3 [1736..1844], antes de Wings [2144..2252])
-        int tailStart = w.Position;
-        int cursor = 0;
-        bool wroteCurrenciesAndTime = false;
-
-        foreach (var (place, offset) in EquipmentSlots.TailSlots)
-        {
-            if (!wroteCurrenciesAndTime && offset > currenciesTailOffset)
-            {
-                if (currenciesTailOffset > cursor)
-                    w.WriteZeros(currenciesTailOffset - cursor);
-                w.WriteU16(character.Wallet.Medals);
-                w.WriteU16(character.Wallet.Coins);
-                w.WriteZeros(4); // 0x19AC..0x19AF
-                w.WriteU32((uint)serverUnixTime);
-                cursor = currenciesTailOffset + 12; // 1856 = 0x19B4 - 4724
-                wroteCurrenciesAndTime = true;
-            }
-            if (offset > cursor)
-                w.WriteZeros(offset - cursor);
-            if (character.Inventory.EquippedAt(place) is { } eq)
-                ItemRecord.Write(w, eq);
-            else
-                w.WriteZeros(ItemRecord.Length);
-            cursor = offset + ItemRecord.Length;
-        }
-
-        if (tailLength > cursor)
-            w.WriteZeros(tailLength - cursor);
-
-        // Garante exatamente 2876 bytes na cauda (total 7600 B no S2C 0x02)
-        int written = w.Position - tailStart;
-        if (written < tailLength) w.WriteZeros(tailLength - written);
-    }
-
-    /// <summary>Bloco do time: o começo do bloco de status, com 64..191 próprio.</summary>
-    private static void WritePartyBlock(PacketWriter w, Digimon d)
-    {
-        int block = w.Position;
-        DigimonStatusBlock.WriteHead(w, d);
-        w.WriteZeros(52);                       // 64
-        w.WriteI16(0);                          // 116 bônus de ATK (taxa)
-        w.WriteI16(0);                          // 118 bônus de DEF (taxa)
-        w.WriteI16(0);                          // 120 bônus de BR (taxa)
-        w.WriteZeros(38);                       // 122
-        w.WriteU8(d.Species.Stage);             // 160 estágio (1 in-training, 2 rookie...)
-        w.WriteU8(d.Species.Attribute);         // 161 atributo
-        w.WriteSparse(30, (0, [0x01]));         // 162
-        DigimonStatusBlock.WriteCombat(w, d);
-        DigimonStatusBlock.WriteProgress(w, d);
-        DigimonStatusBlock.WriteSkills(w, d);
-        var bonus = d.TitleAttributeBonus;
-        w.WriteI32(bonus.Str);                  // 328 ✅ bônus de STR (título)
-        w.WriteI32(bonus.Agi);                  // 332 ✅ bônus de AGI
-        w.WriteI32(bonus.Con);                  // 336 ✅ bônus de CON
-        w.WriteI32(bonus.Int);                  // 340 ✅ bônus de INT
-        w.WriteZeros(DigimonStatusBlock.Length - (w.Position - block));
+        return new CharacterDataPacket(
+            c.Uid, c.Serial, c.Name, c.TamerId,
+            Unknown42: 1,                                       // ?
+            c.Level,
+            Fame: 0,
+            Exp: 0,                                             // EXP do tamer ❓ não persistido
+            ExpToNextLevel: (int)ExpFormulas.TamerExpToNext(c.Level), // ✅ 5·(L + 1)
+            c.Wallet.Bits, c.TotalWins, c.TotalBattles,
+            RankedWins: 0, RankedBattles: 0,
+            RankedPoints: 1800,                                 // 84 (0x54)
+            Rank: (ushort)Rank.ChromeDigizoid,                  // 88 (0x58) ✅ WORD [player+0x12AC]
+            c.Wallet.LadderPoints,                              // 92 (0x5C) ✅ DWORD [player+0x12B0] (DigimonRPG.bin @ 0x00B5C119)
+            primary, cards, party, c.X, c.Y,                    // X/Y: 4720 na v322 (4680 na v242)
+            tail,
+            // 0x19A8 / 0x19AA / 0x19B0 (✅ DigimonRPG.bin @ 0x00B5C028 / 0x00B5C044 / 0x00ABE028 e captures.db conn=238/428)
+            c.Wallet.Medals, c.Wallet.Coins, (uint)serverUnixTime);
     }
 }
 
