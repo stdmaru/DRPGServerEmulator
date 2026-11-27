@@ -47,7 +47,7 @@ public sealed class LauncherFlow(
         string PatchStatus = "Checking for updates...",
         double PatchFraction = 0,
         bool PatchComplete = false,
-        IReadOnlyList<PatchConfiguration.NewsItem>? News = null,
+        IReadOnlyList<NewsItem>? News = null,
         string PatchDetail = "",
         int StatusVersion = 0);
 
@@ -60,7 +60,8 @@ public sealed class LauncherFlow(
     private double _patchFraction;
     private bool _patchComplete;
     private int _statusVersion;
-    private IReadOnlyList<PatchConfiguration.NewsItem> _news = [];
+    private bool _newsSubscribed;
+    private IReadOnlyList<NewsItem> _news = [];
     private Func<Task>? _retry;
     private string _failure = "";
     private int _failuresInARow;
@@ -79,7 +80,24 @@ public sealed class LauncherFlow(
 
     public bool IsBusy => !_running.IsCompleted;
 
-    public void Start(CancellationToken ct) => _running = Run(() => PatchAsync(ct), null, ct);
+    public void Start(CancellationToken ct)
+    {
+        if (!_newsSubscribed)
+        {
+            patcher.NewsLoaded += SetNews;
+            _newsSubscribed = true;
+        }
+        _running = Run(() => PatchAsync(ct), null, ct);
+    }
+
+    private void SetNews(IReadOnlyList<NewsItem> news)
+    {
+        lock (_lock)
+        {
+            _news = news;
+            _state = _state with { News = news };
+        }
+    }
 
     /// <summary>Sends ID and password (Ready only). Empty fields are refused here without asking the server.</summary>
     public void Login(string login, string password, CancellationToken ct)
@@ -173,7 +191,8 @@ public sealed class LauncherFlow(
         {
             case PatchOutcome.UpToDate up:
                 _configuration = up.Configuration;
-                _news = up.Configuration.News;
+                if (up.News is not null)
+                    _news = up.News;
                 string doneText = up.InstalledVersion > 0
                     ? $"Up to date (v{up.InstalledVersion}) - Ready"
                     : "Up to date - Ready";

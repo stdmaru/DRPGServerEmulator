@@ -26,12 +26,13 @@ public sealed class PatcherTests : IDisposable
 
     private static byte[] Bytes(string s) => Encoding.UTF8.GetBytes(s);
 
-    private static string Config(int patchVersion, int min = 0, bool maintenance = false) => $$"""
+    private static string Config(int patchVersion, int min = 0, bool maintenance = false, string newsUrl = "") => $$"""
     {
       "ServerInfo": { "Maintenance": {{(maintenance ? "true" : "false")}}, "Message": { "Title": "Down", "Msg": "Back soon" } },
       "LanuncherInfo": { "RunExeFileName": "DigimonRPG.bin" },
       "PatchInfo": { "DownloadUrl": "http://patch.test/files", "MinPatchVersion": {{min}}, "PatchVersion": {{patchVersion}},
-                     "DownloadFileHeader": "Patch_%d.zip", "PatchFileHeader": "Patch_%d" }
+                     "DownloadFileHeader": "Patch_%d.zip", "PatchFileHeader": "Patch_%d" },
+      "MainUrl": { "NewsPageUrl": "{{newsUrl}}" }
     }
     """;
 
@@ -93,6 +94,31 @@ public sealed class PatcherTests : IDisposable
     {
         var outcome = await Run(Config(242, maintenance: true));
         Assert.Equal(new PatchOutcome.Maintenance("Down", "Back soon"), outcome);
+    }
+
+    [Fact]
+    public async Task Fetches_dynamic_news_from_NewsPageUrl_even_during_maintenance()
+    {
+        _files["/news.json"] = Bytes("""
+        [
+          { "Category": "Event", "Title": "Weekend Boost", "Date": "11/26", "URL": "https://example.com/boost" }
+        ]
+        """);
+        var outcome = await Run(Config(242, maintenance: true, newsUrl: "http://patch.test/news.json"));
+        var maintenance = Assert.IsType<PatchOutcome.Maintenance>(outcome);
+        Assert.NotNull(maintenance.News);
+        Assert.Single(maintenance.News!);
+        Assert.Equal("Weekend Boost", maintenance.News![0].Title);
+        Assert.Equal("11/26", maintenance.News![0].Date);
+        Assert.Equal("https://example.com/boost", maintenance.News![0].Url);
+    }
+
+    [Fact]
+    public async Task Missing_news_endpoint_does_not_block_patching()
+    {
+        var outcome = await Run(Config(240, newsUrl: "http://patch.test/missing-news.json"));
+        var up = Assert.IsType<PatchOutcome.UpToDate>(outcome);
+        Assert.Null(up.News);
     }
 
     [Fact]

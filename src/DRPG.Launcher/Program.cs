@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DRPG.Engine.Assets;
 using DRPG.Launcher.Login;
 using DRPG.Launcher.Patching;
@@ -46,11 +47,11 @@ internal static class Program
             renderer.BeginFrame();
             bool patchComplete = fraction is null;
             login.PanelAvailable = patchComplete;
-            var sampleNews = new PatchConfiguration.NewsItem[]
+            var sampleNews = new NewsItem[]
             {
-                new() { Category = "Event", Title = "Double EXP weekend in Digital World" },
-                new() { Category = "Update", Title = "Client v322 character creation and deletion" },
-                new() { Category = "Info", Title = "Welcome to Digimon RPG Preservation Server" },
+                new() { Category = "Event", Title = "Double EXP weekend in Digital World", Date = "11/26", Url = "https://example.com/event" },
+                new() { Category = "Update", Title = "Client v322 character creation and deletion", Date = "11/25", Url = "https://example.com/update" },
+                new() { Category = "Info", Title = "Welcome to Digimon RPG Preservation Server", Date = "11/24", Url = "https://example.com/info" },
             };
             var sampleState = new LauncherFlow.State(
                 patchComplete ? LauncherStage.Connecting : LauncherStage.Patching,
@@ -132,6 +133,11 @@ internal static class Program
                 newsView.Handle(e);
                 cursor.Handle(e);
             }
+            if (newsView.ClickedUrl is { } newsUrl)
+            {
+                newsView.ClickedUrl = null;
+                OpenUrl(newsUrl);
+            }
             if (login.SubmitRequested)
             {
                 login.SubmitRequested = false;
@@ -184,6 +190,23 @@ internal static class Program
         {
             Console.Error.WriteLine(e.Message);
             return null;
+        }
+    }
+
+    private static void OpenUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("https" or "http"))
+            return;
+        try
+        {
+            if (OperatingSystem.IsLinux())
+                Process.Start(new ProcessStartInfo { FileName = "xdg-open", ArgumentList = { uri.AbsoluteUri }, UseShellExecute = false });
+            else
+                Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+        }
+        catch (Exception e)
+        {
+            Console.Error.WriteLine($"Could not open URL ({uri.AbsoluteUri}): {e.Message}");
         }
     }
 
