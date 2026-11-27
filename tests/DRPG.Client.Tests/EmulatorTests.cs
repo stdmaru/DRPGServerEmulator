@@ -127,4 +127,71 @@ public sealed class EmulatorTests
         Assert.Null(session.LastDeleteError);
         Assert.DoesNotContain(session.Characters!.Slots, s => !s.IsEmpty && s.Uid == created.Uid);
     }
+
+    [EmulatorFact]
+    public void A_created_character_enters_the_world()
+    {
+        var log = new List<string>();
+        var settings = EmulatorEnvironment.Settings;
+        var command = new GameCommandLine(EmulatorEnvironment.User!, EmulatorEnvironment.Key!);
+        using var session = new AccountSession(settings, command, log.Add);
+        ulong now = 0;
+
+        session.StartLogin(now);
+        Pump(session, ref now, () => session.Step is AccountStep.LoggedIn or AccountStep.Failed);
+        session.SelectChannel(now);
+        Pump(session, ref now, () => session.Step is AccountStep.ChannelSelected or AccountStep.Failed);
+        session.Authenticate(now);
+        Pump(session, ref now, () => session.Step is AccountStep.Authenticated or AccountStep.Failed);
+        session.RequestCharacterList(now);
+        Pump(session, ref now, () => session.Step == AccountStep.Ready && session.UserConfirmed);
+        int targetSlot = CharacterNameRules.PickTargetSlot(session.Characters!.Slots, selectedSlot: -1);
+        Assert.True(targetSlot >= 0, "E2E account has no empty character slot");
+
+        string name = $"E2e{Random.Shared.Next(100000, 999999)}";
+        int beforeCreate = session.CharacterListVersion;
+        var header = CharacterNameRules.BuildCreateHeader((byte)targetSlot, Random.Shared);
+        session.CreateCharacter(new CharacterCreateRequest(header, TamerId: 1, name, DigimonId: 10, DigimonName: "Gigimon"));
+        Pump(session, ref now, () => session.CharacterListVersion > beforeCreate || session.LastCreateError is not null || session.Step == AccountStep.Failed);
+        var created = session.Characters!.Slots.FirstOrDefault(s => !s.IsEmpty && s.Name == name);
+        Assert.NotNull(created);
+
+        try
+        {
+            // "Game Start": 0x16 and 0x18 on the channel, then the map connection and the sequence of the world entry
+            session.SendMapConnection(name, ["00-00-00-00-00-01"]);
+            var world = new WorldSession(settings, command, log.Add);
+            world.Start(name, firstEntry: true);
+            WaitFor(world, () => world.Step is WorldStep.DataReady or WorldStep.Failed);
+            Console.WriteLine(string.Join(Environment.NewLine, log));
+            Assert.Null(world.FailureMessage);
+            Assert.Equal(WorldStep.DataReady, world.Step);
+            Assert.Equal(name, world.Character!.Name);
+            Assert.Equal(created!.Uid, world.Character.Uid);
+
+            world.EnterWorld();
+            WaitFor(world, () => world.GlobalConnected || world.Step == WorldStep.Failed);
+            Assert.Null(world.FailureMessage);
+            Assert.Equal(WorldStep.InWorld, world.Step);
+            Assert.True(world.GlobalConnected);
+            Assert.Empty(world.UnknownOpcodes);                // everything the emulator sends on entry is in the capture's list
+            world.Dispose();                                   // the emulator holds the delete until the save of this exit is in the database
+        }
+        finally
+        {
+            int beforeDelete = session.CharacterListVersion;
+            session.DeleteCharacter(created!.Uid, DeleteCharacterDialog.ComputePasswordMd5(""));
+            Pump(session, ref now, () => session.CharacterListVersion > beforeDelete || session.LastDeleteError is not null || session.Step == AccountStep.Failed);
+        }
+    }
+
+    private static void WaitFor(WorldSession world, Func<bool> done)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (!done() && DateTime.UtcNow < deadline)
+        {
+            world.Update();
+            Thread.Sleep(5);
+        }
+    }
 }

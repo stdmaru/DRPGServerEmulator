@@ -200,7 +200,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     {
         _tamerAnimation?.Step();
         _digimonAnimation?.Step(random.Next(4));                       // ✅ 1 in 4 for the animation 3
-        if (_transition < FadeEnd)
+        if (_transition is > 0 and < FadeEnd)                          // 0 = the brightening is over: it does not start again
             _transition++;
         if (_transition >= FadeEnd)
             _transition = 0;

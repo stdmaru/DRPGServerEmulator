@@ -119,6 +119,9 @@ internal sealed class FakeInstall : IDisposable
             ("sprite\\003_1.ani", Ani("003_1.spr", 16)),
             ("sprite\\065_1.spr", Sprite(70, 70, 16)),
             ("sprite\\065_1.ani", Ani("065_1.spr", 16)),
+            // the maps of the world entry: r001 is 20 x 20 cells without tiles or objects, r002 is not a map
+            ("map\\r001.map", EmptyMap(20, 20)),
+            ("map\\r002.map", [1, 2, 3]),
         });
         if (withTable)
             PackWriter.Create(Path.Combine(Directory, "table.hf"), new (string, byte[])[] { ("table\\x.dat", [1, 2, 3]) });
@@ -151,6 +154,30 @@ internal sealed class FakeInstall : IDisposable
         w.Write("data"u8);
         w.Write(441 * 2);
         w.Write(new byte[441 * 2]);
+        return ms.ToArray();
+    }
+
+    /// <summary>A <c>.map</c> of <paramref name="width"/> x <paramref name="height"/> cells without tilesets or objects (layout of MapFormatTests).</summary>
+    internal static byte[] EmptyMap(int width, int height)
+    {
+        using var ms = new MemoryStream();
+        using var w = new BinaryWriter(ms);
+        w.Write((uint)width);
+        w.Write((uint)height);
+        w.Write(64u);
+        w.Write(32u);
+        for (int i = 0; i < width * height; i++)
+        {
+            w.Write(0u);
+            w.Write(-1);
+            w.Write(-1);
+            w.Write((short)-1);
+            w.Write((short)0);
+            w.Write(0u);
+            w.Write(1u);
+        }
+        w.Write((ushort)0);
+        w.Write((ushort)0);
         return ms.ToArray();
     }
 

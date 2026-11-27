@@ -39,6 +39,7 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
     private ClientConnection? _map, _global;
     private string _characterName = "";
     private bool _firstEntry;
+    private bool _disposed;
     private readonly List<ushort> _unknownLogged = [];
 
     public WorldStep Step { get; private set; }
@@ -203,6 +204,9 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
 
     public void Dispose()
     {
+        if (_disposed)
+            return;
+        _disposed = true;
         _cancel.Cancel();
         DisposeConnections();
         _cancel.Dispose();

@@ -124,6 +124,20 @@ public sealed class MapFormatTests
     }
 
     [Fact]
+    public void A_name_in_the_korean_code_page_is_decoded_as_text_not_as_latin1()
+    {
+        // ✅ the maps of the game have names like 074_자갈.obj; the bytes are code page 949 (the last field of the file is the object name)
+        var data = Map(1, 1, [(0, -1, -1, 0, 1)], [], ["074_xxxx.obj"]);
+        byte[] korean = [0x30, 0x37, 0x34, 0x5f, 0xc0, 0xda, 0xb0, 0xa5, 0x2e, 0x6f, 0x62, 0x6a];     // "074_자갈.obj"
+        Array.Clear(data, data.Length - MapFile.NameBytes, MapFile.NameBytes);
+        korean.CopyTo(data, data.Length - MapFile.NameBytes);
+
+        var map = MapFile.Parse(data);
+
+        Assert.Equal(["074_\uc790\uac08.obj"], map.ObjectNames);
+    }
+
+    [Fact]
     public void A_cell_outside_the_map_is_empty()
     {
         var map = MapFile.Parse(Map(1, 1, [(-1, -1, 0, 0, 1)], ["a.til"], []));
