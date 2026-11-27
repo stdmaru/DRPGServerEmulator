@@ -1,4 +1,5 @@
 using DRPG.Client.Ui;
+using DRPG.Shared.Protocol;
 
 namespace DRPG.Client.World;
 
@@ -11,8 +12,14 @@ namespace DRPG.Client.World;
 /// </summary>
 public sealed class FieldAnimator
 {
-    /// <summary>✅ Animation 1 = standing; 2 and 3 = digimon idle variations; 4 = walk; 5 = run; 0x0f = fast.</summary>
-    public const int Standing = 1, IdleA = 2, IdleB = 3, Walk = 4, Run = 5, Fast = 0x0f;
+    /// <summary>
+    /// ✅ The animation of a movement state has the state's number (<c>+0x149</c> is passed to <c>0x0085e4c0</c> as it is):
+    /// 1 = standing, 2 and 3 = the digimon's idle variations, 4 = walk, 5 = run, 0x0f = fast.
+    /// </summary>
+    public const int Standing = (int)MoveState.Standing, IdleA = (int)MoveState.IdleA, IdleB = (int)MoveState.IdleB;
+
+    /// <inheritdoc cref="Standing"/>
+    public const int Walk = (int)MoveState.Walk, Run = (int)MoveState.Run, Fast = (int)MoveState.Fast;
 
     /// <summary>✅ The digimon changes animation at this step of its idle counter and comes back at <see cref="BackStep"/>.</summary>
     public const int ChangeStep = 200, BackStep = 320;
@@ -39,12 +46,12 @@ public sealed class FieldAnimator
         _species = species;
         _offset = initialOffset;
         Animation = Standing;
-        _view.ShowFrame(Standing, FrameOf(Standing, Direction));
+        _view.ShowFrame(Standing, _view.Ani.Range(Standing, (int)Direction).Start + _offset);
     }
 
     public int Animation { get; private set; }
 
-    public int Direction { get; private set; }
+    public Direction Direction { get; private set; }
 
     public int Offset => _offset;
 
@@ -54,15 +61,13 @@ public sealed class FieldAnimator
 
     public SpriteAnimator View => _view;
 
-    private int FrameOf(int animation, int direction) => _view.Ani.Range(animation, direction).Start + _offset;
-
-    /// <summary>Updates the facing direction (0..7) and refreshes the shown frame if it changed.</summary>
-    public void SetDirection(int direction)
+    /// <summary>Updates the facing direction and refreshes the shown frame if it changed.</summary>
+    public void SetDirection(Direction direction)
     {
-        if (direction is < 0 or >= 8 || direction == Direction)
+        if (direction == Direction)
             return;
         Direction = direction;
-        var range = _view.Ani.Range(Animation, Direction);
+        var range = _view.Ani.Range(Animation, (int)Direction);
         if (range.Count == 0)
             return;
         if (_offset > range.Count - 1)
@@ -73,7 +78,7 @@ public sealed class FieldAnimator
     /// <summary>One logic step. <paramref name="idleRoll"/> is the 1-in-4 draw of the change at step 200 (0 = the animation 3).</summary>
     public void Step(int idleRoll = 1)
     {
-        var range = _view.Ani.Range(Animation, Direction);
+        var range = _view.Ani.Range(Animation, (int)Direction);
         if (range.Count == 0)
             range = _view.Ani.Range(Animation, 0);
         if (_offset > range.Count - 1)
@@ -109,7 +114,7 @@ public sealed class FieldAnimator
     /// <summary>✅ <c>0x0085e4c0</c>: zeroes the offset and the counter and shows the first frame of the animation (an animation the sprite lacks is not played).</summary>
     public void Switch(int animation)
     {
-        var range = _view.Ani.Range(animation, Direction);
+        var range = _view.Ani.Range(animation, (int)Direction);
         if (range.Count == 0)
             range = _view.Ani.Range(animation, 0);
         if (range.Count == 0)
@@ -120,6 +125,24 @@ public sealed class FieldAnimator
         if (animation >= Walk)
             _idle = 0;
         _view.ShowFrame(animation, range.Start);
+    }
+
+    /// <summary>
+    /// ✅ <c>0x007f3df0</c> / <c>0x00867a60</c>: shows what <paramref name="entity"/> does: its direction, the animation of its
+    /// movement state while it moves, and the standing animation when it stops (the idle variations stay).
+    /// </summary>
+    public void Follow(FieldEntity entity)
+    {
+        SetDirection(entity.Direction);
+        if (entity.IsMoving)
+        {
+            if (Animation != (int)entity.State)
+                Switch((int)entity.State);
+        }
+        else if (Animation >= Walk)
+        {
+            Switch(Standing);
+        }
     }
 
     private int DurationOf(int frame) =>

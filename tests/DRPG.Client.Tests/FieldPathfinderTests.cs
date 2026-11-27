@@ -47,16 +47,16 @@ public sealed class FieldPathfinderTests
             "..#..",
             ".....");
         var pathfinder = new FieldPathfinder(collision);
-        var entity = new FieldEntity(1, 2);
-        entity.SetDestination(3, 2);
+        var entity = new FieldEntity(new Cell(1, 2));
+        entity.SetDestination(new Cell(3, 2));
 
         for (int step = 0; step < 100 && entity.IsMoving; step++)
         {
-            entity.StepPhysics(pathfinder.ResolveStep);
-            Assert.True(collision.IsWalkable(entity.CellX, entity.CellY));
+            entity.StepPhysics(pathfinder);
+            Assert.True(collision.IsWalkable(entity.Cell.X, entity.Cell.Y));
         }
 
-        Assert.Equal((3, 2), (entity.CellX, entity.CellY));
+        Assert.Equal(new Cell(3, 2), entity.Cell);
         Assert.Equal(MoveState.Standing, entity.State);
     }
 
@@ -68,15 +68,15 @@ public sealed class FieldPathfinderTests
             "....#",
             ".....");
         var pathfinder = new FieldPathfinder(collision);
-        var entity = new FieldEntity(0, 1);
-        entity.SetDestination(4, 1);            // (4, 1) is blocked
+        var entity = new FieldEntity(new Cell(0, 1));
+        entity.SetDestination(new Cell(4, 1));            // (4, 1) is blocked
 
         for (int step = 0; step < 80 && entity.IsMoving; step++)
-            entity.StepPhysics(pathfinder.ResolveStep);
+            entity.StepPhysics(pathfinder);
 
-        Assert.Equal((3, 1), (entity.CellX, entity.CellY));
+        Assert.Equal(new Cell(3, 1), entity.Cell);
         Assert.Equal(MoveState.Standing, entity.State);
-        Assert.Equal(6, entity.Direction);      // ✅ 0x008671c0: still faces the blocked target cell (E = 6)
+        Assert.Equal((Direction)6, entity.Direction);      // ✅ 0x008671c0: still faces the blocked target cell (E = 6)
     }
 
     [Fact]
@@ -89,8 +89,8 @@ public sealed class FieldPathfinderTests
         collision.Occupy(2, 1, new Serial(1, 2));
         var pathfinder = new FieldPathfinder(collision);
 
-        Assert.Null(pathfinder.NextStep(0, 1, 1, 1));       // adjacent wall
-        Assert.Null(pathfinder.NextStep(2, 2, 2, 1));       // adjacent occupied cell
+        Assert.Null(pathfinder.NextStep(new Cell(0, 1), new Cell(1, 1)));       // adjacent wall
+        Assert.Null(pathfinder.NextStep(new Cell(2, 2), new Cell(2, 1)));       // adjacent occupied cell
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public sealed class FieldPathfinderTests
             "..#..");
         var pathfinder = new FieldPathfinder(collision);
 
-        Assert.Null(pathfinder.NextStep(0, 1, 4, 1));
+        Assert.Null(pathfinder.NextStep(new Cell(0, 1), new Cell(4, 1)));
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public sealed class FieldPathfinderTests
         var collision = Grid(row);
         var pathfinder = new FieldPathfinder(collision);
 
-        Assert.NotNull(pathfinder.NextStep(0, 0, 24, 0));   // depth 24 < 25 -> found
-        Assert.Null(pathfinder.NextStep(0, 0, 26, 0));      // depth 26 >= 25 -> cut off (0x00b430f0)
+        Assert.NotNull(pathfinder.NextStep(new Cell(0, 0), new Cell(24, 0)));   // depth 24 < 25 -> found
+        Assert.Null(pathfinder.NextStep(new Cell(0, 0), new Cell(26, 0)));      // depth 26 >= 25 -> cut off (0x00b430f0)
     }
 }

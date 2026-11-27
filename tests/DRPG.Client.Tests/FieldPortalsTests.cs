@@ -1,3 +1,4 @@
+using DRPG.Client.Features.Field;
 using DRPG.Client.Net;
 using DRPG.Client.Scenes;
 using DRPG.Client.Startup;
@@ -38,7 +39,7 @@ public sealed class FieldPortalsTests : IDisposable
     [Fact]
     public void Portal_animation_advances_every_2_steps_for_standard_and_4_for_square()
     {
-        var portals = new FieldPortals(_fixture.Game.Sprites);
+        var portals = new FieldPortals(NoFieldSprites.Instance);
         Assert.Equal((0, 0), (portals.PortalFrame, portals.SquareFrame));
 
         portals.Step();
@@ -91,9 +92,9 @@ public sealed class FieldPortalsTests : IDisposable
         ulong t = EnterWorld(scene, session);
 
         // Start walking 2 cells east (16 logic steps at Run speed)
-        scene.TamerEntity.SetDestination(7, 6);
+        scene.State!.Party.Tamer.SetDestination(new Cell(7, 6));
         scene.Step();
-        Assert.True(scene.TamerEntity.IsMoving);
+        Assert.True(scene.State!.Party.Tamer.IsMoving);
 
         // Server sends cross-map 0xB0 while tamer is still walking to the portal
         _map.Send(new TeleportCharacterPacket(2, 4, 5));
@@ -103,11 +104,11 @@ public sealed class FieldPortalsTests : IDisposable
             scene.Frame(_fixture.Renderer, t);
             t += 34;
             // Must NOT snap to loading while tamer is still walking
-            return !scene.TamerEntity.IsMoving || scene.Loading.Showing;
+            return !scene.State!.Party.Tamer.IsMoving || scene.Loading.Showing;
         });
 
         // After stopping on the portal cell, the warp effect triggers and then loading begins
-        Assert.False(scene.TamerEntity.IsMoving);
+        Assert.False(scene.State!.Party.Tamer.IsMoving);
         Pump(() =>
         {
             scene.Frame(_fixture.Renderer, t);
@@ -115,7 +116,7 @@ public sealed class FieldPortalsTests : IDisposable
             return scene.Loading.Showing;
         });
         Assert.Equal(2, _fixture.Game.World!.MapId);
-        Assert.Equal((4, 5), (scene.TamerEntity.CellX, scene.TamerEntity.CellY));
+        Assert.Equal(new Cell(4, 5), scene.State!.Party.Tamer.Cell);
     }
 
     [Fact]
@@ -128,15 +129,15 @@ public sealed class FieldPortalsTests : IDisposable
         ulong t = EnterWorld(scene, session);
 
         // Map 1 starts with its NPC and receives a wild digimon
-        Assert.Single(scene.Npcs.All);
-        Assert.Equal(101, scene.Npcs.All[0].NpcId);
+        Assert.Single(scene.State!.Area.Npcs.All);
+        Assert.Equal(101, scene.State!.Area.Npcs.All[0].NpcId);
 
         _map.Send(new FieldDigimonPacket(new Serial(9, 9), "Yuramon", 14, 1, 2, 2, 1, 0, 6, 6, 6, 6));
         Pump(() =>
         {
             scene.Frame(_fixture.Renderer, t);
             t += 34;
-            return scene.Wilds.All.Count == 1;
+            return scene.State!.Area.Wilds.All.Count == 1;
         });
 
         int sentBefore = _map.Received.Count;
@@ -151,11 +152,11 @@ public sealed class FieldPortalsTests : IDisposable
         });
 
         Assert.Equal(2, _fixture.Game.World!.MapId);
-        Assert.Empty(scene.Wilds.All);
-        Assert.Single(scene.Npcs.All);
-        Assert.Equal(202, scene.Npcs.All[0].NpcId);
-        Assert.Equal((4, 5), (scene.TamerEntity.CellX, scene.TamerEntity.CellY));
-        Assert.Equal((3, 4), (scene.DigimonEntity!.CellX, scene.DigimonEntity.CellY));
+        Assert.Empty(scene.State!.Area.Wilds.All);
+        Assert.Single(scene.State!.Area.Npcs.All);
+        Assert.Equal(202, scene.State!.Area.Npcs.All[0].NpcId);
+        Assert.Equal(new Cell(4, 5), scene.State!.Party.Tamer.Cell);
+        Assert.Equal(new Cell(3, 4), scene.State!.Party.Partner!.Cell);
 
         // Finish the 16-frame transition loading screen
         for (int guard = 0; scene.Loading.Showing && guard < 100; guard++, t += WorldLoading.FrameMs)

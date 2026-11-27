@@ -1,3 +1,4 @@
+using DRPG.Client.Features.Field;
 using DRPG.Client.Net;
 using DRPG.Client.Scenes;
 using DRPG.Client.Startup;
@@ -332,10 +333,10 @@ public sealed class GameSceneTests : IDisposable
         var (scene, _) = Enter();
         using var owned = scene;
 
-        Assert.Equal((5 * 64 + 32, 6 * 32 + 16), scene.TamerWorld);
-        Assert.Equal((4 * 64 + 32, 5 * 32 + 16), scene.DigimonWorld);          // one cell up and to the left
-        Assert.NotNull(scene.TamerAnimation);
-        Assert.NotNull(scene.DigimonAnimation);
+        Assert.Equal((5 * 64 + 32, 6 * 32 + 16), (scene.State!.Party.Tamer.WorldX, scene.State.Party.Tamer.WorldY));
+        Assert.Equal((4 * 64 + 32, 5 * 32 + 16), (scene.State!.Party.Partner!.WorldX, scene.State.Party.Partner.WorldY));          // one cell up and to the left
+        Assert.NotNull(scene.State!.Party.TamerAnimation);
+        Assert.NotNull(scene.State!.Party.PartnerAnimation);
     }
 
     [Theory]
@@ -349,7 +350,7 @@ public sealed class GameSceneTests : IDisposable
         using var owned = scene;
 
         Assert.True(scene.WorldEntered);
-        Assert.Null(scene.DigimonAnimation);
+        Assert.Null(scene.State!.Party.PartnerAnimation);
     }
 
     [Fact]
@@ -360,8 +361,8 @@ public sealed class GameSceneTests : IDisposable
         using var owned = scene;
 
         Assert.True(scene.WorldEntered);
-        Assert.Null(scene.DigimonAnimation);
-        Assert.NotNull(scene.TamerAnimation);
+        Assert.Null(scene.State!.Party.PartnerAnimation);
+        Assert.NotNull(scene.State!.Party.TamerAnimation);
     }
 
     [Fact]
@@ -371,8 +372,8 @@ public sealed class GameSceneTests : IDisposable
         var (scene, _) = Enter(rand: 1234);
         using var owned = scene;
 
-        Assert.Equal(1234 % 8, scene.TamerAnimation!.Offset);
-        Assert.Equal(1234 % 8, scene.DigimonAnimation!.Offset);
+        Assert.Equal(1234 % 8, scene.State!.Party.TamerAnimation!.Offset);
+        Assert.Equal(1234 % 8, scene.State!.Party.PartnerAnimation!.Offset);
     }
 
     [Fact]
@@ -381,16 +382,16 @@ public sealed class GameSceneTests : IDisposable
         UseData();
         var (scene, entered) = Enter();                                 // the clock of the logic starts when the loading screen ends
         using var owned = scene;
-        Assert.Equal(0, scene.DigimonAnimation!.IdleCounter);
+        Assert.Equal(0, scene.State!.Party.PartnerAnimation!.IdleCounter);
 
         scene.Frame(_fixture.Renderer, entered + 500);                  // half a second: 15 steps (✅ 30 a second)
-        Assert.Equal(15, scene.DigimonAnimation.IdleCounter);
+        Assert.Equal(15, scene.State!.Party.PartnerAnimation.IdleCounter);
 
         scene.Frame(_fixture.Renderer, entered + 500 + 20);             // 20 ms are not a whole step (33.3 ms)
-        Assert.Equal(15, scene.DigimonAnimation.IdleCounter);
+        Assert.Equal(15, scene.State!.Party.PartnerAnimation.IdleCounter);
 
         scene.Frame(_fixture.Renderer, entered + 1000);                 // a second since the start: 30 steps in all
-        Assert.Equal(30, scene.DigimonAnimation.IdleCounter);
+        Assert.Equal(30, scene.State!.Party.PartnerAnimation.IdleCounter);
     }
 
     [Fact]
@@ -404,7 +405,7 @@ public sealed class GameSceneTests : IDisposable
         scene.Frame(_fixture.Renderer, entered + 1_000_000);
         scene.Frame(_fixture.Renderer, entered + 1_000_000 + 1000);
 
-        Assert.Equal((10_000 + 30) % 320, scene.DigimonAnimation!.IdleCounter);
+        Assert.Equal((10_000 + 30) % 320, scene.State!.Party.PartnerAnimation!.IdleCounter);
         Assert.False(scene.ConnectionLost);
     }
 

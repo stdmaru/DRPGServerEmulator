@@ -20,32 +20,18 @@ public enum CursorKind
 /// 36×36), <c>cursor_click</c> while the button is held, and <c>cursor_door</c> over portal cells (case 10).
 /// The tip of the arrow, the hot spot, is pixel (0, 0).
 /// </summary>
-public sealed class CursorView
+public sealed class CursorView(SpriteStore sprites)
 {
     private const ulong NormalFrameMs = 100;
 
     /// <summary>✅ <c>0x00b3e3d0</c> case 10: <c>cursor_door</c> advances every 8 frames at 30 FPS (~267 ms).</summary>
     private const ulong DoorFrameMs = 267;
 
-    private readonly ITexture[] _normal;
-    private readonly ITexture _click;
-    private readonly ITexture[]? _door;
+    private readonly ITexture[] _normal = sprites.Load("interface\\cursor_normal.spr");
+    private readonly ITexture _click = sprites.Load("interface\\cursor_click.spr")[0];
+    private ITexture[]? _door;                                  // loaded on first use: the launcher never shows it
     private int _x = -1, _y = -1;
     private bool _down;
-
-    public CursorView(SpriteStore sprites)
-    {
-        _normal = sprites.Load("interface\\cursor_normal.spr");
-        _click = sprites.Load("interface\\cursor_click.spr")[0];
-        try
-        {
-            _door = sprites.Load("interface\\cursor_door.spr");
-        }
-        catch (Exception)
-        {
-            _door = null;
-        }
-    }
 
     public void Handle(InputEvent e)
     {
@@ -69,8 +55,8 @@ public sealed class CursorView
         if (_x < 0 || _y < 0 || _x >= IRenderer.FrameWidth || _y >= IRenderer.FrameHeight)
             return;
         ITexture texture;
-        if (kind == CursorKind.Portal && _door is { Length: > 0 })
-            texture = _door[(int)(nowMs / DoorFrameMs % (ulong)_door.Length)];
+        if (kind == CursorKind.Portal && (_door ??= sprites.Load("interface\\cursor_door.spr")) is { Length: > 0 } door)
+            texture = door[(int)(nowMs / DoorFrameMs % (ulong)door.Length)];
         else
             texture = _down ? _click : _normal[(int)(nowMs / NormalFrameMs % (ulong)_normal.Length)];
         r.Draw(texture, _x, _y);

@@ -1,208 +1,177 @@
+using DRPG.Client.Features.Field;
 using DRPG.Client.Net;
 using DRPG.Client.World;
-using DRPG.Shared.Formats.Map;
 using DRPG.Shared.Packets.Map;
 using DRPG.Shared.Protocol;
 
 namespace DRPG.Client.Tests;
 
 /// <summary>
-/// Stage 4 wild digimon tests (<c>0x11</c>, <c>0x00af25c0</c>, <c>0x00afdba0</c>, <c>0x007f3df0</c>, <c>0x00859340</c>,
+/// Wild digimon tests through <see cref="FieldHandlers"/> (<c>0x11</c>, <c>0x00af25c0</c>, <c>0x00afdba0</c>, <c>0x007f3df0</c>, <c>0x00859340</c>,
 /// <c>0x007f4b10</c>): spawn, command queue at cell centres, A* pathfinding around walls, teleport &gt; 6 cells,
 /// state 12 despawn, 10 × 12 cell drop range and map 0xFA ignore.
 /// </summary>
 public sealed class FieldWildsTests
 {
-    private static FieldCollision Grid(params string[] rows)
-    {
-        int height = rows.Length, width = rows[0].Length;
-        using var ms = new MemoryStream();
-        using var w = new BinaryWriter(ms);
-        w.Write((uint)width);
-        w.Write((uint)height);
-        w.Write(64u);
-        w.Write(32u);
-        for (int y = 0; y < height; y++)
-            for (int x = 0; x < width; x++)
-            {
-                w.Write(0u);
-                w.Write(-1);
-                w.Write(-1);
-                w.Write((short)-1);
-                w.Write((short)0);
-                w.Write(0u);
-                w.Write(rows[y][x] == '#' ? 0u : 1u);
-            }
-        w.Write((ushort)0);
-        w.Write((ushort)0);
-        return new FieldCollision(MapFile.Parse(ms.ToArray()));
-    }
-
     private static FieldDigimonPacket WildPacket(Serial serial, byte state, short x, short y, short destX, short destY, ushort dir = 0) =>
         new(serial, "Yuramon", 14, 1, 2, 2, state, dir, x, y, destX, destY);
 
     [Fact]
     public void Wild_spawns_walks_around_obstacle_via_command_queue_and_updates_occupancy()
     {
-        var collision = Grid(
+        using var field = new FieldFixture(
+        [
             ".......",
             "...#...",
             "...#...",
             "...#...",
-            ".......");
-        var pathfinder = new FieldPathfinder(collision);
-        var wilds = new FieldWilds();
-        var tamer = new FieldEntity(3, 2);
+            ".......",
+        ], tamer: new Cell(3, 2));
         var serial = new Serial(10, 20);
-        var rng = new Random(0);
 
         // Spawn at (2, 2) walking (state 4 -> ×1, 16 steps/cell) to (4, 2) across the wall
-        wilds.Apply(WildPacket(serial, 4, 2, 2, 4, 2, dir: 6), mapId: 79, collision, _ => null, rng);
-        Assert.Single(wilds.All);
-        Assert.Equal(serial, collision.OccupantAt(2, 2));
+        field.Handlers.Handle(WildPacket(serial, 4, 2, 2, 4, 2, dir: 6));
+        Assert.Single(field.Wilds.All);
+        Assert.Equal(serial, field.Collision.OccupantAt(2, 2));
 
         for (int step = 0; step < 120; step++)
-            wilds.Step(tamer, collision, pathfinder, rng);
+            field.Wilds.Step(field.Tamer);
 
-        Assert.True(wilds.TryGet(serial, out var wild));
-        Assert.Equal((4, 2), (wild.Entity.CellX, wild.Entity.CellY));
+        var wild = Assert.IsType<WildEntity>(field.Wilds.Find(serial));
+        Assert.Equal(new Cell(4, 2), wild.Entity.Cell);
         Assert.Equal(MoveState.Standing, wild.Entity.State);
-        Assert.Equal(serial, collision.OccupantAt(4, 2));
-        Assert.Equal(default, collision.OccupantAt(2, 2));
+        Assert.Equal(serial, field.Collision.OccupantAt(4, 2));
+        Assert.Equal(default, field.Collision.OccupantAt(2, 2));
     }
 
     [Fact]
     public void Wild_command_farther_than_six_cells_teleports_and_stops()
     {
-        var collision = Grid(Enumerable.Repeat(new string('.', 20), 5).ToArray());
-        var pathfinder = new FieldPathfinder(collision);
-        var wilds = new FieldWilds();
-        var tamer = new FieldEntity(10, 2);
+        using var field = new FieldFixture(FieldFixture.Open(20, 5), tamer: new Cell(10, 4));
         var serial = new Serial(1, 2);
-        var rng = new Random(0);
 
-        wilds.Apply(WildPacket(serial, 1, 2, 2, 2, 2), mapId: 79, collision, _ => null, rng);
-        wilds.Step(tamer, collision, pathfinder, rng);
+        field.Handlers.Handle(WildPacket(serial, 1, 2, 2, 2, 2));
+        field.Wilds.Step(field.Tamer);
 
         // Move command with origin 8 cells away (> 6) -> teleports to (10, 2) and stops
-        wilds.Apply(WildPacket(serial, 4, 10, 2, 12, 2), mapId: 79, collision, _ => null, rng);
-        wilds.Step(tamer, collision, pathfinder, rng);
+        field.Handlers.Handle(WildPacket(serial, 4, 10, 2, 12, 2));
+        field.Wilds.Step(field.Tamer);
 
-        Assert.True(wilds.TryGet(serial, out var wild));
-        Assert.Equal((10, 2), (wild.Entity.CellX, wild.Entity.CellY));
+        var wild = Assert.IsType<WildEntity>(field.Wilds.Find(serial));
+        Assert.Equal(new Cell(10, 2), wild.Entity.Cell);
         Assert.Equal(MoveState.Standing, wild.Entity.State);
     }
 
     [Fact]
     public void State_12_removes_wild_and_vacates_its_cell()
     {
-        var collision = Grid(".....", ".....", ".....");
-        var wilds = new FieldWilds();
+        using var field = new FieldFixture(FieldFixture.Open(5, 3), tamer: new Cell(0, 2));
         var serial = new Serial(5, 6);
-        var rng = new Random(0);
 
-        wilds.Apply(WildPacket(serial, 1, 2, 1, 2, 1), mapId: 79, collision, _ => null, rng);
-        Assert.Single(wilds.All);
-        Assert.Equal(serial, collision.OccupantAt(2, 1));
+        field.Handlers.Handle(WildPacket(serial, 1, 2, 1, 2, 1));
+        Assert.Single(field.Wilds.All);
+        Assert.Equal(serial, field.Collision.OccupantAt(2, 1));
 
-        wilds.Apply(WildPacket(serial, FieldWilds.LeavingState, 2, 1, 2, 1), mapId: 79, collision, _ => null, rng);
-        Assert.Empty(wilds.All);
-        Assert.Equal(default, collision.OccupantAt(2, 1));
+        field.Handlers.Handle(WildPacket(serial, FieldHandlers.WildLeavingState, 2, 1, 2, 1));
+        Assert.Empty(field.Wilds.All);
+        Assert.Equal(default, field.Collision.OccupantAt(2, 1));
     }
 
     [Fact]
     public void Wild_beyond_10_by_12_cells_of_tamer_is_dropped()
     {
-        var collision = Grid(Enumerable.Repeat(new string('.', 30), 30).ToArray());
-        var pathfinder = new FieldPathfinder(collision);
-        var wilds = new FieldWilds();
-        var tamer = new FieldEntity(0, 0);
+        using var field = new FieldFixture(FieldFixture.Open(30, 30), tamer: new Cell(0, 0));
         var near = new Serial(1, 1);
         var farX = new Serial(2, 2);
         var farY = new Serial(3, 3);
-        var rng = new Random(0);
 
-        wilds.Apply(WildPacket(near, 1, 10, 12, 10, 12), mapId: 79, collision, _ => null, rng);
-        wilds.Apply(WildPacket(farX, 1, 11, 0, 11, 0), mapId: 79, collision, _ => null, rng);
-        wilds.Apply(WildPacket(farY, 1, 0, 13, 0, 13), mapId: 79, collision, _ => null, rng);
+        field.Handlers.Handle(WildPacket(near, 1, 10, 12, 10, 12));
+        field.Handlers.Handle(WildPacket(farX, 1, 11, 0, 11, 0));
+        field.Handlers.Handle(WildPacket(farY, 1, 0, 13, 0, 13));
 
-        wilds.Step(tamer, collision, pathfinder, rng);
+        field.Wilds.Step(field.Tamer);
 
-        Assert.Single(wilds.All);
-        Assert.True(wilds.TryGet(near, out _));
-        Assert.Equal(default, collision.OccupantAt(11, 0));
-        Assert.Equal(default, collision.OccupantAt(0, 13));
+        Assert.Single(field.Wilds.All);
+        Assert.NotNull(field.Wilds.Find(near));
+        Assert.Equal(default, field.Collision.OccupantAt(11, 0));
+        Assert.Equal(default, field.Collision.OccupantAt(0, 13));
     }
 
     [Fact]
     public void Map_0xFA_ignores_0x11_packets()
     {
-        var wilds = new FieldWilds();
-        wilds.Apply(WildPacket(new Serial(1, 1), 1, 5, 5, 5, 5), mapId: FieldWilds.IgnoredMapId, null, _ => null, new Random(0));
-        Assert.Empty(wilds.All);
+        using var field = new FieldFixture(FieldFixture.Open(10, 10), tamer: new Cell(0, 0), mapId: FieldHandlers.WildlessMapId);
+        field.Handlers.Handle(WildPacket(new Serial(1, 1), 1, 5, 5, 5, 5));
+        Assert.Empty(field.Wilds.All);
     }
 
     [Fact]
     public void Standing_0x11_stops_walking_wild_and_applies_final_direction()
     {
-        var collision = Grid(".......", ".......", ".......", ".......", ".......");
-        var pathfinder = new FieldPathfinder(collision);
-        var wilds = new FieldWilds();
-        var tamer = new FieldEntity(3, 3);
+        using var field = new FieldFixture(FieldFixture.Open(7, 5), tamer: new Cell(6, 4));
         var serial = new Serial(7, 8);
-        var rng = new Random(0);
 
         // Wild starts walking NW from (3, 3) toward (1, 1)
-        wilds.Apply(WildPacket(serial, 4, 3, 3, 1, 1, dir: 3), mapId: 79, collision, _ => null, rng);
+        field.Handlers.Handle(WildPacket(serial, 4, 3, 3, 1, 1, dir: 3));
         // Step 16 frames (1 cell at Walk speed) to reach cell centre (2, 2) facing NW (3)
         for (int i = 0; i < 16; i++)
-            wilds.Step(tamer, collision, pathfinder, rng);
-        Assert.True(wilds.TryGet(serial, out var wild));
-        Assert.Equal((2, 2), (wild.Entity.CellX, wild.Entity.CellY));
-        Assert.Equal(3, wild.Entity.Direction);
+            field.Wilds.Step(field.Tamer);
+        var wild = Assert.IsType<WildEntity>(field.Wilds.Find(serial));
+        Assert.Equal(new Cell(2, 2), wild.Entity.Cell);
+        Assert.Equal(Direction.NorthWest, wild.Entity.Direction);
 
         // Server sends Standing (state 1) at (2, 2) facing North (4): must stop immediately and face North (4), not keep walking NW
-        wilds.Apply(WildPacket(serial, 1, 2, 2, 2, 2, dir: 4), mapId: 79, collision, _ => null, rng);
-        wilds.Step(tamer, collision, pathfinder, rng);
+        field.Handlers.Handle(WildPacket(serial, 1, 2, 2, 2, 2, dir: 4));
+        field.Wilds.Step(field.Tamer);
 
         Assert.Equal(MoveState.Standing, wild.Entity.State);
-        Assert.Equal((2, 2), (wild.Entity.CellX, wild.Entity.CellY));
-        Assert.Equal(4, wild.Entity.Direction);
+        Assert.Equal(new Cell(2, 2), wild.Entity.Cell);
+        Assert.Equal(Direction.North, wild.Entity.Direction);
     }
 
     [Fact]
     public void Wild_blocked_north_by_own_occupancy_faces_north_matching_0x007f4b10()
     {
-        var collision = Grid(".....", ".....", ".....", ".....", ".....");
-        var pathfinder = new FieldPathfinder(collision);
-        var wilds = new FieldWilds();
-        var tamer = new FieldEntity(2, 2);
+        using var field = new FieldFixture(FieldFixture.Open(5, 5), tamer: new Cell(4, 4));
         var serial = new Serial(9, 10);
-        var rng = new Random(0);
 
         // Spawn at (2, 3): 0x00b36550 occupies both (2, 3) and (2, 2)
-        wilds.Apply(WildPacket(serial, 1, 2, 3, 2, 3, dir: 0), mapId: 79, collision, _ => null, rng);
-        wilds.Step(tamer, collision, pathfinder, rng);
-        Assert.Equal(serial, collision.OccupantAt(2, 2));
+        field.Handlers.Handle(WildPacket(serial, 1, 2, 3, 2, 3, dir: 0));
+        field.Wilds.Step(field.Tamer);
+        Assert.Equal(serial, field.Collision.OccupantAt(2, 2));
 
         // Server moved wild to (2, 2) with Facing = NE (5) (e.g. after a dx=+1, dy=-2 walk) and now sends Standing at (2, 2)
-        wilds.Apply(WildPacket(serial, 1, 2, 2, 2, 2, dir: 5), mapId: 79, collision, _ => null, rng);
-        wilds.Step(tamer, collision, pathfinder, rng);
+        field.Handlers.Handle(WildPacket(serial, 1, 2, 2, 2, 2, dir: 5));
+        field.Wilds.Step(field.Tamer);
 
         // ✅ 0x00859340 sets Dest=(2,2), State=Run, Dir=NE(5); then 0x007f4b10 finds (2,2) occupied (by self!), sets Dest=(2,3)
         // AND still overwrites Direction = FromTo((2,3) -> (2,2)) = North (4), then 0x0085e5b0 stops it facing North (4).
-        Assert.True(wilds.TryGet(serial, out var wild));
+        var wild = Assert.IsType<WildEntity>(field.Wilds.Find(serial));
         Assert.Equal(MoveState.Standing, wild.Entity.State);
-        Assert.Equal((2, 3), (wild.Entity.CellX, wild.Entity.CellY));
-        Assert.Equal(4, wild.Entity.Direction);
+        Assert.Equal(new Cell(2, 3), wild.Entity.Cell);
+        Assert.Equal(Direction.North, wild.Entity.Direction);
 
         // ✅ 0x007f3df0 lines 22-55: while playing IdleA/IdleB (state 2/3), a Standing 0x11 keeps IdleA and applies
         // cmd.Direction without triggering 0x007f4b10 until state returns to Standing (1).
         wild.Entity.SetIdleState(MoveState.IdleA);
-        wilds.Apply(WildPacket(serial, 1, 2, 2, 2, 2, dir: 5), mapId: 79, collision, _ => null, rng);
-        wilds.Step(tamer, collision, pathfinder, rng);
+        field.Handlers.Handle(WildPacket(serial, 1, 2, 2, 2, 2, dir: 5));
+        field.Wilds.Step(field.Tamer);
         Assert.Equal(MoveState.IdleA, wild.Entity.State);
-        Assert.Equal(5, wild.Entity.Direction);
+        Assert.Equal(Direction.NorthEast, wild.Entity.Direction);
+    }
+
+    [Fact]
+    public void Hostile_direction_out_of_range_is_not_applied()
+    {
+        using var field = new FieldFixture(FieldFixture.Open(5, 5), tamer: new Cell(4, 4));
+        var serial = new Serial(11, 12);
+
+        field.Handlers.Handle(WildPacket(serial, 1, 2, 2, 2, 2, dir: 0xFFFF));
+        field.Wilds.Step(field.Tamer);
+
+        var wild = Assert.IsType<WildEntity>(field.Wilds.Find(serial));
+        Assert.Equal(Direction.South, wild.Entity.Direction);
+        Assert.Equal(new Cell(2, 2), wild.Entity.Cell);
     }
 
     [Fact]

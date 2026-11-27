@@ -111,19 +111,24 @@ public sealed class FieldCollisionTests
         // 5x1 strip: (0..2, 0) walkable, (3, 0) wall, (4, 0) walkable
         var map = MakeMap(5, 1, [1u, 1u, 1u, 0u, 1u]);
         var collision = new FieldCollision(map);
-        var entity = new FieldEntity(0, 0);
-        entity.SetDestination(4, 0);
+        var entity = new FieldEntity(new Cell(0, 0));
+        entity.SetDestination(new Cell(4, 0));
 
-        PathStep? Next(int fx, int fy, int dx, int dy)
-        {
-            int nx = fx + Math.Sign(dx - fx), ny = fy + Math.Sign(dy - fy);
-            return collision.CanStepTo(nx, ny, dx, dy) ? new PathStep(nx, ny, BlockedAtTarget: false) : null;
-        }
-
+        var steps = new CheckedStraightSteps(collision);
         for (int step = 0; step < 40; step++)
-            entity.StepPhysics(Next);
+            entity.StepPhysics(steps);
 
-        Assert.Equal((2, 0), (entity.CellX, entity.CellY));
+        Assert.Equal(new Cell(2, 0), entity.Cell);
         Assert.Equal(MoveState.Standing, entity.State);
+    }
+
+    /// <summary>Straight toward the destination, stopping where <see cref="FieldCollision.CanStepTo"/> refuses the next cell.</summary>
+    private sealed class CheckedStraightSteps(FieldCollision collision) : IStepResolver
+    {
+        public PathStep? ResolveStep(Cell from, Cell destination)
+        {
+            var next = new Cell(from.X + Math.Sign(destination.X - from.X), from.Y + Math.Sign(destination.Y - from.Y));
+            return collision.CanStepTo(next.X, next.Y, destination.X, destination.Y) ? new PathStep(next, BlockedAtTarget: false) : null;
+        }
     }
 }

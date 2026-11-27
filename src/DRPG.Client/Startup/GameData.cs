@@ -24,6 +24,9 @@ public sealed class GameData(
     /// <summary>Rows of each table by lower case name (<c>textattach</c>, <c>map</c>, …); a table the pack lacks is absent.</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string[]>> Tables { get; } = tables;
 
+    /// <summary>The NPCs of <c>npc_info_us</c>, checked when the tables load.</summary>
+    public NpcTable Npcs { get; } = NpcTable.From(tables);
+
     /// <summary>Raw <c>Language\*_US.bin</c> files by file name. ❓ Only <c>TextAttach</c> and <c>ProhibitedWords</c> are applied so far.</summary>
     public IReadOnlyDictionary<string, byte[]> Language { get; } = language;
 
@@ -46,64 +49,6 @@ public sealed class GameData(
     /// </summary>
     public string? MapFile(int mapId) => MapRow(mapId) is { Length: >= 5 } row && row[4].Length > 0 ? $"map\\{row[4]}.map" : null;
 
-    /// <summary>
-    /// All NPC rows from <c>npc_info_us</c> belonging to <paramref name="mapId"/> (✅ <c>0x007231e0</c>, <c>0x00ad3730</c>).
-    /// </summary>
-    public IReadOnlyList<NpcDefinition> NpcsForMap(int mapId)
-    {
-        if (!Tables.TryGetValue("NPC_INFO", out var rows))
-            return [];
-        var list = new List<NpcDefinition>();
-        foreach (var row in rows)
-            if (TryParseNpc(row, out var npc) && npc.MapId == mapId)
-                list.Add(npc);
-        return list;
-    }
-
-    /// <summary>Finds one NPC definition in <c>npc_info_us</c> by its id (✅ <c>0x00722ce0</c>).</summary>
-    public NpcDefinition? FindNpc(int npcId)
-    {
-        if (!Tables.TryGetValue("NPC_INFO", out var rows))
-            return null;
-        foreach (var row in rows)
-            if (TryParseNpc(row, out var npc) && npc.NpcId == npcId)
-                return npc;
-        return null;
-    }
-
-    /// <summary>
-    /// Tamer body id for a <c>Custom_N</c> avatar NPC from <c>Custom_AvatarNPC</c> (✅ <c>0x007230e0</c>, 1-based index).
-    /// Returns 0 if the table or row is absent.
-    /// </summary>
-    public int CustomAvatarTamerId(int customIndex)
-    {
-        if (customIndex < 1 || !Tables.TryGetValue("Custom_AvatarNPC", out var rows) || customIndex > rows.Count)
-            return 0;
-        var row = rows[customIndex - 1];
-        return row.Length >= 1 && int.TryParse(row[0], out int tamerId) ? tamerId : 0;
-    }
-
-    private static bool TryParseNpc(string[] row, out NpcDefinition npc)
-    {
-        npc = default!;
-        if (row.Length < 10
-            || !int.TryParse(row[0], out int mapId)
-            || !int.TryParse(row[1], out int npcId)
-            || !int.TryParse(row[3], out int dir)
-            || !int.TryParse(row[4], out int x)
-            || !int.TryParse(row[5], out int y)
-            || !int.TryParse(row[9], out int autoSpawn))
-            return false;
-        var sprite = row[6];
-        int customIndex = 0;
-        // ✅ 0x007231e0: sprite containing "Custom" (e.g. "Custom_1") parses the 1-based avatar index after byte 7
-        if (sprite.Contains("Custom", StringComparison.OrdinalIgnoreCase) && sprite.Length > 7
-            && int.TryParse(sprite.AsSpan(7), out int parsed))
-            customIndex = parsed;
-        npc = new NpcDefinition(mapId, npcId, row[2], dir, x, y, sprite, autoSpawn == 1, customIndex);
-        return true;
-    }
-
     private string[]? MapRow(int mapId)
     {
         if (!Tables.TryGetValue("map", out var rows))
@@ -115,14 +60,3 @@ public sealed class GameData(
     }
 }
 
-/// <summary>One row of <c>npc_info_us</c> (✅ <c>0x007231e0</c>, docs/cliente/cena-jogo.md#npcs-do-mapa).</summary>
-public sealed record NpcDefinition(
-    int MapId,
-    int NpcId,
-    string Name,
-    int Direction,
-    int X,
-    int Y,
-    string Sprite,
-    bool AutoSpawn,
-    int CustomAvatarIndex);

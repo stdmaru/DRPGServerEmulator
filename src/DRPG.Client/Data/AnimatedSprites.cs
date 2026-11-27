@@ -7,7 +7,7 @@ using DRPG.Shared.Formats.Sprite;
 namespace DRPG.Client.Data;
 
 /// <summary>Opens the <c>.ani</c> + <c>.spr</c> pairs of the pack for the scenes. A missing or broken pair is null, never an error.</summary>
-public sealed class AnimatedSprites(PackArchive resource, SpriteStore sprites, Action<string> log)
+public sealed class AnimatedSprites(PackArchive resource, SpriteStore sprites, Action<string> log) : IFieldSprites
 {
     /// <summary>✅ <c>0x00b46120</c>: the file used when a species has no animation of its own.</summary>
     public const string FallbackDigimon = "Sprite\\065_1.ani";
@@ -85,6 +85,8 @@ public sealed class AnimatedSprites(PackArchive resource, SpriteStore sprites, A
         }
         return new TamerDoll(body, layers);
     }
+
+    public IReadOnlyList<ITexture>? OpenEffect(string path) => OpenSprite(path);
 
     private IReadOnlyList<ITexture>? OpenSprite(string path)
     {

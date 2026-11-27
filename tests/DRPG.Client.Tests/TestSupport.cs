@@ -81,6 +81,7 @@ internal sealed class FakeInstall : IDisposable
             ("gui\\dr2_in_000_000.spr", Sprite(800, 600)),
             ("interface\\cursor_normal.spr", Sprite(36, 36)),
             ("interface\\cursor_click.spr", Sprite(36, 36)),
+            ("interface\\cursor_door.spr", Sprite(36, 36)),
             // world selection
             ("gui\\dr2_in_002_005_eng.spr", Sprite(800, 600)),
             ("gui\\dr2_in_000_006_eng.spr", Sprite(107, 29, 3)),
@@ -330,4 +331,27 @@ internal sealed class SceneFixture : IDisposable
         Sprites.Dispose();
         Install.Dispose();
     }
+}
+
+/// <summary>Steps straight toward the destination on an open map (the field tests that do not need the pathfinder).</summary>
+public sealed class StraightSteps : DRPG.Client.World.IStepResolver
+{
+    public static StraightSteps Instance { get; } = new();
+
+    public DRPG.Client.World.PathStep? ResolveStep(DRPG.Client.World.Cell from, DRPG.Client.World.Cell destination) =>
+        from == destination
+            ? null
+            : new DRPG.Client.World.PathStep(
+                new DRPG.Client.World.Cell(from.X + Math.Sign(destination.X - from.X), from.Y + Math.Sign(destination.Y - from.Y)), BlockedAtTarget: false);
+}
+
+/// <summary>Field sprites of a pack without them: every entity is created without a sprite.</summary>
+public sealed class NoFieldSprites : DRPG.Client.Data.IFieldSprites
+{
+    public static NoFieldSprites Instance { get; } = new();
+
+    public DRPG.Client.Ui.SpriteAnimator? OpenDigimon(int species) => null;
+    public DRPG.Client.Ui.SpriteAnimator? OpenNpc(string spriteName) => null;
+    public DRPG.Client.Data.TamerDoll? OpenTamer(int tamerId) => null;
+    public IReadOnlyList<DRPG.Engine.Rendering.ITexture>? OpenEffect(string path) => null;
 }

@@ -1,13 +1,6 @@
 namespace DRPG.Client.World;
 
 /// <summary>
-/// ✅ <c>0x007f4b10</c> / <c>0x008671c0</c>: one A* step result. When <see cref="BlockedAtTarget"/> is true, the next cell
-/// IS the destination and failed <see cref="FieldCollision.IsFree"/>, so the entity stops (<c>Dest = Cell</c>) while still
-/// turning to face (<see cref="NextX"/>, <see cref="NextY"/>).
-/// </summary>
-public readonly record struct PathStep(int NextX, int NextY, bool BlockedAtTarget);
-
-/// <summary>
 /// A* pathfinder of the field map (✅ v322 <c>0x00b43200</c> → <c>0x00b430f0</c> → <c>0x00b433d0</c> → <c>0x00b43520</c> /
 /// <c>0x00b436e0</c>, docs/cliente/campo.md). Used identically by the player tamer (<c>0x008671c0</c>, <c>0x00b4d290</c>),
 /// the partner digimon and the server wild digimon (<c>0x007f4b10</c>).
@@ -17,21 +10,20 @@ public readonly record struct PathStep(int NextX, int NextY, bool BlockedAtTarge
 /// during search (<c>0x00b432d0</c>) so an entity can walk up next to a blocked or occupied target and stop before entering it.
 /// </para>
 /// </summary>
-public sealed class FieldPathfinder(FieldCollision collision)
+public sealed class FieldPathfinder(FieldCollision collision) : IStepResolver
 {
     /// <summary>✅ <c>0x00b430f0</c>: maximum path depth (<c>0x19 = 25</c>).</summary>
     public const int MaxDepth = 25;
 
-    // ✅ 0x00b433d0: exact 8-neighbour expansion order (NW, N, NE, E, SE, S, SW, W)
-    private static readonly (int Dx, int Dy)[] Neighbors =
+    /// <summary>✅ <c>0x00b433d0</c>: the exact 8-neighbour expansion order (NW, N, NE, E, SE, S, SW, W), as offsets from the cell.</summary>
+    private static readonly Cell[] Neighbors =
     [
-        (-1, -1), (0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0),
+        new(-1, -1), new(0, -1), new(1, -1), new(1, 0), new(1, 1), new(0, 1), new(-1, 1), new(-1, 0),
     ];
 
-    private sealed class Node(int x, int y, int g, int h, Node? parent)
+    private sealed class Node(Cell cell, int g, int h, Node? parent)
     {
-        public int X { get; } = x;
-        public int Y { get; } = y;
+        public Cell Cell { get; } = cell;
         public int G { get; set; } = g;
         public int H { get; } = h;
         public int F => G + H;
@@ -41,45 +33,41 @@ public sealed class FieldPathfinder(FieldCollision collision)
     }
 
     /// <summary>
-    /// ✅ <c>0x007f4b10</c> / <c>0x008671c0</c>: resolves the next A* step toward (<paramref name="destX"/>,
-    /// <paramref name="destY"/>), reporting <see cref="PathStep.BlockedAtTarget"/> when the next cell is the destination
-    /// itself and is not free (<see cref="FieldCollision.IsFree"/>) so callers can stop AND still face that cell.
+    /// ✅ <c>0x007f4b10</c> / <c>0x008671c0</c>: resolves the next A* step toward <paramref name="destination"/>, reporting
+    /// <see cref="PathStep.BlockedAtTarget"/> when the next cell is the destination itself and is not free
+    /// (<see cref="FieldCollision.IsFree"/>) so callers can stop AND still face that cell.
     /// </summary>
-    public PathStep? ResolveStep(int fromX, int fromY, int destX, int destY)
+    public PathStep? ResolveStep(Cell from, Cell destination)
     {
-        if (fromX == destX && fromY == destY)
+        if (!TryFindFirstStep(from, destination, out var next))
             return null;
-        if (!TryFindFirstStep(fromX, fromY, destX, destY, out int nextX, out int nextY))
-            return null;
-        bool blockedAtTarget = nextX == destX && nextY == destY && !collision.IsFree(nextX, nextY);
-        return new PathStep(nextX, nextY, blockedAtTarget);
+        bool blockedAtTarget = next == destination && !collision.IsFree(next.X, next.Y);
+        return new PathStep(next, blockedAtTarget);
     }
 
     /// <summary>
-    /// ✅ <c>0x00b43200</c> + <c>0x00b35b30</c> final-cell check: returns the next adjacent cell from
-    /// (<paramref name="fromX"/>, <paramref name="fromY"/>) toward (<paramref name="destX"/>, <paramref name="destY"/>),
-    /// or <c>null</c> when already there, unreachable within <see cref="MaxDepth"/>, or when the next cell is the target
-    /// itself and is not free (<see cref="FieldCollision.IsFree"/>).
+    /// ✅ <c>0x00b43200</c> + <c>0x00b35b30</c> final-cell check: the next adjacent cell from <paramref name="from"/> toward
+    /// <paramref name="destination"/>, or null when already there, unreachable within <see cref="MaxDepth"/>, or when the next
+    /// cell is the target itself and is not free (<see cref="FieldCollision.IsFree"/>).
     /// </summary>
-    public (int NextX, int NextY)? NextStep(int fromX, int fromY, int destX, int destY) =>
-        ResolveStep(fromX, fromY, destX, destY) is { BlockedAtTarget: false } step ? (step.NextX, step.NextY) : null;
+    public Cell? NextStep(Cell from, Cell destination) =>
+        ResolveStep(from, destination) is { BlockedAtTarget: false } step ? step.Next : null;
 
     /// <summary>✅ <c>0x00b43200</c> / <c>0x00b430f0</c>: raw A* search returning the first step without the final-cell free check.</summary>
-    public bool TryFindFirstStep(int fromX, int fromY, int destX, int destY, out int nextX, out int nextY)
+    public bool TryFindFirstStep(Cell from, Cell destination, out Cell next)
     {
-        nextX = -1;
-        nextY = -1;
-        if (fromX == destX && fromY == destY)
+        next = from;
+        if (from == destination)
             return false;
 
-        int manhattan = Math.Abs(destX - fromX) + Math.Abs(destY - fromY);
+        int manhattan = Manhattan(from, destination);
         int maxG = Math.Min(manhattan * 2 + 1, MaxDepth);
 
         var open = new List<Node>();
-        var byCell = new Dictionary<(int, int), Node>();
-        var start = new Node(fromX, fromY, g: 0, h: manhattan, parent: null);
+        var byCell = new Dictionary<Cell, Node>();
+        var start = new Node(from, g: 0, h: manhattan, parent: null);
         open.Add(start);
-        byCell[(fromX, fromY)] = start;
+        byCell[from] = start;
 
         Node? goal = null;
         while (open.Count > 0)
@@ -87,7 +75,7 @@ public sealed class FieldPathfinder(FieldCollision collision)
             var current = open[0];
             if (current.G >= maxG)
                 return false;
-            if (current.X == destX && current.Y == destY)
+            if (current.Cell == destination)
             {
                 goal = current;
                 break;
@@ -95,13 +83,12 @@ public sealed class FieldPathfinder(FieldCollision collision)
             open.RemoveAt(0);
             current.Closed = true;
 
-            foreach (var (dx, dy) in Neighbors)
+            foreach (var offset in Neighbors)
             {
-                int nx = current.X + dx;
-                int ny = current.Y + dy;
-                if (!collision.CanPathThrough(nx, ny, destX, destY))
+                var neighbor = new Cell(current.Cell.X + offset.X, current.Cell.Y + offset.Y);
+                if (!collision.CanPathThrough(neighbor.X, neighbor.Y, destination.X, destination.Y))
                     continue;
-                ExpandNeighbor(current, nx, ny, destX, destY, open, byCell);
+                ExpandNeighbor(current, neighbor, destination, open, byCell);
             }
         }
 
@@ -112,15 +99,16 @@ public sealed class FieldPathfinder(FieldCollision collision)
         var step = goal;
         while (step.G > 1 && step.Parent is not null)
             step = step.Parent;
-        nextX = step.X;
-        nextY = step.Y;
+        next = step.Cell;
         return true;
     }
 
-    private static void ExpandNeighbor(Node current, int nx, int ny, int destX, int destY, List<Node> open, Dictionary<(int, int), Node> byCell)
+    private static int Manhattan(Cell a, Cell b) => Math.Abs(b.X - a.X) + Math.Abs(b.Y - a.Y);
+
+    private static void ExpandNeighbor(Node current, Cell neighbor, Cell destination, List<Node> open, Dictionary<Cell, Node> byCell)
     {
         int newG = current.G + 1;
-        if (byCell.TryGetValue((nx, ny), out var existing))
+        if (byCell.TryGetValue(neighbor, out var existing))
         {
             (current.Children ??= []).Add(existing);
             if (newG < existing.G)
@@ -134,9 +122,8 @@ public sealed class FieldPathfinder(FieldCollision collision)
             return;
         }
 
-        int h = Math.Abs(destX - nx) + Math.Abs(destY - ny);
-        var node = new Node(nx, ny, newG, h, current);
-        byCell[(nx, ny)] = node;
+        var node = new Node(neighbor, newG, Manhattan(neighbor, destination), current);
+        byCell[neighbor] = node;
         (current.Children ??= []).Add(node);
         InsertOpen(open, node);
     }

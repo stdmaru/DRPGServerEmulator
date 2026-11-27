@@ -86,4 +86,15 @@ public sealed class FieldCollision
             _occupied[(y - 1) * _map.Width + x] = default;
         _occupied[index] = default;
     }
+
+    /// <summary>
+    /// ✅ <c>0x0085e940</c>: an entity's step on the grid: the old cell is freed when it changed, and the current cell is occupied
+    /// again (every step, like the cell update of the original).
+    /// </summary>
+    public void Move(Cell from, Cell to, Serial serial)
+    {
+        if (from != to)
+            Vacate(from.X, from.Y);
+        Occupy(to.X, to.Y, serial);
+    }
 }

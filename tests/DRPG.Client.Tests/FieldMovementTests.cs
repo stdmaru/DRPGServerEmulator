@@ -1,4 +1,5 @@
 using System.Text;
+using DRPG.Client.Features.Field;
 using DRPG.Client.Net;
 using DRPG.Client.Scenes;
 using DRPG.Client.Startup;
@@ -30,13 +31,15 @@ public sealed class FieldMovementTests
     [InlineData(5, 5, 6, 4, 5, 4, -2)]      // NE
     [InlineData(5, 5, 6, 5, 6, 4, 0)]       // E
     [InlineData(5, 5, 6, 6, 7, 4, 2)]       // SE
-    [InlineData(5, 5, 5, 5, -1, 0, 0)]      // same cell
     public void Direction_and_base_velocity_match_0x007f3880_and_0x0085e5b0(
         int fx, int fy, int tx, int ty, int expectedDir, int dx, int dy)
     {
-        Assert.Equal(expectedDir, FieldDirection.FromTo(fx, fy, tx, ty));
-        Assert.Equal((dx, dy), FieldDirection.BaseVelocity(expectedDir));
+        Assert.Equal((Direction)expectedDir, FieldDirection.FromTo(new Cell(fx, fy), new Cell(tx, ty)));
+        Assert.Equal(new PixelStep(dx, dy), FieldDirection.BaseVelocity((Direction)expectedDir));
     }
+
+    [Fact]
+    public void Same_cell_has_no_direction() => Assert.Null(FieldDirection.FromTo(new Cell(5, 5), new Cell(5, 5)));
 
     [Theory]
     [InlineData(0, 5, 4)]   // S -> behind is N
@@ -48,7 +51,7 @@ public sealed class FieldMovementTests
     [InlineData(6, 4, 5)]   // E -> behind is W
     [InlineData(7, 4, 4)]   // SE -> behind is NW
     public void Cell_behind_is_one_step_opposite_to_the_direction(int dir, int expectedX, int expectedY) =>
-        Assert.Equal((expectedX, expectedY), FieldDirection.CellBehind(5, 5, dir));
+        Assert.Equal(new Cell(expectedX, expectedY), FieldDirection.CellBehind(new Cell(5, 5), (Direction)dir));
 
     [Theory]
     [InlineData(MoveState.Walk, 16)]    // ×1: ±4, ±2 -> 16 steps/cell
@@ -56,38 +59,38 @@ public sealed class FieldMovementTests
     [InlineData(MoveState.Fast, 4)]     // ×4: ±16, ±8 -> 4 steps/cell (7.5 cells/s at 30 FPS)
     public void Moving_one_diagonal_cell_takes_the_exact_number_of_steps(MoveState state, int stepsPerCell)
     {
-        var entity = new FieldEntity(5, 5);
-        entity.SetDestination(6, 6, state);
+        var entity = new FieldEntity(new Cell(5, 5));
+        entity.SetDestination(new Cell(6, 6), state);
 
         for (int i = 0; i < stepsPerCell - 1; i++)
         {
-            entity.StepPhysics();
+            entity.StepPhysics(StraightSteps.Instance);
             Assert.False(entity.IsAtCellCenter);
-            Assert.Equal((5, 5), (entity.CellX, entity.CellY));
+            Assert.Equal(new Cell(5, 5), entity.Cell);
         }
 
-        entity.StepPhysics();
+        entity.StepPhysics(StraightSteps.Instance);
         Assert.True(entity.IsAtCellCenter);
-        Assert.Equal((6, 6), (entity.CellX, entity.CellY));
-        Assert.Equal(7, entity.Direction);
+        Assert.Equal(new Cell(6, 6), entity.Cell);
+        Assert.Equal((Direction)7, entity.Direction);
 
         // Next step detects arrival and returns to Standing
-        entity.StepPhysics();
+        entity.StepPhysics(StraightSteps.Instance);
         Assert.Equal(MoveState.Standing, entity.State);
     }
 
     [Fact]
     public void Switching_to_fast_mid_cell_aligns_half_step_pixels_so_it_still_lands_on_center()
     {
-        var entity = new FieldEntity(5, 5);
-        entity.SetDestination(6, 6, MoveState.Run);
-        entity.StepPhysics();                   // +8, +4 -> WorldX % 16 == 8, WorldY % 8 == 4
-        entity.SetDestination(6, 6, MoveState.Fast);
+        var entity = new FieldEntity(new Cell(5, 5));
+        entity.SetDestination(new Cell(6, 6), MoveState.Run);
+        entity.StepPhysics(StraightSteps.Instance);                   // +8, +4 -> WorldX % 16 == 8, WorldY % 8 == 4
+        entity.SetDestination(new Cell(6, 6), MoveState.Fast);
 
         for (int i = 0; i < 6; i++)
-            entity.StepPhysics();
+            entity.StepPhysics(StraightSteps.Instance);
 
-        Assert.Equal((6, 6), (entity.CellX, entity.CellY));
+        Assert.Equal(new Cell(6, 6), entity.Cell);
         Assert.True(entity.IsAtCellCenter);
         Assert.Equal(MoveState.Standing, entity.State);
     }
@@ -95,45 +98,45 @@ public sealed class FieldMovementTests
     [Fact]
     public void Partner_digimon_follows_one_cell_behind_the_tamer()
     {
-        var tamer = new FieldEntity(5, 5);
-        var partner = new FieldEntity(4, 4);
-        tamer.SetDestination(9, 5);             // East (dir 6)
+        var tamer = new FieldEntity(new Cell(5, 5));
+        var partner = new FieldEntity(new Cell(4, 4));
+        tamer.SetDestination(new Cell(9, 5));             // East (dir 6)
 
         for (int step = 0; step < 60; step++)
         {
-            tamer.StepPhysics();
-            partner.FollowLeader(tamer);
+            tamer.StepPhysics(StraightSteps.Instance);
+            partner.FollowLeader(tamer, StraightSteps.Instance);
         }
 
-        Assert.Equal((9, 5), (tamer.CellX, tamer.CellY));
+        Assert.Equal(new Cell(9, 5), tamer.Cell);
         Assert.Equal(MoveState.Standing, tamer.State);
-        Assert.Equal((8, 5), (partner.CellX, partner.CellY));       // 1 cell behind (West of destination)
+        Assert.Equal(new Cell(8, 5), partner.Cell);       // 1 cell behind (West of destination)
         Assert.Equal(MoveState.Standing, partner.State);
     }
 
     [Fact]
     public void Partner_within_one_cell_turns_to_face_tamer_without_moving()
     {
-        var tamer = new FieldEntity(5, 5);
-        var partner = new FieldEntity(4, 5, direction: 0);
-        tamer.SetDestination(6, 5);             // East (dir 6)
+        var tamer = new FieldEntity(new Cell(5, 5));
+        var partner = new FieldEntity(new Cell(4, 5), (Direction)0);
+        tamer.SetDestination(new Cell(6, 5));             // East (dir 6)
 
-        tamer.StepPhysics();
-        partner.FollowLeader(tamer);
+        tamer.StepPhysics(StraightSteps.Instance);
+        partner.FollowLeader(tamer, StraightSteps.Instance);
 
-        Assert.Equal((4, 5), (partner.CellX, partner.CellY));
+        Assert.Equal(new Cell(4, 5), partner.Cell);
         Assert.Equal(MoveState.Standing, partner.State);
     }
 
     [Fact]
     public void Partner_farther_than_five_cells_teleports_to_tamer_minus_one()
     {
-        var tamer = new FieldEntity(15, 15);
-        var partner = new FieldEntity(5, 5);
+        var tamer = new FieldEntity(new Cell(15, 15));
+        var partner = new FieldEntity(new Cell(5, 5));
 
-        partner.FollowLeader(tamer);
+        partner.FollowLeader(tamer, StraightSteps.Instance);
 
-        Assert.Equal((14, 14), (partner.CellX, partner.CellY));
+        Assert.Equal(new Cell(14, 14), partner.Cell);
         Assert.Equal(MoveState.Standing, partner.State);
         Assert.True(partner.IsAtCellCenter);
     }
@@ -143,19 +146,19 @@ public sealed class FieldMovementTests
     {
         var queue = new MovePacketQueue();
 
-        queue.Enqueue(10, 20);
-        Assert.True(queue.TryDequeue(1000, out short x, out short y));
-        Assert.Equal((10, 20), (x, y));
+        queue.Enqueue(new Cell(10, 20));
+        Assert.True(queue.TryDequeue(1000, out var sent));
+        Assert.Equal(new Cell(10, 20), sent);
 
         // Multiple clicks during cooldown coalesce to the latest
-        queue.Enqueue(11, 21);
-        queue.Enqueue(12, 22);
-        Assert.False(queue.TryDequeue(1500, out _, out _));
-        Assert.False(queue.TryDequeue(1800, out _, out _));     // exact 800 is still cooling (800 < elapsed)
+        queue.Enqueue(new Cell(11, 21));
+        queue.Enqueue(new Cell(12, 22));
+        Assert.False(queue.TryDequeue(1500, out _));
+        Assert.False(queue.TryDequeue(1800, out _));            // exact 800 is still cooling (800 < elapsed)
 
-        Assert.True(queue.TryDequeue(1801, out x, out y));
-        Assert.Equal((12, 22), (x, y));
-        Assert.False(queue.TryDequeue(3000, out _, out _));
+        Assert.True(queue.TryDequeue(1801, out sent));
+        Assert.Equal(new Cell(12, 22), sent);
+        Assert.False(queue.TryDequeue(3000, out _));
     }
 
     [Fact]
@@ -182,7 +185,7 @@ public sealed class FieldMovementTests
         var textures = Enumerable.Range(0, frames).Select(_ => (ITexture)new FakeTexture(8, 8)).ToList();
         var animator = new FieldAnimator(new SpriteAnimator(AniFile.Parse(data), textures, null, null), digimon: true, species: 3, initialOffset: 0);
 
-        animator.SetDirection(6);
+        animator.SetDirection(Direction.East);
         animator.Switch(FieldAnimator.Run);
         Assert.Equal(12, animator.View.Frame);
 
@@ -290,9 +293,9 @@ public sealed class GameSceneWalkingTests : IDisposable
         // Advance 2 seconds (60 steps): enough for 3 cells (24 steps) plus partner catching up
         scene.Frame(_fixture.Renderer, t + 2000);
 
-        Assert.Equal((8, 6), (scene.TamerEntity.CellX, scene.TamerEntity.CellY));
-        Assert.Equal(MoveState.Standing, scene.TamerEntity.State);
-        Assert.Equal((7, 6), (scene.DigimonEntity!.CellX, scene.DigimonEntity.CellY));
+        Assert.Equal(new Cell(8, 6), scene.State!.Party.Tamer.Cell);
+        Assert.Equal(MoveState.Standing, scene.State!.Party.Tamer.State);
+        Assert.Equal(new Cell(7, 6), scene.State!.Party.Partner!.Cell);
     }
 
     [Fact]
@@ -305,7 +308,7 @@ public sealed class GameSceneWalkingTests : IDisposable
         scene.Frame(_fixture.Renderer, t + 34);
         scene.Frame(_fixture.Renderer, t + 1000);
 
-        Assert.Equal((5, 6), (scene.TamerEntity.CellX, scene.TamerEntity.CellY));
+        Assert.Equal(new Cell(5, 6), scene.State!.Party.Tamer.Cell);
         Assert.DoesNotContain((ushort)MapOpcode.MoveCharacter, _map.Received);
     }
 
@@ -319,16 +322,16 @@ public sealed class GameSceneWalkingTests : IDisposable
         scene.Frame(_fixture.Renderer, t + 34);
         _fixture.Game.Mouse.EndFrame();
         _fixture.Game.Mouse.Handle(new MouseButtonEvent(9 * 64 + 32, 6 * 32 + 16, false), t + 50);
-        Assert.Equal(MoveState.Run, scene.TamerEntity.State);
+        Assert.Equal(MoveState.Run, scene.State!.Party.Tamer.State);
 
         _map.Send(new TeleportCharacterPacket(1, 3, 4));
         Pump(() =>
         {
             scene.Frame(_fixture.Renderer, t + 100);
-            return scene.TamerEntity.CellX == 3 && scene.TamerEntity.CellY == 4;
+            return scene.State!.Party.Tamer.Cell == new Cell(3, 4);
         });
 
-        Assert.Equal(MoveState.Standing, scene.TamerEntity.State);
-        Assert.Equal((2, 3), (scene.DigimonEntity!.CellX, scene.DigimonEntity.CellY));
+        Assert.Equal(MoveState.Standing, scene.State!.Party.Tamer.State);
+        Assert.Equal(new Cell(2, 3), scene.State!.Party.Partner!.Cell);
     }
 }

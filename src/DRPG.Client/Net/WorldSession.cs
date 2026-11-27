@@ -48,9 +48,7 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
     private bool _firstEntry;
     private bool _disposed;
     private readonly List<ushort> _unknownLogged = [];
-    private readonly Queue<TeleportCharacterPacket> _teleports = new();
-    private readonly Queue<FieldDigimonPacket> _wilds = new();
-    private readonly Queue<FieldNpcPacket> _npcs = new();
+    private readonly Queue<object> _featurePackets = new();
 
     public WorldStep Step { get; private set; }
 
@@ -134,14 +132,11 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
         _map.Send(new TeleportAckRequest());
     }
 
-    /// <summary>Dequeues the next <c>0xB0</c> teleport / position-correction packet received from the map server.</summary>
-    public bool TryReceiveTeleport(out TeleportCharacterPacket packet) => _teleports.TryDequeue(out packet!);
-
-    /// <summary>Dequeues the next <c>0x11</c> wild digimon update received from the map server.</summary>
-    public bool TryReceiveFieldDigimon(out FieldDigimonPacket packet) => _wilds.TryDequeue(out packet!);
-
-    /// <summary>Dequeues the next <c>0x09</c> dynamic NPC add/remove packet received from the map server.</summary>
-    public bool TryReceiveFieldNpc(out FieldNpcPacket packet) => _npcs.TryDequeue(out packet!);
+    /// <summary>
+    /// The next typed map packet that the session itself does not use, in arrival order, for the features' handlers
+    /// (<c>Features/&lt;Domain&gt;/&lt;Domain&gt;Handlers</c>; docs/arquitetura/cliente.md#a-fatia-de-feature).
+    /// </summary>
+    public bool TryReceive(out object packet) => _featurePackets.TryDequeue(out packet!);
 
     /// <summary>One step; call every frame.</summary>
     public void Update()
@@ -211,15 +206,6 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
             case MapPing:
                 map.Send(new Shared.Packets.Channel.KeepAliveRequest());        // ✅ answered at once in the capture
                 break;
-            case TeleportCharacterPacket teleport:
-                _teleports.Enqueue(teleport);
-                break;
-            case FieldDigimonPacket wild:
-                _wilds.Enqueue(wild);
-                break;
-            case FieldNpcPacket npc:
-                _npcs.Enqueue(npc);
-                break;
             case IgnoredPacket ignored:
                 IgnoredCounts[ignored.Opcode] = IgnoredCounts.GetValueOrDefault(ignored.Opcode) + 1;
                 break;
@@ -229,6 +215,10 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
                     _unknownLogged.Add(unknown.Opcode);
                     log($"map: opcode 0x{unknown.Opcode:X} ({unknown.PayloadLength} B) is not used yet");
                 }
+                break;
+            default:
+                // a typed packet of a feature (MapDecoder types only what some feature reads)
+                _featurePackets.Enqueue(packet);
                 break;
         }
         CheckDataReady();
