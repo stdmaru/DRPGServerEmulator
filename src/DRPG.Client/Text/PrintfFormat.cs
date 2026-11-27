@@ -35,6 +35,11 @@ public static class PrintfFormat
                 i++;
                 precision = ReadNumber(format, ref i);
             }
+            // ✅ the length prefixes of the MSVC printf the texts use ("EXP %I64d/%I64d", 0x885) only change the argument's size
+            if (string.CompareOrdinal(format, i, "I64", 0, 3) == 0)
+                i += 3;
+            while (i < format.Length && format[i] is 'l' or 'h')
+                i++;
             if (i >= format.Length || argument >= arguments.Length)
             {
                 result.Append(format, start, Math.Min(i + 1, format.Length) - start);

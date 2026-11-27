@@ -6,6 +6,9 @@ public interface IVoice
     bool IsPlaying { get; }
 
     void Stop();
+
+    /// <summary>Changes the volume of the sound that plays (clamped to 0..1).</summary>
+    void SetGain(float gain);
 }
 
 /// <summary>Plays <see cref="PcmSound"/>s. Game thread only; <see cref="Update"/> once per frame (refills the loops).</summary>
@@ -30,6 +33,10 @@ public sealed class SilentAudio : IAudio
         public bool IsPlaying => false;
 
         public void Stop()
+        {
+        }
+
+        public void SetGain(float gain)
         {
         }
     }

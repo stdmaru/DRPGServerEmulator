@@ -19,7 +19,7 @@ public sealed record TextEvent(string Text) : InputEvent;
 public enum GameKey { Other, Enter, Escape, Tab, Backspace }
 
 /// <summary>SDL window, renderer and event pump. Nothing else in a game executable calls SDL directly.</summary>
-public sealed unsafe class SdlPlatform : IDisposable
+public sealed unsafe class SdlPlatform : IDisplayMode, IDisposable
 {
     private readonly SDL_Window* _window;
     private readonly SdlRenderer _renderer;
@@ -54,6 +54,9 @@ public sealed unsafe class SdlPlatform : IDisposable
     }
 
     public IRenderer Renderer => _renderer;
+
+    /// <summary>The window keeps its fixed 800×600 size; the renderer letterboxes it on a full screen.</summary>
+    public void SetFullscreen(bool fullscreen) => SDL_SetWindowFullscreen(_window, fullscreen);
 
     public static ulong TicksMs => SDL_GetTicks();
 

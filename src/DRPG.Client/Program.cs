@@ -1,3 +1,4 @@
+using DRPG.Client.Features.Options;
 using DRPG.Client.Scenes;
 using DRPG.Client.Ui;
 using DRPG.Engine.Assets;
@@ -62,7 +63,7 @@ internal static class Program
         using var audio = AudioFactory.Create(Console.Error.WriteLine);
         var options = IniFile.Read(install.OptionsPath);
         using var sounds = new SoundBank(audio, install.SoundDirectory, Volume(options, "bgm.sound"), Volume(options, "bgm.bgm"), Console.Error.WriteLine);
-        var game = new GameContext(install, resource, sprites, uiText, sounds, command, settings, SpriteOptions.From(options), Console.WriteLine);
+        var game = new GameContext(install, resource, sprites, uiText, sounds, command, settings, SpriteOptions.From(options), GameOptions.From(options), platform, Console.WriteLine);
         using var scenes = new SceneManager(id => CreateScene(id, game));
         game.Scenes = scenes;
         var cursor = new CursorView(sprites);

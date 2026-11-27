@@ -16,7 +16,11 @@ public sealed class SoundBankTests : IDisposable
                 IsPlaying = false;
                 owner.Stops++;
             }
+
+            public void SetGain(float gain) => owner.Gains.Add(gain);
         }
+
+        public List<float> Gains { get; } = [];
 
         public List<(float Volume, bool Loop)> Plays { get; } = [];
         public int Stops { get; private set; }

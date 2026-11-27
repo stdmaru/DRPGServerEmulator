@@ -17,6 +17,7 @@ public sealed class SoundBank(IAudio audio, string soundDirectory, float effectV
     private readonly Dictionary<string, PcmSound?> _decoded = new(StringComparer.OrdinalIgnoreCase);
     private IVoice? _music;
     private string? _musicFile;
+    private float _effectVolume = effectVolume, _musicVolume = musicVolume;
 
     /// <summary>
     /// ✅ <c>0x00a18910</c>: the option is 0 for mute, otherwise <c>(v − 4) × 400</c> hundredths of a decibel
@@ -42,10 +43,10 @@ public sealed class SoundBank(IAudio audio, string soundDirectory, float effectV
     /// <summary>Plays effect <paramref name="id"/> once; an id nobody registered is silent (✅ the original ignores it).</summary>
     public void PlayEffect(int id)
     {
-        if (effectVolume <= 0 || !_effects.TryGetValue(id, out var path))
+        if (_effectVolume <= 0 || !_effects.TryGetValue(id, out var path))
             return;
         if (Load(path) is { } sound)
-            audio.Play(sound, effectVolume, loop: false);
+            audio.Play(sound, _effectVolume, loop: false);
     }
 
     /// <summary>
@@ -58,10 +59,32 @@ public sealed class SoundBank(IAudio audio, string soundDirectory, float effectV
             return;
         StopMusic();
         _musicFile = relativePath;
-        if (musicVolume <= 0 || Load(relativePath) is not { } sound)
+        if (_musicVolume <= 0 || Load(relativePath) is not { } sound)
             return;
-        _music = audio.Play(sound, musicVolume, loop: true);
+        _music = audio.Play(sound, _musicVolume, loop: true);
     }
+
+    /// <summary>
+    /// ✅ The options' music level (<c>[DAT_01158530]+8</c>): 0 stops the track and keeps it chosen (<c>0x00b426e0</c>); another level
+    /// sets the volume (<c>0x00b42460</c>) and, coming from 0, plays the chosen track again from the start (<c>0x00b42670(1)</c>).
+    /// </summary>
+    public void SetMusicLevel(int level)
+    {
+        _musicVolume = GainFromOption(level);
+        if (_musicVolume <= 0)
+        {
+            _music?.Stop();
+            _music = null;
+            return;
+        }
+        if (_music is { IsPlaying: true })
+            _music.SetGain(_musicVolume);
+        else if (_musicFile is { } file && Load(file) is { } sound)
+            _music = audio.Play(sound, _musicVolume, loop: true);
+    }
+
+    /// <summary>✅ The options' effect level (<c>[DAT_01158530]+9</c>, <c>0x00a18910</c>): the volume of the effects played from now on.</summary>
+    public void SetEffectLevel(int level) => _effectVolume = GainFromOption(level);
 
     public void StopMusic()
     {

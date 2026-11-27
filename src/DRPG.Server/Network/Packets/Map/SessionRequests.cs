@@ -23,15 +23,3 @@ public sealed record ChatNormalRequest(string Message) : IClientPacket<ChatNorma
         return new(message);
     }
 }
-
-/// <summary>✅ 0x2B (C2S 14 B, v322): sair do jogo. Nada é lido.</summary>
-public sealed record ExitGameRequest : IClientPacket<ExitGameRequest>
-{
-    public static PacketLength Length => PacketLength.Exact(14);
-
-    public static ExitGameRequest Read(PacketReader r)
-    {
-        r.Skip(14);
-        return new();
-    }
-}

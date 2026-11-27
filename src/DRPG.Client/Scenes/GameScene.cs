@@ -1,4 +1,7 @@
 using DRPG.Client.Data;
+using DRPG.Client.Features.Chat;
+using DRPG.Client.Features.Exit;
+using DRPG.Client.Features.Options;
 using DRPG.Client.Features.Field;
 using DRPG.Client.Net;
 using DRPG.Client.Startup;
@@ -40,8 +43,15 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     public const int ConnectionLostText = 0xed0;
     private const int MessageCenterX = 400, MessageCenterY = 300;
 
+    /// <summary>✅ The 9-part box of the messages and the side tooltips (<c>0x007dcfb0</c>).</summary>
+    private const string BoxSprite = "gui\\dr2_in_000_003.spr";
+
     private AnimatedSprites _sprites = null!;                  // set in Init
     private FieldHud _hud = null!;                             // set in Init
+    private WindowManager _windows = null!;                    // set in Init
+    private UiSprites _ui = null!;                             // set in Init
+    private readonly ChatLog _chat = new();
+    private ExitWindow _exit = null!;                          // set in Init
     private MessageBox _box = null!;                           // set in Init
     private LoadingScreen _screen = null!;                     // set in Init
     private WorldLoading _loading = null!;                     // set in Init
@@ -86,15 +96,43 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         }
         _sprites = new AnimatedSprites(game.Resource, game.Sprites, game.Log);
         _view = new FieldView(_sprites, game.SpriteOptions);
-        _hud = new FieldHud(game);
+        _windows = new WindowManager(game.Sounds);
+        _ui = new UiSprites(game);
+        _hud = new FieldHud(game, _ui, _windows, new Tooltips(_ui.Load(Tooltips.PanelSprite), new MessageBox(_ui.Load(BoxSprite), game.Text), game.Text));
+        RegisterWindows(game.World.Session);
         _box = new MessageBox(game.Sprites.Load("gui\\dr2_in_000_003.spr"), game.Text);
         _screen = new LoadingScreen(game);
         _loading = new WorldLoading(random, _screen.BackgroundCount);
-        // ✅ the scene's sound effects (0x00b4bab0) are not registered yet: nothing in this step plays one
+        GameSceneSounds.Register(game.Sounds);                         // ✅ 0x00b4bab0
     }
 
+    internal WindowManager Windows => _windows;
+
+    /// <summary>
+    /// The field's windows (✅ the original makes them all at start, <c>0x00b9a170</c>). Until the window registry generator exists
+    /// (docs/arquitetura/cliente.md), each one is one line here.
+    /// </summary>
+    private void RegisterWindows(WorldSession session)
+    {
+        _exit = new ExitWindow(_windows, new ExitActions(session), game.Text, game.Texts,
+            _ui.Load("gui\\dr2_sub_007_005.spr"), _ui.Gui("dr2_sub_007_001"));
+        _windows.Register(_exit);
+        _windows.Register(new OptionsWindow(game, _ui, _windows, _chat));
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00b4c080</c>, the scene's key: nothing while the exit window counts down (<c>+0x3eb0</c>). Escape in the field closes the
+    /// topmost window (<c>0x00b93030</c>) or, with none, opens the exit window (6) with the text <c>0xecc</c>. ❓ The window hotkeys
+    /// (<c>0x00b9a8d0</c>) wait for their windows.
+    /// </summary>
     public void Handle(InputEvent input)
     {
+        if (_aborted || _lost || _windows is null || _windows.Locked || input is not KeyEvent { Key: GameKey.Escape })
+            return;
+        if (_map is null || _loading.Showing)
+            return;
+        if (!_windows.CloseTopmost())
+            _windows.Open(WindowManager.ExitWindow);
     }
 
     public void Frame(IRenderer renderer, ulong nowMs)
@@ -133,7 +171,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
             }
         }
         if (_map is not null && _state is not null)
-            DrawField(renderer, _map, _state, session);
+            DrawField(renderer, _map, _state, session, nowMs);
         if (_lost)
             DrawLost(renderer);
     }
@@ -256,7 +294,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
             if (!_handlers!.Handle(packet))
                 game.Log($"map: {packet.GetType().Name} has no handler");
 
-        if (!_state!.Transition.LocksInput)
+        if (!_state!.Transition.LocksInput && !_windows.Locked)
         {
             var mouse = game.Mouse;
             if (!mouse.Down)
@@ -304,21 +342,25 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private Cell? GroundCellUnderMouse()
     {
         var mouse = game.Mouse;
-        if (mouse.X < 0 || mouse.Y < 0 || mouse.X >= IRenderer.FrameWidth || mouse.Y >= IRenderer.FrameHeight || FieldHud.Covers(mouse.X, mouse.Y))
+        if (mouse.X < 0 || mouse.Y < 0 || mouse.X >= IRenderer.FrameWidth || mouse.Y >= IRenderer.FrameHeight || FieldHud.Covers(mouse.X, mouse.Y)
+            || _windows.Covers(mouse.X, mouse.Y))
             return null;
         return FieldView.CellAt(_map!, _state!, mouse.X, mouse.Y);
     }
 
-    /// <summary>✅ <c>0x00b4b550</c>: the field (<see cref="FieldView"/>), then the HUD.</summary>
-    private void DrawField(IRenderer renderer, FieldMap map, FieldState state, WorldSession session)
+    /// <summary>✅ <c>0x00b4b550</c>: the field (<see cref="FieldView"/>), then the HUD (the bar) and the windows (<c>0x00b9a7c0</c>).</summary>
+    private void DrawField(IRenderer renderer, FieldMap map, FieldState state, WorldSession session, ulong nowMs)
     {
         _view.Draw(renderer, map, state, game.SpriteOptions);
         var character = session.Character!;
         var leader = character.Party[0];
         var tamer = state.Party.Tamer.Cell;
-        _hud.Draw(renderer, new HudValues(
+        _hud.Frame(renderer, new HudValues(
             character.Name, character.TamerId, character.TamerClass, character.Level, game.ChannelName, state.Area.MapId, Data.MapName(state.Area.MapId),
-            tamer.X, tamer.Y, leader.IsEmpty ? null : leader, DateTime.UtcNow + _clockOffset));
+            tamer.X, tamer.Y, leader.IsEmpty ? null : leader, DateTime.UtcNow + _clockOffset), game.Mouse);
+        _windows.Frame(renderer, game.Mouse, nowMs);
+        if (_exit.LeaveRequested)
+            LeaveWorld();
     }
 
     private void DrawLoading(IRenderer renderer) =>
@@ -331,18 +373,31 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         game.Sounds.StopMusic();
     }
 
+    /// <summary>
+    /// ✅ The end of the exit window's count: <c>0x00ad0ae0</c> leaves the world and <c>0x00ad0bd0</c> sets <c>+0x7a4</c>, so the next
+    /// frame (<c>0x00b4e550</c>) stops the music, closes the connections and switches to scene 2.
+    /// </summary>
+    private void LeaveWorld()
+    {
+        game.Sounds.StopMusic();
+        ReturnToServerScene();
+    }
+
+    private void ReturnToServerScene()
+    {
+        game.World?.Dispose();
+        game.World = null;
+        game.Account?.Reset();
+        game.Scenes.Switch(SceneId.Server);
+        _aborted = true;
+    }
+
     /// <summary>✅ <c>0x00b4e550</c> step 2: the text of a lost connection in the middle of the screen; ❓ the original's way out is not read, a click goes back to scene 2.</summary>
     private void DrawLost(IRenderer renderer)
     {
         _box.Draw(renderer, game.Texts[ConnectionLostText], MessageCenterX, MessageCenterY);
         if (game.Mouse.Pressed)
-        {
-            game.World?.Dispose();
-            game.World = null;
-            game.Account?.Reset();
-            game.Scenes.Switch(SceneId.Server);
-            _aborted = true;
-        }
+            ReturnToServerScene();
     }
 
     public void Dispose()

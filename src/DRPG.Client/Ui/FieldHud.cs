@@ -14,11 +14,13 @@ public sealed record HudValues(
 
 /// <summary>
 /// The basic UI of the field (✅ v322 main bar <c>0x00b8a850</c>, docs/cliente/cena-jogo.md#ui-do-campo-hud): the tamer panel in the
-/// top left corner and the bar at the bottom, with the digimon's gauges, the menu buttons, the side buttons and the chat frame.
-/// Everything is only drawn: nothing reacts to the mouse in this milestone. ❓ Not drawn yet (they come with their own step): the
-/// minimap, the teleport buttons, the quest panels, the EXP bonus box, the bell and the W/E icons.
+/// top left corner and the bar at the bottom, with the digimon's gauges, the menu buttons, the side buttons and the chat frame. The
+/// original draws and reads the mouse in the same pass, in this order, and draws each tooltip the moment its control is hot. The menu
+/// buttons open their window through <see cref="WindowManager"/> (a window the client does not have yet does nothing); the side buttons
+/// only show the press (their windows and requests come with their features). ❓ Not drawn yet (they come with their own step): the
+/// teleport buttons, the quest panels, the EXP bonus box, the bell and the W/E icons.
 /// </summary>
-public sealed class FieldHud(GameContext game)
+public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager windows, Tooltips tooltips)
 {
     /// <summary>✅ The text colours are COLORREF: <c>0x80ffff</c> is a light yellow.</summary>
     public const uint Yellow = 0x80FFFF;
@@ -45,8 +47,29 @@ public sealed class FieldHud(GameContext game)
         (10, 450, 515), (11, 482, 515), (12, 546, 514), (13, 546, 548), (14, 514, 515), (15, 514, 548), (16, 482, 548), (17, 450, 548),
     ];
 
-    // ✅ SEAL, SHOP, DEPOSITORY, WORLD
-    private static readonly (int Sprite, int X, int Y)[] SideButtons = [(42, 516, 439), (32, 516, 462), (41, 516, 485), (31, 451, 485)];
+    /// <summary>✅ <c>0x00b91720</c>: the window each menu button opens and closes, in the order of <see cref="MenuButtons"/>.</summary>
+    public static readonly int[] MenuWindows = [1, 3, 4, 0xf, 2, 0xcc, 0xa8, 0xb];
+
+    /// <summary>✅ <c>0x00b91720</c> case 0: the first menu button closes window 2 before its own.</summary>
+    private const int ClosedByFirstMenuButton = 2;
+
+    /// <summary>✅ Frame 3 for state 0 while the button's window is closed, 0 while it is open.</summary>
+    private const int ClosedMenuFrame = 3, OpenMenuFrame = 0;
+
+    // ✅ the side buttons in the order the bar reads them (0x00b8d4..): SHOP (+0x1cd8), DEPOSITORY (+0x773f8), SEAL (+0x775e0), WORLD (+0x1d18)
+    private static readonly (int Sprite, int X, int Y)[] SideButtons = [(32, 516, 462), (41, 516, 485), (42, 516, 439), (31, 451, 485)];
+    private const int Shop = 0, Depository = 1, World = 3;
+
+    /// <summary>✅ The texts of the side tooltips (<c>0x00b8d6aa</c>…): REWARD, WORLD, SHOP, DEPOSITORY.</summary>
+    public const int RewardHint = 0x886, WorldHint = 0x888, ShopHint = 0x10ee, DepositoryHint = 0x887;
+
+    /// <summary>✅ The box of every side tooltip is 7 px high: no middle row (<c>(7 − 28) / 14 + 1 = 0</c>).</summary>
+    private const int HintBoxHeight = 7;
+
+    /// <summary>✅ <c>0x00b8cf05</c>…: the gauge tooltips, and the EXP one (<c>TextAttach 0x885</c>), 12 px above the gauge.</summary>
+    public const string HpHint = "HP %d/%d", VpHint = "VP %d/%d", EvpHint = "EVP %d/%d";
+    public const int ExpHint = 0x885;
+    private const int GaugeHintGap = 12;
 
     // ✅ the chat mode buttons (000_023..027), mode 0 = 000_025 shows frame 0, and the tabs 000_037..040
     private static readonly (int Sprite, int X, int Y)[] ChatButtons = [(23, 179, 572), (24, 201, 572), (25, 222, 572), (26, 244, 572), (27, 157, 572)];
@@ -86,15 +109,32 @@ public sealed class FieldHud(GameContext game)
     private const string RewardSprite = "gui\\dr2_sub_016_005.spr";
     private const int RewardX = 451, RewardY = 462;
 
-    private readonly Dictionary<string, ITexture[]> _cache = new(StringComparer.OrdinalIgnoreCase);
+    private Button[]? _menu, _side;
+    private Button? _reward;
 
-    public void Draw(IRenderer renderer, HudValues v)
+    /// <summary>
+    /// ✅ <c>0x00b8a850</c>: draws the bar and reads its buttons for this frame. Call it once per frame, after the field and before the
+    /// windows.
+    /// </summary>
+    public void Frame(IRenderer renderer, HudValues v, MouseState mouse)
     {
+        CreateButtons();
         DrawBar(renderer);
         DrawTamerPanel(renderer, v);
-        DrawDigimonPanel(renderer, v.Leader);
-        DrawButtons(renderer);
+        DrawDigimonPanel(renderer, v.Leader, mouse);
+        DrawSideButtons(renderer, mouse);
+        DrawChat(renderer);
         DrawChatSizeButtons(renderer);
+    }
+
+    /// <summary>✅ <c>0x00b90570</c>: the buttons and where they sit (<c>0x009b7570</c>, frame map 0, 1, 2, 3).</summary>
+    private void CreateButtons()
+    {
+        if (_menu is not null)
+            return;
+        _menu = [.. MenuButtons.Select(b => new Button(Gui(b.Sprite), b.X, b.Y))];
+        _side = [.. SideButtons.Select(b => new Button(Gui(b.Sprite), b.X, b.Y))];
+        _reward = new Button(Load(RewardSprite, gui: true), RewardX, RewardY);
     }
 
     /// <summary>✅ <c>0x00b8e2a0</c>, the last call of <c>0x00b8a850</c>: the three chat size buttons.</summary>
@@ -145,17 +185,59 @@ public sealed class FieldHud(GameContext game)
         text.Draw(renderer, place, 130, 27);
     }
 
-    /// <summary>✅ 4. the digimon's panel: portrait, level and the four gauges.</summary>
-    private void DrawDigimonPanel(IRenderer renderer, DigimonStatus? leader)
+    /// <summary>
+    /// ✅ 4. the digimon's panel: portrait, level, the HP, VP and EVP gauges, the menu buttons (<c>0x00b91720</c>, between EVP and EXP)
+    /// and the EXP gauge; each gauge draws its tooltip at once when the mouse is on it. Without a leader only the menu buttons.
+    /// </summary>
+    private void DrawDigimonPanel(IRenderer renderer, DigimonStatus? leader, MouseState mouse)
     {
         if (leader is null || leader.IsEmpty)
+        {
+            DrawMenuButtons(renderer, mouse);
             return;
+        }
         Portrait(renderer, leader.SpeciesId, 0, 594, 509);                                    // ✅ 0x00b1ec40(species) frame 0
         game.Text.Draw(renderer, $"Lv.{leader.Level}", 670, 508);
-        Gauge(renderer, 2, 692, 525, Percent(leader.Hp, leader.MaxHp));
-        Gauge(renderer, 5, 692, 545, Percent(leader.Vp, leader.MaxVp));
-        Gauge(renderer, 4, 692, 564, Percent(leader.Evp, leader.MaxEvp));
-        Gauge(renderer, 3, 488, 585, Percent(leader.Exp, leader.ExpToNextLevel));
+        Gauge(renderer, mouse, 2, 692, 525, leader.Hp, leader.MaxHp, PrintfFormat.Format(HpHint, leader.Hp, leader.MaxHp));
+        Gauge(renderer, mouse, 5, 692, 545, leader.Vp, leader.MaxVp, PrintfFormat.Format(VpHint, leader.Vp, leader.MaxVp));
+        Gauge(renderer, mouse, 4, 692, 564, leader.Evp, leader.MaxEvp, PrintfFormat.Format(EvpHint, leader.Evp, leader.MaxEvp));
+        DrawMenuButtons(renderer, mouse);
+        Gauge(renderer, mouse, 3, 488, 585, leader.Exp, leader.ExpToNextLevel, PrintfFormat.Format(game.Texts[ExpHint],
+            leader.Exp, leader.ExpToNextLevel, ExpPercent(leader.Exp, leader.ExpToNextLevel)));
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00b31c00</c> as the EXP tooltip prints it: <c>(float)current / (float)maximum · 100</c> of the low 32 bits the call gets,
+    /// 0 when the maximum is 0.
+    /// </summary>
+    public static float ExpPercent(long current, long maximum)
+    {
+        int low = unchecked((int)current), lowMaximum = unchecked((int)maximum);
+        return lowMaximum == 0 ? 0f : (float)low / lowMaximum * 100f;
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00b91720</c>: each menu button reads the mouse with frame 3 for state 0 while its window is closed (0 while open), and
+    /// a click closes or opens its window. ❓ The battle zone message of the sixth button (0x89e) and its window's load wait for those
+    /// windows.
+    /// </summary>
+    private void DrawMenuButtons(IRenderer renderer, MouseState mouse)
+    {
+        for (int i = 0; i < _menu!.Length; i++)
+        {
+            var button = _menu[i];
+            button.Update(mouse);
+            button.SetFrame(0, windows.IsOpen(MenuWindows[i]) ? OpenMenuFrame : ClosedMenuFrame);
+            button.Draw(renderer);
+        }
+        for (int i = 0; i < _menu.Length; i++)
+        {
+            if (!_menu[i].Clicked)
+                continue;
+            if (i == 0)
+                windows.Close(ClosedByFirstMenuButton);
+            windows.Toggle(MenuWindows[i]);
+        }
     }
 
     /// <summary>
@@ -183,28 +265,79 @@ public sealed class FieldHud(GameContext game)
         Frame(renderer, frames, frame, x, y);
     }
 
-    /// <summary>✅ <c>0x007e3560</c>: frame 0 clipped to the gauge's width, then frame 1 whole over it.</summary>
-    private void Gauge(IRenderer renderer, int sprite, int x, int y, int percent)
+    /// <summary>
+    /// ✅ <c>0x007e3560</c>: frame 0 clipped to the gauge's width, then frame 1 whole over it. ✅ With the mouse on the gauge
+    /// (<c>0x00b31aa0</c>: x ≤ mouse ≤ x + w and y ≤ mouse ≤ y + h, frame 0's size, edges included) the tooltip at (x, y − h − 12).
+    /// </summary>
+    private void Gauge(IRenderer renderer, MouseState mouse, int sprite, int x, int y, long current, long maximum, string hint)
     {
         var frames = Gui(sprite);
         if (frames.Length == 0)
             return;
-        renderer.DrawPart(frames[0], x, y, 0, Math.Min(frames[0].Width, GaugeWidth(frames[0].Width, percent)));
+        renderer.DrawPart(frames[0], x, y, 0, Math.Min(frames[0].Width, GaugeWidth(frames[0].Width, Percent(current, maximum))));
         Frame(renderer, frames, 1, x, y);
+        int width = frames[0].Width, height = frames[0].Height;
+        if (mouse.X >= x && mouse.X <= x + width && mouse.Y >= y && mouse.Y <= y + height)
+            tooltips.DrawPanel(renderer, game.SpriteOptions, hint, x, y - height - GaugeHintGap);
     }
 
-    /// <summary>✅ 4–5. the menu buttons, the side buttons and the chat, in their normal state.</summary>
-    private void DrawButtons(IRenderer renderer)
+    /// <summary>
+    /// ✅ 5. REWARD (<c>GUI\dr2_sub_016_005</c>, not in the BATTLE ZONE channels, <c>0x00b8d399</c>), then SHOP, DEPOSITORY, SEAL and
+    /// WORLD, each read and drawn by state; then the tooltip of the hot one among REWARD, WORLD, SHOP and DEPOSITORY (<c>0x00b8d6aa</c>).
+    /// ❓ The original blinks REWARD when there is a reward (+0x7743c: who sets it is not read); the clicks open windows and send
+    /// requests the client does not have yet, so they only show the press.
+    /// </summary>
+    private void DrawSideButtons(IRenderer renderer, MouseState mouse)
     {
-        foreach (var (sprite, x, y) in MenuButtons)
-            Frame(renderer, Gui(sprite), 3, x, y);                                            // ✅ frame 3 = the window is closed
-        foreach (var (sprite, x, y) in SideButtons)
-            Frame(renderer, Gui(sprite), 0, x, y);
-        // ✅ REWARD = GUI\dr2_sub_016_005 at (451, 462), frame 0 = normal; not drawn in the BATTLE ZONE channels (0x00b8d399, docs/cliente/cena-jogo.md).
-        // ❓ The original blinks it when there is a reward (+0x7743c: who sets it is not read); nothing sets it in this step.
-        if (!game.IsBattleZone)
-            Frame(renderer, Load(RewardSprite, gui: true), 0, RewardX, RewardY);
+        if (game.IsBattleZone)
+            return;
+        _reward!.Update(mouse);
+        _reward.Draw(renderer);
+        foreach (var button in _side!)
+        {
+            button.Update(mouse);
+            button.Draw(renderer);
+        }
 
+        if (_reward.IsHot(mouse))
+            SizedHint(renderer, RewardHint, _reward, 0x1f, 0x17);
+        else if (_side[World].IsHot(mouse))
+            FixedHint(renderer, WorldHint, _side[World], 0x32, 0x1b, 0xc8, 0x28, 0x12);
+        else if (_side[Shop].IsHot(mouse))
+            SizedHint(renderer, ShopHint, _side[Shop], 0x1a, 0x12);
+        else if (_side[Depository].IsHot(mouse))
+            FixedHint(renderer, DepositoryHint, _side[Depository], 0x1e, 0x1a, 0x12c, 0x14, 0x12);
+    }
+
+    /// <summary>
+    /// ✅ A side tooltip sized on its text (REWARD, SHOP): box at (x − w/3 − 10, y − <paramref name="boxUp"/>), w + 10 wide; the text at
+    /// (x − w/3, y − <paramref name="textUp"/>).
+    /// </summary>
+    private void SizedHint(IRenderer renderer, int textId, Button button, int boxUp, int textUp)
+    {
+        var text = game.Texts[textId];
+        int third = tooltips.Measure(renderer, text) / 3;
+        tooltips.DrawBox(renderer, button.X - third - 10, button.Y - boxUp, tooltips.Measure(renderer, text) + 10, HintBoxHeight);
+        tooltips.DrawBoxText(renderer, text, button.X - third, button.Y - textUp);
+    }
+
+    /// <summary>✅ A side tooltip of fixed width (WORLD, DEPOSITORY): box and text at fixed offsets from the button.</summary>
+    private void FixedHint(IRenderer renderer, int textId, Button button, int boxLeft, int boxUp, int boxWidth, int textLeft, int textUp)
+    {
+        tooltips.DrawBox(renderer, button.X - boxLeft, button.Y - boxUp, boxWidth, HintBoxHeight);
+        tooltips.DrawBoxText(renderer, game.Texts[textId], button.X - textLeft, button.Y - textUp);
+    }
+
+    /// <summary>✅ The chat (<c>0x00b91a80</c> tabs, <c>0x00b8e6a0</c> frame and mode buttons).</summary>
+    private void DrawChat(IRenderer renderer)
+    {
+        for (int i = 0; i < ChatTabs.Length; i++)
+        {
+            if (i == HiddenChatTab)
+                continue;
+            // ✅ frame 2 on the current tab (+0x4b7b0 = 0 on entry) and on "Setting" while its window 0x10 is open (never yet), else 0
+            Frame(renderer, Gui(ChatTabs[i].Sprite), i == 0 ? 2 : 0, ChatTabs[i].X, ChatTabs[i].Y);
+        }
         if (Gui(18) is { Length: > 0 } chat)                                                  // ✅ the chat frame, clipped to 81 px
         {
             game.SpriteOptions.DrawRegionBlended(renderer, chat[0], ChatX, ChatY, chat[0].Width, Math.Min(chat[0].Height, ChatHeight), ChatAlpha);
@@ -216,42 +349,12 @@ public sealed class FieldHud(GameContext game)
             // (0x00b8e6a0); ❓ how a disabled button looks is not read: drawn as the others (the original looks the same at class 1)
             Frame(renderer, Gui(sprite), current ? 0 : 3, x, y);
         }
-        for (int i = 0; i < ChatTabs.Length; i++)
-        {
-            if (i == HiddenChatTab)
-                continue;
-            // ✅ frame 2 on the current tab (+0x4b7b0 = 0 on entry) and on "Setting" while its window 0x10 is open (never yet), else 0
-            Frame(renderer, Gui(ChatTabs[i].Sprite), i == 0 ? 2 : 0, ChatTabs[i].X, ChatTabs[i].Y);
-        }
     }
 
-    private ITexture[] Gui(int number) => Load($"gui\\dr2_main_000_{number:000}.spr", gui: true);
+    private ITexture[] Gui(int number) => sprites.Gui($"dr2_main_000_{number:000}");
 
-    /// <summary>A sprite's frames; none when the pack lacks the file or it is damaged (the original draws nothing then).</summary>
-    private ITexture[] Load(string path, bool gui = false)
-    {
-        if (_cache.TryGetValue(path, out var frames))
-            return frames;
-        try
-        {
-            if (gui)
-            {
-                var name = path["gui\\".Length..^".spr".Length];
-                frames = game.Resource.Contains(path) || game.Resource.Contains($"gui\\{name}_eng.spr") ? game.Sprites.Gui(name) : [];
-            }
-            else
-            {
-                frames = game.Resource.Contains(path) ? game.Sprites.Load(path) : [];
-            }
-        }
-        catch (Exception e) when (e is SpriteFormatException or PackFormatException or InvalidDataException)
-        {
-            game.Log($"{path}: {e.Message}");
-            frames = [];
-        }
-        _cache[path] = frames;
-        return frames;
-    }
+    private ITexture[] Load(string path, bool gui = false) =>
+        gui ? sprites.Gui(path["gui\\".Length..^".spr".Length]) : sprites.Load(path);
 
     private static void Frame(IRenderer renderer, ITexture[] frames, int index, int x, int y)
     {

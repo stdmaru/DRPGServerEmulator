@@ -29,6 +29,12 @@ public sealed unsafe class SdlAudio : IAudio
             Stream = null;
             owner._voices.Remove(this);
         }
+
+        public void SetGain(float gain)
+        {
+            if (Stream != null)
+                SDL_SetAudioStreamGain(Stream, Math.Clamp(gain, 0f, 1f));
+        }
     }
 
     private readonly List<SdlVoice> _voices = [];

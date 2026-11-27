@@ -1,3 +1,4 @@
+using DRPG.Client.Features.Options;
 using DRPG.Client.Scenes;
 using DRPG.Client.Ui;
 using DRPG.Engine.Assets;
@@ -124,6 +125,21 @@ internal sealed class FakeInstall : IDisposable
             ("gui\\dr2_main_000_038.spr", Sprite(35, 14, 3)),
             ("gui\\dr2_main_000_039.spr", Sprite(35, 14, 3)),
             ("gui\\dr2_main_000_040.spr", Sprite(35, 14, 3)),
+            // the HP gauge, the options' menu button, the tooltip panel
+            ("gui\\dr2_main_000_002.spr", Sprite(99, 12, 2)),
+            ("gui\\dr2_main_000_013.spr", Sprite(29, 29, 4)),
+            ("gui\\dr2_main_000_032.spr", Sprite(61, 21, 3)),
+            ("interface\\w_panel.spr", Sprite(800, 600)),
+            // the exit window and the options window
+            ("gui\\dr2_sub_007_005.spr", Sprite(214, 117)),
+            ("gui\\dr2_sub_007_001.spr", Sprite(45, 23, 3)),
+            ("gui\\dr2_sub_001_000_eng.spr", Sprite(212, 486, 2)),
+            ("gui\\dr2_sub_001_001.spr", Sprite(13, 13)),
+            ("gui\\dr2_sub_001_002.spr", Sprite(8, 16)),
+            ("gui\\dr_friend_002.spr", Sprite(15, 14, 3)),
+            ("gui\\dr2_sub_001_003_eng.spr", Sprite(90, 30, 3)),
+            ("gui\\dr2_sub_001_004_eng.spr", Sprite(90, 30, 3)),
+            ("gui\\dr2_sub_001_005_eng.spr", Sprite(90, 30, 4)),
             // portraits: tamer 1 has its own, the fallback icon_065 stands in for the others
             ("sprite\\icon_001.spr", Sprite(41, 41, 2)),
             ("sprite\\icon_065.spr", Sprite(65, 65, 2)),
@@ -148,7 +164,7 @@ internal sealed class FakeInstall : IDisposable
         if (withTable)
             PackWriter.Create(Path.Combine(Directory, "table.hf"), new (string, byte[])[] { ("table\\x.dat", [1, 2, 3]) });
         System.IO.Directory.CreateDirectory(Path.Combine(Directory, "Sound"));
-        foreach (var name in new[] { "menu-bt.wav", "menu-1.wav", "menu-dark.wav" })
+        foreach (var name in new[] { "menu-bt.wav", "menu-1.wav", "menu-dark.wav", "w_on.wav", "w_off.wav" })
             File.WriteAllBytes(Path.Combine(Directory, "Sound", name), SilentWav());
         System.IO.Directory.CreateDirectory(Path.Combine(Directory, "Language"));
         File.WriteAllBytes(Path.Combine(Directory, "Language", "Test_US.bin"), [9, 9]);
@@ -279,6 +295,10 @@ internal sealed class RecordingAudio : IAudio
             IsPlaying = false;
             owner.Stopped++;
         }
+
+        public float Gain { get; private set; } = -1;
+
+        public void SetGain(float gain) => Gain = gain;
     }
 
     public List<Played> Plays { get; } = [];
@@ -300,6 +320,14 @@ internal sealed class RecordingAudio : IAudio
     }
 }
 
+/// <summary>Records the display mode switches.</summary>
+internal sealed class FakeDisplay : DRPG.Engine.Platform.IDisplayMode
+{
+    public List<bool> Switches { get; } = [];
+
+    public void SetFullscreen(bool fullscreen) => Switches.Add(fullscreen);
+}
+
 /// <summary>What a scene needs to run without a window: a fake install, a recording renderer and audio, a context.</summary>
 internal sealed class SceneFixture : IDisposable
 {
@@ -311,6 +339,7 @@ internal sealed class SceneFixture : IDisposable
     public SpriteStore Sprites { get; }
     public SoundBank Sounds { get; }
     public GameContext Game { get; }
+    public FakeDisplay Display { get; } = new();
 
     public SceneFixture(ClientSettings? settings = null, float volume = 1f)
     {
@@ -319,8 +348,19 @@ internal sealed class SceneFixture : IDisposable
         Sprites = new SpriteStore(Resource, Renderer);
         Sounds = new SoundBank(Audio, install.SoundDirectory, volume, volume, Log.Add);
         Game = new GameContext(install, Resource, Sprites, new UiText(null), Sounds, new GameCommandLine("tamer", "0123456789ABCDEF0123456789ABCDEF01234567"),
-            settings ?? ClientSettings.Local, SpriteOptions.Default, Log.Add);
+            settings ?? ClientSettings.Local, SpriteOptions.Default, GameOptions.From(new Dictionary<string, string>()), Display, Log.Add);
         Game.Scenes = new SceneManager(_ => throw new InvalidOperationException("no scene is created in these tests"));
+    }
+
+    /// <summary>The field's window manager, made on first use.</summary>
+    public WindowManager Windows => _windows ??= new WindowManager(Sounds);
+    private WindowManager? _windows;
+
+    /// <summary>A bar of the field with its tooltips, drawing into <see cref="Renderer"/>.</summary>
+    public FieldHud Hud()
+    {
+        var ui = new UiSprites(Game);
+        return new(Game, ui, Windows, new Tooltips(ui.Load(Tooltips.PanelSprite), new MessageBox(ui.Load("gui\\dr2_in_000_003.spr"), Game.Text), Game.Text));
     }
 
     /// <summary>The effects the scenes play, by the frames of audio they were decoded from (all test sounds are 0.01 s of silence).</summary>

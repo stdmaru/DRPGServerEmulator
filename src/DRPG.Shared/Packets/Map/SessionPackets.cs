@@ -187,3 +187,21 @@ public sealed record FieldNpcPacket(short MapId, short NpcId, short X, short Y, 
         w.WriteU8(0);
     }
 }
+
+/// <summary>
+/// ✅ 0x2B C2S (14 B zero, v322): the player confirmed the exit window's "Close" (<c>0x00b80e80</c> → <c>0x00ae4bf0</c>,
+/// <c>0x009b4ab0(0x2b, 0, 0)</c>); captures.db: 28 B (14 header + 14 zeros), answered by an empty S2C 0x2B.
+/// </summary>
+public sealed record ExitGameRequest : ITwoWayPacket<ExitGameRequest>
+{
+    public static ushort Opcode => (ushort)MapOpcode.ExitGame;
+    public static PacketLength Length => PacketLength.Exact(14);
+
+    public static ExitGameRequest Read(PacketReader r)
+    {
+        r.Skip(14);
+        return new();
+    }
+
+    public void Write(PacketWriter w) => w.WriteZeros(14);
+}

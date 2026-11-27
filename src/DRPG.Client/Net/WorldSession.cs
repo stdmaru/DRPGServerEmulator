@@ -124,6 +124,9 @@ public sealed class WorldSession(ClientSettings settings, GameCommandLine comman
     /// ✅ <c>0x00aba410</c> (<c>0x00aba6ea</c> &amp; <c>0x00aba757</c>): after a cross-map <c>0xB0</c> transition finishes loading,
     /// sends <c>C2S 0x04</c> (character refresh) and <c>C2S 0xB0</c> (14 zero bytes).
     /// </summary>
+    /// <summary>✅ <c>0x00ae4bf0</c>: the exit window's "Close" sends the <c>0x2B</c> before its 10 s countdown.</summary>
+    public void ExitGame() => _map?.Send(new ExitGameRequest());
+
     public void CompleteMapTransition()
     {
         if (Step != WorldStep.InWorld || _map is null || Character is null)
