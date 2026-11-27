@@ -53,5 +53,5 @@ public abstract class GameWindow(int id)
     }
 
     /// <summary>✅ <c>0x00b626b0</c>: the mouse is inside the window's rectangle.</summary>
-    public bool Contains(int x, int y) => x >= X && x < X + Width && y >= Y && y < Y + Height;
+    public virtual bool Contains(int x, int y) => x >= X && x < X + Width && y >= Y && y < Y + Height;
 }

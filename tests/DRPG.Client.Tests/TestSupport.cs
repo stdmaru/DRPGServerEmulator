@@ -130,6 +130,14 @@ internal sealed class FakeInstall : IDisposable
             ("gui\\dr2_main_000_013.spr", Sprite(29, 29, 4)),
             ("gui\\dr2_main_000_032.spr", Sprite(61, 21, 3)),
             ("interface\\w_panel.spr", Sprite(800, 600)),
+            // the minimap: map 1's picture, the title, the frame, the collapse button, the markers and the player's point
+            ("interface\\w_minimap_1.spr", Sprite(150, 120, 2)),
+            ("gui\\dr2_sub_007_007.spr", Sprite(158, 20)),
+            ("gui\\dr2_sub_007_021.spr", Sprite(158, 126)),
+            ("gui\\dr2_sub_007_022.spr", Sprite(11, 10, 3)),
+            ("gui\\dr2_sub_007_023.spr", Sprite(10, 11, 3)),
+            ("interface\\map_icon_01.spr", Sprite(12, 12, 5)),
+            ("interface\\w_minimap_point.spr", Sprite(8, 8)),
             // the exit window and the options window
             ("gui\\dr2_sub_007_005.spr", Sprite(214, 117)),
             ("gui\\dr2_sub_007_001.spr", Sprite(45, 23, 3)),

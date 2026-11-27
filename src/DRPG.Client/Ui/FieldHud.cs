@@ -10,7 +10,7 @@ namespace DRPG.Client.Ui;
 /// <summary>What the basic HUD shows (the real values of the <c>0x02</c> packet and of the map).</summary>
 public sealed record HudValues(
     string TamerName, int TamerId, int TamerClass, int TamerLevel, string ChannelName, int MapId, string MapName, int CellX, int CellY,
-    DigimonStatus? Leader, DateTime ClockUtc);
+    DigimonStatus? Leader, DateTime ClockUtc, bool MiniMapOpen = false);
 
 /// <summary>
 /// The basic UI of the field (✅ v322 main bar <c>0x00b8a850</c>, docs/cliente/cena-jogo.md#ui-do-campo-hud): the tamer panel in the
@@ -123,6 +123,7 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
         DrawTamerPanel(renderer, v);
         DrawDigimonPanel(renderer, v.Leader, mouse);
         DrawSideButtons(renderer, mouse);
+        DrawTeleportButtons(renderer, mouse, v);
         DrawChat(renderer);
         DrawChatSizeButtons(renderer);
     }
@@ -327,6 +328,29 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
         tooltips.DrawBox(renderer, button.X - boxLeft, button.Y - boxUp, boxWidth, HintBoxHeight);
         tooltips.DrawBoxText(renderer, game.Texts[textId], button.X - textLeft, button.Y - textUp);
     }
+
+    /// <summary>
+    /// ✅ The three round buttons left of the minimap (<c>0x00b8db44</c>, <c>GUI\TeleportEasy_Icon24.spr</c>, set in <c>0x00b91610</c>):
+    /// frames 0, 1 and 2 whatever their state (<c>0x009b71e0</c>), only while the minimap shows its picture, outside the BATTLE ZONE and
+    /// the maps 0x58, 0x76, 0x78..0x7b. ❓ A click uses a teleport item (<c>0x238</c>, <c>0x23a..0x23c</c>): it comes with the inventory.
+    /// </summary>
+    private void DrawTeleportButtons(IRenderer renderer, MouseState mouse, HudValues v)
+    {
+        if (!v.MiniMapOpen || game.IsBattleZone || v.MapId is 0x58 or 0x76 or (>= 0x78 and <= 0x7b))
+            return;
+        _teleport ??= [.. TeleportButtonYs.Select(y => new Button(Load(TeleportSprite), TeleportX, y))];
+        for (int i = 0; i < _teleport.Length; i++)
+        {
+            _teleport[i].Update(mouse);
+            _teleport[i].DrawFrame(renderer, i);
+        }
+    }
+
+    /// <summary>✅ <c>0x00b91610</c>: the teleport buttons at (615, 65), (615, 92), (615, 119).</summary>
+    private const string TeleportSprite = "gui\\TeleportEasy_Icon24.spr";
+    private const int TeleportX = 0x267;
+    private static readonly int[] TeleportButtonYs = [0x41, 0x5c, 0x77];
+    private Button[]? _teleport;
 
     /// <summary>✅ The chat (<c>0x00b91a80</c> tabs, <c>0x00b8e6a0</c> frame and mode buttons).</summary>
     private void DrawChat(IRenderer renderer)

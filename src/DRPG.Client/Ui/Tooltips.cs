@@ -38,6 +38,17 @@ public sealed class Tooltips(ITexture[] panel, MessageBox box, UiText text)
         text.Draw(renderer, message, x + padding, y + padding, UiText.White, shadow: false);
     }
 
+    /// <summary>✅ <c>0x007ddb10(x, y, w, h, alpha)</c>: the top-left of <c>w_panel</c> cut to w × h, mixed at <paramref name="alpha"/>/32.</summary>
+    public void DrawPanelRect(IRenderer renderer, SpriteOptions options, int x, int y, int width, int height, int alpha)
+    {
+        if (panel.Length > 0)
+            options.DrawRegionBlended(renderer, panel[0], x, y, Math.Min(width, panel[0].Width), Math.Min(height, panel[0].Height), alpha);
+    }
+
+    /// <summary>✅ <c>0x00b55900(0, text, x, y, 0xffffff, …)</c>: white, no shadow.</summary>
+    public void DrawPlainText(IRenderer renderer, string message, int x, int y) =>
+        text.Draw(renderer, message, x, y, UiText.White, shadow: false);
+
     /// <summary>✅ <c>0x007dcfb0(x, y, w, h, 0x20)</c>: the 9-part box of <c>GUI\dr2_in_000_003</c>, plain.</summary>
     public void DrawBox(IRenderer renderer, int x, int y, int width, int height) => box.DrawBox(renderer, x, y, width, height);
 

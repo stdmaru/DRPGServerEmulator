@@ -50,6 +50,8 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private FieldHud _hud = null!;                             // set in Init
     private WindowManager _windows = null!;                    // set in Init
     private UiSprites _ui = null!;                             // set in Init
+    private Tooltips _tooltips = null!;                        // set in Init
+    private MiniMapWindow? _miniMap;
     private readonly ChatLog _chat = new();
     private ExitWindow _exit = null!;                          // set in Init
     private MessageBox _box = null!;                           // set in Init
@@ -98,7 +100,8 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         _view = new FieldView(_sprites, game.SpriteOptions);
         _windows = new WindowManager(game.Sounds);
         _ui = new UiSprites(game);
-        _hud = new FieldHud(game, _ui, _windows, new Tooltips(_ui.Load(Tooltips.PanelSprite), new MessageBox(_ui.Load(BoxSprite), game.Text), game.Text));
+        _tooltips = new Tooltips(_ui.Load(Tooltips.PanelSprite), new MessageBox(_ui.Load(BoxSprite), game.Text), game.Text);
+        _hud = new FieldHud(game, _ui, _windows, _tooltips);
         RegisterWindows(game.World.Session);
         _box = new MessageBox(game.Sprites.Load("gui\\dr2_in_000_003.spr"), game.Text);
         _screen = new LoadingScreen(game);
@@ -227,6 +230,10 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         _state = state;
         _actions = actions;
         _handlers = new FieldHandlers(state, actions, Data.Npcs);
+        // ✅ the minimap is open when the field first shows (the capture); ❓ who opens it is not read
+        _miniMap = new MiniMapWindow(game, _ui, _tooltips, state, Data.Npcs, Data.MapPortals);
+        _windows.Register(_miniMap);
+        _windows.Open(MiniMapWindow.WindowId);
         return true;
     }
 
@@ -357,7 +364,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         var tamer = state.Party.Tamer.Cell;
         _hud.Frame(renderer, new HudValues(
             character.Name, character.TamerId, character.TamerClass, character.Level, game.ChannelName, state.Area.MapId, Data.MapName(state.Area.MapId),
-            tamer.X, tamer.Y, leader.IsEmpty ? null : leader, DateTime.UtcNow + _clockOffset), game.Mouse);
+            tamer.X, tamer.Y, leader.IsEmpty ? null : leader, DateTime.UtcNow + _clockOffset, _miniMap is { ShowsMap: true, Collapsed: false }), game.Mouse);
         _windows.Frame(renderer, game.Mouse, nowMs);
         if (_exit.LeaveRequested)
             LeaveWorld();

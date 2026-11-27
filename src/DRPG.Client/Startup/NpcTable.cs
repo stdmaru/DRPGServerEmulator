@@ -6,6 +6,8 @@ namespace DRPG.Client.Startup;
 /// <param name="Direction">Column 3, 0..7 (checked on load).</param>
 /// <param name="AutoSpawn">✅ Column 9 == 1: spawned when the map loads (<c>0x00ad3730</c>).</param>
 /// <param name="CustomAvatarIndex">✅ 1-based row of <c>Custom_AvatarNPC</c> for a <c>Custom_N</c> sprite, 0 otherwise.</param>
+/// <param name="MiniMapFrame">✅ Column 13 (<c>+0xb8</c>): the frame of <c>Map_icon_01</c> on the minimap.</param>
+/// <param name="OnMiniMap">✅ Column 14 (<c>+0xbc</c>) ≠ 0: the minimap marks the NPC (<c>0x00b9b930</c>).</param>
 public sealed record NpcDefinition(
     int MapId,
     int NpcId,
@@ -15,7 +17,9 @@ public sealed record NpcDefinition(
     int Y,
     string Sprite,
     bool AutoSpawn,
-    int CustomAvatarIndex);
+    int CustomAvatarIndex,
+    int MiniMapFrame = 0,
+    bool OnMiniMap = false);
 
 /// <summary>
 /// The NPCs of <c>npc_info_us</c> and the tamer bodies of <c>Custom_AvatarNPC</c>, read once when the tables load (✅ <c>0x007231e0</c>,
@@ -25,6 +29,9 @@ public sealed class NpcTable
 {
     /// <summary>✅ <c>0x007231e0</c>: the columns a row needs (map, id, name, direction, x, y, sprite, icon, …, auto-spawn at 9).</summary>
     public const int MinColumns = 10;
+
+    /// <summary>✅ The minimap columns: the marker's frame and whether it shows.</summary>
+    public const int MiniMapFrameColumn = 13, OnMiniMapColumn = 14;
 
     /// <summary>
     /// ✅ <c>0x007231e0</c>: a sprite name containing this is an avatar NPC, and <c>atoi</c> of the name after its 7th byte
@@ -96,7 +103,10 @@ public sealed class NpcTable
             Number(row, 5, "NPC_INFO", line),
             sprite,
             Number(row, 9, "NPC_INFO", line) == 1,
-            customIndex);
+            customIndex,
+            // ✅ every row of the v322 table has the 15 columns; a shorter row reads them as 0, as the original's parser leaves them
+            row.Length > MiniMapFrameColumn ? Number(row, MiniMapFrameColumn, "NPC_INFO", line) : 0,
+            row.Length > OnMiniMapColumn && Number(row, OnMiniMapColumn, "NPC_INFO", line) != 0);
     }
 
     private static int Number(string[] row, int column, string table, int line)
