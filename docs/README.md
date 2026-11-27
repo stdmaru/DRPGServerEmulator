@@ -71,7 +71,7 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Carga inicial](cliente/carga-inicial.md): passos da tela de carga e alvo da barra (39/70/90/99/101), as 39 tabelas, listas de pré-carga.
 - [Formato `.ani`](cliente/formato-ani.md): `DCANIMATION0.5`, âncoras por quadro, 20 animações × 8 direções.
 - [Tabelas por espécie](cliente/tabelas-de-especie.md): espécie → sprite e deslocamentos da seleção de personagens.
-- [Mapas](cliente/mapas.md): formato do `.map` (grade de células, bit de andável), `grids.bin`.
+- [Mapas](cliente/mapas.md): formatos `.map` (células, espelhamento dos tiles, bit de andável), `.til` e `.obj` (imagem e sombra), desenho do chão e dos objetos, `grids.bin`.
 - [Arquivos de dados](cliente/arquivos-de-dados.md): `table.pf` e `resource.pf`, `drpg_pack.py`, colunas que o servidor lê na partida, o que falta.
 - [Wine](cliente/wine.md): rodar no Linux, prefixo dedicado, causa e correção da tela congelada no loading (corrida no backbuffer DirectDraw).
 - [Qualidade de vida](cliente/qualidade-de-vida.md): resolução e os três níveis (wrapper → hooks → decompilação incremental).
