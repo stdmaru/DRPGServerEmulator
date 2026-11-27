@@ -41,6 +41,13 @@ public sealed class SpriteAnimator(AniFile ani, IReadOnlyList<ITexture> frames)
     /// <summary>Plays <paramref name="animation"/> from the frame it is at.</summary>
     public void Switch(int animation) => Animation = animation;
 
+    /// <summary>Shows a frame chosen by the caller (the map's animation logic, <see cref="World.FieldAnimator"/>).</summary>
+    public void ShowFrame(int animation, int frame)
+    {
+        Animation = animation;
+        Frame = frame;
+    }
+
     /// <summary>One game frame.</summary>
     public void Tick()
     {
