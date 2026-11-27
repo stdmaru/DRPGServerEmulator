@@ -110,7 +110,9 @@ Despachante do mapa `0x00abc350`: índice = opcode − 2 na tabela de bytes `0xa
 - ✅ `0x00afe310` (campo): chama a vtable `+0x24` do personagem e põe a rolagem do mapa (`0x00b36b80`) em **(`+0x168` − 400, `+0x16c` − 300)**, presa a `0..largura·64 − 800` e `0..altura·32 − 600`. Na batalha a rolagem é fixa (250, 206).
 
 ## UI do campo (HUD)
-Escopo do marco 3 (decisão do dono): **painéis com os valores reais** do `0x02`; chat e botões só desenhados (sem função). Minimapa: ❓ não se sabe se aparece aberto na entrada (janela própria, `GUI\dr2_main_001_*`, carregador `0x00b64540`, posição dinâmica presa à tela em `0x00b67240`/`0x00b67790`); fica de fora até uma captura de tela do original.
+Escopo do marco 3 (decisão do dono): **painéis com os valores reais** do `0x02`; chat e botões só desenhados (sem função).
+
+Referência: captura de tela do original logo após entrar no Digital Administration Bureau (mapa 1), enviada pelo dono (fica em `.local/m3/ref_entry_original.png`, fora do git). Na entrada aparecem, além da barra: o **minimapa** aberto no canto superior direito com 3 botões redondos à esquerda, a caixa **"EXP 2000%"** e os ícones sino/W/E à esquerda, **3 painéis de missão** no canto inferior esquerdo, mensagens no chat e os botões SEAL/REWARD/SHOP/WORLD/DEPOSITORY acima do painel do digimon. Correção: `GUI\dr2_main_001_*` (`0x00b67b10`, `0x00b65470`) é a **UI de batalha** (COMMAND, SKILL, CARD SLASH), não o minimapa.
 
 - ✅ Bloco de UI do campo (`0x00b4b550` passo 3): `0x00a45230(0)`/`(1)` são as **camadas de efeitos** (não janelas). `0x009b6010` → `0x009b1640` (objeto com modos 1..4, ❓). `0x00b42f60` é vazio. `0x007dca50` → `0x00b641b0` ×2, `0x00b40340` (aviso que gira a cada 7 s em (centrado, 40)), `0x007de4b0` (`Interface\w_tamer_menu.spr`, ❓), **`0x00b9a7c0`** (gerenciador de janelas: cada janela visível pela vtable `+0x28`).
 - ✅ **Barra principal** = objeto global `DAT_01158508` (ctor `0x00b84b20`, vtable `0x01031724`, desenho `+0x28` = `0x00b8a850`, carga dos sprites e posições `+0x20` = `0x00b90570`). Visível por `+0x184` (1 no ctor; Ctrl+Z alterna). Janela 800 × altura de `dr2_main_000_000`, em y = 600 − 105 = **495**. Sprites `GUI\%s.spr` (o `_eng` quando existe).
@@ -141,10 +143,56 @@ Escopo do marco 3 (decisão do dono): **painéis com os valores reais** do `0x02
      | TP | `dr2_main_000_006` (202×12) | (464, 481) | só na batalha |
    - os textos `"HP %d/%d"`, `"VP %d/%d"`, `"EVP %d/%d"`, `0x885` `"EXP %I64d/%I64d %.2f%%"` só aparecem com o **mouse sobre a barra** (`0x00b31aa0`), no painel de dica `0x007de1b0` (fora do marco).
    - entre EVP e EXP, `0x00b91720`: os **8 botões de menu** `dr2_main_000_010..017` (29×29) em (450, 515), (482, 515), (546, 514), (546, 548), (514, 515), (514, 548), (482, 548), (450, 548); quadro **3** com a janela fechada, 0 aberta (janelas 1, 3, 4, 0xf, 2, 0xcc, 0xa8, 0xb) → todos no quadro 3 na entrada.
-5. Botões no estado normal (quadro 0; `0x009b7260` = quadro `tabela[estado]`, estado 0/1/2 = normal/mouse em cima/pressionado): `000_032` (516, 462), `000_041` (516, 485), `000_042` (516, 439), `000_031` (451, 485).
+5. Botões no estado normal (quadro 0; `0x009b7260` = quadro `tabela[estado]`, estado 0/1/2 = normal/mouse em cima/pressionado): `000_042` SEAL (516, 439), `000_032` SHOP (516, 462), `000_041` DEPOSITORY (516, 485), `000_031` WORLD (451, 485). **REWARD** = `GUI\dr2_sub_016_005` (controle `+0x77478`, carregado em `0x00b91554`) em (451, 462), desenhado em `0x00b8d399` fora dos canais BATTLE ZONE: com `+0x77438` = 0 pelo estado do mouse; senão pisca (contador `+0x7743c`, há recompensa; ❓ quem liga).
 - ✅ **Chat** (`0x00b8e6a0`/`0x00b91a70`, modo do tamanho `+0x770a4` = 0 na entrada): fundo `dr2_main_000_018` quadro 0 em **(28, 460) recortado a 81 px de altura** (opção `[DAT_01158530]+1` → por `0x00b569f0` modo `0x14`, ❓ mistura; senão `0x00b56ff0` direto). Botões do modo de chat `000_023..027` (20×20) em (179, 572), (201, 572), (222, 572), (244, 572), (157, 572): quadro 3, e 0 no modo atual (0 → `000_025`); o `000_027` fica desabilitado com nível ≤ 4. Abas `000_037..040` (35×14) em (280, 574), (317, 574), (355, 574), (391, 574): quadro 2 na aba atual (0 na entrada), 0 nas outras.
 
+### Canto esquerdo: bônus de EXP, sino, W/E (`0x00b8ae36`…, dentro do desenho da barra)
+Só fora dos canais BATTLE ZONE (`0x00b39760`) e com `[DAT_01158504]+0x80` = 1 (campo).
+- ✅ **Bônus fixo**: com `[jogador]+0xf6a8` > 0, `Sprite\Exp_Bonus.spr` quadro 0 (caixa verde "경험 이벤트") em (2, 100); mouse em cima → dica `0x805` com o valor (fora do marco). ❓ Quem preenche `+0xf6a8` (`0x00af1a80`).
+- ✅ **Bônus de evento** (a caixa "EXP 2000%" da captura): com `+0xe390` = 1 e nível `+0xe3d4` ≠ 0, em **(0, 96)**:
+  - `+0xe3d5` = 0: `Exp_Bonus.spr` quadro `nível` (o quadro n mostra **n × 25 %**, 1..80 → 25 %..2000 %; 81 quadros), ou quadro `nível + 0x14` se um dos 6 efeitos em `[DAT_01158504]+0xd2c` (passo 0xc) tem id `0x3ED`;
+  - `+0xe3d5` ≠ 0: `Sprite\Exp_Bonus_Hot.spr` quadro `nível`;
+  - mouse em cima → dica com o texto `+0xe394` (fora do marco).
+- ✅ Esses campos vêm do **S2C `0xE6`** (caso `0xac0093` → `0x00aef8b0`; ignorado se o u32 em +4 = `0x7F6`): byte +0 = nível (0 desliga: `+0xe390 = 0`), u32 +4/+8/+0xc = números do texto `0xE63`, byte +0x10 = "hot", byte +0x11 = tipo (1 → só o texto `0xE62`, sem mudar o nível; 0 → grava nível e "hot"). Na captura o nível é 80.
+- ✅ **Sino** = `GUI\RemainingTime_Notification_Icon.spr` (controle `+0x774f8`) em (1, 123): quadro 1 se algum dos 6 itens com prazo tem menos de 1 dia (`< 0x15180` s e ≠ −1, `0x00b28f70`), senão quadro 0 (`0x00b8bdd6`).
+- ✅ **W** e **E** = `Interface\icon_buff.spr` quadros `0x75` e `0x76` (controles `+0x77538`/`+0x7758c`) em (17, 123) e (33, 123), só com a barra visível e quando as listas `+0x77578`/`+0x775cc` têm algo (montadas dos efeitos do jogador a partir de `+0x4078`; ❓ quais efeitos e quais pacotes). Fora do marco além do desenho.
+
+### Minimapa (`WindowMiniMap`, janela 5)
+- ✅ Classe vtable `0x01033008` (ctor `0x00b9ae90`, carga `+0x20` = `0x00b9d310`, desenho `+0x28` = `0x00b9c600`). Janela em **(641, 0)**; na captura ela já está **aberta na entrada**.
+- ✅ **Quando aparece**: barra visível (`+0x184`) **e** `0x00b9cfe0(mapa)` (mapa = `[DAT_011584f8]+0x511c98`) **e** o mapa tem imagem na tabela abaixo. `0x00b9cfe0` esconde nos mapas `0x22, 0x25, 0x2E, 0x33..0x35, 0x4F..0x57, 0x59, 0x5E, 0x64..0x6E, 0x75, 0x77, 0x85, 0x88..0x8D, 0x8F, 0x98..0x9C, 0xCA, 0xFA`. O **tutorial (mapa 79 = `0x4F`) não tem minimapa** (o que o dono viu).
+- ✅ **Imagem por mapa** (`Interface\w_minimap_N.spr`, quadros 150×120; sem linha = sem minimapa, `+0x20d = 0`):
+  | Mapas | Sprite | Quadro |
+  |---|---|---|
+  | 1..19 | `w_minimap_1` | mapa − 1 (mapa 1 → quadro 0, conferido com a captura) |
+  | 20..34 | `w_minimap_2` | mapa − 20 (35 → 9, 36 → 8; 37..39 → mapa − 32) |
+  | 40..46 | `w_minimap_3` | mapa − 40 |
+  | 60..65 | `w_minimap_4` | mapa − 60 |
+  | 70..77 | `w_minimap_6` | mapa − 70 |
+  | 200..202 | `w_minimap_5` | mapa − 200 |
+  | 88, 118, 120, 121, 122, 123 | `w_minimap_7` | 0, 1, 2, 3, 4, 5 |
+  Largura/altura = as do quadro (largura 0 → 150).
+- ✅ **Desenho** (`0x00b9c600`):
+  1. `GUI\dr2_sub_007_007` (158×20, título) em (641, 0);
+  2. se não recolhido (`+0x180` = 0): `dr2_sub_007_021` (158×126, moldura) em (641, y + 15) — ou (641, y + 20) com a opção `[DAT_01158530]+1` ligada; depois a imagem do mapa em **(645, 22)** (com a opção ligada por `0x00b569f0(…, −1, 0x18, …)`, ❓ mistura);
+  3. botão recolher/abrir (controle `+0x184`) em **(781, 5)**: `dr2_sub_007_022` aberto, `023` recolhido; o clique alterna `+0x180`. Recolhido, nada abaixo é desenhado;
+  4. `0x00b9b930` — **marcadores** (`Interface\Map_icon_01.spr`, 12×12): para cada NPC do mapa (lista `[DAT_01158504]+0x300`), o registro da tabela `CTableClass_Npc` pelo id do NPC: se `+0xbc` ≠ 0, quadro `+0xb8` na célula (`+0x24`, `+0x28`) do registro; e os até 4 pontos do registro do mapa em `CTableClass_MapInfo` (`+0x84`, passo 0x24: ligado em +0x18, célula em +0x1c/+0x20) com o quadro 0 (o portal azul). Mouse em cima → nome (texto do registro) por `0x00b9c4b0`;
+  5. membros do grupo no mesmo mapa (lista `[DAT_01158504]+0x308`, menos o próprio): `w_minimap_point` por `0x00b569f0(…, 6, −18, −3, 31, …)` (❓ tingido);
+  6. **o jogador**: `Interface\w_minimap_point.spr` (8×8) quadro 0 centrado em (645 + px · L / Lpx, 22 + py · A / Apx), com px/py = posição em pixels (`+0x168`/`+0x16c`) e Lpx/Apx = tamanho do mapa em pixels (`[DAT_011584f8]+0x511c88/+0x511c8c`).
+  Posição na imagem de uma célula (NPC, grupo, portal) = (645 + cx · L / largura em células − w/2, 22 + cy · A / altura em células − h/2) (`[DAT_011584f8]+4/+8`), centrada pelo tamanho do quadro.
+- Fora do marco: clique no minimapa = andar até lá (`0x00b9d120`, C2S `0xE3` a cada 3 s; mensagens `0xF2F`/`0xF30`).
+- ✅ **3 botões redondos** à esquerda = `GUI\TeleportEasy_Icon24.spr` quadros 0, 1, 2 (controles da barra `+0x77624/+0x77664/+0x776a4`, carregados em `0x00b91610`) em **(615, 65), (615, 92), (615, 119)**, desenhados em `0x00b8db44` só com o minimapa visível e aberto (`0x00b9d0f0` e `+0x180` = 0) e fora das linhas 7..18 do servidor e dos mapas `0x58`, `0x76`, `0x78..0x7B`. O clique usa itens de teletransporte (`0x238`/`0x23a`/`0x23b`/`0x23c`; fora do marco).
+
+### Painéis de missão (`CWindow_QuestNotice`, janela `0x17B`)
+- ✅ **Não vêm de um pacote**: o handler do S2C `0x03` (`0x00abbd04`) chama a vtable `+0x20` (`0x0098bed0`) da janela, fora das linhas 7..18 e dos mapas de `0x00b38b30`. Ela percorre a tabela **`CTableClass_QuestDialog`** (tabela `0x15`, registros de 0x48 bytes) e cria um painel para cada registro cujo **item** (u32 +0) o jogador tem (`0x00ad30f0(item, 1)`: bolsa principal `[jogador]+0x1ee4`, 4 × 6 espaços de 0x6c bytes, e as 7 bolsas extras em `+0x76fc` de 0xa90 bytes, que são as páginas do **S2C `0x7F`**). Sem nenhum painel a janela fecha. Na captura são as cartas de apresentação recebidas no tutorial.
+- ✅ **Desenho** (`0x0098b0e0`): base (x, y) = (2, 398); painel n (n = 0 é o primeiro registro da tabela, embaixo) com deslocamento n × 61 para cima:
+  - `GUI\QuestNoticeUI.spr` quadro 1 (misturado, `0x00b569f0`) e quadro 0 em (2, 398 − 61n);
+  - retrato `Sprite\QuestNoticeIcon.spr` quadro `registro+0xc` em y = 398 − 61n + 19;
+  - textos brancos com sombra em x = 2 + 47: título (`registro+0x18`) e mapa (`registro+0x30`), cortados com "..." acima de 25 e 20 caracteres (`+0x180`/`+0x184` da janela); mouse em cima do texto → texto inteiro;
+  - botão "Progress" `GUI\win052_1_go` em (2 + 169, 398 − 61(n+1) + 99); o clique (fora do tutorial `0x4F`) manda um C2S (fora do marco).
+  ❓ Posições exatas do retrato e do título/mapa no eixo y (ler os `push` em `0x0098b44e`…`0x0098ba75`).
+- O `0x7E` (7 páginas, índices `0x29..0x2F`, 0x790 bytes cada, gravadas em `[jogador]+0x4190 + 0x790·(índice − 0x29)`) é outra bolsa (espaços de 0x4c bytes; ❓ cards?), não os painéis.
+
 ## Ainda ❓ (fase A em andamento)
-- UI: fórmula das misturas `0x00b569f0` (modos −1 e `0x14`), sprite do ícone `+0x12df`, se o minimapa e o `w_tamer_menu` aparecem na entrada (precisa de uma captura de tela do original), `0x009b1640`, `0x00a0ceb0`.
+- UI: fórmula das misturas `0x00b569f0` (modos −1, 6, `0x14`, `0x18`), sprite do ícone `+0x12df`, `w_tamer_menu` na entrada, `0x009b1640`, `0x00a0ceb0`; formato das tabelas `CTableClass_Npc`/`MapInfo`/`QuestDialog` (arquivos e campos usados acima); conteúdo do inventário no `0x02`.
 - Montagem de `0x16`, `0x18`, `0x49`, `0x01`, resto do `0xF0`, e da conexão global (`0x64`).
 - Nome sobre o tamer (fonte, cor), sombra (opção) e o `0x00b57330`.
