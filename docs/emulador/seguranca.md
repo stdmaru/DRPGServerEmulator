@@ -42,6 +42,7 @@ Cada conta tem um estado no `PlayerSystem`: `Offline → Loading → Online → 
 - **Sair** (`Leave`): o jogador sai do mundo, o snapshot vai para a fila e a conta fica em `Saving` até o flush depois dele. Uma entrada que fecha no meio da carga também deixa a conta em `Saving` até o save que ela esperava.
 - O estado é por **conta**, não por personagem: o depósito da conta é compartilhado.
 - Nunca se carrega do banco um personagem cujo último estado ainda está só em memória ou na fila.
+- **Apagar personagem** (`0x11`, `PlayerSystem.ReleaseForDeleteAsync`): só depois de o último save da conta chegar ao banco. Apagar com o save de saída ainda na fila quebra o save (a linha do personagem já não existe e a chave estrangeira do digimon falha, cai no dead-letter). Recusa, sem resposta (❓ a recusa não tem captura), se o personagem está no mundo com a sessão aberta ou se a conta está carregando. Sessão de mapa que já caiu, mas cujo `Leave` ainda espera na fila do mundo, sai do mundo ali mesmo. Testes: `WorldEntryTests`.
 - Uma transferência pendente adia o snapshot final até ela terminar. Um save que falha de vez ainda libera a conta: o snapshot vai para o [dead-letter](#persistência), e o personagem fica bloqueado até ele ser gravado.
 
 ## Transferências entre conta e personagem

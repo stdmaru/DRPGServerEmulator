@@ -163,6 +163,44 @@ public sealed class PlayerSystem : IWorldSystem
         }
     }
 
+    /// <summary>
+    /// Pré-condição de apagar o personagem (qualquer thread): espera o último save da conta chegar ao banco e diz se pode
+    /// apagar. Falso quando o personagem está no mundo com a sessão aberta, ou a conta está entrando no mapa (a carga pode
+    /// ser dele). Apagar com o save ainda na fila quebraria o save: a linha do personagem já não existe quando ele grava.
+    /// A sessão de mapa que já fechou, mas cujo <see cref="Leave"/> ainda não rodou, sai do mundo aqui.
+    /// </summary>
+    public async Task<bool> ReleaseForDeleteAsync(uint accountUid, uint characterUid)
+    {
+        var (allowed, saved) = await _world.InvokeAsync(() => BeginDelete(accountUid, characterUid));
+        if (saved is not null)
+            await saved;
+        return allowed;
+    }
+
+    private (bool Allowed, Task? Saved) BeginDelete(uint accountUid, uint characterUid)
+    {
+        _world.AssertWorldThread();
+        if (!_presence.TryGetValue(accountUid, out var presence))
+            return (true, null);
+
+        switch (presence.State)
+        {
+            case PresenceState.Loading:
+                return (false, null);
+            case PresenceState.Online:
+                var owner = presence.Owner!;
+                bool isThisCharacter = _bySession.TryGetValue(owner.Id, out var player) && player.Character.Uid == characterUid;
+                if (!isThisCharacter)
+                    return (true, null);                       // outro personagem da conta está no mundo: este pode ser apagado
+                if (!owner.IsClosed)
+                    return (false, null);
+                Leave(owner);                                  // a conexão caiu e o Leave dela ainda espera na fila do mundo
+                return (true, _presence[accountUid].Saved);
+            default:
+                return (true, presence.Saved);
+        }
+    }
+
     /// <summary>O personagem está no mundo ou com a saída ainda gravando (thread do mundo).</summary>
     public bool IsOnline(uint characterUid)
     {

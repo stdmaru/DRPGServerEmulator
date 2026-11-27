@@ -250,6 +250,99 @@ public class WorldEntryTests
         Assert.Equal(77, (await reentered.WaitAsync(Wait)).Character.Wallet.Bits);
     }
 
+    // --- apagar personagem (ReleaseForDeleteAsync) ---
+
+    [Fact]
+    public async Task Delete_is_allowed_when_the_account_has_nothing_in_the_world()
+    {
+        await using var f = new Fixture();
+        await f.StartAsync();
+
+        Assert.True(await f.Players.ReleaseForDeleteAsync(Account.Uid, Entities.Character().Uid).WaitAsync(Wait));
+    }
+
+    [Fact]
+    public async Task Delete_is_refused_while_the_character_is_in_the_world()
+    {
+        await using var f = new Fixture();
+        await f.StartAsync();
+        var session = NewMapSession();
+        var (_, entered) = await f.EnterAsync(session);
+        var player = await entered.WaitAsync(Wait);
+
+        Assert.False(await f.Players.ReleaseForDeleteAsync(Account.Uid, player.Character.Uid).WaitAsync(Wait));
+        Assert.Equal(1, await f.OnlineAsync());                      // recusar não tira ninguém do mundo
+    }
+
+    [Fact]
+    public async Task Delete_of_another_character_is_allowed_while_one_is_in_the_world()
+    {
+        await using var f = new Fixture();
+        await f.StartAsync();
+        var (_, entered) = await f.EnterAsync(NewMapSession());
+        var player = await entered.WaitAsync(Wait);
+
+        Assert.True(await f.Players.ReleaseForDeleteAsync(Account.Uid, player.Character.Uid + 1).WaitAsync(Wait));
+    }
+
+    [Fact]
+    public async Task Delete_is_refused_while_the_account_is_loading_into_the_world()
+    {
+        await using var f = new Fixture();
+        await f.StartAsync();
+        f.Loader.Hold();
+        var loading = f.EnterAsync(NewMapSession());
+        await WaitUntil(() => f.Loader.Calls == 1);
+
+        Assert.False(await f.Players.ReleaseForDeleteAsync(Account.Uid, Entities.Character().Uid).WaitAsync(Wait));
+
+        f.Loader.Release();
+        await (await loading.WaitAsync(Wait)).Entered.WaitAsync(Wait);
+    }
+
+    [Fact]
+    public async Task Delete_waits_for_the_save_of_the_exit_before_it_goes_on()
+    {
+        await using var f = new Fixture();
+        await f.StartAsync();
+        var session = NewMapSession();
+        var (_, entered) = await f.EnterAsync(session);
+        var player = await entered.WaitAsync(Wait);
+
+        f.Store.Hold();                                              // o save de saída fica preso no banco
+        session.Close("logout");
+        await f.Harness.RunAsync(() => f.Players.Leave(session));    // conta em Saving
+        var delete = f.Players.ReleaseForDeleteAsync(Account.Uid, player.Character.Uid);
+        await Task.Delay(100);
+        Assert.False(delete.IsCompleted);                            // apagar agora quebraria o save
+
+        f.Store.Release();
+        Assert.True(await delete.WaitAsync(Wait));
+        Assert.Single(f.Store.Saved);                                // o save chegou antes de o delete poder seguir
+    }
+
+    [Fact]
+    public async Task Delete_after_the_connection_dropped_leaves_the_world_and_waits_for_the_save()
+    {
+        await using var f = new Fixture();
+        await f.StartAsync();
+        var session = NewMapSession();
+        var (_, entered) = await f.EnterAsync(session);
+        var player = await entered.WaitAsync(Wait);
+
+        f.Store.Hold();
+        session.Close("conexão caiu");                               // o Leave do MapLifecycle ainda não rodou
+        var delete = f.Players.ReleaseForDeleteAsync(Account.Uid, player.Character.Uid);
+        await WaitUntil(() => f.OnlineAsync().Result == 0);          // o delete tirou o jogador do mundo
+        Assert.False(delete.IsCompleted);
+
+        f.Store.Release();
+        Assert.True(await delete.WaitAsync(Wait));
+        await f.Harness.RunAsync(() => f.Players.Leave(session));    // o Leave tardio do ciclo de vida não faz nada
+        await f.Harness.InvokeAsync(() => true);
+        Assert.Single(f.Store.Saved);                                // um save só, sem duplicar
+    }
+
     private static async Task WaitUntil(Func<bool> condition)
     {
         var deadline = DateTime.UtcNow + Wait;
