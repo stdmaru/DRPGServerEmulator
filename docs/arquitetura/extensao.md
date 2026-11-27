@@ -35,7 +35,7 @@ Card, título e buff seguem a mesma receita (efeito ou `StatModifierKind` novo).
 ## Pacote S2C novo (servidor informa algo)
 1. **Shared:** `Opcodes` + o pacote no arquivo do domínio. Ida e volta + dourado.
 2. **Servidor:** o serviço do domínio monta e envia (método de fábrica a partir das entidades). Sequência que o oficial manda junta fica num método só.
-3. **Cliente:** um método em `<Domínio>Handlers` que atualiza `<Domínio>State`. A janela já lê o estado.
+3. **Cliente:** o `case` do opcode no `MapDecoder` (ou no decodificador do servidor) e um método em `<Domínio>Handlers` que atualiza `<Domínio>State`, com o `case` no `Handle(object)` do mesmo arquivo enquanto o gerador de registro não existe ([cliente](cliente.md#a-fatia-de-feature)). A janela já lê o estado.
 4. **Wiki:** catálogo de opcodes.
 
 ## Janela nova (cliente)

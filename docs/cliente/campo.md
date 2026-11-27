@@ -63,7 +63,7 @@ Cada passo chama, nesta ordem:
   - **0xb** (batalha): só a direção.
   - **4, 5, 0xf** (andando): a mais de **6 células** da posição do comando → **teleporta** (`+0x44`, `0x0085e890(x, y)`, animação 1) e para; senão o destino passa a ser o do comando.
   - **6** e os seguintes (batalha, por espécie): fora deste passo.
-- Implementação no cliente novo: cada selvagem é uma entidade com essa fila. O `0x11` empilha, e a entidade só lê o próximo comando quando chega ao centro de uma célula. Por isso o selvagem termina o passo de célula antes de virar.
+- Implementação no cliente novo: cada selvagem é uma entidade com essa fila. O `0x11` empilha (`FieldHandlers`), e a entidade só lê o próximo comando quando chega ao centro de uma célula (`FieldWilds.Step`). Por isso o selvagem termina o passo de célula antes de virar. Direção fora de `0..7` no pacote não é aplicada (o selvagem novo nasce virado para o sul).
 
 ## Tamer do jogador e digimon seguidor (etapa 1 ✅)
 - ✅ **Vtable do tamer** (`0x0102fccc`, ctor `0x00b58eb0` / base `0x00863ff0`): `+0x24` atualização `0x008671c0`, `+0x30` estado → animação `0x00867790`, `+0x34` passo da animação `0x00867a60`, `+0x38` fila `0x00b5a890`.
@@ -104,7 +104,7 @@ Cada passo chama, nesta ordem:
 - ✅ **Sprite e avatar**:
   - Padrão (`0x00b40d30`): carrega `Sprite\<col6>.ani` (fallback `Sprite\065_1.ani`). Animação (`0x00863430` + `0x00863b80`): a cada 200 passos, 1 em 4 troca para animação `3` ou `2` (se disponível), retornando a `1` ao concluir o ciclo. Desenho (`0x00860e50`): sombra 14/32 + edge 14/32 + sprite pela âncora, na fila Y-sort (`0x00ad4a50`, tipo 6).
   - Avatar (`Custom_N`, `0x007231e0` + `0x007230e0` + `0x00862650`): extrai o índice base-1 em `Custom_AvatarNPC` e desenha como boneco de papel (`TamerDoll`) em `(x − 120, y − 162)`, avançando quadro a cada 3 passos.
-- ✅ **Ocupação na colisão** (`0x0085e940` / `0x0085f5c0`): cada NPC recebe um `Serial` (GUID) e ocupa `(x, y)` e `(x, y − 1)` na `FieldCollision`, fazendo o pathfinder parar adjacente ao clicar nele.
+- ✅ **Ocupação na colisão** (`0x0085e940` / `0x0085f5c0`): cada NPC recebe um `Serial` (❓ feito pelo cliente: um contador com a marca `NPC` na metade alta, para nunca coincidir com um serial do servidor) e ocupa `(x, y)` e `(x, y − 1)` na `FieldCollision`, fazendo o pathfinder parar adjacente ao clicar nele.
 - ✅ **NPCs dinâmicos via S2C `0x09`** (`FieldNpcPacket`, 10 B: `i16 mapId, i16 npcId, i16 x, i16 y, u8 action, u8 0`; golden `captures.db`: `8D005500C800FF000100`):
   - `action == 1` (`0x00abb9e0`): se `mapId == currentMapId` e `npcId` existe em `NPC_INFO`, instancia em `(x, y)` e grava na lista persistente (`+0x760`) para recriar em futuras cargas do mesmo mapa.
   - `action == 0` (`0x00acfed0`): remove da lista ativa (se `mapId == 0` ou `mapId == currentMapId`) e da lista persistente, desocupando a célula.
@@ -123,6 +123,26 @@ Cada passo chama, nesta ordem:
     1. `0x00af0d70` trava cliques no campo (`+0x772 = 0`), marca transição pendente (`+0x771 = 1`) e **deixa o tamer terminar de andar até a célula do portal** (sem snap instantâneo).
     2. Assim que o tamer para (`state < 4`, `0x00afe310` linha 49), dispara o efeito `0xa8` (`Effect\effect_map.spr`, `0x00a26b72`), desenhado sobre o tamer em `(worldX − cameraX − w/2, worldY − cameraY − h + 100)` em **modo 5 aditivo** (`0x00a46e0a`), com `delay = 1` (2 passos por quadro, `0x00a1be69` + `0x00a4ab1c`).
     3. Ao terminar todos os quadros do `effect_map.spr` (`0x00a4ab91`), executa `0x00aba410`: para a BGM, limpa selvagens e NPCs do mapa anterior, abre a tela de carga (`WorldLoading.BeginMapTransition`, 16 quadros × 90 ms), carrega o novo `.map`, colisão, pathfinder, NPCs e BGM, posiciona tamer/digimon na célula de destino e, ao fim da tela de carga, envia `C2S 0x04` (`RefreshCharacterInfoRequest`) e `C2S 0xB0` (`TeleportAckRequest`, 14 bytes zero — `0x00aba757`).
+
+## Código no cliente novo
+A fatia segue o [contrato do cliente](../arquitetura/cliente.md#a-fatia-de-feature).
+
+| Onde | O quê |
+|---|---|
+| `Features/Field/FieldState.cs` | espelho do campo: `Area` (mapa carregado), `Party` (tamer + digimon), `QuestNpcs` (os `0x09` de toda a execução), `Transition` (troca de mapa) e `Warp`; `TryWalkTo` (previsão local do clique), `PlaceParty`, `EnterArea`, `Step` |
+| `Features/Field/FieldHandlers.cs` | `0x11`, `0x09` e `0xB0`, um método cada; confere direção e id da tabela antes de usar |
+| `Features/Field/FieldActions.cs` | clique e segurar no chão (`PressGround`/`ReleaseGround`), `0x20` com cooldown (`MovePacketQueue`), `0x04` + `0xB0` no fim da troca de mapa; único lugar da feature que envia pacote |
+| `Features/Field/FieldView.cs` | desenha o estado (chão, portais, fila por y, warp); célula sob o mouse e cursor de porta |
+| `Features/Field/MapTransition.cs` | fases da troca de mapa: `WaitingForStop` → `Warping` → `ReadyToLoad` |
+| `World/FieldArea.cs` | um mapa carregado: `FieldCollision`, `FieldPathfinder`, `FieldWilds`, `FieldNpcs`; troca de mapa = área nova |
+| `World/FieldParty.cs` | tamer e digimon do jogador: ocupação, passo (`0x008671c0`) e animação |
+| `World/FieldEntity.cs`, `Cell.cs`, `FieldDirection.cs`, `MoveState.cs`, `IStepResolver.cs` | física por passo, fila de comandos, direções (`Direction` do Shared) e o passo do A* (obrigatório, sem caminho alternativo) |
+| `World/EntityDrawer.cs` | o desenho de cada tipo de entidade num lugar só (sprite `.ani` com sombra e borda; boneco de papel do tamer) |
+| `World/FieldPortals.cs`, `WarpEffect.cs`, `EffectFrames.cs` | redemoinhos dos portais, efeito `0xa8` e o sprite de efeito aberto uma vez |
+| `Startup/NpcTable.cs` | `npc_info_us` e `Custom_AvatarNPC` lidos uma vez na carga; linha malformada derruba a carga |
+| `Scenes/GameScene.cs` | liga as peças ao quadro: tela de carga, uma carga de mapa (`LoadArea`) para a entrada e para a troca, pacotes → handlers, mouse → ações, passos de lógica, desenho |
+
+Testes: `FieldFeatureTests` (`0xB0`, ações, fases da troca), `FieldWildsTests` e `FieldNpcsTests` (pelos handlers, em `FieldFixture`), `FieldMovementTests`, `FieldCollisionTests`, `FieldPathfinderTests`, `FieldPortalsTests` (troca de mapa ponta a ponta na cena).
 
 ## Roteiro do que falta
 Pontos de entrada já localizados; ✅ quando lido.
