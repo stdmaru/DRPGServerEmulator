@@ -80,10 +80,12 @@ Handlers (`[PacketHandler]`) e janelas (`[Window]`) são achados por um **gerado
 - ✅ **Fase C:** `ServerScene` e `CharacterSelectScene` seguem a especificação do RE ([cenas](../cliente/cenas.md#implementação-fase-c-)). O `AccountSession` virou uma máquina por passos (`StartLogin`, `SelectChannel`, `Authenticate`, `RequestCharacterList`, `Reset`) e **as cenas** decidem quando cada passo roda, como o original.
 
 ## Teste de ponta a ponta
+- `WorldSessionTests`, `GameSceneTests`, `EnterGameTests`, `MapDecoderTests` e `FieldTests`: o mesmo, para a entrada no mundo (servidores de mapa e global falsos, a ordem dos pacotes da captura, tamanho errado, servidor que fecha, mapa ausente ou corrompido, falha de conexão no "Game Start"). Rodam no CI.
 - `AccountSessionTests` e `AccountDecoderTests`: servidores falsos em loopback (ordem dos pacotes, chave recusada, opcode desconhecido, lista forjada, servidor que fecha ou não responde, keep-alive) e entradas hostis. Rodam no CI.
 - `EmulatorTests` (ponta a ponta, **não** roda sem configuração): contra o emulador de verdade. No devcontainer:
   1. suba o emulador com um banco descartável: `docker exec -w /workspaces/DRPGServer -d -e DRPG_Database__Name=drpg_e2e server_devcontainer-server-1 dotnet run --project src/DRPG.Server`;
   2. crie uma conta com chave: `INSERT INTO account (username, auth_key, authority) VALUES ('e2e', '<40 caracteres>', 0)` em `drpg_e2e`;
   3. `docker exec -w /workspaces/DRPGServer -e DRPG_E2E_USER=e2e -e DRPG_E2E_KEY=<chave> server_devcontainer-server-1 dotnet test tests/DRPG.Client.Tests --filter EmulatorTests`.
-  Opcionais: `DRPG_E2E_LOGIN` e `DRPG_E2E_CHANNEL` (`host:porta`). Sem as variáveis os testes aparecem como pulados.
+  O teste `A_created_character_enters_the_world` também cria um personagem, manda `0x16`/`0x18` e entra no mapa e no global (`WorldSession`) até o mundo carregar; apaga o personagem no fim (o emulador segura o apagar até o save de saída chegar ao banco).
+  Opcionais: `DRPG_E2E_LOGIN`, `DRPG_E2E_CHANNEL`, `DRPG_E2E_MAP` e `DRPG_E2E_GLOBAL` (`host:porta`). Sem as variáveis os testes aparecem como pulados.
 - O executável NativeAOT também foi rodado contra o emulador com a instalação real (`DRPG_GAME_DIR`, `SDL_VIDEO_DRIVER=offscreen`, `SDL_AUDIODRIVER=dummy`): chega em `step: Ready` e `character list: 0 of 4 slots in use`. Para ver a tela sem janela: `DRPG_SCREENSHOT=<arquivo.ppm> DRPG_SCREENSHOT_MS=<ms>` (só desenvolvimento).

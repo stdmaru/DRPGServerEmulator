@@ -237,3 +237,23 @@ Texto separado por `|` em `table.hf` ([arquivos de dados](arquivos-de-dados.md))
 - UI: fórmula das misturas `0x00b569f0` (modos −1, 6, `0x14`, `0x18`), sprite do ícone `+0x12df`, `w_tamer_menu` na entrada, `0x009b1640`, `0x00a0ceb0`; colunas ❓ das tabelas acima; sprite e animação do NPC (`0x0085f090`).
 - Montagem de `0x16`, `0x18`, `0x49`, `0x01`, resto do `0xF0`, e da conexão global (`0x64`).
 - Nome sobre o tamer (fonte, cor), sombra (opção) e o `0x00b57330`.
+
+## Implementação no cliente novo (marco 3, fase C)
+Código: `GameScene` (cena 5), `WorldSession` (conexões de mapa e global), `MapDecoder`, `FieldMap`, `FieldAnimator`, `FieldHud`, `MapBgm`, `HardwareAddresses`; pacotes em `DRPG.Shared/Packets/Map/WorldEntryPackets.cs`, `Channel/ChannelPackets.cs`, `Global/GlobalPackets.cs`; leitores em `DRPG.Shared/Formats/Map`. Testes: `WorldSessionTests`, `GameSceneTests`, `EnterGameTests`, `MapDecoderTests`, `FieldTests`, `MapFormatTests`, `WorldEntryPacketTests` e, contra o emulador, `EmulatorTests.A_created_character_enters_the_world`.
+
+**Como a sequência da tabela acima é seguida**
+1. "Game Start" (`CharacterSelectScene.EnterGame`): registra `Map Server : <host> <porta>` (de `servers.map`, ❓ o original escolhe por uma tabela mundo × mapa do binário), guarda o personagem no `GameContext` e escurece como a seleção de mundo.
+2. No fim do escurecimento: `0x16` e `0x18` no channel, depois a conexão no mapa. Falhou → texto `0xee6` por 80 quadros e o jogador fica na seleção.
+3. Mapa: `0x49` × 3 e `0x01` (nome do personagem + usuário) na conexão; o `0x0E` do servidor é **ecoado** (a semente fica guardada para o `0xE6`); chegam `0x02`, `0x03`, `0x7E` × 7, `0x7F` × 7, `0x05`, `0xE6`, `0x74`, `0x152`, `0xB4`, `0x73` (os sem uso só têm o **tamanho** conferido, e um tamanho errado derruba a sessão).
+4. Com `0x02` e `0x03` a `GameScene` carrega o mapa (`Map` → coluna 4, `map\<código>.map`) e **só então** manda `0x04`, `0xF0` e, na primeira entrada da execução, `0x121`; abre o global (`0x64`, `0xDE` × 2). Mapa sem linha, sem arquivo ou corrompido = mundo perdido (`LoadMap Error`), sem enviar nada.
+5. O `0xC4` do servidor é respondido na hora (✅ capturas: 5,35 s e 10,54 s).
+
+**Layouts tirados das capturas** (sessão 52, conexões 87 a 89; o RE do cliente não leu a montagem) ✅ conferidos byte a byte, ❓ nos campos que são zero ou constante:
+- `0xF0` **C2S** = pedido de renomear, 42 B: `u8 0, u8 tipo (1 tamer, 2 digimon), u16 0, u32 uid, nome[20], 14 B`; na entrada o cliente manda `(tamer, uid 0, sem nome)`. O de 28 B é o S2C de resposta.
+- `0x04` C2S: o id de 16 B do personagem (o serial do `0x02`) e 14 B. `0x121` C2S: 14 B zero. `0x49` C2S: 18 B, o primeiro é 1 (❓).
+- `0x0E` C2S: a semente recebida e 14 B zero. `0x16` C2S (55 B): usuário[21], personagem[21], 13 B zero ❓. `0x18` C2S (74 B): três campos de 20 B com os MAC `AA-BB-CC-DD-EE-FF` e 14 B zero. Decisão do dono: **MAC reais**, só no pacote, nunca em log.
+- Global `0x64` C2S (114 B): usuário[21], personagem[21], zeros, `u32 3, u32 1, u32 1` ❓ e o uid do personagem no byte 96; `0xDE` C2S (50 B): `u32 3`, personagem[20], `u32 x`, `u32 y` (a célula do tamer), duas vezes.
+
+**Provisório (❓)** no código, para a conferência lado a lado: curva do clareamento (escuro até 100, linear até 200), âncora dos objetos do mapa, retratos `Sprite\icon_%03d`, véu `0x88bcf8` e quadro 1 da barra (mistura), nome do servidor (texto do link do canal), passo da lógica de 60/s no lugar de `DAT_0135af08 = 30`, saída da tela de conexão perdida (um clique volta à cena 2) e bit 8 das células do `.map`.
+
+**Corrigido ao testar**: o contador do clareamento (`+0x34c`) zerava ao chegar em 200 e o passo seguinte o somava de novo, escurecendo a tela outra vez em ciclo; agora 0 = terminado.

@@ -35,7 +35,7 @@ Célula (24 B):
 | largura, altura | u32, u32 (640, 640 no `001.til`; ❓ uso) |
 | `n` | u32 quadros (200) |
 | larguras | u32[n] (64) |
-| alturas | u32[n] (32) |
+| alturas | u32[n] (32). ✅ Conferido nos 128 mapas da instalação: a tabela **não é a altura do quadro** (alguns arquivos dizem 1, 16 ou 24 para quadros de 32 linhas); o cliente novo lê a altura das **linhas do quadro** e ignora a tabela. Alguns quadros no fim de um `.til` são lixo: a decodificação é por quadro, só quando o chão o pede, e um quadro ruim vira "nada desenhado" com log |
 | offsets | u32[n], em palavras |
 | `wordCount` | u32 |
 | imagem | u16[wordCount]: cada quadro no **mesmo formato de linha do `.spr`** (RGB565, trechos com transparência; convertido para 555 em `0x00874fa0` como o `.spr`) |
@@ -67,3 +67,6 @@ Grade **retangular** de 64 × 32 px (os tiles já trazem a arte isométrica): a 
 O servidor não lê o `resource.pf`: `extract-client` gera o `grids.bin` (só o bit de andável). Ver
 [arquivos de dados](arquivos-de-dados.md). 128 dos 140 mapas do `map_us` têm `.map`. Faltam a VIP Dungeon (111)
 e os mapas de evento 157–168 (R153–R156).
+
+## Nomes dentro dos arquivos ✅
+Os nomes de tileset e de objeto dentro do `.map` (20 B, terminados em zero) estão em **CP949** (página de código coreana), como as strings do original: por exemplo `074_자갈.obj` ao lado de `074_01.obj`. O índice do pack guarda os mesmos nomes em UTF-16. O leitor (`LegacyText`) decodifica em 949; sem a página de código disponível cai em Latin-1 e só nomes ASCII funcionam. Teste: `MapFormatTests`. ❓ Sob NativeAOT a página 949 ainda não foi conferida com a instalação real: um objeto coreano que não carrega aparece no log como `LoadObject Error : map\… (not in the pack)`.
