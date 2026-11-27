@@ -13,7 +13,6 @@ public sealed class PatchView : IDisposable
     private const int PaddingX = 16;
     private const int StatusY = BoxY + 18;
     private const int BarY = BoxY + 48;
-    private const int BarCapWidth = 8;
 
     private const uint NormalColor = 0xFFFFFFFF;
     private const uint CompleteColor = 0xFF6EE66E;
@@ -75,53 +74,13 @@ public sealed class PatchView : IDisposable
 
         if (_bar.Length > 0)
         {
-            int barX = BoxX + PaddingX;
-            int fillWidth = (int)Math.Round(innerWidth * clamped);
+            var fill = _bar[0];
+            int barX = BoxX + (BoxWidth - fill.Width) / 2;
+            int fillWidth = (int)Math.Round(fill.Width * clamped);
             if (fillWidth > 0)
-                DrawStretchedBar(r, _bar[0], barX, BarY, innerWidth, fillWidth);
+                r.DrawPart(fill, barX, BarY, 0, fillWidth);
             if (_bar.Length > 1)
-                DrawStretchedBar(r, _bar[1], barX, BarY, innerWidth, innerWidth);
-        }
-    }
-
-    /// <summary>
-    /// Draws a horizontal bar sprite (<c>dr2_in_001_002</c>, 231×23) stretched to <paramref name="totalWidth"/> by
-    /// preserving the left/right caps and tiling the middle segment, clipped at <paramref name="visibleWidth"/>.
-    /// </summary>
-    private static void DrawStretchedBar(IRenderer r, ITexture tex, int x, int y, int totalWidth, int visibleWidth)
-    {
-        if (visibleWidth <= 0 || totalWidth <= 0 || tex.Width <= 0)
-            return;
-
-        int cap = Math.Min(BarCapWidth, tex.Width / 2);
-        int middleSrcW = tex.Width - 2 * cap;
-        if (middleSrcW <= 0)
-        {
-            r.DrawPart(tex, x, y, 0, Math.Min(visibleWidth, tex.Width));
-            return;
-        }
-
-        // Left cap
-        int leftW = Math.Min(cap, visibleWidth);
-        if (leftW > 0)
-            r.DrawPart(tex, x, y, 0, leftW);
-
-        // Middle tiled section
-        int middleEnd = Math.Min(totalWidth - cap, visibleWidth);
-        int cursor = cap;
-        while (cursor < middleEnd)
-        {
-            int chunk = Math.Min(middleSrcW, middleEnd - cursor);
-            r.DrawPart(tex, x + cursor, y, cap, chunk);
-            cursor += chunk;
-        }
-
-        // Right cap
-        int rightStart = totalWidth - cap;
-        if (visibleWidth > rightStart)
-        {
-            int rightW = Math.Min(cap, visibleWidth - rightStart);
-            r.DrawPart(tex, x + rightStart, y, tex.Width - cap, rightW);
+                r.Draw(_bar[1], barX, BarY);
         }
     }
 
