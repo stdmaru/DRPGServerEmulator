@@ -170,10 +170,10 @@ public sealed class EntityPlatesTests : IDisposable
         plates.DrawPlate(_scene.Renderer, _scene.Game.SpriteOptions, plate);
 
         var draws = _scene.Renderer.Draws;
-        var box = draws.Where(d => (d.Texture.Width, d.Texture.Height) == (14, 7)).ToList();
+        var box = draws.Where(d => (d.Texture.Width, d.Texture.Height) == (8, 7)).ToList();
         Assert.Equal(4 * (pieces + 2), box.Count);                                                        // y − 7, y, y + 7, y + 14
         Assert.Contains(box, d => (d.X, d.Y, d.PartWidth) == (100, 193, 7));                                      // top-left
-        Assert.Contains(box, d => (d.X, d.Y, d.PartWidth) == (100 + (pieces + 1) * 7, 214, 14));                  // bottom-right, 14 wide
+        Assert.Contains(box, d => (d.X, d.Y, d.PartWidth) == (100 + (pieces + 1) * 7, 214, 8));                   // bottom-right: 14 asked, 8 drawn
         Assert.All(box, d => Assert.Equal(0x10, d.Alpha));
         Assert.Contains(draws, d => (d.Texture.Width, d.Texture.Height, d.X, d.Y) == (13, 11, 103, 199));       // grade at (x + 3, y − 1)
     }
