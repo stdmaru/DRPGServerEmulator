@@ -27,6 +27,9 @@ public sealed class GameData(
     /// <summary>The NPCs of <c>npc_info_us</c>, checked when the tables load.</summary>
     public NpcTable Npcs { get; } = NpcTable.From(tables);
 
+    /// <summary>✅ The wild digimon's full names of <c>monsterregen_us</c>, checked when the tables load.</summary>
+    public MonsterRegenTable MonsterRegen { get; } = MonsterRegenTable.From(tables);
+
     /// <summary>Raw <c>Language\*_US.bin</c> files by file name. ❓ Only <c>TextAttach</c> and <c>ProhibitedWords</c> are applied so far.</summary>
     public IReadOnlyDictionary<string, byte[]> Language { get; } = language;
 

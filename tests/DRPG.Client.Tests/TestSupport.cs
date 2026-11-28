@@ -135,6 +135,10 @@ internal sealed class FakeInstall : IDisposable
             ("gui\\dr2_main_000_031.spr", Sprite(63, 22, 3)),
             ("gui\\dr2_main_000_005.spr", Sprite(99, 20, 2)),
             ("interface\\w_panel.spr", Sprite(800, 600)),
+            // the hover plate's pieces (14 wide so the 14 px corner shows), the leader's HP bar, the wild's grade icons
+            ("interface\\draw_balloon.spr", Sprite(14, 7, 5)),
+            ("gui\\dr2_sub_007_014.spr", Sprite(40, 6, 2)),
+            ("interface\\draw_Monster_class.spr", Sprite(13, 11, 4)),
             // the minimap: map 1's picture, the title, the frame, the collapse button, the markers and the player's point
             ("interface\\w_minimap_1.spr", Sprite(150, 120, 2)),
             ("gui\\dr2_sub_007_007.spr", Sprite(158, 20)),

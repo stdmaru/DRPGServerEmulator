@@ -55,6 +55,49 @@ public static class SpeciesTables
         return DefaultOffset;
     }
 
+    /// <summary>
+    /// ✅ <c>0x007e7470</c>: the species a digimon counts as for its height (<see cref="NameHeight"/>); a species not listed is itself.
+    /// </summary>
+    public static int HeightSpecies(int species) => species switch
+    {
+        0x25 or 0x2f or 0x32 => 0xf,
+        0x30 => 0x13,
+        0x31 => 0x21,
+        0x54 or 0x27d => 0x33,
+        0x58 or 0x298 => 0x40,
+        0x59 or 0x299 => 0x4a,
+        0x80 or 0x2e3 => 0x5b,
+        0xa8 or 0x34c => 0x83,
+        0xd5 or 0xd6 => 0xbc,
+        0xff => 0xfe,
+        0x271 => 0x53,
+        0x272 => 0x39,
+        0x286 => 0x3e,
+        0x2c1 or 0x306 => 0x70,
+        0x2c2 or 0x307 => 0x69,
+        0x2d6 or 0x2ed => 0x66,
+        0x328 or 0x36e => 0x8f,
+        0x329 or 0x36f => 0x90,
+        0x33a => 0x9b,
+        _ => species,
+    };
+
+    /// <summary>
+    /// ✅ <c>0x007f3bf0</c>, recomputed each frame by the draw pass (<c>0x00a0ece5</c>): a digimon's height <c>+0x18c</c>, how far
+    /// above its feet the name plate sits. By <see cref="HeightSpecies"/> first, then by stage (<c>+0x8a0</c>).
+    /// </summary>
+    public static int NameHeight(int species, int stage) => HeightSpecies(species) switch
+    {
+        0x35 or 0x38 or 0x3b or 0x3f or 0x41 or 0x4e or 0x63 or 0x292 => 0x41,
+        0xa0 => 0x82,
+        _ => (byte)stage switch
+        {
+            1 => 0x37,
+            5 => 0x82,
+            _ => 0x55,
+        },
+    };
+
     private static readonly SpriteRange[] SpriteRanges =
     [
         new(10, 34, 34),

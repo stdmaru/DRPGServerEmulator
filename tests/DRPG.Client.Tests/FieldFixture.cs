@@ -18,20 +18,23 @@ internal sealed class FieldFixture : IDisposable
 
     private readonly WorldSession _session;
 
-    public FieldFixture(string[] rows, Cell tamer, int mapId = 79, NpcTable? npcs = null, Random? random = null)
+    public FieldFixture(string[] rows, Cell tamer, int mapId = 79, NpcTable? npcs = null, Random? random = null,
+        Func<CharacterDataPacket, CharacterDataPacket>? character = null)
     {
         Random = random ?? new Random(0);
         Npcs = npcs ?? NpcTable.Empty;
         Area = new FieldArea(mapId, Grid(rows), Npcs, NoFieldSprites.Instance, Random);
-        var character = ClientPacket.Parse<CharacterDataPacket>(new byte[CharacterDataPacket.Length.Min])
+        var data = ClientPacket.Parse<CharacterDataPacket>(new byte[CharacterDataPacket.Length.Min])
             with { Serial = TamerSerial, TamerId = 5, X = (short)tamer.X, Y = (short)tamer.Y };
-        State = new FieldState(Area, FieldParty.Of(character, NoFieldSprites.Instance, Random), NoFieldSprites.Instance);
+        Character = character?.Invoke(data) ?? data;
+        State = new FieldState(Area, FieldParty.Of(Character, NoFieldSprites.Instance, Random), NoFieldSprites.Instance);
         _session = new WorldSession(ClientSettings.Local, new GameCommandLine("tamer", new string('0', 40)), _ => { });
         Actions = new FieldActions(_session, State);
         Handlers = new FieldHandlers(State, Actions, Npcs);
     }
 
     public Random Random { get; }
+    public CharacterDataPacket Character { get; }
     public NpcTable Npcs { get; }
     public FieldArea Area { get; }
     public FieldState State { get; }

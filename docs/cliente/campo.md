@@ -28,11 +28,11 @@ Cada passo chama, nesta ordem:
   - Estado **12** (saindo) → `0x00acfdd0(serial)`: remove o grupo.
   - Outros → `0x00abb5b0` (acha pelo serial `0x00ad17a0` ou cria) e `0x007f3b30(estado, x, y, destino x, destino y, direção)` **empilha um comando** na fila da entidade.
 - ✅ **Criar** (`0x00abb5b0`): objeto de `0xcb8` bytes (construtor `0x007e6de0`, vtable `0x010071c8`), iniciado por `0x007e78c0(serial[16], espécie, nome, x, y, direção)`. Depois:
-  - `+0x82e` = estágio (`+0x2a` do pacote);
+  - `+0x82e` = nível (`+0x2a` do pacote; é o `LV` da placa e o nível do bloco de status em `+0x800`; correção: não é o estágio);
   - `+4` = 1;
   - `+0x92c` = grau (`+0x2c`);
-  - `+0x8a0` = nível (`+0x28`);
-  - `+0x18c` = `0x007f3bf0(…)` (❓).
+  - `+0x8a0` = estágio (`+0x28`);
+  - `+0x18c` = altura da placa, `0x007f3bf0(estágio)` ([entidade sob o mouse](janelas.md#entidade-sob-o-mouse)).
   - Se o tamer está a até 6 × 4 células e o estado < 2, toca o efeito `0x76` (`0x00a1b670`).
   - Entra no fim da lista `+0x2f8` (contador `+0x2fc`) e chama `0x00b232b0(espécie)` (❓ provavelmente carrega o sprite da espécie).
 - ✅ **Classe base das entidades** (construtor `0x0085e1c0`, vtable `0x01007178`), campos usados aqui:
@@ -133,6 +133,8 @@ A fatia segue o [contrato do cliente](../arquitetura/cliente.md#a-fatia-de-featu
 | `Features/Field/FieldHandlers.cs` | `0x11`, `0x09` e `0xB0`, um método cada; confere direção e id da tabela antes de usar |
 | `Features/Field/FieldActions.cs` | clique e segurar no chão (`PressGround`/`ReleaseGround`), `0x20` com cooldown (`MovePacketQueue`), `0x04` + `0xB0` no fim da troca de mapa; único lugar da feature que envia pacote |
 | `Features/Field/FieldView.cs` | desenha o estado (chão, portais, fila por y, warp); célula sob o mouse e cursor de porta |
+| `Features/Field/EntityPlates.cs` | placa de nome da entidade sob o mouse e barra de HP do líder (`0x00a0d340`, `0x00a11180`, `0x00a13e60`), desenhadas depois do `FieldView` |
+| `Startup/MonsterRegenTable.cs` | `monsterregen_us`: nome completo do selvagem pela espécie e pelos 20 primeiros caracteres |
 | `Features/Field/MapTransition.cs` | fases da troca de mapa: `WaitingForStop` → `Warping` → `ReadyToLoad` |
 | `World/FieldArea.cs` | um mapa carregado: `FieldCollision`, `FieldPathfinder`, `FieldWilds`, `FieldNpcs`; troca de mapa = área nova |
 | `World/FieldParty.cs` | tamer e digimon do jogador: ocupação, passo (`0x008671c0`) e animação |

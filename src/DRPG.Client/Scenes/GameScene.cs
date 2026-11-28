@@ -58,6 +58,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private LoadingScreen _screen = null!;                     // set in Init
     private WorldLoading _loading = null!;                     // set in Init
     private FieldView _view = null!;                           // set in Init
+    private EntityPlates _plates = null!;                      // set in Init
     private FieldMap? _map;
     private FieldState? _state;
     private FieldActions? _actions;
@@ -100,6 +101,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         _view = new FieldView(_sprites, game.SpriteOptions);
         _windows = new WindowManager(game.Sounds);
         _ui = new UiSprites(game);
+        _plates = new EntityPlates(_ui, game.Text, Data.MonsterRegen);
         _tooltips = new Tooltips(_ui.Load(Tooltips.PanelSprite), new MessageBox(_ui.Load(BoxSprite), game.Text), game.Text);
         _hud = new FieldHud(game, _ui, _windows, _tooltips);
         RegisterWindows(game.World.Session);
@@ -361,6 +363,8 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     {
         _view.Draw(renderer, map, state, game.SpriteOptions);
         var character = session.Character!;
+        var (cameraX, cameraY) = map.Camera(state.Party.Tamer.WorldX, state.Party.Tamer.WorldY);
+        _plates.Draw(renderer, state, character, cameraX, cameraY, game.SpriteOptions, game.Options.Language);
         var leader = character.Party[0];
         var tamer = state.Party.Tamer.Cell;
         _hud.Frame(renderer, new HudValues(

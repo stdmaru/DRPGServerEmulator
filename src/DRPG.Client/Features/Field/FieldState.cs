@@ -27,8 +27,8 @@ public sealed class FieldState
 
     /// <summary>
     /// ✅ <c>DAT_0135b254</c>: the entity under the mouse, set each frame by <c>0x00b4dd90</c> (<see cref="Hover"/>); none
-    /// (<c>default</c>) when the mouse is off the ground. ❓ The name plates and the attack cursor the original draws for it
-    /// (<c>0x00a0d340</c>, <c>0x00a11180</c>) come with their step.
+    /// (<c>default</c>) when the mouse is off the ground. Its name plate and the leader's HP bar are <see cref="EntityPlates"/>; ❓ the
+    /// attack cursor the original picks for it (<c>0x00a0d340</c>, <c>+0x25c</c>) comes with its step.
     /// </summary>
     public Serial Hovered { get; private set; }
 
