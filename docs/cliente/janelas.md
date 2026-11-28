@@ -43,7 +43,8 @@ UI interativa do campo no cliente novo (PR #51, marco 3, passo 2): botões da ba
 - ✅ **Close**: fecha todas as outras janelas (menos 0xd8), manda o **C2S `0x2B`** (14 B zero; `0x00ae4bf0`; captura: 28 B, resposta S2C `0x2B` vazia), trava o campo (`+0x3eb0 = 1`) e conta **10 s** (`DAT_01011c10`): texto `0xf1c` "Exit after %d second(s)." com `10 − (int)segundos`. No fim, fecha, sai do mundo (`0x00ad0ae0`) e liga `+0x7a4` (`0x00ad0bd0`): o quadro seguinte para a música, fecha as conexões e vai para a **cena 2** (seleção de mundo), não fecha o jogo.
 - ✅ **Cancel** (pergunta ou contagem): fecha pela vtable (sem som) e destrava. ❓ O 2º caso abre a janela 0x17b (painéis de missão) e o `0x32` do grupo (`0x00ae2870`) esperam essas features.
 - ✅ ESC com a janela aberta a fecha (`0x00b81450`).
-- Código: `Features/Exit/ExitWindow.cs`, `ExitActions.cs`; pacote `ExitGameRequest` no Shared.
+- ✅ **Resposta do servidor (S2C `0x2B`, vazio)**: o despachante do mapa (`0xabe26d`) chama `0x00b816e0(1)` na janela 6: liga `+0x690` e passa o Cancel da contagem (`+0x600`) de x + 0x50 para **x + 0x73**. Durante a contagem, com `+0x690`, aparece o botão **"Exit"** (`+0x640`, texto `0xf1e`, rótulo centrado por `0x00b61f50` 6 px abaixo) em (x + 0x34, y + 0x49); o clique fecha a janela, desliga `+0x690` (`0x00b816e0(0)`) e **sai na hora**, pelo mesmo caminho do fim dos 10 s (`0x00b8100a`). Sem a resposta, só a contagem. `+0x690` volta a 0 a cada abertura (`0x00b81560`).
+- Código: `Features/Exit/ExitWindow.cs`, `ExitActions.cs`; pacotes `ExitGameRequest` (C2S) e `ExitAllowedPacket` (S2C) no Shared.
 
 ## Opções, janela 0xf (`0x00b161b0`)
 - ✅ Vtable `0x0102d3f8`: carga `0x00b18540`, abrir `0x00b181c0`, quadro `0x00b16980` + `0x00b18000`. O 4º botão de menu a abre.

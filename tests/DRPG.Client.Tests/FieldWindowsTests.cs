@@ -309,6 +309,40 @@ public sealed class ExitWindowTests : IDisposable
     }
 
     [Fact]
+    public void The_server_answer_shows_exit_during_the_count_and_its_click_leaves_at_once()
+    {
+        _fixture.Windows.Open(WindowManager.ExitWindow);
+        Click(293 + 0x34 + 5, 242 + 0x49 + 5, 1000);
+        _exit.AllowExit();                                                     // ✅ S2C 0x2B → 0x00b816e0(1)
+        _fixture.Renderer.Draws.Clear();
+        Frame(2000);
+        var buttons = _fixture.Renderer.Draws.Where(d => (d.Texture.Width, d.Texture.Height) == (45, 23)).Select(d => (d.X, d.Y)).ToList();
+        Assert.Equal([(293 + 0x73, 242 + 0x49), (293 + 0x34, 242 + 0x49)], buttons);   // Cancel moved right, then Exit
+
+        Click(293 + 0x34 + 5, 242 + 0x49 + 5, 2000);
+        Assert.True(_exit.LeaveRequested);
+        Assert.False(_exit.Visible);
+        Assert.False(_exit.ExitAllowed);
+        Assert.False(_fixture.Windows.Locked);
+    }
+
+    [Fact]
+    public void Without_the_server_answer_there_is_no_exit_button_and_reopening_forgets_it()
+    {
+        _fixture.Windows.Open(WindowManager.ExitWindow);
+        Click(293 + 0x34 + 5, 242 + 0x49 + 5, 1000);
+        Click(293 + 0x34 + 5, 242 + 0x49 + 5, 2000);                         // where Exit would be
+        Assert.False(_exit.LeaveRequested);
+        Assert.True(_exit.Counting);
+
+        _exit.AllowExit();
+        Click(293 + 0x73 + 5, 242 + 0x49 + 5, 3000);                         // the moved Cancel
+        Assert.False(_exit.Visible);
+        _fixture.Windows.Open(WindowManager.ExitWindow);                       // ✅ 0x00b81560: +0x690 = 0
+        Assert.False(_exit.ExitAllowed);
+    }
+
+    [Fact]
     public void Escape_closes_it()
     {
         _fixture.Windows.Open(WindowManager.ExitWindow);

@@ -12,6 +12,7 @@ using DRPG.Engine.Rendering;
 using DRPG.Engine.Scenes;
 using DRPG.Shared.Formats.Map;
 using DRPG.Shared.Formats.Pack;
+using DRPG.Shared.Packets.Map;
 
 namespace DRPG.Client.Scenes;
 
@@ -300,8 +301,12 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     private void RunField(WorldSession session, ulong nowMs)
     {
         while (session.TryReceive(out var packet))
-            if (!_handlers!.Handle(packet))
+        {
+            if (packet is ExitAllowedPacket)
+                _exit.AllowExit();                                                 // ✅ 0xabe26d: window 6, 0x00b816e0(1)
+            else if (!_handlers!.Handle(packet))
                 game.Log($"map: {packet.GetType().Name} has no handler");
+        }
 
         if (!_state!.Transition.LocksInput && !_windows.Locked)
         {

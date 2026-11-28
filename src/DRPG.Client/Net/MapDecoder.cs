@@ -56,6 +56,8 @@ public static class MapDecoder
                 return ClientPacket.Parse<FieldDigimonPacket>(frame.Payload);
             case (ushort)MapOpcode.FieldNpcUpdate:
                 return ClientPacket.Parse<FieldNpcPacket>(frame.Payload);
+            case (ushort)MapOpcode.ExitGame:
+                return ClientPacket.Parse<ExitAllowedPacket>(frame.Payload);
         }
         if (IgnoredSizes.TryGetValue(frame.Opcode, out int size))
         {

@@ -205,3 +205,19 @@ public sealed record ExitGameRequest : ITwoWayPacket<ExitGameRequest>
 
     public void Write(PacketWriter w) => w.WriteZeros(14);
 }
+
+/// <summary>
+/// ✅ 0x2B S2C (empty, captures.db: the answer to the C2S 0x2B): the server lets the player leave at once. The map dispatcher
+/// (<c>0xabe26d</c>) calls <c>0x00b816e0(1)</c> on window 6: the count shows an "Exit" button that leaves without waiting.
+/// </summary>
+public sealed record ExitAllowedPacket : ITwoWayPacket<ExitAllowedPacket>
+{
+    public static ushort Opcode => (ushort)MapOpcode.ExitGame;
+    public static PacketLength Length => PacketLength.Exact(0);
+
+    public static ExitAllowedPacket Read(PacketReader r) => new();
+
+    public void Write(PacketWriter w)
+    {
+    }
+}
