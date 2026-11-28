@@ -147,4 +147,4 @@ Testes: `FieldFeatureTests` (`0xB0`, ações, fases da troca), `FieldWildsTests`
 ## Roteiro do que falta
 Pontos de entrada já localizados; ✅ quando lido.
 - **Minimapa:** `WindowMiniMap`, marcadores em `0x00b9b930` e nomes em `0x00b9c4b0` ([minimapa](cena-jogo.md#minimapa-windowminimap-janela-5)).
-- **Botões e dicas da UI:** desenho da barra `0x00b8a850`, tamanho do chat `0x00b8e2a0`, abas `0x00b91a80`; hover, clique e dica ❓.
+- ✅ **Botões e dicas da UI:** desenho da barra `0x00b8a850`, dicas dos botões de menu `0x00b8e220`, tamanho do chat `0x00b8e2a0`, abas `0x00b91a80` (sem dica); detalhes em [janelas do campo](janelas.md#dicas).

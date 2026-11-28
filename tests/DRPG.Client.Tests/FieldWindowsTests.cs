@@ -490,6 +490,58 @@ public sealed class FieldHudInteractionTests
         hud.Frame(fixture.Renderer, Values(), mouse);
         Assert.Contains(fixture.Renderer.Draws, d => d.Texture.Width == 14 && d.Texture.Height == 14 && d.Y == 462 - 0x1a);
     }
+
+    private static bool IsPanel(FakeRenderer.DrawCall d) => (d.Texture.Width, d.Texture.Height) == (800, 600);
+
+    [Fact]
+    public void A_menu_button_under_the_mouse_shows_its_name_20_px_above_it_mixed_at_16()
+    {
+        using var fixture = new SceneFixture();
+        var hud = fixture.Hud();
+        var mouse = fixture.Game.Mouse;
+        hud.Frame(fixture.Renderer, Values(), mouse);
+        Assert.DoesNotContain(fixture.Renderer.Draws, IsPanel);
+
+        mouse.Move(546 + 5, 548 + 5);                                          // the options button (0x00b8e220)
+        fixture.Renderer.Draws.Clear();
+        hud.Frame(fixture.Renderer, Values(), mouse);
+
+        var panel = Assert.Single(fixture.Renderer.Draws, IsPanel);
+        Assert.Equal((546, 548 - 20, 0x10), (panel.X, panel.Y, panel.Alpha));
+    }
+
+    [Fact]
+    public void The_world_tooltip_sits_on_the_shop_button_like_the_original()
+    {
+        using var fixture = new SceneFixture();
+        fixture.Game.ChannelLine = 0;
+        var hud = fixture.Hud();
+        var mouse = fixture.Game.Mouse;
+        mouse.Move(451 + 3, 485 + 3);                                          // WORLD (0x00b8d7a1 reads SHOP's +0x1ce0/+0x1ce4)
+        hud.Frame(fixture.Renderer, Values(), mouse);
+
+        var row = fixture.Renderer.Draws.Where(d => (d.Texture.Width, d.Texture.Height) == (14, 14) && d.Y == 462 - 0x1b).ToList();
+        Assert.NotEmpty(row);
+        Assert.Equal(516 - 0x32, row.Min(d => d.X));                           // the box's left corner, from SHOP's x
+    }
+
+    [Fact]
+    public void The_vp_gauge_is_hit_with_the_size_of_the_hp_gauge()
+    {
+        using var fixture = new SceneFixture();
+        var hud = fixture.Hud();
+        var mouse = fixture.Game.Mouse;
+        var leader = DRPG.Shared.Packets.Map.DigimonStatus.Empty with { Uid = 1, Level = 1, Vp = 5, MaxVp = 10 };
+        mouse.Move(692 + 3, 545 + 15);                                         // inside the 20 px VP sprite, below HP's 12 px
+        hud.Frame(fixture.Renderer, Values(leader), mouse);
+        Assert.DoesNotContain(fixture.Renderer.Draws, IsPanel);
+
+        mouse.Move(692 + 3, 545 + 5);
+        fixture.Renderer.Draws.Clear();
+        hud.Frame(fixture.Renderer, Values(leader), mouse);
+        var panel = Assert.Single(fixture.Renderer.Draws, IsPanel);
+        Assert.Equal((692, 545 - 12 - 12), (panel.X, panel.Y));
+    }
 }
 
 public sealed class FieldHudChatInteractionTests
@@ -540,6 +592,18 @@ public sealed class FieldHudChatInteractionTests
         Assert.Equal(1, hud.ChatTab);
         Click(fixture, hud, 280 + 3, 574 + 3);
         Assert.Equal(0, hud.ChatTab);
+    }
+
+    [Fact]
+    public void A_chat_mode_tooltip_has_its_corner_30_px_above_the_button()
+    {
+        using var fixture = new SceneFixture();
+        var hud = fixture.Hud();
+        var mouse = fixture.Game.Mouse;
+        mouse.Move(222 + 3, 572 + 3);                                          // General (000_025), 0x007dd610(…, x, y − 30, 1, …)
+        hud.Frame(fixture.Renderer, Values(), mouse);
+
+        Assert.Contains(fixture.Renderer.Draws, d => (d.Texture.Width, d.Texture.Height, d.X, d.Y) == (14, 14, 222, 572 - 30));
     }
 
     [Theory]

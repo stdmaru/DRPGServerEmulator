@@ -14,13 +14,19 @@ public sealed class MessageBox(ITexture[] parts, UiText text)
     /// <summary>The sprite has nine frames: 0..2 top row, 3..5 middle rows, 6..8 bottom row.</summary>
     public const int FrameCount = 9;
 
+    /// <summary>✅ <c>0x007dd610</c> with a mode other than 1 or 2: the box centred on (x, y), <c>x − 14 − w/2</c>, <c>y − 14 − h/2</c>.</summary>
     public void Draw(IRenderer renderer, string message, int centerX, int centerY, uint colorRef = UiText.White)
+    {
+        var (width, height) = text.Measure(renderer, message);
+        DrawAt(renderer, message, centerX - Corner - width / 2, centerY - Corner - height / 2, colorRef);
+    }
+
+    /// <summary>✅ <c>0x007dd610</c> with mode 1 or 2: the box's top-left corner at (<paramref name="left"/>, <paramref name="top"/>).</summary>
+    public void DrawAt(IRenderer renderer, string message, int left, int top, uint colorRef = UiText.White)
     {
         if (parts.Length < FrameCount)
             return;
-        var (width, height) = text.Measure(renderer, message);
-        int left = centerX - Corner - width / 2;
-        int top = centerY - Corner - height / 2;
+        var (width, _) = text.Measure(renderer, message);
         int repeats = (width - 24) / Step + 2;                  // ✅ n of 0x007dd610
         DrawRow(renderer, left, top, repeats, 0);
         DrawRow(renderer, left, top + Corner, repeats, 6);

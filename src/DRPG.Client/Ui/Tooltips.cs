@@ -55,8 +55,8 @@ public sealed class Tooltips(ITexture[] panel, MessageBox box, UiText text)
     /// <summary>The text inside a <see cref="DrawBox"/>: <c>0x00b55270(0, text, x, y, 0xffffff, 1, 0)</c>, white with shadow.</summary>
     public void DrawBoxText(IRenderer renderer, string message, int x, int y) => text.Draw(renderer, message, x, y);
 
-    /// <summary>✅ <c>0x007dd610(text, x, y, 1, 0xffffff)</c>: the single-line message box centred on (x, y).</summary>
-    public void DrawMessage(IRenderer renderer, string message, int centerX, int centerY) => box.Draw(renderer, message, centerX, centerY);
+    /// <summary>✅ <c>0x007dd610(text, x, y, 1, 0xffffff)</c>: the single-line message box with its corner at (x, y) (mode 1 does not centre).</summary>
+    public void DrawMessageAt(IRenderer renderer, string message, int left, int top) => box.DrawAt(renderer, message, left, top);
 
     /// <summary>The width of a text, for the boxes that size themselves on it (<c>0x00b56310</c>).</summary>
     public int Measure(IRenderer renderer, string message) => text.Measure(renderer, message).Width;

@@ -130,6 +130,7 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
         DrawDigimonPanel(renderer, v.Leader, mouse);
         DrawSideButtons(renderer, mouse);
         DrawTeleportButtons(renderer, mouse, v);
+        DrawMenuHints(renderer);
         TamerClass = (byte)v.TamerClass;
         DrawChat(renderer, mouse);
         DrawChatSizeButtons(renderer, mouse);
@@ -225,11 +226,12 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
         }
         Portrait(renderer, leader.SpeciesId, 0, 594, 509);                                    // ✅ 0x00b1ec40(species) frame 0
         game.Text.Draw(renderer, $"Lv.{leader.Level}", 670, 508);
-        Gauge(renderer, mouse, 2, 692, 525, leader.Hp, leader.MaxHp, PrintfFormat.Format(HpHint, leader.Hp, leader.MaxHp));
-        Gauge(renderer, mouse, 5, 692, 545, leader.Vp, leader.MaxVp, PrintfFormat.Format(VpHint, leader.Vp, leader.MaxVp));
-        Gauge(renderer, mouse, 4, 692, 564, leader.Evp, leader.MaxEvp, PrintfFormat.Format(EvpHint, leader.Evp, leader.MaxEvp));
+        Gauge(renderer, mouse, HpGauge, HpGauge, 692, 525, leader.Hp, leader.MaxHp, PrintfFormat.Format(HpHint, leader.Hp, leader.MaxHp));
+        Gauge(renderer, mouse, VpGauge, HpGauge, 692, 545, leader.Vp, leader.MaxVp, PrintfFormat.Format(VpHint, leader.Vp, leader.MaxVp));
+        Gauge(renderer, mouse, EvpGauge, HpGauge, 692, 564, leader.Evp, leader.MaxEvp,
+            PrintfFormat.Format(EvpHint, leader.Evp, leader.MaxEvp));
         DrawMenuButtons(renderer, mouse);
-        Gauge(renderer, mouse, 3, 488, 585, leader.Exp, leader.ExpToNextLevel, PrintfFormat.Format(game.Texts[ExpHint],
+        Gauge(renderer, mouse, ExpGauge, ExpGauge, 488, 585, leader.Exp, leader.ExpToNextLevel, PrintfFormat.Format(game.Texts[ExpHint],
             leader.Exp, leader.ExpToNextLevel, ExpPercent(leader.Exp, leader.ExpToNextLevel)));
     }
 
@@ -292,18 +294,27 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
         Frame(renderer, frames, frame, x, y);
     }
 
+    // ✅ the gauges' sprites (dr2_main_000_0NN): HP +0x1ac, VP +0x200, EVP +0x254, EXP +0x2a8
+    private const int HpGauge = 2, VpGauge = 5, EvpGauge = 4, ExpGauge = 3;
+
     /// <summary>
     /// ✅ <c>0x007e3560</c>: frame 0 clipped to the gauge's width, then frame 1 whole over it. ✅ With the mouse on the gauge
-    /// (<c>0x00b31aa0</c>: x ≤ mouse ≤ x + w and y ≤ mouse ≤ y + h, frame 0's size, edges included) the tooltip at (x, y − h − 12).
+    /// (<c>0x00b31aa0</c>: x ≤ mouse ≤ x + w and y ≤ mouse ≤ y + h, edges included) the tooltip at (x, y − h − 12). ✅ w and h are
+    /// frame 0 of <paramref name="sizeSprite"/>: HP, VP and EVP all measure the HP gauge's sprite (<c>+0x1b0</c>, <c>0x00b8d05a</c>,
+    /// <c>0x00b8d16c</c>), EXP its own (<c>+0x2ac</c>).
     /// </summary>
-    private void Gauge(IRenderer renderer, MouseState mouse, int sprite, int x, int y, long current, long maximum, string hint)
+    private void Gauge(IRenderer renderer, MouseState mouse, int sprite, int sizeSprite, int x, int y, long current, long maximum,
+        string hint)
     {
         var frames = Gui(sprite);
         if (frames.Length == 0)
             return;
         renderer.DrawPart(frames[0], x, y, 0, Math.Min(frames[0].Width, GaugeWidth(frames[0].Width, Percent(current, maximum))));
         Frame(renderer, frames, 1, x, y);
-        int width = frames[0].Width, height = frames[0].Height;
+        var size = Gui(sizeSprite);
+        if (size.Length == 0)
+            return;
+        int width = size[0].Width, height = size[0].Height;
         if (mouse.X >= x && mouse.X <= x + width && mouse.Y >= y && mouse.Y <= y + height)
             tooltips.DrawPanel(renderer, game.SpriteOptions, hint, x, y - height - GaugeHintGap);
     }
@@ -311,6 +322,8 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
     /// <summary>
     /// ✅ 5. REWARD (<c>GUI\dr2_sub_016_005</c>, not in the BATTLE ZONE channels, <c>0x00b8d399</c>), then SHOP, DEPOSITORY, SEAL and
     /// WORLD, each read and drawn by state; then the tooltip of the hot one among REWARD, WORLD, SHOP and DEPOSITORY (<c>0x00b8d6aa</c>).
+    /// ✅ WORLD's tooltip sits on SHOP's corner: the hot test is on <c>+0x1d18</c> but the box and text read <c>+0x1ce0/+0x1ce4</c>
+    /// (SHOP, <c>0x00b8d7a1</c>).
     /// ❓ The original blinks REWARD when there is a reward (+0x7743c: who sets it is not read); the clicks open windows and send
     /// requests the client does not have yet, so they only show the press.
     /// </summary>
@@ -329,7 +342,7 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
         if (_reward.IsHot(mouse))
             SizedHint(renderer, RewardHint, _reward, 0x1f, 0x17);
         else if (_side[World].IsHot(mouse))
-            FixedHint(renderer, WorldHint, _side[World], 0x32, 0x1b, 0xc8, 0x28, 0x12);
+            FixedHint(renderer, WorldHint, _side[Shop], 0x32, 0x1b, 0xc8, 0x28, 0x12);
         else if (_side[Shop].IsHot(mouse))
             SizedHint(renderer, ShopHint, _side[Shop], 0x1a, 0x12);
         else if (_side[Depository].IsHot(mouse))
@@ -348,11 +361,11 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
         tooltips.DrawBoxText(renderer, text, button.X - third, button.Y - textUp);
     }
 
-    /// <summary>✅ A side tooltip of fixed width (WORLD, DEPOSITORY): box and text at fixed offsets from the button.</summary>
-    private void FixedHint(IRenderer renderer, int textId, Button button, int boxLeft, int boxUp, int boxWidth, int textLeft, int textUp)
+    /// <summary>✅ A side tooltip of fixed width (WORLD, DEPOSITORY): box and text at fixed offsets from <paramref name="anchor"/>.</summary>
+    private void FixedHint(IRenderer renderer, int textId, Button anchor, int boxLeft, int boxUp, int boxWidth, int textLeft, int textUp)
     {
-        tooltips.DrawBox(renderer, button.X - boxLeft, button.Y - boxUp, boxWidth, HintBoxHeight);
-        tooltips.DrawBoxText(renderer, game.Texts[textId], button.X - textLeft, button.Y - textUp);
+        tooltips.DrawBox(renderer, anchor.X - boxLeft, anchor.Y - boxUp, boxWidth, HintBoxHeight);
+        tooltips.DrawBoxText(renderer, game.Texts[textId], anchor.X - textLeft, anchor.Y - textUp);
     }
 
     /// <summary>
@@ -371,6 +384,28 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
             _teleport[i].DrawFrame(renderer, i);
         }
     }
+
+    /// <summary>
+    /// ✅ <c>0x00b8e220</c>, after the side and teleport buttons and before the chat tabs: each menu button whose state is not 0 (the
+    /// mouse inside, <c>+0x20 &gt; 0</c>; the hot control is not asked) shows its name (<c>0x007de3f0</c>, the wide <c>0x007de1b0</c>)
+    /// at (x, y − 20), 3 px of margin, mixed at 16/32. ✅ The names are texts <c>0x7db + i</c>, loaded by <c>0x00b90570</c> into
+    /// <c>+0x771a0</c> (a wide string every 0x18 bytes); an empty text draws nothing.
+    /// </summary>
+    private void DrawMenuHints(IRenderer renderer)
+    {
+        for (int i = 0; i < _menu!.Length; i++)
+        {
+            var button = _menu[i];
+            var text = game.Texts[FirstMenuHint + i];
+            if (button.State <= 0 || text.Length == 0)
+                continue;
+            tooltips.DrawPanel(renderer, game.SpriteOptions, text, button.X, button.Y - MenuHintUp, alpha: MenuHintAlpha);
+        }
+    }
+
+    /// <summary>✅ <c>0x00b90570</c> / <c>0x00b8e220</c>: the first menu name, how far above the button and the mix.</summary>
+    public const int FirstMenuHint = 0x7db;
+    private const int MenuHintUp = 0x14, MenuHintAlpha = 0x10;
 
     /// <summary>✅ <c>0x00b91610</c>: the teleport buttons at (615, 65), (615, 92), (615, 119).</summary>
     private const string TeleportSprite = "gui\\TeleportEasy_Icon24.spr";
@@ -463,7 +498,8 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
     /// <summary>
     /// ✅ <c>0x00b8fd80</c>: the five mode buttons, each frame 3 for state 0 and 0 on the current mode. Shout (<c>000_027</c>) reads the
     /// mouse only for a GM, a tamer class of 5 or more, or in the BATTLE ZONE; otherwise it is disabled (<c>0x009b7660</c>). A click
-    /// chooses the mode; a hot button shows its name in a message box 30 px above it (<c>0x007dd610</c>). ❓ The click also focuses the
+    /// chooses the mode; a hot button shows its name in a message box whose corner is 30 px above it (<c>0x007dd610(…, x, y − 30, 1,
+    /// 0xffffff)</c>: mode 1 does not centre). ❓ The click also focuses the
     /// input box, which comes with the chat packets.
     /// </summary>
     private void DrawChatModeButtons(IRenderer renderer, MouseState mouse)
@@ -490,7 +526,7 @@ public sealed class FieldHud(GameContext game, UiSprites sprites, WindowManager 
             if (i == Shout && !shoutEnabled)
                 continue;
             if (_chatModes[i].IsHot(mouse))
-                tooltips.DrawMessage(renderer, game.Texts[ChatModeHints[ButtonMode(i)]], _chatModes[i].X, _chatModes[i].Y - ChatHintUp);
+                tooltips.DrawMessageAt(renderer, game.Texts[ChatModeHints[ButtonMode(i)]], _chatModes[i].X, _chatModes[i].Y - ChatHintUp);
         }
     }
 

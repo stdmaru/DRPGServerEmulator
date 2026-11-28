@@ -131,6 +131,9 @@ internal sealed class FakeInstall : IDisposable
             ("gui\\dr2_main_000_025.spr", Sprite(20, 20, 4)),
             ("gui\\dr2_main_000_027.spr", Sprite(20, 20, 4)),
             ("gui\\dr2_main_000_032.spr", Sprite(61, 21, 3)),
+            // the WORLD side button, and the VP gauge taller than the HP one (the bar measures HP's for both)
+            ("gui\\dr2_main_000_031.spr", Sprite(63, 22, 3)),
+            ("gui\\dr2_main_000_005.spr", Sprite(99, 20, 2)),
             ("interface\\w_panel.spr", Sprite(800, 600)),
             // the minimap: map 1's picture, the title, the frame, the collapse button, the markers and the player's point
             ("interface\\w_minimap_1.spr", Sprite(150, 120, 2)),
