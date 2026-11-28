@@ -1,9 +1,11 @@
+using DRPG.Client.Features.Options;
 using DRPG.Client.Net;
 using DRPG.Client.Startup;
 using DRPG.Client.Text;
 using DRPG.Client.Ui;
 using DRPG.Engine.Assets;
 using DRPG.Engine.Audio;
+using DRPG.Engine.Platform;
 using DRPG.Engine.Rendering;
 using DRPG.Engine.Scenes;
 using DRPG.Shared.Formats.Pack;
@@ -21,6 +23,8 @@ public sealed class GameContext(
     GameCommandLine command,
     ClientSettings settings,
     SpriteOptions spriteOptions,
+    GameOptions options,
+    IDisplayMode display,
     Action<string> log)
 {
     /// <summary>✅ Version text every original scene draws in the top left corner (<c>0x0102e220</c>).</summary>
@@ -42,6 +46,12 @@ public sealed class GameContext(
 
     /// <summary>✅ <c>option.ini [SPRITE]</c>: the blends, shadows and soft edges of the sprites (the options window <c>0x00b16980</c> changes them in game).</summary>
     public SpriteOptions SpriteOptions { get; set; } = spriteOptions;
+
+    /// <summary>✅ The rest of <c>DAT_01158530</c>: sound levels, refusals, language and the options window's other choices.</summary>
+    public GameOptions Options { get; } = options;
+
+    /// <summary>✅ The options' "Window Mode" switches it (<c>0x00aa4440</c>).</summary>
+    public IDisplayMode Display { get; } = display;
     public Action<string> Log { get; } = log;
 
     /// <summary>The mouse; the loop feeds it and clears it after each frame.</summary>
@@ -103,7 +113,7 @@ public sealed class WorldEntry(CharacterListSlot slot, int slotIndex) : IDisposa
     public int SlotIndex { get; } = slotIndex;
 
     /// <summary>✅ The map of the slot (<c>[DAT_011584f8]+0x511c98</c>).</summary>
-    public int MapId => Slot.MapId;
+    public int MapId { get; set; } = slot.MapId;
 
     public WorldSession? Session { get; set; }
 

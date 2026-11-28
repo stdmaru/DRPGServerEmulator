@@ -6,6 +6,7 @@ using DRPG.Server.Game.Stats;
 using DRPG.Server.Game.World;
 using DRPG.Server.Network;
 using DRPG.Server.Network.Handlers;
+using DRPG.Shared.Protocol;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DRPG.Server.Tests;
@@ -220,6 +221,19 @@ public class MovementTests
         Assert.Equal(Movement.MaxDistance(TimeSpan.Zero), Movement.MaxDistance(Movement.ReportInterval));
         Assert.True(Movement.MaxDistance(Movement.ReportInterval) >= 8.0);     // tamer normal a 60 FPS: ~6,5 células por 0x20 (Chebyshev)
         Assert.Equal(Movement.MaxDistance(TimeSpan.FromSeconds(2)), Movement.MaxDistance(TimeSpan.FromMinutes(5)));
+    }
+
+    [Fact]
+    public void Click_near_viewport_edge_up_to_11_cells_is_accepted_without_speed_buff()
+    {
+        // ✅ 0x20 envia a célula clicada (em 800×600 meia tela Y = 9,375 células; máximo em 9640 amostras v322 = 11)
+        _zones.Move(_player, 57, 66);                       // dist=10 (ex.: (16,196) -> (17,206))
+        Assert.Equal((57, 66), (_player.Character.X, _player.Character.Y));
+        Assert.Empty(_session.SentOpcodes());
+
+        _zones.Move(_player, 57, 77);                       // dist=11 num intervalo imediato
+        Assert.Equal((57, 77), (_player.Character.X, _player.Character.Y));
+        Assert.Empty(_session.SentOpcodes());
     }
 
     [Fact]

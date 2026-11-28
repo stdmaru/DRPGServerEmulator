@@ -1,3 +1,4 @@
+using DRPG.Client.Features.Options;
 using DRPG.Client.Scenes;
 using DRPG.Client.Ui;
 using DRPG.Engine.Assets;
@@ -62,12 +63,41 @@ internal static class Program
         using var audio = AudioFactory.Create(Console.Error.WriteLine);
         var options = IniFile.Read(install.OptionsPath);
         using var sounds = new SoundBank(audio, install.SoundDirectory, Volume(options, "bgm.sound"), Volume(options, "bgm.bgm"), Console.Error.WriteLine);
-        var game = new GameContext(install, resource, sprites, uiText, sounds, command, settings, SpriteOptions.From(options), Console.WriteLine);
+        var game = new GameContext(install, resource, sprites, uiText, sounds, command, settings, SpriteOptions.From(options), GameOptions.From(options), platform, Console.WriteLine);
         using var scenes = new SceneManager(id => CreateScene(id, game));
         game.Scenes = scenes;
         var cursor = new CursorView(sprites);
 
         scenes.Switch(SceneId.Title);
+        try
+        {
+            return RunLoop(platform, renderer, game, scenes, cursor, audio, screenshot, screenshotAtMs);
+        }
+        finally
+        {
+            SaveOptions(game);
+        }
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00aa4a90</c>: once the message loop ends, the shutdown (<c>0x00aa27e0</c>) writes the options back to <c>option.ini</c>
+    /// (<c>0x00b429f0</c>). A file that cannot be written is logged: the game still closes.
+    /// </summary>
+    private static void SaveOptions(GameContext game)
+    {
+        try
+        {
+            game.Options.Save(game.Install.OptionsPath, game.SpriteOptions);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"option.ini: {e.Message}");
+        }
+    }
+
+    private static int RunLoop(SdlPlatform platform, IRenderer renderer, GameContext game, SceneManager scenes, CursorView cursor,
+        IAudio audio, string? screenshot, ulong screenshotAtMs)
+    {
         var events = new List<InputEvent>();
         ulong lastFrameMs = 0;
         ulong? loadedAtMs = null;                       // development clocks count from the end of the loading screen
@@ -100,7 +130,7 @@ internal static class Program
             scenes.Frame(renderer, now);
             game.Mouse.EndFrame();
             if (scenes.Current?.ShowCursor ?? true)
-                cursor.Draw(renderer, now);
+                cursor.Draw(renderer, now, scenes.Current?.Cursor ?? CursorKind.Normal);
             if (screenshot is not null && loadedAtMs is { } shotLoaded && now - shotLoaded >= screenshotAtMs)
             {
                 Screenshot.WritePpm(screenshot, renderer.Capture(), IRenderer.FrameWidth, IRenderer.FrameHeight);

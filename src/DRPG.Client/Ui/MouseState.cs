@@ -31,6 +31,12 @@ public sealed class MouseState
     /// <summary>The press of this frame was the second of a double click.</summary>
     public bool DoubleClicked { get; private set; }
 
+    /// <summary>
+    /// ✅ <c>DAT_0135a1e4+4</c>: the control the mouse is over, the last one a <see cref="Button.Update"/> saw under it this frame
+    /// (<c>0x00a17880</c>). The field frame clears it first (<c>0x00b4e550</c>); here <see cref="EndFrame"/> does.
+    /// </summary>
+    public object? Hot { get; set; }
+
     public void Handle(InputEvent input, ulong nowMs)
     {
         switch (input)
@@ -65,5 +71,6 @@ public sealed class MouseState
         Pressed = false;
         Released = false;
         DoubleClicked = false;
+        Hot = null;
     }
 }

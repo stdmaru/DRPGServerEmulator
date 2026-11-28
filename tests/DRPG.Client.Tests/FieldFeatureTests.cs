@@ -1,0 +1,164 @@
+using DRPG.Client.Features.Field;
+using DRPG.Client.World;
+using DRPG.Shared.Packets.Map;
+using DRPG.Shared.Protocol;
+
+namespace DRPG.Client.Tests;
+
+/// <summary>
+/// The field feature slice without a scene: the <c>0xB0</c> handler (<c>0x00acb072</c>), the ground click actions
+/// (<c>0x00b4c1a0</c> / <c>0x00b4d290</c>) and the map change phases (<c>0x00af0d70</c> → <c>0x00aba410</c>).
+/// </summary>
+public sealed class FieldFeatureTests
+{
+    [Fact]
+    public void Same_map_0xB0_places_the_party_and_drops_the_queued_move()
+    {
+        using var field = new FieldFixture(FieldFixture.Open(20, 20), tamer: new Cell(5, 5));
+        field.Actions.PressGround(new Cell(9, 5));
+        Assert.True(field.Actions.HasPendingMove);
+        Assert.True(field.Tamer.IsMoving);
+
+        Assert.True(field.Handlers.Handle((object)new TeleportCharacterPacket(79, 12, 3)));
+
+        Assert.Equal(new Cell(12, 3), field.Tamer.Cell);
+        Assert.False(field.Tamer.IsMoving);
+        Assert.False(field.Actions.HasPendingMove);
+        Assert.Equal(FieldFixture.TamerSerial, field.Collision.OccupantAt(12, 3));
+        Assert.Equal(default, field.Collision.OccupantAt(5, 5));
+        Assert.Equal(MapTransitionPhase.None, field.State.Transition.Phase);
+    }
+
+    [Fact]
+    public void Other_map_0xB0_locks_input_waits_for_the_stop_then_plays_the_warp()
+    {
+        using var field = new FieldFixture(FieldFixture.Open(20, 20), tamer: new Cell(5, 5));
+        field.Actions.PressGround(new Cell(7, 5));
+
+        field.Handlers.Handle(new TeleportCharacterPacket(46, 15, 15));
+
+        var transition = field.State.Transition;
+        Assert.Equal(MapTransitionPhase.WaitingForStop, transition.Phase);
+        Assert.True(transition.LocksInput);
+        Assert.Equal(new MapTarget(46, new Cell(15, 15)), transition.Target);
+        Assert.False(field.Actions.HasPendingMove);
+
+        // the tamer finishes its walk first (✅ 0x00af0d70 +0x771 = 1)
+        field.State.Step();
+        Assert.Equal(MapTransitionPhase.WaitingForStop, transition.Phase);
+        for (int i = 0; i < 100 && transition.Phase == MapTransitionPhase.WaitingForStop; i++)
+            field.State.Step();
+
+        Assert.False(field.Tamer.IsMoving);
+        Assert.Equal(new Cell(7, 5), field.Tamer.Cell);
+        // without effect_map.spr the warp ends at once and the map is ready to load
+        Assert.Equal(MapTransitionPhase.ReadyToLoad, transition.Phase);
+        transition.Complete();
+        Assert.False(transition.LocksInput);
+    }
+
+    [Fact]
+    public void Holding_the_mouse_on_one_cell_asks_once_and_a_blocked_target_is_not_sent()
+    {
+        using var field = new FieldFixture(
+        [
+            "..........",
+            "......#...",
+            "..........",
+        ], tamer: new Cell(2, 1));
+
+        field.Actions.PressGround(new Cell(4, 1));
+        Assert.True(field.Actions.HasPendingMove);
+        Assert.Equal(new Cell(4, 1), field.Tamer.Destination);
+
+        // the 0x20 goes out (the session is not in the world here, so nothing is written); holding the same cell asks nothing more
+        field.Actions.Update(nowMs: 1000);
+        Assert.False(field.Actions.HasPendingMove);
+        field.Actions.PressGround(new Cell(4, 1));
+        Assert.False(field.Actions.HasPendingMove);
+
+        // released and pressed again: asked again
+        field.Actions.ReleaseGround();
+        field.Actions.PressGround(new Cell(4, 1));
+        Assert.True(field.Actions.HasPendingMove);
+
+        // ✅ 0x00b4d290: a click on the wall next to the tamer is blocked at the target: no walk, no 0x20
+        field.Actions.CancelMoves();
+        field.State.PlaceParty(new Cell(5, 1));
+        field.Actions.PressGround(new Cell(6, 1));
+        Assert.False(field.Actions.HasPendingMove);
+        Assert.False(field.Tamer.IsMoving);
+
+        // a cell outside the map is never asked
+        field.Actions.ReleaseGround();
+        field.Actions.PressGround(new Cell(50, 1));
+        Assert.False(field.Actions.HasPendingMove);
+    }
+
+    [Fact]
+    public void Packets_outside_the_field_are_not_handled()
+    {
+        using var field = new FieldFixture(FieldFixture.Open(3, 3), tamer: new Cell(0, 0));
+        Assert.False(field.Handlers.Handle(new MoveCharacterRequest(1, 1)));
+    }
+}
+
+public sealed class FieldHoverTests
+{
+    [Fact]
+    public void The_entity_under_the_mouse_is_the_occupant_of_its_cell_or_the_one_below()
+    {
+        using var field = new FieldFixture(FieldFixture.Open(10, 10), new DRPG.Client.World.Cell(4, 4));
+        field.State.Hover(new DRPG.Client.World.Cell(4, 4));
+        Assert.Equal(FieldFixture.TamerSerial, field.State.Hovered);
+        field.State.Hover(new DRPG.Client.World.Cell(4, 3));                  // ✅ 0x00b36550: the cell above is the tamer's too
+        Assert.Equal(FieldFixture.TamerSerial, field.State.Hovered);
+        field.State.Hover(new DRPG.Client.World.Cell(7, 7));
+        Assert.Equal(default, field.State.Hovered);
+        field.State.Hover(null);                                               // the mouse is on the HUD or a window
+        Assert.Equal(default, field.State.Hovered);
+    }
+}
+
+public sealed class FieldOccupancyOrderTests
+{
+    /// <summary>
+    /// ✅ <c>0x00afdba0</c> before <c>0x00afe1c0</c>: the wilds step before the player, so a wild leaving the cell the tamer steps
+    /// onto frees its upper cell too. With the party first this run left the wild's serial on (12, 5) at round 344, and the hover found
+    /// that wild when pointing above the partner's head. ✅ A wild leaving while the partner stands on its lower cell still leaves its
+    /// upper cell, as in the original (same <c>0x00b365c0</c>, same order): longer runs can show it.
+    /// </summary>
+    [Fact]
+    public void A_wild_leaving_the_cell_the_tamer_steps_onto_frees_its_upper_cell()
+    {
+        const int seed = 1, rounds = 400;
+        var wild = new Serial(9, 9);
+        using var field = new FieldFixture(FieldFixture.Open(30, 30), new Cell(2, 10), character: c =>
+        {
+            var party = c.Party.ToArray();
+            party[0] = DigimonStatus.Empty with { Uid = 1, Serial = new Serial(7, 7), SpeciesId = 14, Name = "A", Level = 1 };
+            return c with { TamerId = 1, Party = party };
+        });
+        var random = new Random(seed);
+        int x = 10, y = 10;
+        field.Handlers.Handle(new FieldDigimonPacket(wild, "W", 14, 2, 3, 2, 1, 0, (short)x, (short)y, (short)x, (short)y));
+        for (int round = 0; round < rounds; round++)
+        {
+            if (!field.Tamer.IsMoving)
+                field.State.TryWalkTo(new Cell(random.Next(5, 16), random.Next(5, 16)));
+            if (round % 10 == 0)
+            {
+                int nx = Math.Clamp(x + random.Next(-3, 4), 5, 15), ny = Math.Clamp(y + random.Next(-3, 4), 5, 15);
+                field.Handlers.Handle(new FieldDigimonPacket(wild, "W", 14, 2, 3, 2, 4, 0, (short)x, (short)y, (short)nx, (short)ny));
+                (x, y) = (nx, ny);
+            }
+            for (int step = 0; step < 10; step++)
+                field.State.Step();
+            var at = field.Wilds.Find(wild)!.Entity.Cell;
+            for (int cy = 0; cy < 30; cy++)
+                for (int cx = 0; cx < 30; cx++)
+                    if (field.Collision.OccupantAt(cx, cy) == wild)
+                        Assert.True(cx == at.X && (cy == at.Y || cy == at.Y - 1), $"round {round}: wild left on ({cx}, {cy}), it is on {at}");
+        }
+    }
+}

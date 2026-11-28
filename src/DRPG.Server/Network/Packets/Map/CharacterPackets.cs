@@ -80,19 +80,6 @@ public sealed class RefreshCharacterInfoPacket(Character character, TamerState s
     }
 }
 
-/// <summary>0xB0: muda o personagem de posição ou de mapa.</summary>
-public sealed class TeleportCharacterPacket(byte mapId, short x, short y) : ServerPacket
-{
-    public override ushort Opcode => (ushort)MapOpcode.TeleportCharacter;
-
-    protected override void Write(PacketWriter w)
-    {
-        w.WriteI32(mapId);
-        w.WriteI16(x);
-        w.WriteI16(y);
-    }
-}
-
 /// <summary>
 /// 0x21 (277 bytes): ✅ mensagem de chat normal (21 B remetente + 256 B mensagem; DigimonRPG.bin @ 0x00ABE221 → 0x00AEDFF0).
 /// Se o remetente não existe no mapa, vai direto para a janela de chat em branco sem balão de fala.
@@ -193,26 +180,30 @@ public sealed class NpcChoicePacket(uint choiceId) : ServerPacket
     protected override void Write(PacketWriter w) => w.WriteU32(choiceId);
 }
 
-/// <summary>0x11: estado e posição de um grupo de digimons selvagens.</summary>
-public sealed class WildDigimonUpdatePacket(WildDigimon wild) : ServerPacket
+/// <summary>
+/// 0x11: estado e posição de um grupo de digimons selvagens. O pacote é o <see cref="FieldDigimonPacket"/> do Shared; aqui só
+/// se monta a partir do <see cref="WildDigimon"/>.
+/// </summary>
+public static class WildDigimonUpdate
 {
-    public override ushort Opcode => (ushort)MapOpcode.FieldDigimonUpdate;
-
-    protected override void Write(PacketWriter w)
+    public static FieldDigimonPacket Of(WildDigimon wild)
     {
         var leader = wild.Leader;
-        wild.Serial.Write(w);
-        w.WriteFixedString(leader.Name, 21);
-        w.WriteU8(0);
-        w.WriteU16(leader.SpeciesId);
-        w.WriteU16(leader.Species.Stage);       // ❓ estágio (era 1 fixo)
-        w.WriteU16(leader.Level);
-        w.WriteU8(wild.Spawn.Grade);            // ✅ grau do grupo: 2 Beginner, 3 Veteran (como byte 300 do 0x63)
-        w.WriteU8(wild.StateCode);              // ✅ 1 parado, 4 andando, 11 batalha, 8 derrotado, 12 saindo
-        w.WriteU16((ushort)wild.Facing);
-        w.WriteI16(wild.X);
-        w.WriteI16(wild.Y);
-        w.WriteI16(wild.DestX);                 // ✅ destino do movimento (igual à posição quando parado)
-        w.WriteI16(wild.DestY);
+        return new FieldDigimonPacket(
+            wild.Serial,
+            leader.Name,
+            leader.SpeciesId,
+            leader.Species.Stage,               // ❓ estágio (era 1 fixo)
+            leader.Level,
+            wild.Spawn.Grade,                   // ✅ grau do grupo: 2 Beginner, 3 Veteran (como byte 300 do 0x63)
+            wild.StateCode,                     // ✅ 1 parado, 4 andando, 11 batalha, 8 derrotado, 12 saindo
+            (ushort)wild.Facing,
+            wild.X,
+            wild.Y,
+            wild.DestX,                         // ✅ destino do movimento (igual à posição quando parado)
+            wild.DestY);
     }
+
+    /// <summary>O <see cref="Of"/> pronto para a fila de envio.</summary>
+    public static ServerPacket Packet(WildDigimon wild) => TwoWayServerPacket.Of(Of(wild));
 }

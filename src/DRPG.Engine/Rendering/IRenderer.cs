@@ -48,6 +48,12 @@ public interface IRenderer : IDisposable
     void DrawHalved(ITexture texture, int x, int y);
 
     /// <summary>
+    /// Adds every colour channel of <paramref name="texture"/> onto what is already in the frame, saturating at 255
+    /// (✅ v322 mode 5 of <c>0x00876a30</c>: <c>min(dst + src, max)</c>, used by portals and glow effects).
+    /// </summary>
+    void DrawAdditive(ITexture texture, int x, int y);
+
+    /// <summary>
     /// Subtracts <paramref name="amount"/> (0..255) from every colour channel of what is already in the frame, never
     /// below 0: the fade to black of the scene changes (✅ v322 <c>FUN_00b55f10</c>).
     /// </summary>

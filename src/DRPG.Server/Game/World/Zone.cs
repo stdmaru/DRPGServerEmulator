@@ -102,7 +102,7 @@ public sealed class Zone
         player.NextRecoveryAt = _world.Now + RecoveryInterval;
         foreach (var wild in _wild.Values)
             if (wild.State != WildState.Gone && IsInView(player, wild.X, wild.Y))
-                player.Send(new WildDigimonUpdatePacket(wild));
+                player.Send(WildDigimonUpdate.Packet(wild));
         foreach (var drop in _drops.Values)
             player.Send(new ItemDropPacket(drop));
     }
@@ -227,13 +227,13 @@ public sealed class Zone
                     if (Spawn(wild.Spawn, wild.Slot) is { } fresh)
                     {
                         AddWild(fresh);
-                        BroadcastNear(fresh.X, fresh.Y, new WildDigimonUpdatePacket(fresh));
+                        BroadcastNear(fresh.X, fresh.Y, WildDigimonUpdate.Packet(fresh));
                     }
                     continue;
                 case WildState.Gone:
                     continue;
             }
-            BroadcastNear(wild.X, wild.Y, new WildDigimonUpdatePacket(wild));
+            BroadcastNear(wild.X, wild.Y, WildDigimonUpdate.Packet(wild));
         }
     }
 
@@ -254,7 +254,7 @@ public sealed class Zone
         wild.State = WildState.Dead;
         wild.EnsureBattleDiagonal();
         wild.DiedAt = _world.Now;
-        BroadcastNear(wild.X, wild.Y, new WildDigimonUpdatePacket(wild));
+        BroadcastNear(wild.X, wild.Y, WildDigimonUpdate.Packet(wild));
     }
 
     public void ReloadSpawns()
@@ -262,12 +262,12 @@ public sealed class Zone
         foreach (var wild in _wild.Values)
         {
             wild.State = WildState.Gone;
-            Broadcast(new WildDigimonUpdatePacket(wild));
+            Broadcast(WildDigimonUpdate.Packet(wild));
         }
         _wild.Clear();
         SpawnAll();
         foreach (var wild in _wild.Values)
-            BroadcastNear(wild.X, wild.Y, new WildDigimonUpdatePacket(wild));
+            BroadcastNear(wild.X, wild.Y, WildDigimonUpdate.Packet(wild));
     }
 
     // ---------- itens no chão ----------

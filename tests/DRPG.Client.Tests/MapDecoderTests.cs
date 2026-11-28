@@ -36,6 +36,13 @@ public sealed class MapDecoderTests
         Assert.Throws<PacketFormatException>(() => MapDecoder.Map(Frame(0xC4, 1)));
     }
 
+    [Fact]
+    public void The_exit_answer_is_an_empty_0x2b()
+    {
+        Assert.IsType<ExitAllowedPacket>(MapDecoder.Map(Frame(0x2B, 0)));
+        Assert.Throws<PacketFormatException>(() => MapDecoder.Map(Frame(0x2B, 14)));
+    }
+
     [Theory]
     [InlineData(0x33, 504)]
     [InlineData(0x05, 164)]

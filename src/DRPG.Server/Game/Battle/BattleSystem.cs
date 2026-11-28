@@ -61,7 +61,7 @@ public sealed class BattleSystem : IWorldSystem
         {
             wild.State = WildState.InBattle;
             wild.FaceBattleDiagonal(player.Character.X, player.Character.Y);
-            zone.BroadcastNear(wild.X, wild.Y, new WildDigimonUpdatePacket(wild));
+            zone.BroadcastNear(wild.X, wild.Y, WildDigimonUpdate.Packet(wild));
         }
         _log.LogDebug("{Player} começou {Battle} contra {Wild}", player, battle, wild.Leader.Name);
         return battle;
@@ -94,7 +94,7 @@ public sealed class BattleSystem : IWorldSystem
             else
             {
                 battle.Wild.Reset();
-                zone.BroadcastNear(battle.Wild.X, battle.Wild.Y, new WildDigimonUpdatePacket(battle.Wild));
+                zone.BroadcastNear(battle.Wild.X, battle.Wild.Y, WildDigimonUpdate.Packet(battle.Wild));
             }
         }
         _log.LogDebug("{Battle} terminou: {Result}", battle, result);

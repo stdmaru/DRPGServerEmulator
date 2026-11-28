@@ -43,7 +43,7 @@ senão, pelo id. 762 espécies; 5 sem dex (sem crescimento): 515 Kazemon, 516 Ze
 | `digimon_skill_us`, `digimon_title_us`, `tamer_title_us` | skills e títulos |
 | `item_info_us`, `item_change_us`, `item_composite_us`, `item_equipment_point_us` | itens |
 | `make_item_us`, `makeitem_us`, `makeitem_material_item_us` | crafting (❓ sem as chances de sucesso) |
-| `monsterregen_us` | ❓ id composto, espécie, nome, nível, ?; **não tem mapa nem área**, então os spawns continuam em `Resources/Map/DigimonSpawns.xml` |
+| `monsterregen_us` | ✅ `CTableClass_RegenInfo` (grupo 19, `0x007b19b0`): id composto, espécie, nome completo, nível, ?, ?; o cliente usa o nome no hover do selvagem ([entidade sob o mouse](janelas.md#entidade-sob-o-mouse)); **não tem mapa nem área**, então os spawns continuam em `Resources/Map/DigimonSpawns.xml` |
 | `map_us`, `npc_info_us`, `npc_function_us`, `npcdialogwindow_us`, `questdialog_us` | mapas, NPCs, diálogos, texto de quest |
 | `pop-upwindow_us` | painéis de missão do canto inferior esquerdo (item → NPC, título, lugar) |
 

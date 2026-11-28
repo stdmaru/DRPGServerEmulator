@@ -1,6 +1,8 @@
 using DRPG.Server.Data.GameData;
 using DRPG.Server.Game.Entities;
+using DRPG.Server.Network.Packets;
 using DRPG.Server.Network.Packets.Map;
+using DRPG.Shared.Packets.Map;
 using Microsoft.Extensions.Logging;
 
 namespace DRPG.Server.Game.World;
@@ -52,7 +54,7 @@ public sealed class ZoneSystem : IWorldSystem
         player.LastMoveAt = _world.Now;
         if (changedMap) player.RequestImmediateSave();
         else player.MarkDirty();
-        player.Send(new TeleportCharacterPacket(mapId, x, y));
+        player.Send(TwoWayServerPacket.Of(new TeleportCharacterPacket(mapId, x, y)));
         return true;
     }
 

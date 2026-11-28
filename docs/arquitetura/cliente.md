@@ -34,6 +34,10 @@ Toda funcionalidade tem a mesma forma, em `Features/<Domínio>/`. Exemplo para o
 - Feature que precisa de outra lê o **estado** dela (ex.: a batalha lê `PartyState`). Nunca chama a janela de outra feature.
 - **Previsão local** (agir antes da resposta) só onde o original faz, com evidência. Exemplo: o movimento anda antes do `0x20` voltar. Cada previsão é documentada na página da feature.
 
+✅ **Primeira fatia: `Features/Field/`** (PR #51, [campo](../cliente/campo.md#código-no-cliente-novo)): `FieldState` (o mapa carregado, o tamer e o digimon, os NPCs de quest, a troca de mapa), `FieldHandlers` (`0x11`, `0x09`, `0xB0`), `FieldActions` (clique no chão e `0x20`, o único `Send` da feature) e `FieldView` (desenha o estado; o campo não tem janela). As peças sem regra de feature (entidade, colisão, A*, selvagens, NPCs, portais, desenho por tipo de entidade) ficam em `World/`, sem pacote e sem dependência opcional.
+
+**Entrega dos pacotes, até o gerador de registro existir** ([decisão de 2026-11-27](../projeto/decisoes.md)): o `MapDecoder` tipa o opcode; o `WorldSession` trata só os pacotes da sessão (`0x0E`, `0x02`, `0x03`, `0xC4`) e põe **todo outro pacote tipado** numa fila única (`TryReceive`); a cena esvazia a fila e entrega cada pacote ao `Handle(object)` do `<Domínio>Handlers`, que tem um `case` por pacote e um método tipado para cada. Pacote sem handler vai para o log. Nada de fila ou `TryReceiveX` por opcode.
+
 ## Threads e o frame
 - **Thread principal** dona de todo o estado, da UI e da GPU.
 - **Rede:** uma tarefa de recepção por conexão corta e faz o parse do pacote, e põe o pacote **já tipado** na fila da thread principal. Pacote inválido fecha a conexão e mostra a mensagem.
@@ -60,7 +64,7 @@ Handlers (`[PacketHandler]`) e janelas (`[Window]`) são achados por um **gerado
 
 ## Instalação original (drop-in)
 - O executável roda **na pasta da instalação oficial** e acha os arquivos pelo diretório dele (ou `--game-dir`). `GameInstall` valida a pasta na partida: falta de arquivo obrigatório para com mensagem clara.
-- Os arquivos do jogo são **somente leitura**: o cliente nunca grava em `resource.pf`, `table.pf` nem nos `.ini` do original. Opções novas ficam em arquivo próprio (`drpg-client.ini`).
+- Os arquivos do jogo são **somente leitura**: o cliente nunca grava em `resource.pf`, `table.pf` nem nos `.ini` do original, **salvo onde o original grava** (comportamento 1:1, decisão do dono de 2026-11-27): o `option.ini` ao fechar o jogo, com as mesmas chaves (`0x00b429f0`, [janelas](../cliente/janelas.md#opções-janela-0xf)). Opções novas ficam em arquivo próprio (`drpg-client.ini`).
 - Linha de comando compatível com o `DigimonRPG.bin` ([servidores](../protocolo/servidores.md)).
 
 ## Erros no cliente

@@ -162,6 +162,18 @@ public sealed class MapFormatTests
     }
 
     [Fact]
+    public void A_tile_frame_above_199_within_tileset_limit_is_kept()
+    {
+        var map = MapFile.Parse(Map(2, 1, [(-1, -1, 0, 200, 1), (-1, -1, 0, TileSetFile.MaxFrames - 1, 1)], ["a.til"], []));
+
+        Assert.Equal(0, map[0, 0].TileSet);
+        Assert.Equal(200, map[0, 0].TileFrame);
+        Assert.Equal(0, map[1, 0].TileSet);
+        Assert.Equal(TileSetFile.MaxFrames - 1, map[1, 0].TileFrame);
+        Assert.Equal(0, map.InvalidCellReferences);
+    }
+
+    [Fact]
     public void A_tile_frame_outside_the_tileset_clears_the_ground_of_the_cell()
     {
         var map = MapFile.Parse(Map(1, 1, [(-1, -1, 0, 0xBAADF00D, 1)], ["a.til"], []));

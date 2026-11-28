@@ -32,21 +32,6 @@ public sealed record SpriteOptions(bool Edge, bool Alpha, bool Shadow, bool Card
     public static SpriteOptions From(IReadOnlyDictionary<string, string> ini) => new(
         Flag(ini, "sprite.anti"), Flag(ini, "sprite.alpha"), Flag(ini, "sprite.shadow"), Flag(ini, "sprite.card"));
 
-    /// <summary>
-    /// ✅ <c>GetPrivateProfileInt</c>: a missing key is the default (1); a present one is its leading digits (none = 0). The options are
-    /// bytes, so only the low byte counts (256 is off).
-    /// </summary>
-    private static bool Flag(IReadOnlyDictionary<string, string> ini, string key)
-    {
-        if (!ini.TryGetValue(key, out var text))
-            return true;
-        int value = 0;
-        foreach (char c in text)
-        {
-            if (c is < '0' or > '9')
-                break;
-            value = unchecked(value * 10 + (c - '0'));
-        }
-        return (byte)value != 0;
-    }
+    /// <summary>✅ The options are bytes: only the low byte counts (256 is off).</summary>
+    private static bool Flag(IReadOnlyDictionary<string, string> ini, string key) => IniProfile.ReadByte(ini, key, 1) != 0;
 }

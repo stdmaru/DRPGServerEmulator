@@ -1,9 +1,15 @@
 using DRPG.Client.Data;
+using DRPG.Client.Features.Chat;
+using DRPG.Client.Features.Exit;
+using DRPG.Client.Features.Options;
+using DRPG.Client.Features.Field;
 using DRPG.Client.Net;
+using DRPG.Client.Startup;
 using DRPG.Client.Ui;
 using DRPG.Client.World;
 using DRPG.Engine.Platform;
 using DRPG.Engine.Rendering;
+using DRPG.Engine.Scenes;
 using DRPG.Shared.Formats.Map;
 using DRPG.Shared.Formats.Pack;
 using DRPG.Shared.Packets.Map;
@@ -12,19 +18,22 @@ namespace DRPG.Client.Scenes;
 
 /// <summary>
 /// <c>CSceneGame</c>, scene 5 (✅ v322 ctor <c>0x00b494f0</c>, init <c>0x00b4bab0</c>, frame <c>0x00b4e550</c>, field <c>0x00b4b550</c>;
-/// docs/cliente/cena-jogo.md): the map of the character's slot with the tamer and the leader digimon standing on it and the basic
-/// HUD. This step only enters the world: nothing moves and nothing reacts. First the loading screen of the original's loading thread
+/// docs/cliente/cena-jogo.md, docs/cliente/campo.md). It wires the field feature (<see cref="FieldState"/>, <see cref="FieldHandlers"/>,
+/// <see cref="FieldActions"/>, <see cref="FieldView"/>) to the frame. First the loading screen of the original's loading thread
 /// (<see cref="WorldLoading"/>): it sends the <c>0x01</c> when its first run ends, the map is loaded when the server's <c>0x02</c> and
-/// <c>0x03</c> are in, and the entry packets (<c>0x04</c>, <c>0xF0</c>, <c>0x121</c>, the global connection) go out when it ends. Then the
-/// logic runs in fixed steps, and the field is drawn: ground, the objects and the two characters sorted by y, the HUD. A lost connection shows the text <c>0xed0</c> in the middle of the screen until a click takes the player back to scene 2.
+/// <c>0x03</c> are in, and the entry packets (<c>0x04</c>, <c>0xF0</c>, <c>0x121</c>, the global connection) go out when it ends. Then,
+/// each frame: the map packets go to the handlers, a ground click to the actions, the logic runs in fixed steps, and the field and
+/// the HUD are drawn. An <c>0xB0</c> to another map opens the loading screen again. A lost connection shows the text <c>0xed0</c> in
+/// the middle of the screen until a click takes the player back to scene 2.
 /// </summary>
 public sealed class GameScene(GameContext game, Random random) : IScene
 {
     /// <summary>
     /// ✅ 30 logic steps a second. The main loop (<c>0x00aa4a90</c>) runs a frame only when the performance counter passes the due time,
     /// which goes forward by <c>frequency / 30</c> each frame (<c>0x00867ed0(0x1e)</c>, <c>0x00867eb0</c>, <c>0x00868020</c>): at most 30
-    /// frames a second. The field frame (<c>0x00b4e550</c>) runs one step per frame, plus catch-up steps when the measured frame rate
-    /// (<c>0x00867fb0</c>, once a second) falls under <c>DAT_0135af08 = 30</c>. Steps by the clock at 30 a second give the same pace.
+    /// frames a second. The field frame (<c>0x00b4e550</c>) runs exactly one step per frame: its catch-up adds
+    /// <c>DAT_0135af08 − 0x00867e40()</c>, and 0x00867e40 returns the measured rate or 30.0 under 30, so it never adds. Steps by the
+    /// clock at 30 a second give the same pace.
     /// </summary>
     public const int StepsPerSecond = 30;
 
@@ -35,44 +44,50 @@ public sealed class GameScene(GameContext game, Random random) : IScene
     public const int ConnectionLostText = 0xed0;
     private const int MessageCenterX = 400, MessageCenterY = 300;
 
-    /// <summary>✅ <c>0x008669e0</c>: the species whose sprite is drawn 32 px lower (<c>0x149</c>, <c>0x3e9</c>).</summary>
-    private static readonly HashSet<int> LowerSpecies = [0x149, 0x3e9];
+    /// <summary>✅ The 9-part box of the messages and the side tooltips (<c>0x007dcfb0</c>).</summary>
+    private const string BoxSprite = "gui\\dr2_in_000_003.spr";
 
-    private AnimatedSprites _animated = null!;                 // set in Init
+    private AnimatedSprites _sprites = null!;                  // set in Init
     private FieldHud _hud = null!;                             // set in Init
+    private WindowManager _windows = null!;                    // set in Init
+    private UiSprites _ui = null!;                             // set in Init
+    private Tooltips _tooltips = null!;                        // set in Init
+    private MiniMapWindow? _miniMap;
+    private readonly ChatLog _chat = new();
+    private ExitWindow _exit = null!;                          // set in Init
     private MessageBox _box = null!;                           // set in Init
     private LoadingScreen _screen = null!;                     // set in Init
     private WorldLoading _loading = null!;                     // set in Init
-    private FieldMap? _field;
-    private FieldAnimator? _tamerAnimation, _digimonAnimation;
-    private TamerDoll? _tamer;
-    private SpriteAnimator? _digimon;
-    private int _digimonSpecies;
-    private (int X, int Y) _tamerWorld;
-    private (int X, int Y) _digimonWorld;
-    private bool _hasDigimon;
+    private FieldView _view = null!;                           // set in Init
+    private EntityPlates _plates = null!;                      // set in Init
+    private FieldMap? _map;
+    private FieldState? _state;
+    private FieldActions? _actions;
+    private FieldHandlers? _handlers;
+    private CursorKind _cursor = CursorKind.Normal;
     private bool _aborted, _lost;
     private long _stepsRun;
     private ulong _startMs;
     private bool _started;
     private TimeSpan _clockOffset;
-    private readonly List<DrawItem> _queue = [];
     private readonly FrameStats _stats = new();
 
     public int FrameIntervalMs => 0;
 
-    internal bool WorldEntered => _field is not null;
+    internal bool WorldEntered => _map is not null;
     internal bool ConnectionLost => _lost;
-    internal FieldMap? Field => _field;
-    internal FieldAnimator? TamerAnimation => _tamerAnimation;
-    internal FieldAnimator? DigimonAnimation => _digimonAnimation;
-    internal (int X, int Y) TamerWorld => _tamerWorld;
-    internal (int X, int Y) DigimonWorld => _digimonWorld;
+    internal FieldMap? Field => _map;
+    internal FieldState? State => _state;
     internal FrameStats Stats => _stats;
     internal WorldLoading Loading => _loading;
 
     /// <summary>✅ The loading thread does not draw the cursor (no <c>0x00b3e3d0</c>).</summary>
     public bool ShowCursor => _aborted || !_loading.Showing;
+
+    /// <summary>✅ <c>0x00b4e550</c> + <c>0x00b3e3d0</c> case 10: <c>cursor_door.spr</c> over portal cells.</summary>
+    public CursorKind Cursor => _cursor;
+
+    private GameData Data => game.Data ?? throw new InvalidOperationException("the game scene runs after the loading screen");
 
     public void Init()
     {
@@ -83,16 +98,47 @@ public sealed class GameScene(GameContext game, Random random) : IScene
             game.Scenes.Switch(SceneId.Server);
             return;
         }
-        _animated = new AnimatedSprites(game.Resource, game.Sprites, game.Log);
-        _hud = new FieldHud(game);
+        _sprites = new AnimatedSprites(game.Resource, game.Sprites, game.Log);
+        _view = new FieldView(_sprites, game.SpriteOptions);
+        _windows = new WindowManager(game.Sounds);
+        _ui = new UiSprites(game);
+        _plates = new EntityPlates(_ui, game.Text, Data.MonsterRegen);
+        _tooltips = new Tooltips(_ui.Load(Tooltips.PanelSprite), new MessageBox(_ui.Load(BoxSprite), game.Text), game.Text);
+        _hud = new FieldHud(game, _ui, _windows, _tooltips);
+        RegisterWindows(game.World.Session);
         _box = new MessageBox(game.Sprites.Load("gui\\dr2_in_000_003.spr"), game.Text);
         _screen = new LoadingScreen(game);
         _loading = new WorldLoading(random, _screen.BackgroundCount);
-        // ✅ the scene's sound effects (0x00b4bab0) are not registered yet: nothing in this step plays one
+        GameSceneSounds.Register(game.Sounds);                         // ✅ 0x00b4bab0
     }
 
+    internal WindowManager Windows => _windows;
+
+    /// <summary>
+    /// The field's windows (✅ the original makes them all at start, <c>0x00b9a170</c>). Until the window registry generator exists
+    /// (docs/arquitetura/cliente.md), each one is one line here.
+    /// </summary>
+    private void RegisterWindows(WorldSession session)
+    {
+        _exit = new ExitWindow(_windows, new ExitActions(session), game.Text, game.Texts,
+            _ui.Load("gui\\dr2_sub_007_005.spr"), _ui.Gui("dr2_sub_007_001"));
+        _windows.Register(_exit);
+        _windows.Register(new OptionsWindow(game, _ui, _windows, _chat));
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00b4c080</c>, the scene's key: nothing while the exit window counts down (<c>+0x3eb0</c>). Escape in the field closes the
+    /// topmost window (<c>0x00b93030</c>) or, with none, opens the exit window (6) with the text <c>0xecc</c>. ❓ The window hotkeys
+    /// (<c>0x00b9a8d0</c>) wait for their windows.
+    /// </summary>
     public void Handle(InputEvent input)
     {
+        if (_aborted || _lost || _windows is null || _windows.Locked || input is not KeyEvent { Key: GameKey.Escape })
+            return;
+        if (_map is null || _loading.Showing)
+            return;
+        if (!_windows.CloseTopmost())
+            _windows.Open(WindowManager.ExitWindow);
     }
 
     public void Frame(IRenderer renderer, ulong nowMs)
@@ -112,20 +158,26 @@ public sealed class GameScene(GameContext game, Random random) : IScene
             AdvanceLoading(renderer, session, world, nowMs);
             if (!_lost && _loading.Showing)
             {
-                _screen.Draw(renderer, _loading.Background, _loading.GaugeFrame, _screen.TipOf(_loading.Tip));
+                DrawLoading(renderer);
                 return;
             }
         }
 
-        if (_field is not null && !_lost)
+        if (!_lost && _map is not null && _state is not null)
         {
-            RunLogic(nowMs);
-            DrawField(renderer, session);
+            RunField(session, nowMs);
+            if (_state.Transition.Phase == MapTransitionPhase.ReadyToLoad)
+            {
+                ChangeMap(renderer, world, _state, nowMs);
+                if (!_lost)
+                {
+                    DrawLoading(renderer);
+                    return;
+                }
+            }
         }
-        else if (_field is not null)
-        {
-            DrawField(renderer, session);
-        }
+        if (_map is not null && _state is not null)
+            DrawField(renderer, _map, _state, session, nowMs);
         if (_lost)
             DrawLost(renderer);
     }
@@ -140,7 +192,7 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         if (_loading.Phase == LoadingPhase.WaitingForData && session.Step == WorldStep.DataReady)
         {
             _loading.DataArrived();
-            if (!LoadWorld(renderer, session, world))
+            if (!EnterFirstMap(renderer, session, world))
                 return;
             _loading.MapLoaded();
         }
@@ -153,73 +205,130 @@ public sealed class GameScene(GameContext game, Random random) : IScene
             case LoadingAction.EnterWorld:
                 session.EnterWorld();
                 game.HasEnteredWorld = true;
-                _startMs = nowMs;
-                _started = true;
+                StartLogic(nowMs);
                 // ✅ no brightening: the 0x03 handler (0x00abbb20) sets +0x34c = 0x5f, and the first field frame (0x00b4e550) sees the
                 // marker, runs the entry logic (0x00aba410, quests: a later step) and sets it back to 0 at once. The darkening of
                 // 100..0x71 (0x00b55f10) belongs to coming back from a battle or an event (0x18395/0x18396), outside this milestone.
+                break;
+            case LoadingAction.MapTransitionDone:
+                _actions?.CompleteMapTransition();
+                StartLogic(nowMs);
                 break;
         }
     }
 
     /// <summary>
-    /// ✅ <c>0x00abbb20</c>: loads the map (<c>0x00ad3730</c> → <c>map\%s.map</c>), starts its music, puts the tamer and the digimon on their
-    /// cells (<c>0x0085e7b0</c>). The entry packets wait for the end of the loading screen (<see cref="AdvanceLoading"/>).
+    /// ✅ <c>0x00abbb20</c>: the first map of the entry, with the tamer and the digimon on the character's cell (<c>0x0085e7b0</c>);
+    /// the server clock (<c>0x00abbd50</c>). The entry packets wait for the end of the loading screen (<see cref="AdvanceLoading"/>).
     /// </summary>
-    private bool LoadWorld(IRenderer renderer, WorldSession session, WorldEntry world)
+    private bool EnterFirstMap(IRenderer renderer, WorldSession session, WorldEntry world)
     {
         var character = session.Character!;
-        var path = game.Data?.MapFile(world.MapId);
+        if (LoadArea(renderer, world.MapId) is not { } area)
+            return false;
+        // ✅ the server clock: the offset of the server's time from the local clock (0x00abbd50)
+        _clockOffset = DateTimeOffset.FromUnixTimeSeconds(character.ServerUnixTime) - DateTimeOffset.UtcNow;
+        var state = new FieldState(area, FieldParty.Of(character, _sprites, random), _sprites);
+        var actions = new FieldActions(session, state);
+        _state = state;
+        _actions = actions;
+        _handlers = new FieldHandlers(state, actions, Data.Npcs);
+        // ✅ the minimap is open when the field first shows (the capture); ❓ who opens it is not read
+        _miniMap = new MiniMapWindow(game, _ui, _tooltips, state, Data.Npcs, Data.MapPortals);
+        _windows.Register(_miniMap);
+        _windows.Open(MiniMapWindow.WindowId);
+        return true;
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00af0d70</c> → <c>0x00aba410</c>: the map change of an <c>0xB0</c>, once the warp effect ended. The music stops, the
+    /// loading screen opens, the new map loads (<see cref="LoadArea"/>) and the tamer and the digimon stand on the target cell. The
+    /// <c>0x04</c> and <c>0xB0</c> go out when the loading screen ends (<see cref="AdvanceLoading"/>).
+    /// </summary>
+    private void ChangeMap(IRenderer renderer, WorldEntry world, FieldState state, ulong nowMs)
+    {
+        var target = state.Transition.Target;
+        state.Transition.Complete();
+        state.Area.Wilds.Clear();
+        _started = false;
+        game.Sounds.StopMusic();
+        world.MapId = target.MapId;
+        _loading.BeginMapTransition(_screen.BackgroundCount);
+        _loading.Update(nowMs);
+        if (LoadArea(renderer, target.MapId) is not { } area)
+            return;
+        state.EnterArea(area, target.Cell);
+        _loading.MapLoaded();
+    }
+
+    /// <summary>
+    /// ✅ <c>0x00ad3730</c>: loads <c>map\%s.map</c> of <paramref name="mapId"/> and starts its music (no entry: silence). A map the
+    /// pack lacks or a broken file loses the connection with the original's log line.
+    /// </summary>
+    private FieldArea? LoadArea(IRenderer renderer, int mapId)
+    {
+        var path = Data.MapFile(mapId);
+        MapFile map;
         try
         {
             if (path is null || !game.Resource.Contains(path))
-                throw new MapFormatException($"map {world.MapId} has no file in the pack");
-            var map = MapFile.Parse(game.Resource.ReadEntry(path));
-            _field = new FieldMap(map, game.Resource, renderer, game.Log);
-            if (map.InvalidCellReferences > 0)
-                game.Log($"{path}: {map.InvalidCellReferences} cell references outside the lists were cleared");
+                throw new MapFormatException($"map {mapId} has no file in the pack");
+            map = MapFile.Parse(game.Resource.ReadEntry(path));
+            var field = new FieldMap(map, game.Resource, renderer, game.Log);
+            _map?.Dispose();
+            _map = field;
         }
         catch (Exception e) when (e is MapFormatException or PackFormatException or InvalidDataException or IOException)
         {
             game.Log($"LoadMap Error : {path}: {e.Message}");
-            Lose($"map {world.MapId}: {e.Message}");
-            return false;
+            Lose($"map {mapId}: {e.Message}");
+            return null;
         }
+        if (map.InvalidCellReferences > 0)
+            game.Log($"{path}: {map.InvalidCellReferences} cell references outside the lists were cleared");
 
-        // ✅ the BGM of the map load: the current one stops, the map's starts (no entry: silence)
-        if (MapBgm.FileOf(world.MapId) is { } music)
+        if (MapBgm.FileOf(mapId) is { } music)
             game.Sounds.PlayMusic(music);
         else
             game.Sounds.StopMusic();
-
-        // ✅ the server clock: the offset of the server's time from the local clock (0x00abbd50)
-        _clockOffset = DateTimeOffset.FromUnixTimeSeconds(character.ServerUnixTime) - DateTimeOffset.UtcNow;
-        PlaceCharacters(character);
-        return true;
+        return new FieldArea(mapId, map, Data.Npcs, _sprites, random);
     }
 
-    /// <summary>✅ <c>0x0085e7b0</c>: the centre of the cell, <c>cx · 64 + 32</c> and <c>cy · 32 + 16</c>; the digimon one cell up and to the left.</summary>
-    private void PlaceCharacters(CharacterDataPacket character)
+    /// <summary>
+    /// ✅ <c>0x00b4c1a0</c> / <c>0x00b4e550</c>: the map packets to the handlers; while no map change locks the field, a ground click
+    /// or hold to the actions and the throttled <c>0x20</c>; then the logic steps and the cursor.
+    /// </summary>
+    private void RunField(WorldSession session, ulong nowMs)
     {
-        _tamerWorld = CellCenter(character.X, character.Y);
-        _tamer = _animated.OpenTamer(character.TamerId);
-        if (_tamer is not null)
-            _tamerAnimation = new FieldAnimator(_tamer.Body, digimon: false, species: 0, random.Next(8));       // ✅ rand() % 8
+        while (session.TryReceive(out var packet))
+        {
+            if (packet is ExitAllowedPacket)
+                _exit.AllowExit();                                                 // ✅ 0xabe26d: window 6, 0x00b816e0(1)
+            else if (!_handlers!.Handle(packet))
+                game.Log($"map: {packet.GetType().Name} has no handler");
+        }
 
-        // ✅ 0x00abbd50: a tamer of 5, 6 or 7 has no digimon on the map
-        var leader = character.Party[0];
-        _hasDigimon = character.TamerId is not (5 or 6 or 7) && !leader.IsEmpty;
-        if (!_hasDigimon)
-            return;
-        _digimonSpecies = leader.SpeciesId;
-        _digimonWorld = CellCenter(character.X - 1, character.Y - 1);
-        _digimon = _animated.OpenDigimon(leader.SpeciesId);
-        if (_digimon is not null)
-            _digimonAnimation = new FieldAnimator(_digimon, digimon: true, leader.SpeciesId, random.Next(8));
+        if (!_state!.Transition.LocksInput && !_windows.Locked)
+        {
+            var mouse = game.Mouse;
+            if (!mouse.Down)
+                _actions!.ReleaseGround();
+            if ((mouse.Pressed || mouse.Down) && GroundCellUnderMouse() is { } cell)
+                _actions!.PressGround(cell);
+            _actions!.Update(nowMs);
+        }
+
+        RunLogic(nowMs);
+        _state.Hover(GroundCellUnderMouse());
+        UpdateCursor();
     }
 
-    internal static (int X, int Y) CellCenter(int cellX, int cellY) =>
-        (cellX * MapFile.CellWidth + MapFile.CellWidth / 2, cellY * MapFile.CellHeight + MapFile.CellHeight / 2);
+    private void StartLogic(ulong nowMs)
+    {
+        _startMs = nowMs;
+        _stepsRun = 0;
+        _started = true;
+    }
 
     /// <summary>✅ <c>0x00b4e550</c>: the logic in fixed steps from the real time, never more than <see cref="MaxStepsPerFrame"/> at once.</summary>
     private void RunLogic(ulong nowMs)
@@ -233,62 +342,46 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         _stepsRun = steps == MaxStepsPerFrame ? due : _stepsRun + Math.Max(0, steps);
     }
 
+    /// <summary>One logic step of the field (<see cref="FieldState.Step"/>) and of its portal swirls.</summary>
     internal void Step()
     {
-        _tamerAnimation?.Step();
-        _digimonAnimation?.Step(random.Next(4));                       // ✅ 1 in 4 for the animation 3
+        _state!.Step();
+        _view.Step();
     }
 
-    /// <summary>✅ <c>0x00b4b550</c>: the camera on the tamer, the ground, then the queue with the objects, the digimon and the tamer, then the HUD.</summary>
-    private void DrawField(IRenderer renderer, WorldSession session)
+    /// <summary>✅ <c>0x00b4e550</c> lines 604-606: <see cref="CursorKind.Portal"/> while the mouse is over a portal cell.</summary>
+    private void UpdateCursor() =>
+        _cursor = GroundCellUnderMouse() is { } cell && FieldView.IsPortal(_state!, cell) ? CursorKind.Portal : CursorKind.Normal;
+
+    /// <summary>✅ <c>0x00b91ec0</c>: the map cell under the mouse, or null when the mouse is off the frame, over the HUD or off the map.</summary>
+    private Cell? GroundCellUnderMouse()
     {
-        var field = _field!;
-        var (cameraX, cameraY) = field.Camera(_tamerWorld.X, _tamerWorld.Y);
-        field.DrawGround(renderer, cameraX, cameraY);
+        var mouse = game.Mouse;
+        if (mouse.X < 0 || mouse.Y < 0 || mouse.X >= IRenderer.FrameWidth || mouse.Y >= IRenderer.FrameHeight || _hud.Covers(mouse.X, mouse.Y)
+            || _windows.Covers(mouse.X, mouse.Y))
+            return null;
+        return FieldView.CellAt(_map!, _state!, mouse.X, mouse.Y);
+    }
 
-        _queue.Clear();
-        field.QueueObjects(_queue, cameraX, cameraY, SpriteEffects.ObjectLookOf(game.World!.MapId, game.SpriteOptions));
-        if (_digimon?.Texture is { } frame && _hasDigimon)
-        {
-            var (anchorX, anchorY) = _digimon.Anchor;               // ✅ the digimon is drawn by the anchor of the .ani
-            int x = _digimonWorld.X - cameraX, y = _digimonWorld.Y - cameraY;
-            int lower = LowerSpecies.Contains(_digimonSpecies) ? 32 : 0;
-            var digimon = _digimon;
-            int mapId = game.World!.MapId;
-            _queue.Add(new DrawItem(y, frame, x - anchorX, y - anchorY + lower, (r, drawX, drawY) => DrawDigimon(r, digimon, mapId, drawX, drawY)));
-        }
-        if (_tamer is not null)
-        {
-            // ✅ the paper doll of the character selection, by the top-left corner at (x − 120, y − 162), no anchor
-            int x = _tamerWorld.X - cameraX, y = _tamerWorld.Y - cameraY;
-            var tamer = _tamer;
-            bool mapHasShadow = SpriteEffects.TamerHasShadow(game.World!.MapId);
-            _queue.Add(new DrawItem(y, null, x - 120, y - 162, (r, drawX, drawY) => tamer.Draw(r, drawX, drawY, game.SpriteOptions, mapHasShadow)));
-        }
-        FieldMap.Sort(_queue);
-        FieldMap.DrawQueue(renderer, _queue);
-
+    /// <summary>✅ <c>0x00b4b550</c>: the field (<see cref="FieldView"/>), then the HUD (the bar) and the windows (<c>0x00b9a7c0</c>).</summary>
+    private void DrawField(IRenderer renderer, FieldMap map, FieldState state, WorldSession session, ulong nowMs)
+    {
+        _view.Draw(renderer, map, state, game.SpriteOptions);
         var character = session.Character!;
+        var (cameraX, cameraY) = map.Camera(state.Party.Tamer.WorldX, state.Party.Tamer.WorldY);
+        _plates.Draw(renderer, state, character, cameraX, cameraY, game.SpriteOptions, game.Options.Language);
         var leader = character.Party[0];
-        _hud.Draw(renderer, new HudValues(
-            character.Name, character.TamerId, character.TamerClass, character.Level, game.ChannelName, game.World!.MapId, game.Data?.MapName(game.World.MapId) ?? "",
-            character.X, character.Y, leader.IsEmpty ? null : leader, DateTime.UtcNow + _clockOffset));
+        var tamer = state.Party.Tamer.Cell;
+        _hud.Frame(renderer, new HudValues(
+            character.Name, character.TamerId, character.TamerClass, character.Level, game.ChannelName, state.Area.MapId, Data.MapName(state.Area.MapId),
+            tamer.X, tamer.Y, leader.IsEmpty ? null : leader, DateTime.UtcNow + _clockOffset, _miniMap is { ShowsMap: true, Collapsed: false }), game.Mouse);
+        _windows.Frame(renderer, game.Mouse, nowMs);
+        if (_exit.LeaveRequested)
+            LeaveWorld();
     }
 
-    /// <summary>
-    /// ✅ <c>0x007e83d0</c>: with the <c>shadow</c> option the frame's shadow layer, then with the <c>anti</c> option (outside the animations
-    /// 9/10) its edge layer, both blended at the same corner as the sprite (<see cref="SpriteEffects"/>), then the sprite.
-    /// </summary>
-    private void DrawDigimon(IRenderer renderer, SpriteAnimator digimon, int mapId, int x, int y)
-    {
-        var options = game.SpriteOptions;
-        if (options.Shadow && digimon.ShadowTexture is { } shadow)
-            options.DrawBlended(renderer, shadow, x, y, SpriteEffects.DigimonShadowAlpha(mapId));
-        if (options.Edge && SpriteEffects.DigimonHasEdge(digimon.Animation) && digimon.EdgeTexture is { } edge)
-            options.DrawBlended(renderer, edge, x, y, SpriteEffects.DigimonEdgeAlpha(mapId));
-        if (digimon.Texture is { } frame)
-            renderer.Draw(frame, x, y);
-    }
+    private void DrawLoading(IRenderer renderer) =>
+        _screen.Draw(renderer, _loading.Background, _loading.GaugeFrame, _screen.TipOf(_loading.Tip));
 
     private void Lose(string reason)
     {
@@ -297,24 +390,37 @@ public sealed class GameScene(GameContext game, Random random) : IScene
         game.Sounds.StopMusic();
     }
 
+    /// <summary>
+    /// ✅ The end of the exit window's count: <c>0x00ad0ae0</c> leaves the world and <c>0x00ad0bd0</c> sets <c>+0x7a4</c>, so the next
+    /// frame (<c>0x00b4e550</c>) stops the music, closes the connections and switches to scene 2.
+    /// </summary>
+    private void LeaveWorld()
+    {
+        game.Sounds.StopMusic();
+        ReturnToServerScene();
+    }
+
+    private void ReturnToServerScene()
+    {
+        game.World?.Dispose();
+        game.World = null;
+        game.Account?.Reset();
+        game.Scenes.Switch(SceneId.Server);
+        _aborted = true;
+    }
+
     /// <summary>✅ <c>0x00b4e550</c> step 2: the text of a lost connection in the middle of the screen; ❓ the original's way out is not read, a click goes back to scene 2.</summary>
     private void DrawLost(IRenderer renderer)
     {
         _box.Draw(renderer, game.Texts[ConnectionLostText], MessageCenterX, MessageCenterY);
         if (game.Mouse.Pressed)
-        {
-            game.World?.Dispose();
-            game.World = null;
-            game.Account?.Reset();
-            game.Scenes.Switch(SceneId.Server);
-            _aborted = true;
-        }
+            ReturnToServerScene();
     }
 
     public void Dispose()
     {
         if (_stats.Count > 0)
             game.Log($"game scene: {_stats}");
-        _field?.Dispose();
+        _map?.Dispose();
     }
 }

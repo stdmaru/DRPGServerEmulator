@@ -108,9 +108,9 @@ public sealed class FieldHudButtonsTests
     {
         using var fixture = new SceneFixture();
         fixture.Game.ChannelLine = 0;
-        var hud = new FieldHud(fixture.Game);
+        var hud = fixture.Hud();
 
-        hud.Draw(fixture.Renderer, Values());
+        hud.Frame(fixture.Renderer, Values(), fixture.Game.Mouse);
 
         var reward = Assert.Single(fixture.Renderer.Draws, d => d.Texture.Width == 57 && d.Texture.Height == 20);
         Assert.Equal((451, 462), (reward.X, reward.Y));
@@ -123,9 +123,9 @@ public sealed class FieldHudButtonsTests
     {
         using var fixture = new SceneFixture();
         fixture.Game.ChannelLine = line;
-        var hud = new FieldHud(fixture.Game);
+        var hud = fixture.Hud();
 
-        hud.Draw(fixture.Renderer, Values());
+        hud.Frame(fixture.Renderer, Values(), fixture.Game.Mouse);
 
         Assert.DoesNotContain(fixture.Renderer.Draws, d => d.Texture.Width == 57 && d.Texture.Height == 20);
     }
@@ -140,7 +140,7 @@ public sealed class FieldHudBlendTests
     {
         using var fixture = new SceneFixture();
         fixture.Game.SpriteOptions = options;
-        new FieldHud(fixture.Game).Draw(fixture.Renderer, Values());
+        fixture.Hud().Frame(fixture.Renderer, Values(), fixture.Game.Mouse);
         var bar = fixture.Renderer.Draws.Where(d => d.Texture.Width == 800 && d.Texture.Height == 105).ToList();
         return (bar, Assert.Single(fixture.Renderer.Draws, d => d.Texture.Width == 409));
     }
@@ -171,7 +171,7 @@ public sealed class FieldHudBlendTests
     public void The_tamer_portrait_is_frame_1_of_its_icon()
     {
         using var fixture = new SceneFixture();
-        new FieldHud(fixture.Game).Draw(fixture.Renderer, Values(tamerId: 1));
+        fixture.Hud().Frame(fixture.Renderer, Values(tamerId: 1), fixture.Game.Mouse);
 
         var portrait = Assert.Single(fixture.Renderer.Draws, d => d.Texture.Width == 41);
         Assert.Equal((2, 2), (portrait.X, portrait.Y));
@@ -181,7 +181,7 @@ public sealed class FieldHudBlendTests
     public void A_tamer_without_an_icon_gets_icon_065()
     {
         using var fixture = new SceneFixture();
-        new FieldHud(fixture.Game).Draw(fixture.Renderer, Values(tamerId: 4));
+        fixture.Hud().Frame(fixture.Renderer, Values(tamerId: 4), fixture.Game.Mouse);
 
         Assert.Contains(fixture.Renderer.Draws, d => d.Texture.Width == 65 && (d.X, d.Y) == (2, 2));
     }
@@ -194,7 +194,7 @@ public sealed class FieldHudBlendTests
     public void An_id_outside_the_table_has_no_portrait(int tamerId)
     {
         using var fixture = new SceneFixture();
-        new FieldHud(fixture.Game).Draw(fixture.Renderer, Values(tamerId));
+        fixture.Hud().Frame(fixture.Renderer, Values(tamerId), fixture.Game.Mouse);
 
         Assert.DoesNotContain(fixture.Renderer.Draws, d => (d.X, d.Y) == (2, 2) && d.Texture.Width is 41 or 65);
     }
@@ -205,8 +205,8 @@ public sealed class FieldHudClassIconTests
     private static List<FakeRenderer.DrawCall> ClassIcons(int tamerClass)
     {
         using var fixture = new SceneFixture();
-        new FieldHud(fixture.Game).Draw(fixture.Renderer,
-            new HudValues("Marcus", 1, tamerClass, 5, "Net Ocean", 1, "Plains", 5, 6, null, new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc)));
+        fixture.Hud().Frame(fixture.Renderer,
+            new HudValues("Marcus", 1, tamerClass, 5, "Net Ocean", 1, "Plains", 5, 6, null, new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc)), fixture.Game.Mouse);
         return fixture.Renderer.Draws.Where(d => (d.Texture.Width, d.Texture.Height) == (14, 16)).ToList();
     }
 
@@ -234,8 +234,8 @@ public sealed class FieldHudChatTests
     private static List<FakeRenderer.DrawCall> Draws()
     {
         using var fixture = new SceneFixture();
-        new FieldHud(fixture.Game).Draw(fixture.Renderer,
-            new HudValues("Marcus", 1, 1, 5, "Net Ocean", 1, "Plains", 5, 6, null, new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc)));
+        fixture.Hud().Frame(fixture.Renderer,
+            new HudValues("Marcus", 1, 1, 5, "Net Ocean", 1, "Plains", 5, 6, null, new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc)), fixture.Game.Mouse);
         return fixture.Renderer.Draws;
     }
 
@@ -248,12 +248,13 @@ public sealed class FieldHudChatTests
     }
 
     [Fact]
-    public void The_chat_size_buttons_are_frames_2_0_1_side_by_side_last_of_the_bar()
+    public void The_chat_size_buttons_sit_min_normal_max_side_by_side_last_of_the_bar()
     {
         var draws = Draws();
         var sizes = draws.Where(d => (d.Texture.Width, d.Texture.Height) == (13, 13)).ToList();
 
-        Assert.Equal([(398, 549), (413, 549), (428, 549)], sizes.Select(d => (d.X, d.Y)));
+        // ✅ 0x00b8e4bf: frames 0, 1, 2 at the normal, max and min buttons, which sit at 413, 428 and 398
+        Assert.Equal([(413, 549), (428, 549), (398, 549)], sizes.Select(d => (d.X, d.Y)));
         Assert.Equal(sizes, draws.TakeLast(3));
     }
 }

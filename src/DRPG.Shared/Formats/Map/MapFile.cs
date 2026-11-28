@@ -52,7 +52,7 @@ public sealed class MapFile
     public const int MaxSide = 2048;
 
     private const int HeaderBytes = 16;
-    private const int MaxFrame = 199;
+    private const int MaxFrame = TileSetFile.MaxFrames - 1;
 
     private readonly MapCell[] _cells;
 

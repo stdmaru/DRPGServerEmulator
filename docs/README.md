@@ -67,6 +67,8 @@ Documentação do emulador e da preservação do jogo. Ela está dividida em pá
 - [Formato `.spr`](cliente/formato-spr.md): sprites em RGB565 codificados por linha, sombra opcional.
 - [Tela de login do launcher](cliente/tela-login-launcher.md): sprites antigos, medidas do painel e layout escolhido.
 - [Cenas do cliente](cliente/cenas.md): sequência até a seleção de personagens (marco 2): carga, seleção de mundo, seleção de personagens, GUI, texto e som. Inclui o que a fase C implementou e o que ficou ❓.
+- [Campo](cliente/campo.md): andar, selvagens (`0x11`, fila de comandos), entidades e UI do campo (marco 3, passo 2; RE em andamento).
+- [Janelas do campo](cliente/janelas.md): botões, dicas, gerenciador de janelas, saída (ESC), opções, minimapa e chat (PR #51).
 - [Cena de jogo](cliente/cena-jogo.md): entrada no mapa (marco 3): "Game Start", conexão no servidor de mapa, sequência de pacotes, `CSceneGame` (init, quadro, campo), UI básica e a [implementação no cliente novo](cliente/cena-jogo.md#implementação-no-cliente-novo-marco-3-fase-c).
 - [Carga inicial](cliente/carga-inicial.md): passos da tela de carga e alvo da barra (39/70/90/99/101), as 39 tabelas, listas de pré-carga.
 - [Formato `.ani`](cliente/formato-ani.md): `DCANIMATION0.5`, âncoras por quadro, 20 animações × 8 direções.
