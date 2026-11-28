@@ -72,12 +72,17 @@ public sealed class FieldState
     /// <summary>✅ <c>0x00acb072</c>: an <c>0xB0</c> on the same map: the tamer and the partner are placed on <paramref name="cell"/>.</summary>
     public void PlaceParty(Cell cell) => Party.PlaceAt(cell, Area.Collision);
 
-    /// <summary>✅ <c>0x00afdba0</c> + <c>0x00afe1c0</c>: one logic step: the party, the wilds and the NPCs move, then the map change goes on.</summary>
+    /// <summary>
+    /// ✅ <c>0x00afdba0</c> + <c>0x00afe1c0</c>: one logic step: first the world's lists (the wilds of <c>+0x2f8</c>, the NPCs of
+    /// <c>+0x300</c>), then the local player (<c>0x00afe1c0</c> → <c>0x008671c0</c>, tamer and partner), then the map change. ✅ The order
+    /// matters on the occupancy grid: a wild leaving the cell the tamer steps onto frees both its cells before the tamer takes them;
+    /// the other way round its upper cell kept its serial (<c>0x00b365c0</c> only clears it when it matches the lower one).
+    /// </summary>
     public void Step()
     {
-        Party.Step(Area.Collision, Area.Pathfinder);
         Area.Wilds.Step(Party.Tamer);
         Area.Npcs.Step();
+        Party.Step(Area.Collision, Area.Pathfinder);
         Transition.Step(Party.Tamer, Warp);
     }
 }

@@ -20,6 +20,7 @@ Cada passo chama, nesta ordem:
    - para cada entidade das listas **`+0x2f0`** (❓ outros jogadores) e **`+0x2f8`** (selvagens): se `0x0085e760(célula do tamer, 10, 12)` der falso, ou seja, `|dx| > 10` ou `|dy| > 12` do tamer, ela é **removida** (`0x00a24460`, vtable `+0x44`, destrutor `+0`); senão roda a **atualização** (vtable `+0x24`);
    - os NPCs (lista **`+0x300`**) também recebem `+0x24`.
    - O servidor manda o `0x11` até 12 × 23 células, mas o cliente só mantém o que está a até **10 × 12** células.
+   - ✅ **Ordem e grade de ocupação**: as listas do mundo passam **antes** do jogador local (`0x00afe1c0` → `0x008671c0`). Todos (tamer local, líder, selvagens: `+4 = 1`) usam a mesma grade (`0x0085e940`, `DAT_011584f8`). Um selvagem que sai da célula em que o tamer entra libera as suas duas células antes que o tamer as ocupe. Com o grupo antes (como estava o cliente novo), a de cima ficava com o serial do selvagem (`0x00b365c0` só a limpa quando ela tem o mesmo serial da de baixo) e o hover achava um selvagem distante. Um selvagem que sai enquanto o líder está parado sobre o pé dele ainda deixa a de cima, como no original.
 2. ✅ **`0x00afe1c0`**: vtable `+0x34` no tamer (`DAT_011584f0`), nas listas `+0x2f0` e `+0x2f8`, em três árvores (❓ campos `+0x14` das entradas) e na `+0x300`.
 3. ✅ **`0x00a49b10`** (`DAT_01158534`): ❓ não lido.
 

@@ -1,6 +1,7 @@
 using DRPG.Client.Features.Field;
 using DRPG.Client.World;
 using DRPG.Shared.Packets.Map;
+using DRPG.Shared.Protocol;
 
 namespace DRPG.Client.Tests;
 
@@ -116,5 +117,48 @@ public sealed class FieldHoverTests
         Assert.Equal(default, field.State.Hovered);
         field.State.Hover(null);                                               // the mouse is on the HUD or a window
         Assert.Equal(default, field.State.Hovered);
+    }
+}
+
+public sealed class FieldOccupancyOrderTests
+{
+    /// <summary>
+    /// ✅ <c>0x00afdba0</c> before <c>0x00afe1c0</c>: the wilds step before the player, so a wild leaving the cell the tamer steps
+    /// onto frees its upper cell too. With the party first this run left the wild's serial on (12, 5) at round 344, and the hover found
+    /// that wild when pointing above the partner's head. ✅ A wild leaving while the partner stands on its lower cell still leaves its
+    /// upper cell, as in the original (same <c>0x00b365c0</c>, same order): longer runs can show it.
+    /// </summary>
+    [Fact]
+    public void A_wild_leaving_the_cell_the_tamer_steps_onto_frees_its_upper_cell()
+    {
+        const int seed = 1, rounds = 400;
+        var wild = new Serial(9, 9);
+        using var field = new FieldFixture(FieldFixture.Open(30, 30), new Cell(2, 10), character: c =>
+        {
+            var party = c.Party.ToArray();
+            party[0] = DigimonStatus.Empty with { Uid = 1, Serial = new Serial(7, 7), SpeciesId = 14, Name = "A", Level = 1 };
+            return c with { TamerId = 1, Party = party };
+        });
+        var random = new Random(seed);
+        int x = 10, y = 10;
+        field.Handlers.Handle(new FieldDigimonPacket(wild, "W", 14, 2, 3, 2, 1, 0, (short)x, (short)y, (short)x, (short)y));
+        for (int round = 0; round < rounds; round++)
+        {
+            if (!field.Tamer.IsMoving)
+                field.State.TryWalkTo(new Cell(random.Next(5, 16), random.Next(5, 16)));
+            if (round % 10 == 0)
+            {
+                int nx = Math.Clamp(x + random.Next(-3, 4), 5, 15), ny = Math.Clamp(y + random.Next(-3, 4), 5, 15);
+                field.Handlers.Handle(new FieldDigimonPacket(wild, "W", 14, 2, 3, 2, 4, 0, (short)x, (short)y, (short)nx, (short)ny));
+                (x, y) = (nx, ny);
+            }
+            for (int step = 0; step < 10; step++)
+                field.State.Step();
+            var at = field.Wilds.Find(wild)!.Entity.Cell;
+            for (int cy = 0; cy < 30; cy++)
+                for (int cx = 0; cx < 30; cx++)
+                    if (field.Collision.OccupantAt(cx, cy) == wild)
+                        Assert.True(cx == at.X && (cy == at.Y || cy == at.Y - 1), $"round {round}: wild left on ({cx}, {cy}), it is on {at}");
+        }
     }
 }
